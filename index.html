@@ -76,7 +76,22 @@ nav button{font-size:10.5px}
   <button data-t="contas" onclick="go('contas')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Contas</button>
   <button data-t="relatorios" onclick="go('relatorios')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M8 14v4M13 9v9M18 12v6"/></svg>Relatório</button>
 </nav>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
+/* ===== NUVEM (multiusuário) — cole a config do Firebase + e-mails pra ativar a sincronização ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyB1XzbOlufxe8nKhV0Qr7LUUqmjId2rFbo",
+  authDomain: "controle-tcg.firebaseapp.com",
+  projectId: "controle-tcg",
+  storageBucket: "controle-tcg.firebasestorage.app",
+  messagingSenderId: "1055834697410",
+  appId: "1:1055834697410:web:8360e6fae238a2de37155b"
+};
+const EMAILS_OK = ['felypexykawa@gmail.com','pokecentertcgoficial@gmail.com']; /* Felype + operação (Laura). Adicionar mais e-mails aqui quando quiser. */
+const USAR_NUVEM = !!(firebaseConfig && firebaseConfig.apiKey);
+let _db=null,_auth=null,_syncReady=false,_userEmail='';
 const MK='tcg_movs_v2';
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
 const SEED=[];
@@ -97,8 +112,8 @@ if(!colsJ){colsJ={};jogos.forEach(j=>colsJ[j]=[]);movs.forEach(m=>{const j=m.jog
 const fmt=n=>'R$ '+(Math.round(n*100)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=n=>(n>=0?'+':'')+Math.round(n*100)+'%';
 const dBR=d=>d.toLocaleDateString('pt-BR');
-const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();};
-const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStorage.setItem('tcg_cols',JSON.stringify(cols));localStorage.setItem('tcg_pess',JSON.stringify(pess));localStorage.setItem('tcg_pgs',JSON.stringify(pgs));localStorage.setItem('tcg_jogos',JSON.stringify(jogos));localStorage.setItem('tcg_despcats',JSON.stringify(despCats));localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));};
+const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStorage.setItem('tcg_cols',JSON.stringify(cols));localStorage.setItem('tcg_pess',JSON.stringify(pess));localStorage.setItem('tcg_pgs',JSON.stringify(pgs));localStorage.setItem('tcg_jogos',JSON.stringify(jogos));localStorage.setItem('tcg_despcats',JSON.stringify(despCats));localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 
@@ -625,8 +640,19 @@ function excluir(id){const m=movs.find(x=>x.id===id);
 function marcarPago(id){const m=movs.find(x=>x.id===id);if(m){m.status='pago';save();render();}}
 function toggleExp(id){expandId=expandId===id?null:id;render();}
 function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;const ORD=['Em estoque','Vendido','Coleção'];const px=ORD[(ORD.indexOf(sitDe(m))+1)%3];m.situacao=px;m.destino=px==='Coleção'?'Coleção':'Vender';save();toast('Agora: '+px);render();}
-if(!localStorage.getItem('tcg_seed_v1')&&Array.isArray(SEED)&&SEED.length){movs=SEED.map(m=>({...m}));save();localStorage.setItem('tcg_seed_v1','1');}
-render();
+function salvarNuvem(){if(!_db||!_syncReady)return;_db.collection('controle').doc('dados').set({movs,jogos,cats,cols,colsJ,pess,pgs,despCats,cadastros,_upd:Date.now(),_by:_userEmail}).catch(e=>console.warn('nuvem:',e&&e.message));}
+function aplicarNuvem(d){if(!d)return;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;localStorage.setItem(MK,JSON.stringify(movs));render();}
+function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
+function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
+function telaLogin(msg){const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Controle TCG</div><div class="ctx">Entre pra acessar seu controle sincronizado em qualquer aparelho.</div>${msg?`<div class="soon" style="color:var(--red);justify-content:center">${msg}</div>`:''}<button class="btn" style="margin-top:16px" onclick="loginGoogle()">Entrar com Google</button></div>`;document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');const bv=document.getElementById('btnVoltar');if(bv)bv.style.display='none';}
+function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth=firebase.auth();_db=firebase.firestore();telaLogin('');
+  _auth.onAuthStateChanged(u=>{
+    if(u&&EMAILS_OK.map(x=>(x||'').toLowerCase()).includes((u.email||'').toLowerCase())){_userEmail=u.email;
+      _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');go('painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
+    }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
+    else{_syncReady=false;telaLogin('');}});}
+if(USAR_NUVEM){bootNuvem();}
+else{if(!localStorage.getItem('tcg_seed_v1')&&Array.isArray(SEED)&&SEED.length){movs=SEED.map(m=>({...m}));save();localStorage.setItem('tcg_seed_v1','1');}render();}
 </script>
 </body>
 </html>
