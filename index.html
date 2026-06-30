@@ -157,7 +157,7 @@ function voltar(){const s=navHist.pop();if(!s)return;tela=s.tela;consF=s.consF;c
 function render(){const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
 function vPainel(){
-  if(movs.length===0)return `<div class="card"><div class="empty">Sem lançamentos ainda.<br>Comece lançando — ou puxe seu histórico real:</div><div class="btn" style="margin-top:6px" onclick="carregarAcervo()">📥 Carregar minhas compras e vendas</div></div>`;
+  if(movs.length===0)return `<div class="card"><div class="empty">Sem lançamentos ainda.<br>Comece lançando — ou <b>traga seus dados de um backup</b>:</div><div class="btn" style="margin-top:8px" onclick="importarBackup()">⬆ Importar backup (.json)</div>${USAR_NUVEM?'':`<div class="btn g" style="margin-top:6px" onclick="carregarAcervo()">📥 Carregar histórico de exemplo</div>`}</div>`;
   const r=motor();const per=perDe||perAte;
   const ap=aPagar(),ar=aReceber();const apT=ap.reduce((s,x)=>s+x.valor,0),arT=ar.reduce((s,x)=>s+x.valor,0);
   const hm=new Date().getMonth(),hy=new Date().getFullYear();
