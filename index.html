@@ -105,6 +105,8 @@ let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>localStorage.setItem('
 let tela='simular',tipoSel='COMPRA',editId=null,perDe='',perAte='',perSel='tudo',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',sit:'Em estoque',data:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
+let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='';
+let vendaUn='un',consUn='un',trocaUn='un';
 let trocaDei=[],trocaRecebi=[],trocaDin=0,deiModo='estoque';
 const CATB={'ETB':9,'Booster Box':36,'Box da Coleção':10,'Mini BB':6,'Quad':4,'Triple':3,'Sleeved':1,'Blister':1,'Case':0,'Single/Carta':0,'Outro':0};
 movs.forEach(m=>{if(m.cat&&!cats.includes(m.cat))cats.push(m.cat);if(m.colecao&&!cols.includes(m.colecao))cols.push(m.colecao);if(m.contraparte&&!pess.includes(m.contraparte))pess.push(m.contraparte);});
@@ -117,10 +119,38 @@ const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStor
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 function baixarLote(loteId,qtdBaixa,novaSit,extras){const lote=movs.find(m=>m.id===loteId);if(!lote)return null;const qtd=+lote.qtd||1,vUnit=(+lote.valor||0)/qtd;qtdBaixa=Math.max(1,Math.min(qtdBaixa,qtd));const destDe=s=>s==='Coleção'?'Coleção':(s==='Vendido'||s==='Trocado'?'Vender':lote.destino);
+  if(!lote.destIni)lote.destIni=(sitDe(lote)==='Coleção'?'Coleção':'Em estoque');
   if(qtdBaixa>=qtd){lote.situacao=novaSit;lote.destino=destDe(novaSit);if(extras)Object.assign(lote,extras);return lote;}
   lote.qtd=qtd-qtdBaixa;lote.valor=Math.round((qtd-qtdBaixa)*vUnit*100)/100;
   const ped=Object.assign({},lote,{id:'m'+Date.now()+Math.floor(Math.random()*1e4),qtd:qtdBaixa,valor:Math.round(qtdBaixa*vUnit*100)/100,situacao:novaSit,destino:destDe(novaSit),loteOrigem:loteId});if(extras)Object.assign(ped,extras);movs.push(ped);return ped;}
+function baixarBoosters(loteId,nBoo,novaSit,extras){const lote=movs.find(m=>m.id===loteId);if(!lote)return null;
+  const qtd=+lote.qtd||1,bpu=Math.max(1,+lote.boosters||1),tot=qtd*bpu,vLote=+lote.valor||0,vb=vLote/tot;
+  nBoo=Math.max(1,Math.min(nBoo,tot));
+  if(!lote.destIni)lote.destIni=(sitDe(lote)==='Coleção'?'Coleção':'Em estoque');
+  const destDe=s=>s==='Coleção'?'Coleção':(s==='Vendido'||s==='Trocado'?'Vender':lote.destino);
+  if(nBoo>=tot){lote.situacao=novaSit;lote.destino=destDe(novaSit);if(extras)Object.assign(lote,extras);return lote;}
+  const rem=tot-nBoo,remCx=Math.floor(rem/bpu),remBoo=rem%bpu,vPed=Math.round(nBoo*vb*100)/100;
+  const ped=Object.assign({},lote,{id:'m'+Date.now()+Math.floor(Math.random()*1e4),qtd:nBoo,valor:vPed,cat:'Booster',boosters:1,vUnit:Math.round(vb*100)/100,situacao:novaSit,destino:destDe(novaSit),loteOrigem:loteId});
+  if(extras)Object.assign(ped,extras);
+  if(remCx===0){lote.qtd=remBoo;lote.valor=Math.round((vLote-vPed)*100)/100;lote.cat='Booster';lote.boosters=1;lote.vUnit=Math.round(vb*100)/100;lote.obs=(lote.obs?lote.obs+' · ':'')+'aberto em boosters';}
+  else{lote.qtd=remCx;
+    if(remBoo>0){const vSol=Math.round(remBoo*vb*100)/100;
+      const solto=Object.assign({},lote,{id:'m'+Date.now()+Math.floor(Math.random()*1e4)+1,qtd:remBoo,valor:vSol,cat:'Booster',boosters:1,vUnit:Math.round(vb*100)/100,loteOrigem:loteId,obs:(lote.obs?lote.obs+' · ':'')+'aberto de '+(lote.cat||'caixa')});
+      movs.push(solto);lote.valor=Math.round((vLote-vPed-vSol)*100)/100;}
+    else lote.valor=Math.round((vLote-vPed)*100)/100;}
+  movs.push(ped);return ped;}
 
+function unHintGen(selId,rowId,togId,hintId,un){const sel=document.getElementById(selId),row=document.getElementById(rowId);if(!sel||!row)return;const it=movs.find(m=>m.id===sel.value);const bpu=it?Math.max(1,+it.boosters||1):1;
+  if(bpu<=1){row.style.display='none';return;}
+  row.style.display='block';const q=+it.qtd||1;
+  const h=document.getElementById(hintId);if(h)h.textContent=un==='boo'?('disponível: '+q+' un × '+bpu+' = '+(q*bpu)+' boosters'):('disponível: '+q+' un ('+bpu+' boosters cada)');
+  document.querySelectorAll('#'+togId+' .o').forEach(o=>o.classList.toggle('on',o.dataset.v===un));}
+function vendaUnHint(){unHintGen('f_origem','vunrow','vuntog','vunhint',vendaUn);}
+function setVendaUn(v){vendaUn=v;vendaUnHint();}
+function consUnHint(){unHintGen('f_item','cunrow','cuntog','cunhint',consUn);}
+function setConsUn(v){consUn=v;consUnHint();}
+function trocaUnHint(){unHintGen('d_item','dunrow','duntog','dunhint',trocaUn);}
+function setTrocaUn(v){trocaUn=v;trocaUnHint();}
 function motor(){
   const todasC=movs.filter(m=>m.tipo==='COMPRA');
   const compras=todasC.filter(m=>noPer(m.data));
@@ -144,6 +174,7 @@ function aReceber(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   movs.filter(m=>m.tipo==='VENDA'&&m.canal==='App'&&+m.recDias>0).forEach(m=>{const d=new Date((m.data||'')+'T00:00:00');d.setDate(d.getDate()+(+m.recDias||0));const liq=(+m.valor||0)*(1-(+m.taxa||0)/100);if(d>=hoje)L.push({data:d,valor:liq,m});});
   return L.sort((a,b)=>a.data-b.data);}
 function noPer(d){if(!d)return true;if(perDe&&d<perDe)return false;if(perAte&&d>perAte)return false;return true;}
+function mRel(m){return (!relJogo||(m.jogo||'Pokémon')===relJogo)&&(!relCol||(m.colecao||'')===relCol)&&(!relPess||(m.contraparte||'')===relPess);}
 function setPer(k){perSel=k;const h=new Date(),iso=x=>x.toISOString().slice(0,10);
   if(k==='d30'){const a=new Date(h);a.setDate(a.getDate()-30);perDe=iso(a);perAte='';}
   else if(k==='d90'){const a=new Date(h);a.setDate(a.getDate()-90);perDe=iso(a);perAte='';}
@@ -230,17 +261,19 @@ function vLancar(){
     campos=`<div class="toggle" style="margin-bottom:12px"><div class="o ${vendaModo==='item'||editId?'on':''}" onclick="vendaModo='item';render()">1 item</div><div class="o ${vendaModo==='varios'&&!editId?'on':''}" onclick="if(!editId){vendaModo='varios';render()}">Vários itens</div></div>`;
     if(vendaModo==='varios'&&!editId){campos+=vendaForm();}
     else{
-      const avulso=(vendaDe==='avulsa'||editId);
+      const avulso=(vendaDe==='avulsa'||editId);let vun='';vendaUn='un';
       campos+= !editId?`<label style="margin-top:0">De onde sai a carta?</label><div class="toggle" id="vdetog"><div class="o ${vendaDe==='estoque'?'on':''}" onclick="setVendaDe('estoque')">📦 Estoque</div><div class="o ${vendaDe==='colecao'?'on':''}" onclick="setVendaDe('colecao')">⭐ Coleção</div><div class="o ${vendaDe==='avulsa'?'on':''}" onclick="setVendaDe('avulsa')">✍ Avulsa</div></div>`:'';
       if(avulso){campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="f_col" onchange="novo(this,'col')">${selOpts(colsDe(e?.jogo||'Pokémon'),e?.colecao)}</select>
       <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>
       <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125">`;}
       else{const itens=vendaDe==='estoque'?motor().disp:movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
-        campos+= itens.length?`<label>Qual item você vendeu? <span style="color:var(--mut);font-size:10px">(baixa sozinho · na quantidade que vender)</span></label><select id="f_origem">${itens.map(d=>`<option value="${d.id}">${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>`:`<div class="soon">Nada ${vendaDe==='estoque'?'em estoque':'na coleção'} ainda — use "Avulsa".</div>`;}
+        campos+= itens.length?`<label>Qual item você vendeu? <span style="color:var(--mut);font-size:10px">(baixa sozinho · na quantidade que vender)</span></label><select id="f_origem" onchange="vendaUnHint()">${itens.map(d=>`<option value="${d.id}">${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>`:`<div class="soon">Nada ${vendaDe==='estoque'?'em estoque':'na coleção'} ainda — use "Avulsa".</div>`;
+        const it0=itens[0],bpu0=it0?Math.max(1,+it0.boosters||1):1;
+        vun=`<div id="vunrow" style="display:${bpu0>1?'block':'none'}"><label>Vender em</label><div class="toggle" id="vuntog"><div class="o on" data-v="un" onclick="setVendaUn('un')">📦 unidades inteiras</div><div class="o" data-v="boo" onclick="setVendaUn('boo')">🃏 boosters avulsos</div></div><div class="meta" id="vunhint" style="margin-top:4px">${(it0&&bpu0>1)?('disponível: '+(+it0.qtd||1)+' un ('+bpu0+' boosters cada)'):''}</div></div>`;}
       campos+=`<label>Descrição (opcional)</label><input id="f_desc" placeholder="detalhe extra: holo, edição…" value="${e?.obs||''}">
       <div class="row2"><div><label>Valor da venda (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}" oninput="vcalc()"></div>
-        <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}"></div></div>
+        <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}"></div></div>${vun}
       <label>Canal</label><div class="toggle" id="cntog"><div class="o ${canal==='Pix'?'on':''}" data-v="Pix" onclick="togCanal('Pix')">Pix / na hora</div><div class="o ${canal==='App'?'on':''}" data-v="App" onclick="togCanal('App')">App / a prazo</div></div>
       <div id="appDiv" style="display:${canal==='App'?'block':'none'}"><div class="row2"><div><label>Taxa do app (%)</label><input id="f_tax" type="number" inputmode="decimal" value="${e?.taxa??15}" oninput="vcalc()"></div><div><label>Recebo em (dias)</label><input id="f_recdias" type="number" inputmode="numeric" value="${e?.recDias??28}"></div></div></div>
       <label class="req">Cliente</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pess,e?.contraparte)}</select>
@@ -251,10 +284,12 @@ function vLancar(){
   } else if(t==='CONSUMO'){
     const dispc=motor().disp;
     if(!dispc.length)campos=`<div class="soon">Nada em estoque pra guardar. Lance uma compra primeiro.</div>`;
-    else campos=`<div class="ctx" style="margin-bottom:8px">Tirar do estoque pra sua <b>coleção pessoal</b> — você guardou, não vendeu.</div>
-      <label>O que você guardou? <span style="color:var(--mut);font-size:10px">(do estoque)</span></label><select id="f_item">${dispc.map(d=>`<option value="${d.id}">${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,38)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select>
+    else{consUn='un';const cit0=dispc[0],cbpu0=cit0?Math.max(1,+cit0.boosters||1):1;
+      campos=`<div class="ctx" style="margin-bottom:8px">Tirar do estoque pra sua <b>coleção pessoal</b> — você guardou, não vendeu.</div>
+      <label>O que você guardou? <span style="color:var(--mut);font-size:10px">(do estoque)</span></label><select id="f_item" onchange="consUnHint()">${dispc.map(d=>`<option value="${d.id}">${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,38)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select>
       <div class="row2"><div><label>Quantas guardar?</label><input id="f_qtdbaixa" type="number" inputmode="numeric" value="1" min="1"></div><div></div></div>
-      <label>Observação (opcional)</label><input id="f_obs" value="">`;
+      <div id="cunrow" style="display:${cbpu0>1?'block':'none'}"><label>Guardar em</label><div class="toggle" id="cuntog"><div class="o on" data-v="un" onclick="setConsUn('un')">📦 unidades inteiras</div><div class="o" data-v="boo" onclick="setConsUn('boo')">🃏 boosters avulsos</div></div><div class="meta" id="cunhint" style="margin-top:4px">${(cit0&&cbpu0>1)?('disponível: '+(+cit0.qtd||1)+' un ('+cbpu0+' boosters cada)'):''}</div></div>
+      <label>Observação (opcional)</label><input id="f_obs" value="">`;}
   } else if(t==='DESPESA'){
     campos=`<div class="ctx" style="margin-bottom:8px">Custo que <b>não é mercadoria</b> de revenda — entra no resultado, não no estoque.</div>
       <label>Tipo de despesa</label><div class="toggle" id="nattog"><div class="o ${despNat==='ordinaria'?'on':''}" data-v="ordinaria" onclick="togNat('ordinaria')">Ordinária · luz, advogado</div><div class="o ${despNat==='material'?'on':''}" data-v="material" onclick="togNat('material')">Material · sleeve, sacola</div></div>
@@ -322,7 +357,7 @@ function salvarNota(){
   const sit=notaHead.sit||'Em estoque',cp=(notaHead.cp&&notaHead.cp!=='__add__')?notaHead.cp:'',data=notaHead.data||new Date().toISOString().slice(0,10);
   const nid='n'+Date.now();let k=0;
   notaItens.forEach(it=>{const r=tot>0?(it.valor/tot)*extra:0,custo=Math.round((it.valor+r)*100)/100;
-    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',contraparte:cp,pgTipo:'À vista',taxa:0,notaId:nid,obs:r>0?`nota · +${fmt(r)} frete/taxa`:'nota'});});
+    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,pgTipo:'À vista',taxa:0,notaId:nid,obs:r>0?`nota · +${fmt(r)} frete/taxa`:'nota'});});
   const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',sit:'Em estoque',data:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
   const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span><div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd:''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
@@ -354,14 +389,14 @@ function salvarVendaVarios(){
   vendaItens.forEach(it=>{movs.push({id:'m'+Date.now()+(k++),tipo:'VENDA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:it.valor,canal:vendaHead.canal,taxa:app?(+vendaHead.taxa||0):0,recDias:app?(+vendaHead.recDias||0):0,conta,contraparte:cp,destino:'Vender',vendaId:vid,obs:''});});
   const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
 function trocaForm(){
-  const dispc=motor().disp;
+  const dispc=motor().disp;trocaUn='un';const dit0=dispc[0],dbpu0=dit0?Math.max(1,+dit0.boosters||1):1;
   const dei=trocaDei.length?trocaDei.map((d,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${d.desc}</b>${d.estoqueId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">custou ${fmt(d.custo)}</div></div><button class="x" onclick="removeDei(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
   const recebi=trocaRecebi.length?trocaRecebi.map((r,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${r.desc}</b>${r.colecao?' · '+r.colecao:''}<div class="meta">vale ${fmt(r.valorMercado)} · ${r.sit}</div></div><button class="x" onclick="removeRecebi(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
   return `<div class="ctx">Troca de vários × vários. O custo do que você deu é rateado nas cartas que recebeu, proporcional ao valor de cada uma.</div>
     <div class="sec">📤 O que eu dei (${trocaDei.length})</div>${dei}
     <div class="card" style="background:var(--card2);margin:8px 0">
       <div class="toggle" style="margin-bottom:8px"><div class="o ${deiModo==='estoque'?'on':''}" onclick="deiModo='estoque';render()">do estoque</div><div class="o ${deiModo==='avulso'?'on':''}" onclick="deiModo='avulso';render()">avulso</div></div>
-      ${deiModo==='estoque'?(dispc.length?`<div class="row2"><div><label style="margin-top:0">Material (baixa sozinho)</label><select id="d_item">${dispc.map(d=>`<option value="${d.id}">${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select></div><div><label style="margin-top:0">Quantas?</label><input id="d_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>`:`<div class="meta">Nada em estoque — use "avulso".</div>`)
+      ${deiModo==='estoque'?(dispc.length?`<div class="row2"><div><label style="margin-top:0">Material (baixa sozinho)</label><select id="d_item" onchange="trocaUnHint()">${dispc.map(d=>`<option value="${d.id}">${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select></div><div><label style="margin-top:0">Quantas?</label><input id="d_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div><div id="dunrow" style="display:${dbpu0>1?'block':'none'};margin-top:6px"><div class="toggle" id="duntog"><div class="o on" data-v="un" onclick="setTrocaUn('un')">📦 unidades</div><div class="o" data-v="boo" onclick="setTrocaUn('boo')">🃏 boosters</div></div><div class="meta" id="dunhint" style="margin-top:4px">${(dit0&&dbpu0>1)?('disponível: '+(+dit0.qtd||1)+' un ('+dbpu0+' boosters cada)'):''}</div></div>`:`<div class="meta">Nada em estoque — use "avulso".</div>`)
       :`<div class="row2"><div><label style="margin-top:0">O que dei</label><input id="d_desc" placeholder="ex: 14 quads"></div><div><label style="margin-top:0">Me custou (R$)</label><input id="d_custo" type="number" inputmode="decimal"></div></div>`}
       <button class="btn g" style="margin-top:10px" onclick="addDei()">+ adicionar material</button></div>
     <label>+ dinheiro que eu dei (R$)</label><input type="number" inputmode="decimal" value="${trocaDin||0}" oninput="trocaDin=+this.value||0;trocaRatPrev()">
@@ -377,7 +412,11 @@ function trocaForm(){
     <label>Com quem troquei</label><select id="t_cp" onchange="novo(this,'pess')">${selOpts(pess)}</select>
     <div class="calc" id="trocaRat" style="margin-top:10px">${trocaRatTxt()}</div>`;
 }
-function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_item')?.value;const m=movs.find(x=>x.id===id);if(!m){alert('Nada em estoque pra escolher.');return;}const dispM=+m.qtd||1,vU=(+m.valor||0)/dispM;let q=+document.getElementById('d_qtd')?.value||1;if(q>dispM){alert('Você só tem '+dispM+' em estoque desse item.');return;}trocaDei.push({desc:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))).slice(0,40)+(dispM>1?' ('+q+' un)':''),custo:Math.round(vU*q*100)/100,estoqueId:id,estoqueQtd:q});}else{const desc=document.getElementById('d_desc')?.value||'material',custo=+document.getElementById('d_custo')?.value||0;trocaDei.push({desc,custo});}render();}
+function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_item')?.value;const m=movs.find(x=>x.id===id);if(!m){alert('Nada em estoque pra escolher.');return;}
+  const bpu=Math.max(1,+m.boosters||1),boo=(trocaUn==='boo'&&bpu>1);
+  const dispM=boo?(+m.qtd||1)*bpu:(+m.qtd||1),vU=(+m.valor||0)/dispM;let q=+document.getElementById('d_qtd')?.value||1;
+  if(q>dispM){alert('Você só tem '+dispM+(boo?' boosters':' em estoque')+' desse item.');return;}
+  trocaDei.push({desc:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))).slice(0,40)+(boo?' ('+q+' boosters)':(dispM>1?' ('+q+' un)':'')),custo:Math.round(vU*q*100)/100,estoqueId:id,estoqueQtd:q,deiBoo:boo});}else{const desc=document.getElementById('d_desc')?.value||'material',custo=+document.getElementById('d_custo')?.value||0;trocaDei.push({desc,custo});}render();}
 function removeDei(i){trocaDei.splice(i,1);render();}
 function addRecebi(){const desc=document.getElementById('r_desc')?.value||'item',val=+document.getElementById('r_val')?.value||0,col=document.getElementById('r_col')?.value,sit=document.getElementById('r_sit')?.value||'Em estoque',jogo=document.getElementById('r_jogo')?.value||'Pokémon',idi=document.getElementById('r_idi')?.value||'—';trocaRecebi.push({desc,valorMercado:val,colecao:(col&&col!=='__add__')?col:'',sit,jogo,idioma:idi});render();}
 function removeRecebi(i){trocaRecebi.splice(i,1);render();}
@@ -392,10 +431,10 @@ function salvarTroca(){
   const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+(+trocaDin||0),vTot=trocaRecebi.reduce((s,r)=>s+(+r.valorMercado||0),0);
   const cp=document.getElementById('t_cp')?.value,cont=(cp&&cp!=='__add__')?cp:'';
   const data=new Date().toISOString().slice(0,10),tid='t'+Date.now();let k=0;
-  trocaDei.forEach(d=>{if(d.estoqueId){baixarLote(d.estoqueId,d.estoqueQtd||1,'Trocado');}});
+  trocaDei.forEach(d=>{if(d.estoqueId){const ex={dataSaida:data};if(d.deiBoo)baixarBoosters(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);else baixarLote(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);}});
   const deiDesc=trocaDei.map(d=>d.desc).join(' + ')||'dinheiro';
   trocaRecebi.forEach(r=>{const c=vTot>0?custoTot*(r.valorMercado/vTot):custoTot/trocaRecebi.length;
-    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:'Single/Carta',colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
+    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:'Single/Carta',colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
   const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
 function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulação',custo:Math.round(v.custoMat*100)/100}];trocaDin=v.din||0;trocaRecebi=[{desc:'carta',valorMercado:v.V,colecao:'',sit:'Em estoque'}];deiModo='avulso';tipoSel='TROCA';go('lancar');toast('Troca pré-preenchida — ajuste e registre');}
 
@@ -497,19 +536,43 @@ function simPasso(){const e=document.getElementById('simpasso');if(!e)return;con
   e.innerHTML=`<b>Por que o custo real é esse:</b><br>1) ${l1}<br>${din>0?'2) + '+fmt(din)+' em dinheiro.<br>':''}3) Custo real = <b>${fmt(custoMat+din)}</b>. O ganho real compara a revenda com isso, não com o valor de face.`;}
 function chavePer(data,g){const d=new Date(data+'T00:00:00');if(g==='ano')return ''+d.getFullYear();if(g==='mes')return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(g==='semana'){const x=new Date(d);x.setDate(d.getDate()-((d.getDay()+6)%7));return x.toISOString().slice(0,10);}return data;}
 function rotuloPer(k,g){if(g==='ano')return k;const p=k.split('-');if(g==='mes')return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+p[1]-1]+'/'+p[0].slice(2);if(g==='semana')return 'sem de '+p[2]+'/'+p[1];return p[2]+'/'+p[1];}
-function timelineHtml(){const B={},hoje=new Date().toISOString().slice(0,10);
-  movs.forEach(m=>{if(!m.data||!noPer(m.data))return;const k=chavePer(m.data,relGran),b=B[k]=B[k]||{v:0,g:0,d:0};
-    if(m.tipo==='VENDA')b.v+=(+m.valor||0)*(1-(+m.taxa||0)/100);
-    else if(m.tipo==='COMPRA'&&!m.origem){b.g+=+m.valor||0;if(m.destino==='Coleção')b.col=(b.col||0)+(+m.valor||0);else b.est=(b.est||0)+(+m.valor||0);}
-    else if(m.tipo==='DESPESA'){if(m.status==='apagar'&&!perAte&&m.data>hoje)return;b.d+=+m.valor||0;}});
+function fluxoBuckets(){const B={},hoje=new Date().toISOString().slice(0,10);
+  const add=(dt,s,v)=>{if(!dt||!noPer(dt)||!(v>0))return;const k=chavePer(dt,relGran);(B[k]=B[k]||{})[s]=(B[k][s]||0)+v;};
+  const dIni=m=>m.destIni||((sitDe(m)==='Coleção'&&!m.loteOrigem)?'Coleção':'Em estoque');
+  movs.forEach(m=>{const v=+m.valor||0;
+    if(m.tipo==='DESPESA'){if(relJogo||relCol)return;if(relPess&&(m.contraparte||'')!==relPess)return;if(m.status==='apagar'&&!perAte&&m.data>hoje)return;add(m.data,'din_out',v);return;}
+    if(m.tipo==='VENDA'){if(!mRel(m))return;add(m.data,'din_in',v*(1-(+m.taxa||0)/100));const co=+m.custoOrigem||0;if(co)add(m.data,m.vendaTipo==='colecao'?'col_out':'est_out',co);return;}
+    if(m.tipo!=='COMPRA'||!mRel(m))return;
+    if(!m.origem)add(m.data,'din_out',v);
+    const di=dIni(m),s=sitDe(m);
+    add(m.data,di==='Coleção'?'col_in':'est_in',v);
+    if(s==='Trocado')add(m.dataSaida||m.data,'est_out',v);
+    else if(s==='Coleção'&&di!=='Coleção'){add(m.dataSaida||m.data,'col_in',v);add(m.dataSaida||m.data,'est_out',v);}
+  });return B;}
+const FLUXOS=[['din_in','💰 dinheiro entrou','var(--green)'],['din_out','💰 dinheiro saiu','var(--red)'],['est_in','📦 estoque entrou','var(--blue)'],['est_out','📦 estoque saiu','#7ea8dd'],['col_in','⭐ coleção entrou','var(--amber)'],['col_out','⭐ coleção saiu','#c9964f']];
+function timelineHtml(){const B=fluxoBuckets();
+  const chips=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${FLUXOS.map(([k,l,c])=>`<div onclick="relSer.${k}=!relSer.${k};render()" style="cursor:pointer;font-size:11px;padding:4px 10px;border-radius:20px;border:1.5px solid ${relSer[k]?c:'var(--line)'};${relSer[k]?`background:${c};color:#fff;font-weight:700`:'color:var(--mut)'}">${l}</div>`).join('')}</div>`;
+  const on=FLUXOS.filter(([k])=>relSer[k]);
   const ent=Object.entries(B).sort((a,b)=>a[0]<b[0]?1:-1);
-  if(!ent.length)return '<div class="meta">Sem lançamentos no período.</div>';
-  const mx=Math.max(...ent.map(([k,b])=>Math.max(b.v,b.g+b.d)),1);
-  return ent.map(([k,b])=>{const saldo=b.v-b.g-b.d;return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between"><b>${rotuloPer(k,relGran)}</b><b style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fmt(saldo)}</b></div><div class="meta">entrou ${fmt(b.v)} · saiu ${fmt(b.g+b.d)}</div>${(b.g||b.d)?`<div class="meta" style="color:var(--mut)">↳ ${[b.est?fmt(b.est)+' material':'',b.col?fmt(b.col)+' coleção':'',b.d?fmt(b.d)+' despesa':''].filter(Boolean).join(' · ')}</div>`:''}<div style="height:5px;margin-top:4px;background:var(--green);border-radius:3px;width:${Math.max(2,Math.round(b.v/mx*100))}%"></div><div style="height:5px;margin-top:2px;background:var(--red);border-radius:3px;width:${Math.max(2,Math.round((b.g+b.d)/mx*100))}%"></div></div>`;}).join('');}
+  if(!ent.length)return chips+'<div class="meta">Sem lançamentos no período (com esses filtros).</div>';
+  if(!on.length)return chips+'<div class="meta">Ligue ao menos um fluxo acima pra ver o gráfico.</div>';
+  const mx=Math.max(...ent.map(([k,b])=>Math.max(...on.map(([s])=>b[s]||0))),1);
+  return chips+ent.map(([k,b])=>{const saldo=(relSer.din_in&&relSer.din_out)?(b.din_in||0)-(b.din_out||0):null;
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="display:flex;justify-content:space-between"><b>${rotuloPer(k,relGran)}</b>${saldo===null?'':`<b style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fmt(saldo)}</b>`}</div>
+    ${on.map(([s,l,c])=>{const v=b[s]||0;return `<div style="display:flex;align-items:center;gap:7px;margin-top:3px"><span style="width:112px;flex:none;font-size:11px;color:var(--mut)">${l}</span><div style="flex:1;height:5px;background:var(--card2);border-radius:3px"><div style="height:5px;border-radius:3px;background:${c};width:${v>0?Math.max(2,Math.round(v/mx*100)):0}%"></div></div><span style="width:86px;flex:none;text-align:right;font-size:11px">${v?fmt(v):'—'}</span></div>`;}).join('')}</div>`;}).join('');}
 function vRelatorios(){
-  const comp=movs.filter(m=>m.tipo==='COMPRA'),vend=movs.filter(m=>m.tipo==='VENDA');
+  if(!movs.some(m=>m.tipo==='COMPRA'||m.tipo==='VENDA'))return `<div class="card"><div class="empty">Sem dados pra relatório ainda.<br>Lance ou carregue seu histórico no Painel.</div></div>`;
+  const comp=movs.filter(m=>m.tipo==='COMPRA'&&mRel(m)),vend=movs.filter(m=>m.tipo==='VENDA'&&mRel(m));
   const compPer=comp.filter(m=>noPer(m.data)),vendPer=vend.filter(m=>noPer(m.data));
-  if(!comp.length&&!vend.length)return `<div class="card"><div class="empty">Sem dados pra relatório ainda.<br>Lance ou carregue seu histórico no Painel.</div></div>`;
+  const jgsU=[...new Set(movs.filter(m=>m.tipo==='COMPRA'||m.tipo==='VENDA').map(m=>m.jogo||'Pokémon'))].sort();
+  const colsU=[...new Set(movs.filter(m=>(m.tipo==='COMPRA'||m.tipo==='VENDA')&&(!relJogo||(m.jogo||'Pokémon')===relJogo)&&m.colecao).map(m=>m.colecao))].sort();
+  const pessU=[...new Set(movs.map(m=>m.contraparte).filter(Boolean))].sort();
+  const opt=(arr,val)=>arr.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('');
+  const filtros=`<div class="card"><div class="sec" style="margin-top:0">🔎 Filtros do relatório</div>
+    <div class="row2"><div><label style="margin-top:0">Jogo</label><select onchange="relJogo=this.value;relCol='';render()"><option value="">todos</option>${opt(jgsU,relJogo)}</select></div>
+      <div><label style="margin-top:0">Coleção</label><select onchange="relCol=this.value;render()"><option value="">todas</option>${opt(colsU,relCol)}</select></div></div>
+    <label>Cliente / fornecedor</label><select onchange="relPess=this.value;render()"><option value="">todos</option>${opt(pessU,relPess)}</select>
+    ${(relJogo||relCol||relPess)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:8px" onclick="relJogo='';relCol='';relPess='';render()">filtrando: ${[relJogo,relCol,relPess].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}</div>`;
   const jogos={};
   comp.forEach(m=>{const j=m.jogo||'Pokémon',o=(jogos[j]=jogos[j]||{inv:0,vend:0,est:0,cmv:0});o.inv+=+m.valor||0;const s=sitDe(m);if(s==='Em estoque')o.est+=+m.valor||0;else if(s==='Vendido')o.cmv+=+m.valor||0;});
   vend.forEach(m=>{const j=m.jogo||'Pokémon';(jogos[j]=jogos[j]||{inv:0,vend:0,est:0,cmv:0}).vend+=(+m.valor||0)*(1-(+m.taxa||0)/100);});
@@ -523,7 +586,8 @@ function vRelatorios(){
   const jb=Object.entries(jogos).sort((a,b)=>b[1].inv-a[1].inv).map(([j,d])=>{const luc=d.vend-d.cmv;return `<div style="padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="consQ='${j.replace(/'/g,"\\'")}';consF='tudo';go('consultar')"><div style="display:flex;justify-content:space-between"><span style="font-weight:600">${j} →</span><b style="color:${luc>=0?'var(--green)':'var(--red)'}">${fmt(luc)} lucro</b></div><div class="meta">investiu ${fmt(d.inv)} · vendeu ${fmt(d.vend)} · ${fmt(d.est)} parado</div></div>`;}).join('');
   const granSel=`<div class="seg" style="margin-bottom:10px">${[['dia','Dia'],['semana','Semana'],['mes','Mês'],['ano','Ano']].map(([k,l])=>`<button class="${relGran===k?'on':''}" onclick="relGran='${k}';render()">${l}</button>`).join('')}</div>`;
   return `${selPeriodo()}<div class="card"><div class="head">Relatórios</div><div class="ctx">Onde o dinheiro entra, sai e fica parado.</div></div>
-    <div class="card"><div class="sec" style="margin-top:0">📈 Linha do tempo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— entrou × saiu por período</span></div>${granSel}${timelineHtml()}</div>
+    ${filtros}
+    <div class="card"><div class="sec" style="margin-top:0">📈 Linha do tempo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— toque nos fluxos pra escolher o que ver</span></div>${granSel}${timelineHtml()}</div>
     <div class="card"><div class="sec" style="margin-top:0">Por jogo</div>${jb}</div>
     <div class="card"><div class="sec" style="margin-top:0">💰 Estoque parado por coleção <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— saldo hoje</span></div>${bar(estCol,'var(--blue)')}</div>
     <div class="card"><div class="sec" style="margin-top:0">📥 Comprei de cada fornecedor <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— no período</span></div>${bar(forn,'var(--red)')}</div>
@@ -533,9 +597,15 @@ function vRelatorios(){
 function salvar(){
   const g=id=>document.getElementById(id)?.value;
   const e=editId?movs.find(m=>m.id===editId):null;
-  if(tipoSel==='CONSUMO'){const m=movs.find(x=>x.id===g('f_item'));if(!m){alert('Escolha o item que guardou.');return;}const disp=+m.qtd||1;let n=+g('f_qtdbaixa')||1;if(n>disp){alert('Você só tem '+disp+' em estoque desse item.');return;}const o=g('f_obs');baixarLote(m.id,n,'Coleção',o?{obs:(m.obs?m.obs+' · ':'')+o}:null);save();toast('Guardado na coleção — '+n+' un ✓');editId=null;go('consultar');return;}
+  if(tipoSel==='CONSUMO'){const m=movs.find(x=>x.id===g('f_item'));if(!m){alert('Escolha o item que guardou.');return;}
+    const bpu=Math.max(1,+m.boosters||1),boo=(consUn==='boo'&&bpu>1);
+    const disp=boo?(+m.qtd||1)*bpu:(+m.qtd||1);let n=+g('f_qtdbaixa')||1;
+    if(n>disp){alert('Você só tem '+disp+(boo?' boosters':' em estoque')+' desse item.');return;}
+    const o=g('f_obs');const ex={dataSaida:new Date().toISOString().slice(0,10)};if(o)ex.obs=(m.obs?m.obs+' · ':'')+o;
+    if(boo)baixarBoosters(m.id,n,'Coleção',ex);else baixarLote(m.id,n,'Coleção',ex);
+    save();toast('Guardado na coleção — '+n+(boo?' boosters':' un')+' ✓');editId=null;go('consultar');return;}
   if(tipoSel==='TROCA'){const custou=+g('f_custou')||0,din=+g('f_din')||0,recebi=g('f_desc')||'item de troca';
-    let o={id:editId||('m'+Date.now()),tipo:'COMPRA',origem:'TROCA',data:g('f_data'),qtd:1,valor:custou+din,cat:'Single/Carta',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:'—',situacao:g('f_sit')||'Em estoque',destino:(g('f_sit')==='Coleção')?'Coleção':'Vender',contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',deu:g('f_deu')||'',custou,din,recebi,taxa:0,pgTipo:'À vista',obs:recebi+' (🔄 troca: dei '+(g('f_deu')||'?')+(din>0?' + '+fmt(din):'')+')'};
+    let o={id:editId||('m'+Date.now()),tipo:'COMPRA',origem:'TROCA',data:g('f_data'),qtd:1,valor:custou+din,cat:'Single/Carta',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:'—',situacao:g('f_sit')||'Em estoque',destino:(g('f_sit')==='Coleção')?'Coleção':'Vender',destIni:(g('f_sit')==='Coleção')?'Coleção':'Em estoque',contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',deu:g('f_deu')||'',custou,din,recebi,taxa:0,pgTipo:'À vista',obs:recebi+' (🔄 troca: dei '+(g('f_deu')||'?')+(din>0?' + '+fmt(din):'')+')'};
     if(editId){const i=movs.findIndex(m=>m.id===editId);movs[i]=o;}else movs.push(o);
     save();toast('Troca registrada ✓');editId=null;render();return;}
   if(tipoSel==='DESPESA'){const val=+g('f_val')||0;const cat=g('f_dcat');if(!cat||cat==='__add__'){alert('Escolha a categoria da despesa.');return;}
@@ -557,13 +627,15 @@ function salvar(){
   let obj={id:editId||('m'+Date.now()),tipo:tipoSel,data:g('f_data'),qtd:+g('f_qtd')||1,valor:val};
   if(tipoSel==='COMPRA'){const cat=g('f_cat');if(!cat||cat==='__add__'){alert('Escolha o tipo de produto.');return;}
     const sit=g('f_sit')||'Em estoque';
-    Object.assign(obj,{cat,codigo:g('f_cod')||'',jogo:g('f_jogo')||'Pokémon',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:g('f_idi'),boosters:+g('f_boo')||0,contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',taxa:0,pgTipo,nParc:pgTipo==='Parcelado'?(+g('f_nparc')||1):0,venc1:pgTipo==='Parcelado'?g('f_venc1'):'',conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):'',obs:g('f_obs')||''});
+    Object.assign(obj,{cat,codigo:g('f_cod')||'',jogo:g('f_jogo')||'Pokémon',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:g('f_idi'),boosters:+g('f_boo')||0,contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',taxa:0,pgTipo,nParc:pgTipo==='Parcelado'?(+g('f_nparc')||1):0,venc1:pgTipo==='Parcelado'?g('f_venc1'):'',conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):'',obs:g('f_obs')||''});
   } else {const cp=g('f_cp');if(!cp||cp==='__add__'){alert('O cliente é obrigatório na venda.');return;}
     const comum={obs:g('f_desc')||'',canal,taxa:canal==='App'?(+g('f_tax')||0):0,recDias:canal==='App'?(+g('f_recdias')||0):0,conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):'',contraparte:cp,destino:'Vender'};
     if(!editId&&vendaDe!=='avulsa'){const it=movs.find(m=>m.id===g('f_origem'));if(!it){alert('Escolha o item que você vendeu (ou use Avulsa).');return;}
-      const dispI=+it.qtd||1,vUnitI=(+it.valor||0)/dispI,qv=Math.min(+g('f_qtd')||1,dispI);
-      const jg=it.jogo||'Pokémon',ct=it.cat||'',cl=it.colecao||'',idi=it.idioma||'';
-      baixarLote(it.id,qv,'Vendido',{dataVenda:g('f_data')});
+      const bpu=Math.max(1,+it.boosters||1),boo=(vendaUn==='boo'&&bpu>1);
+      const dispI=boo?(+it.qtd||1)*bpu:(+it.qtd||1),vUnitI=(+it.valor||0)/dispI,qv=Math.min(+g('f_qtd')||1,dispI);
+      const jg=it.jogo||'Pokémon',ct=boo?'Booster':(it.cat||''),cl=it.colecao||'',idi=it.idioma||'';
+      const ex={dataVenda:g('f_data'),dataSaida:g('f_data')};
+      if(boo)baixarBoosters(it.id,qv,'Vendido',ex);else baixarLote(it.id,qv,'Vendido',ex);
       Object.assign(obj,comum,{qtd:qv,jogo:jg,cat:ct,colecao:cl,idioma:idi,codigo:it.codigo||'',vendaDe,origemId:it.id,custoOrigem:Math.round(vUnitI*qv*100)/100,vendaTipo:vendaDe==='colecao'?'colecao':'material'});
     } else {Object.assign(obj,comum,{jogo:g('f_jogo')||'Pokémon',cat:g('f_cat')||'',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:g('f_idi')||'',codigo:g('f_cod')||'',vendaTipo:e?.vendaTipo||'material'});}}
   if(editId){const i=movs.findIndex(m=>m.id===editId);movs[i]=obj;save();editId=null;toast('Alteração salva');go('consultar');return;}
