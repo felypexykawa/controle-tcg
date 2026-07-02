@@ -107,6 +107,9 @@ let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
 let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='',relExtrato=false;
 let consOrd='emissao',consGrupoFech={},_gKeys=[],ctAgrupo='mes',ctPess='',ctExp={},_ctKeys=[],relFOpen=false,relDet=false;
+let _preSel=null,vendaJogoF='',vvOrig='avulso';
+function venderDe(id){const m=movs.find(x=>x.id===id);if(!m)return;_preSel=id;vendaJogoF='';tipoSel='VENDA';vendaModo='item';vendaDe=(sitDe(m)==='Coleção')?'colecao':'estoque';editId=null;go('lancar');}
+function guardarDe(id){_preSel=id;tipoSel='CONSUMO';editId=null;go('lancar');}
 function togGrupo(k){consGrupoFech[k]=!consGrupoFech[k];render();}
 function togTodosGrupos(){if(Object.keys(consGrupoFech).length)consGrupoFech={};else _gKeys.forEach(k=>consGrupoFech[k]=true);render();}
 function togCt(k){ctExp[k]=!ctExp[k];render();}
@@ -183,6 +186,19 @@ function aPagar(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
 function aReceber(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   movs.filter(m=>m.tipo==='VENDA'&&m.canal==='App'&&+m.recDias>0).forEach(m=>{const d=new Date((m.data||'')+'T00:00:00');d.setDate(d.getDate()+(+m.recDias||0));const liq=(+m.valor||0)*(1-(+m.taxa||0)/100);if(d>=hoje)L.push({data:d,valor:liq,m});});
   return L.sort((a,b)=>a.data-b.data);}
+function contasPagas(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
+  const parc=movs.filter(m=>m.tipo==='COMPRA'&&m.pgTipo==='Parcelado'&&+m.nParc>0&&m.data);
+  const notas={},solo=[];parc.forEach(m=>{if(m.notaId)(notas[m.notaId]=notas[m.notaId]||[]).push(m);else solo.push(m);});
+  solo.forEach(m=>{const v=(+m.valor||0)/m.nParc,d0=new Date((m.venc1||m.data)+'T00:00:00');
+    for(let i=0;i<+m.nParc;i++){const d=new Date(d0);d.setMonth(d.getMonth()+i);if(d<hoje)L.push({venc:d,valor:v,m});}});
+  Object.values(notas).forEach(itens=>{const h=itens[0],tot=itens.reduce((s,x)=>s+(+x.valor||0),0),nP=+h.nParc||1,v=tot/nP,d0=new Date((h.venc1||h.data)+'T00:00:00');
+    for(let i=0;i<nP;i++){const d=new Date(d0);d.setMonth(d.getMonth()+i);if(d<hoje)L.push({venc:d,valor:v,m:h,nota:{id:h.notaId,num:h.notaNum||'',n:itens.length,tot,parcela:i+1,nP}});}});
+  const seen={};movs.forEach(m=>{if(m.tipo!=='COMPRA'||m.origem||m.pgTipo==='Parcelado'||!m.data)return;
+    const rz=raizDe(m),key=m.notaId||rz.id;
+    if(seen[key]){seen[key].valor+=(+m.valor||0);if(seen[key].nota){seen[key].nota.tot+=(+m.valor||0);seen[key].nota.n++;}return;}
+    const e={venc:new Date(m.data+'T00:00:00'),valor:+m.valor||0,m:rz};if(m.notaId)e.nota={id:m.notaId,num:m.notaNum||'',n:1,tot:+m.valor||0,parcela:1,nP:1};seen[key]=e;L.push(e);});
+  movs.filter(m=>m.tipo==='DESPESA'&&m.status!=='apagar'&&(m.dataPagamento||m.data)).forEach(m=>{L.push({venc:new Date((m.dataPagamento||m.data)+'T00:00:00'),valor:+m.valor||0,m});});
+  return L.sort((a,b)=>b.venc-a.venc);}
 function noPer(d){if(!d)return true;if(perDe&&d<perDe)return false;if(perAte&&d>perAte)return false;return true;}
 function mRel(m){return (!relJogo||(m.jogo||'Pokémon')===relJogo)&&(!relCol||(m.colecao||'')===relCol)&&(!relPess||(m.contraparte||'')===relPess);}
 function setPer(k){perSel=k;const h=new Date(),iso=x=>x.toISOString().slice(0,10);
@@ -200,7 +216,7 @@ function selPeriodo(){return `<div class="perbox"><div class="seg" style="margin
   <div class="row2"><div><label style="margin:0 0 3px">De</label><input type="date" value="${perDe}" onchange="perDe=this.value;perSel='custom';render()"></div>
     <div><label style="margin:0 0 3px">Até</label><input type="date" value="${perAte}" onchange="perAte=this.value;perSel='custom';render()"></div></div></div>`;}
 function snap(){return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel};}
-function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;tela=t;editId=null;render();}
+function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar')_preSel=null;tela=t;editId=null;render();}
 function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
 function verFiltro(f){consF=f;consMenu=false;consQ='';expandId=null;render();}
 function voltar(){const s=navHist.pop();if(!s)return;tela=s.tela;consF=s.consF;consQ=s.consQ;consMenu=s.consMenu;perDe=s.perDe;perAte=s.perAte;perSel=s.perSel;editId=s.editId;tipoSel=s.tipoSel;render();}
@@ -282,9 +298,12 @@ function vLancar(){
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="f_col" onchange="novo(this,'col')">${selOpts(colsDe(e?.jogo||'Pokémon'),e?.colecao)}</select>
       <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>
       <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125">`;}
-      else{const itens=vendaDe==='estoque'?motor().disp:movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
-        campos+= itens.length?`<label>Qual item você vendeu? <span style="color:var(--mut);font-size:10px">(baixa sozinho · na quantidade que vender)</span></label><select id="f_origem" onchange="vendaUnHint()">${itens.map(d=>`<option value="${d.id}">${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>`:`<div class="soon">Nada ${vendaDe==='estoque'?'em estoque':'na coleção'} ainda — use "Avulsa".</div>`;
-        const it0=itens[0],bpu0=it0?Math.max(1,+it0.boosters||1):1;
+      else{let itens=vendaDe==='estoque'?motor().disp:movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
+        const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
+        if(vendaJogoF&&jgsIt.includes(vendaJogoF))itens=itens.filter(d=>(d.jogo||'Pokémon')===vendaJogoF);
+        const selJg=jgsIt.length>1?`<label>Jogo <span style="color:var(--mut);font-size:10px">(filtra a lista abaixo)</span></label><select onchange="vendaJogoF=this.value;render()"><option value="">todos os jogos</option>${jgsIt.map(j=>`<option ${vendaJogoF===j?'selected':''}>${j}</option>`).join('')}</select>`:'';
+        campos+= itens.length?`${selJg}<label>Qual item você vendeu? <span style="color:var(--mut);font-size:10px">(baixa sozinho · na quantidade que vender)</span></label><select id="f_origem" onchange="vendaUnHint()">${itens.map(d=>`<option value="${d.id}" ${_preSel===d.id?'selected':''}>${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>`:selJg+`<div class="soon">Nada ${vendaDe==='estoque'?'em estoque':'na coleção'} ${vendaJogoF?'desse jogo':''} ainda — use "Avulsa".</div>`;
+        const it0=itens.find(d=>d.id===_preSel)||itens[0],bpu0=it0?Math.max(1,+it0.boosters||1):1;
         vun=`<div id="vunrow" style="display:${bpu0>1?'block':'none'}"><label>Vender em</label><div class="toggle" id="vuntog"><div class="o on" data-v="un" onclick="setVendaUn('un')">📦 unidades inteiras</div><div class="o" data-v="boo" onclick="setVendaUn('boo')">🃏 boosters avulsos</div></div><div class="meta" id="vunhint" style="margin-top:4px">${(it0&&bpu0>1)?('disponível: '+(+it0.qtd||1)+' un ('+bpu0+' boosters cada)'):''}</div></div>`;}
       campos+=`<label>Descrição (opcional)</label><input id="f_desc" placeholder="detalhe extra: holo, edição…" value="${e?.obs||''}">
       <div class="row2"><div><label>Valor da venda (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}" oninput="vcalc()"></div>
@@ -299,9 +318,9 @@ function vLancar(){
   } else if(t==='CONSUMO'){
     const dispc=motor().disp;
     if(!dispc.length)campos=`<div class="soon">Nada em estoque pra guardar. Lance uma compra primeiro.</div>`;
-    else{consUn='un';const cit0=dispc[0],cbpu0=cit0?Math.max(1,+cit0.boosters||1):1;
+    else{consUn='un';const cit0=dispc.find(d=>d.id===_preSel)||dispc[0],cbpu0=cit0?Math.max(1,+cit0.boosters||1):1;
       campos=`<div class="ctx" style="margin-bottom:8px">Tirar do estoque pra sua <b>coleção pessoal</b> — você guardou, não vendeu.</div>
-      <label>O que você guardou? <span style="color:var(--mut);font-size:10px">(do estoque)</span></label><select id="f_item" onchange="consUnHint()">${dispc.map(d=>`<option value="${d.id}">${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,38)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select>
+      <label>O que você guardou? <span style="color:var(--mut);font-size:10px">(do estoque)</span></label><select id="f_item" onchange="consUnHint()">${dispc.map(d=>`<option value="${d.id}" ${_preSel===d.id?'selected':''}>${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,38)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select>
       <div class="row2"><div><label>Quantas guardar?</label><input id="f_qtdbaixa" type="number" inputmode="numeric" value="1" min="1"></div><div></div></div>
       <div id="cunrow" style="display:${cbpu0>1?'block':'none'}"><label>Guardar em</label><div class="toggle" id="cuntog"><div class="o on" data-v="un" onclick="setConsUn('un')">📦 unidades inteiras</div><div class="o" data-v="boo" onclick="setConsUn('boo')">🃏 boosters avulsos</div></div><div class="meta" id="cunhint" style="margin-top:4px">${(cit0&&cbpu0>1)?('disponível: '+(+cit0.qtd||1)+' un ('+cbpu0+' boosters cada)'):''}</div></div>
       <label>Observação (opcional)</label><input id="f_obs" value="">`;}
@@ -378,17 +397,23 @@ function salvarNota(){
     movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:r>0?`nota · +${fmt(r)} frete/taxa`:'nota'});});
   const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
-  const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span><div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd:''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
+  const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.origemId?'📦 ':''}${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span>${it.origemId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd+(it.un==='boo'?' boosters':''):''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
   const tot=vendaItens.reduce((s,it)=>s+(+it.valor||0),0),app=vendaHead.canal==='App';
-  return `<div class="ctx">Vários itens numa venda só (mesmo cliente). Cada um com seu valor.</div>
+  const dispV=motor().disp;
+  return `<div class="ctx">Vários itens numa venda só (mesmo cliente). Cada um com seu valor — e pode puxar do estoque, que baixa sozinho.</div>
     <div class="sec">Itens da venda (${vendaItens.length})</div>${itens}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="row2"><div><label style="margin-top:0">Jogo</label><select id="v_jogo" onchange="reColV(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
+      <div class="toggle" style="margin-bottom:8px"><div class="o ${vvOrig==='estoque'?'on':''}" onclick="vvOrig='estoque';render()">📦 do estoque</div><div class="o ${vvOrig==='avulso'?'on':''}" onclick="vvOrig='avulso';render()">✍ avulso</div></div>
+      ${vvOrig==='estoque'?(dispV.length?`<label style="margin-top:0">Item do estoque <span style="color:var(--mut);font-size:10px">(baixa sozinho)</span></label><select id="v_orig">${dispV.map(d=>`<option value="${d.id}">${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''}${(+d.boosters||0)>1?' ('+d.boosters+' boo/un)':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>
+      <div class="row2"><div><label>Vender em</label><select id="v_un"><option value="un">unidades</option><option value="boo">boosters</option></select></div><div><label>Qtd</label><input id="v_qtd2" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <label>Valor da venda deste item (R$)</label><input id="v_val2" type="number" inputmode="decimal" placeholder="0,00">`
+      :`<div class="meta">Nada em estoque — use "avulso".</div>`)
+      :`<div class="row2"><div><label style="margin-top:0">Jogo</label><select id="v_jogo" onchange="reColV(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label style="margin-top:0">Tipo de produto</label><select id="v_cat" onchange="novo(this,'cat')">${selOpts(cats)}</select></div></div>
       <div class="row2"><div><label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="v_col" onchange="novo(this,'col')">${selOpts(colsDe('Pokémon'))}</select></div>
         <div><label>Idioma</label><select id="v_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
       <div class="row2"><div><label>Qtd</label><input id="v_qtd" type="number" inputmode="numeric" value="1"></div>
-        <div><label>Valor da venda (R$)</label><input id="v_val" type="number" inputmode="decimal" placeholder="0,00"></div></div>
+        <div><label>Valor da venda (R$)</label><input id="v_val" type="number" inputmode="decimal" placeholder="0,00"></div></div>`}
       <button class="btn g" style="margin-top:10px" onclick="addItemVenda()">+ adicionar à venda</button></div>
     <div class="calc" style="margin:6px 0">Total da venda: <b>${fmt(tot)}</b></div>
     <label>Canal</label><div class="toggle"><div class="o ${!app?'on':''}" onclick="vendaHead.canal='Pix';render()">Pix / na hora</div><div class="o ${app?'on':''}" onclick="vendaHead.canal='App';render()">App / a prazo</div></div>
@@ -398,13 +423,27 @@ function vendaForm(){
     <label>Data de emissão</label><input id="v_data" type="date" value="${vendaHead.data||new Date().toISOString().slice(0,10)}" onchange="vendaHead.data=this.value">`;
 }
 function reColV(jogo){const sel=document.getElementById('v_col');if(!sel)return;sel.innerHTML=selOpts(colsDe(jogo));}
-function addItemVenda(){const g=id=>document.getElementById(id);const val=+g('v_val')?.value||0;if(val<=0){alert('Informe o valor do item.');return;}const col=g('v_col')?.value,cat=g('v_cat').value;vendaItens.push({jogo:g('v_jogo').value,cat:(cat&&cat!=='__add__')?cat:'',colecao:(col&&col!=='__add__')?col:'',idioma:g('v_idi').value,qtd:+g('v_qtd').value||1,valor:val});render();}
+function addItemVenda(){const g=id=>document.getElementById(id);
+  if(vvOrig==='estoque'){const src=movs.find(m=>m.id===g('v_orig')?.value);if(!src){alert('Escolha o item do estoque.');return;}
+    const un=g('v_un')?.value||'un',bpu=Math.max(1,+src.boosters||1),boo=(un==='boo'&&bpu>1);
+    const q=+g('v_qtd2')?.value||1,dispI=boo?(+src.qtd||1)*bpu:(+src.qtd||1);
+    if(q>dispI){alert('Você só tem '+dispI+(boo?' boosters':' un')+' desse item.');return;}
+    const val=+g('v_val2')?.value||0;if(val<=0){alert('Informe o valor da venda deste item.');return;}
+    vendaItens.push({origemId:src.id,un:boo?'boo':'un',qtd:q,valor:val,jogo:src.jogo||'Pokémon',cat:boo?'Booster':(src.cat||''),colecao:src.colecao||'',idioma:src.idioma||''});render();return;}
+  const val=+g('v_val')?.value||0;if(val<=0){alert('Informe o valor do item.');return;}const col=g('v_col')?.value,cat=g('v_cat').value;vendaItens.push({jogo:g('v_jogo').value,cat:(cat&&cat!=='__add__')?cat:'',colecao:(col&&col!=='__add__')?col:'',idioma:g('v_idi').value,qtd:+g('v_qtd').value||1,valor:val});render();}
 function removeItemVenda(i){vendaItens.splice(i,1);render();}
 function salvarVendaVarios(){
   if(!vendaItens.length){alert('Adicione pelo menos um item à venda.');return;}
   const cp=(vendaHead.cp&&vendaHead.cp!=='__add__')?vendaHead.cp:'';if(!cp){alert('O cliente é obrigatório.');return;}
   const app=vendaHead.canal==='App',data=vendaHead.data||new Date().toISOString().slice(0,10),conta=(vendaHead.conta&&vendaHead.conta!=='__add__')?vendaHead.conta:'',vid='v'+Date.now();let k=0;
-  vendaItens.forEach(it=>{movs.push({id:'m'+Date.now()+(k++),tipo:'VENDA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:it.valor,canal:vendaHead.canal,taxa:app?(+vendaHead.taxa||0):0,recDias:app?(+vendaHead.recDias||0):0,conta,contraparte:cp,destino:'Vender',vendaId:vid,obs:''});});
+  vendaItens.forEach(it=>{const base={id:'m'+Date.now()+(k++),tipo:'VENDA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:it.valor,canal:vendaHead.canal,taxa:app?(+vendaHead.taxa||0):0,recDias:app?(+vendaHead.recDias||0):0,conta,contraparte:cp,destino:'Vender',vendaId:vid,obs:''};
+    if(it.origemId){const src=movs.find(m=>m.id===it.origemId);
+      if(src&&sitDe(src)==='Em estoque'){const bpu=Math.max(1,+src.boosters||1),boo=(it.un==='boo'&&bpu>1);
+        const dispI=boo?(+src.qtd||1)*bpu:(+src.qtd||1),vU=(+src.valor||0)/dispI,qv=Math.min(it.qtd,dispI);
+        const ex={dataVenda:data,dataSaida:data};
+        if(boo)baixarBoosters(src.id,qv,'Vendido',ex);else baixarLote(src.id,qv,'Vendido',ex);
+        Object.assign(base,{qtd:qv,codigo:src.codigo||'',vendaDe:'estoque',origemId:src.id,custoOrigem:Math.round(vU*qv*100)/100,vendaTipo:'material'});}}
+    movs.push(base);});
   const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
 function trocaForm(){
   const dispc=motor().disp;trocaUn='un';const dit0=dispc[0],dbpu0=dit0?Math.max(1,+dit0.boosters||1):1;
@@ -501,7 +540,8 @@ function vConsultar(){
         <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(total)}</div>
           <div style="font-size:11px;font-weight:600;color:${venda?'var(--green)':'var(--red)'}">${pg}</div></div>
       </div>
-      ${expandId===m.id?`<div style="display:flex;gap:16px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line)">
+      ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
+        ${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ guardar</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
     </div>`;}).join(''):`<div class="empty">Nada nesse filtro.</div>`;
@@ -519,9 +559,11 @@ function vContas(){
   const linha=(data,valor,m,cor,nota)=>{const atras=data<hoje;const podePagar=m.tipo==='DESPESA'&&m.status==='apagar';
     if(nota)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px"><div onclick="abrirNota('${nota.id}')" style="flex:1;cursor:pointer"><div class="ttl">${dBR(data)}${atras?' <span style="color:var(--red);font-size:11px">• atrasado</span>':''} · 🧾 Nota${nota.num?' '+nota.num:''} <span style="color:var(--mut);font-size:11px;font-weight:400">parcela ${nota.parcela}/${nota.nP}</span></div><div class="meta">${nota.n} ${nota.n===1?'produto':'produtos'} · nota de ${fmt(nota.tot)} · ${m.contraparte||'—'} · toque pra ver a nota</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${cor}">${fmt(valor)}</div></div></div></div>`;
     return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px"><div onclick="abrir('${m.id}')" style="flex:1;cursor:pointer"><div class="ttl">${dBR(data)}${atras?' <span style="color:var(--red);font-size:11px">• atrasado</span>':''}</div><div class="meta">${m.obs||m.colecao||m.cat||'—'} · ${m.contraparte||'—'}</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${cor}">${fmt(valor)}</div>${podePagar?`<button class="x" style="color:var(--green);margin-top:4px" onclick="event.stopPropagation();marcarPago('${m.id}')">✓ paguei</button>`:''}</div></div></div>`;};
-  const pessTodos=[...new Set(ap.concat(ar).map(x=>x.m.contraparte||'—'))].sort();
+  const pg=contasPagas();
+  const pessTodos=[...new Set(ap.concat(ar).concat(pg).map(x=>x.m.contraparte||'—'))].sort();
   const fAp=ctPess?ap.filter(x=>(x.m.contraparte||'—')===ctPess):ap;
   const fAr=ctPess?ar.filter(x=>(x.m.contraparte||'—')===ctPess):ar;
+  const fPg=ctPess?pg.filter(x=>(x.m.contraparte||'—')===ctPess):pg;
   const fApT=fAp.reduce((s,x)=>s+x.valor,0),fArT=fAr.reduce((s,x)=>s+x.valor,0);
   const gK=x=>ctAgrupo==='pessoa'?(x.m.contraparte||'—'):((x.venc||x.data).toISOString().slice(0,7));
   const gR=k=>ctAgrupo==='pessoa'?k:rotuloPer(k,'mes');
@@ -539,6 +581,7 @@ function vContas(){
       <div class="mini"><div class="k">Falta receber${ctPess?' (filtrado)':''}</div><div class="v" style="color:var(--amber)">${fmt(fArT)}</div></div></div>${controles}</div>
     <div class="sec">A pagar — toque no grupo pra abrir</div>${bloco(fAp,'var(--red)','Nada a pagar. 🎉','p:')}
     <div class="sec">A receber — vendas no app</div>${bloco(fAr,'var(--amber)','Nada a receber agora.','r:')}
+    <div class="sec">✓ Pagas — histórico <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">(à vista na emissão · parcelas vencidas · despesas pagas)</span></div>${bloco(fPg,'var(--mut)','Nada pago ainda.','g:')}
     <div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button></div>`;
 }
 function abrirNota(nid){const itens=movs.filter(m=>m.notaId===nid);if(!itens.length){toast('Nota não encontrada');return;}const h=itens[0];
@@ -828,6 +871,9 @@ function excluir(id){const m=movs.find(x=>x.id===id);
   if(m&&m.serieId&&m.status==='apagar'){const n=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar').length;
     if(!confirm(`É uma despesa fixa. Excluir esta e as próximas previsões a pagar (${n} no total)?`))return;
     movs=movs.filter(x=>!(x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar'));save();render();return;}
+  if(m&&m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')){
+    if(!confirm('⚠️ Excluir apaga a COMPRA e o CUSTO dela dos números — como se você nunca tivesse comprado.\n\nUse só pra lançamento ERRADO. Se o item saiu de verdade (vendeu, guardou, trocou), use o botão certo — o custo fica registrado.\n\nExcluir mesmo assim?'))return;
+    movs=movs.filter(x=>x.id!==id);save();render();toast('Compra excluída (custo removido)');return;}
   if(confirm('Excluir este lançamento?')){movs=movs.filter(x=>x.id!==id);save();render();}}
 function marcarPago(id){const m=movs.find(x=>x.id===id);if(m){m.status='pago';m.dataPagamento=new Date().toISOString().slice(0,10);save();render();}}
 function toggleExp(id){expandId=expandId===id?null:id;render();}
