@@ -164,6 +164,47 @@ function baixarBoosters(loteId,nBoo,novaSit,extras){const lote=movs.find(m=>m.id
     else lote.valor=Math.round((vLote-vPed)*100)/100;}
   movs.push(ped);return ped;}
 
+/* ===== FOTOS — nuvem: docs separados em controle/dados/fotos (doc único de 1MB não comporta imagem); local: IndexedDB ===== */
+let _idb=null,_fotosCache=[];
+function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',1);
+  rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});};
+  rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);}catch(e){cb(null);}}
+function fotoAdd(movId,b64,cb){const fid='f'+Date.now()+Math.floor(Math.random()*1e4);
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId,b64,ts:Date.now()}).then(()=>cb(true)).catch(e=>{alert('A nuvem recusou a foto — quase certo que falta publicar a REGRA de fotos no Firebase (está no chat do Claude). Detalhe: '+(e&&e.message));cb(false);});}
+  else idbOpen(db=>{if(!db){alert('Não consegui abrir o armazenamento de fotos deste aparelho.');cb(false);return;}
+    const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId,b64,ts:Date.now()});tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
+function fotoList(movId,cb){
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').where('movId','==',movId).get().then(q=>{const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));L.sort((a,b)=>(a.ts||0)-(b.ts||0));cb(L);}).catch(()=>cb([]));}
+  else idbOpen(db=>{if(!db){cb([]);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();
+    cur.onsuccess=e=>{const c=e.target.result;if(c){if(c.value.movId===movId)L.push(c.value);c.continue();}else{L.sort((a,b)=>(a.ts||0)-(b.ts||0));cb(L);}};cur.onerror=()=>cb(L);});}
+function fotoDel(fid,cb){
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).delete().then(()=>cb(true)).catch(()=>cb(false));}
+  else idbOpen(db=>{if(!db){cb(false);return;}const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').delete(fid);tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
+function fotoComprime(file,cb){const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{
+  let w=img.width,h=img.height;const MX=1280;if(w>=h&&w>MX){h=Math.round(h*MX/w);w=MX;}else if(h>w&&h>MX){w=Math.round(w*MX/h);h=MX;}
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);
+  cb(cv.toDataURL('image/jpeg',0.72));};img.onerror=()=>cb(null);img.src=e.target.result;};rd.onerror=()=>cb(null);rd.readAsDataURL(file);}
+function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
+  const old=document.getElementById('modal');if(old)old.remove();
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">📷 Fotos do lançamento</div>
+    <div class="ctx">Nota, boleto, comprovante ou a própria carta — fica guardado junto do lançamento${USAR_NUVEM?' na nuvem (você e a Laura veem em qualquer aparelho)':' neste aparelho'}.</div>
+    <div id="fotoGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0"><div class="meta" style="grid-column:1/-1">carregando…</div></div>
+    <input type="file" id="fotoFile" accept="image/*" style="display:none" onchange="fotoEscolhida('${movId}',this)">
+    <button class="btn" onclick="document.getElementById('fotoFile').click()">📷 adicionar foto</button>
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal();render()">fechar</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);
+  fotoRefresh(movId);}
+function fotoRefresh(movId){fotoList(movId,L=>{_fotosCache=L;const g=document.getElementById('fotoGrid');if(!g)return;
+  g.innerHTML=L.length?L.map(f=>`<img src="${f.b64}" style="width:100%;height:92px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="verFoto('${f.id}','${movId}')">`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda.</div>';
+  const m=movs.find(x=>x.id===movId);if(m&&(+m.nFotos||0)!==L.length){m.nFotos=L.length;save();}});}
+function fotoEscolhida(movId,inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
+  const g=document.getElementById('fotoGrid');if(g)g.innerHTML='<div class="meta" style="grid-column:1/-1">guardando foto…</div>';
+  fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');fotoRefresh(movId);return;}
+    fotoAdd(movId,b64,ok=>{if(ok)toast('Foto guardada ✓');fotoRefresh(movId);});});}
+function verFoto(fid,movId){const f=_fotosCache.find(x=>x.id===fid);if(!f)return;
+  const v=`<div id="fotoview" onclick="this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px"><img src="${f.b64}" style="max-width:96%;max-height:80%;border-radius:8px"><button class="btn g" style="width:auto;padding:10px 18px" onclick="event.stopPropagation();if(confirm('Excluir esta foto?')){fotoDel('${fid}',ok=>{if(ok)toast('Foto excluída');document.getElementById('fotoview')&&document.getElementById('fotoview').remove();fotoRefresh('${movId}');});}">🗑 excluir</button><div style="color:#aaa;font-size:12px">toque fora da foto pra fechar</div></div>`;
+  document.body.insertAdjacentHTML('beforeend',v);}
 function unHintGen(selId,rowId,togId,hintId,un){const sel=document.getElementById(selId),row=document.getElementById(rowId);if(!sel||!row)return;const it=movs.find(m=>m.id===sel.value);const bpu=it?Math.max(1,+it.boosters||1):1;
   if(bpu<=1){row.style.display='none';return;}
   row.style.display='block';const q=+it.qtd||1;
@@ -274,7 +315,8 @@ function vPainel(){
       <div class="mini click" onclick="consF='COMPRA';go('consultar')"><div class="k">Investido total ${per?'(período)':''}</div><div class="v">${fmt(r.investido+r.despTotal)}</div>${r.despTotal>0?`<div style="font-size:11px;color:var(--mut);margin-top:4px;line-height:1.7">📦 ${fmt(r.investido)} <span style="opacity:.7">mercadoria</span><br>🧾 ${fmt(r.despTotal)} <span style="opacity:.7">infraestrutura</span></div>`:`<div class="s">o que comprou →</div>`}</div>
       <div class="mini click" onclick="consF='VENDA';go('consultar')"><div class="k">Vendido ${per?'(período)':'(tudo)'}</div><div class="v" style="color:var(--green)">${fmt(r.vendasLiq)}</div><div class="s">líquido →</div></div>
       <div class="mini click" onclick="consF='ESTOQUE';go('consultar')"><div class="k">Estoque pra vender</div><div class="v" style="color:var(--blue)">${fmt(r.estoque)}</div><div class="s">a custo · hoje →</div></div>
-      <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div></div></div>
+      <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div></div>
+      ${contasBanc.length?`<div class="mini click" onclick="go('contas')"><div class="k">💼 Saldo em contas</div><div class="v" style="color:${contasBanc.reduce((s,cb)=>s+saldoConta(cb),0)>=0?'var(--green)':'var(--red)'}">${fmt(contasBanc.reduce((s,cb)=>s+saldoConta(cb),0))}</div><div class="s">${contasBanc.length} conta${contasBanc.length===1?'':'s'} · detalhe no Fluxo →</div></div>`:''}</div>
     <div class="sec">Contas <span style="text-transform:none;font-weight:400">(o que falta pagar e receber)</span></div>
     <div class="grid2">
       <div class="mini click" onclick="go('contas')"><div class="k">A pagar (parcelas)</div><div class="v" style="color:var(--red)">${fmt(apT)}</div><div class="s">${apMes>0?fmt(apMes)+' vence este mês':'nada vence este mês'} →</div></div>
@@ -592,6 +634,7 @@ function vConsultar(){
       </div>
       ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
         ${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ guardar</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
+        <button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${(+m.nFotos||0)>0?' ('+m.nFotos+')':''}</button>
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
     </div>`;}).join(''):`<div class="empty">Nada nesse filtro.</div>`;
@@ -642,6 +685,7 @@ function vContas(){
     ${fxBar}
     <div class="sec">A pagar — toque no grupo pra abrir</div>${bloco(fAp,'var(--red)','Nada a pagar. 🎉','p:')}
     <div class="sec">A receber — vendas no app</div>${bloco(fAr,'var(--amber)','Nada a receber agora.','r:')}
+    ${contasBanc.length?`<div class="sec">💼 Saldo por conta <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— inicial + entrou − saiu (por emissão)</span></div>${contasBanc.slice().sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(cb=>{const s=saldoConta(cb);return `<div class="item" style="justify-content:space-between;align-items:center;cursor:pointer" onclick="extConta='${(cb.nome||'').replace(/'/g,"\\'")}';relExtrato=true;go('relatorios')"><div><b>${cb.nome}</b><div class="meta">${cb.saldoIni!=null?'inicial '+fmt(+cb.saldoIni||0)+(cb.saldoData?' em '+cb.saldoData.split('-').reverse().join('/'):''):'sem saldo inicial — toque em Cadastros pra definir'} · toque p/ ver o extrato</div></div><b style="color:${s>=0?'var(--green)':'var(--red)'}">${fmt(s)}</b></div>`;}).join('')}`:''}
     <div class="sec">✓ Pagas — histórico <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">(à vista na emissão · parcelas vencidas · despesas pagas)</span></div>${bloco(fPg,'var(--mut)','Nada pago ainda.','g:')}
     <div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button></div>`;
 }
@@ -938,7 +982,8 @@ function vCadastros(){
   if(cadTab==='contas')return `${volta}<div class="sec" style="margin-top:0">🏦 Contas <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— bancos, Pix, cartão (aparecem nos lançamentos)</span></div>
     <button class="btn g" onclick="abrirConta()">+ nova conta</button><div style="margin-top:10px">${linCB}</div>`;
   return `${volta}<div class="sec" style="margin-top:0">📚 Coleções por jogo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— grupos/anos, renomear, excluir</span></div>
-    <div class="acoes">${jogos.map(j=>`<button class="btn g" onclick="abrirCols('${j.replace(/'/g,"\\'")}')">${j}</button>`).join('')}</div>`;
+    <div class="acoes">${jogos.map(j=>`<button class="btn g" onclick="abrirCols('${j.replace(/'/g,"\\'")}')">${j}</button>`).join('')}</div>
+    <button class="btn g" style="margin-top:8px" onclick="abrirJogos()">✎ gerenciar jogos <span style="color:var(--mut);font-size:11px">(adicionar, renomear, excluir)</span></button>`;
 }
 function historicoDe(nome){consQ=nome;consF='tudo';expandId=null;go('consultar');}
 function abrirConta(id){let c;if(id&&id.indexOf('auto:')===0){c={nome:id.slice(5)};id=null;}else c=id?contasBanc.find(x=>x.id===id):{};c=c||{};
@@ -948,17 +993,27 @@ function abrirConta(id){let c;if(id&&id.indexOf('auto:')===0){c={nome:id.slice(5
     ${f('nome','Nome no app (como aparece nos lançamentos)','ex: Nubank PJ / Pix Laura')}
     <div class="row2"><div>${f('banco','Banco','ex: Nubank')}</div><div>${f('nbanco','Nº do banco','ex: 260')}</div></div>
     <div class="row2"><div>${f('agencia','Agência','')}</div><div>${f('numero','Nº da conta','')}</div></div>
-    ${f('titular','Titular','nome do dono da conta')}${f('obs','Observação','')}
+    ${f('titular','Titular','nome do dono da conta')}
+    <div class="row2"><div><label>Saldo inicial (R$)</label><input id="cb_saldoIni" type="number" inputmode="decimal" value="${c.saldoIni??''}" placeholder="0,00"></div>
+      <div><label>Saldo vale a partir de</label><input id="cb_saldoData" type="date" value="${c.saldoData||''}"></div></div>
+    <div class="ctx">O app soma o que <b>entrou</b> e <b>saiu</b> dessa conta a partir dessa data e mostra o <b>saldo atual</b> no Fluxo de caixa.</div>
+    ${f('obs','Observação','')}
     <button class="btn" style="margin-top:12px" onclick="salvarConta('${id||''}')">Salvar conta</button>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal()">cancelar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);}
 function salvarConta(id){const g=k=>document.getElementById('cb_'+k)?.value;const nome=(g('nome')||'').trim();if(!nome){alert('Informe o nome da conta.');return;}
   const antigo=id?(contasBanc.find(x=>x.id===id)?.nome||null):null;
-  const o={id:id||('b'+Date.now()),nome,banco:g('banco')||'',nbanco:g('nbanco')||'',agencia:g('agencia')||'',numero:g('numero')||'',titular:g('titular')||'',obs:g('obs')||''};
+  const o={id:id||('b'+Date.now()),nome,banco:g('banco')||'',nbanco:g('nbanco')||'',agencia:g('agencia')||'',numero:g('numero')||'',titular:g('titular')||'',saldoIni:(g('saldoIni')===''||g('saldoIni')==null)?null:+g('saldoIni'),saldoData:g('saldoData')||'',obs:g('obs')||''};
   if(id){const i=contasBanc.findIndex(x=>x.id===id);if(i>=0)contasBanc[i]=o;}else contasBanc.push(o);
   if(antigo&&antigo!==nome){const pi=pgs.indexOf(antigo);if(pi>=0)pgs[pi]=nome;else if(!pgs.includes(nome))pgs.push(nome);movs.forEach(m=>{if(m.conta===antigo)m.conta=nome;});save();}
   else if(!pgs.includes(nome))pgs.push(nome);
   salvarCB();saveL();fecharModal();render();}
+function saldoConta(cb){const hoje=new Date().toISOString().slice(0,10);let s=+cb.saldoIni||0;
+  movs.forEach(m=>{if((m.conta||'')!==cb.nome)return;if(cb.saldoData&&(m.data||'')<cb.saldoData)return;
+    if(m.tipo==='VENDA')s+=(+m.valor||0)*(1-(+m.taxa||0)/100);
+    else if(m.tipo==='COMPRA'&&!m.origem)s-=(+m.valor||0);
+    else if(m.tipo==='DESPESA'){if(m.status==='apagar'&&m.data>hoje)return;s-=(+m.valor||0);}});
+  return Math.round(s*100)/100;}
 function excluirConta(id){const c=contasBanc.find(x=>x.id===id);if(!c)return;
   const uso=movs.filter(m=>m.conta===c.nome).length;
   if(!confirm('Excluir o cadastro da conta "'+c.nome+'"?'+(uso?'\n\nEla tem '+uso+' lançamento(s) — eles continuam, só os dados bancários somem.':'')))return;
