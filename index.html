@@ -109,6 +109,7 @@ let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:
 let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='',relExtrato=false;
 let consOrd='emissao',consGrupoFech={},_gKeys=[],ctAgrupo='mes',ctPess='',ctExp={},_ctKeys=[],relFOpen=false,relDet=false;
 let _preSel=null,vendaJogoF='',vvOrig='avulso',selMode=false,selIds={},ctJogo='',relChart=false;
+let relDim={est:'colecao',col:'colecao',compra:'pessoa',venda:'pessoa'};
 function togSel(id){if(selIds[id])delete selIds[id];else selIds[id]=1;render();}
 function juntarNota(){const ids=Object.keys(selIds);const its=movs.filter(m=>ids.includes(m.id)&&m.tipo==='COMPRA');
   if(its.length<2){alert('Marque pelo menos 2 compras pra juntar numa nota.');return;}
@@ -735,10 +736,13 @@ function vRelatorios(){
   const jogos={};
   comp.forEach(m=>{const j=m.jogo||'Pokémon',o=(jogos[j]=jogos[j]||{inv:0,vend:0,est:0,cmv:0});o.inv+=+m.valor||0;const s=sitDe(m);if(s==='Em estoque')o.est+=+m.valor||0;else if(s==='Vendido')o.cmv+=+m.valor||0;});
   vend.forEach(m=>{const j=m.jogo||'Pokémon';(jogos[j]=jogos[j]||{inv:0,vend:0,est:0,cmv:0}).vend+=(+m.valor||0)*(1-(+m.taxa||0)/100);});
-  const estCol={},forn={},cli={},estColM={},fornM={},cliM={};
-  comp.filter(m=>sitDe(m)==='Em estoque').forEach(m=>{const c=m.colecao||'(sem coleção)';estCol[c]=(estCol[c]||0)+(+m.valor||0);(estColM[c]=estColM[c]||[]).push(m);});
-  compPer.forEach(m=>{const f=m.contraparte||'—';forn[f]=(forn[f]||0)+(+m.valor||0);(fornM[f]=fornM[f]||[]).push(m);});
-  vendPer.forEach(m=>{const c=m.contraparte||'—';cli[c]=(cli[c]||0)+(+m.valor||0)*(1-(+m.taxa||0)/100);(cliM[c]=cliM[c]||[]).push(m);});
+  const dimK=(m,d)=>d==='pessoa'?(m.contraparte||'—'):d==='jogo'?(m.jogo||'Pokémon'):d==='cat'?(m.cat||'(sem tipo)'):(m.colecao||'(sem coleção)');
+  const agg=(lista,d,liq)=>{const o={},M={};lista.forEach(m=>{const k=dimK(m,d);o[k]=(o[k]||0)+(liq?(+m.valor||0)*(1-(+m.taxa||0)/100):(+m.valor||0));(M[k]=M[k]||[]).push(m);});return[o,M];};
+  const cardComp=(icone,titulo,sub,key,lista,cor,liq,pessLabel)=>{const dim=relDim[key],r=agg(lista,dim,liq),o=r[0],M=r[1];
+    const DIMS=[['colecao','ver por coleção'],['pessoa','ver por '+pessLabel],['jogo','ver por jogo'],['cat','ver por tipo de produto']];
+    return `<div class="card"><div class="sec" style="margin-top:0">${icone} ${titulo} <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— ${sub}</span></div>
+      <select style="margin-bottom:10px" onchange="relDim.${key}=this.value;render()">${DIMS.map(([v,l])=>`<option value="${v}" ${dim===v?'selected':''}>${l}</option>`).join('')}</select>
+      ${relDet?barDet(o,M,cor,liq):bar(o,cor)}</div>`;};
   const barDet=(obj,map,cor,liq)=>{const e=Object.entries(obj).sort((a,b)=>b[1]-a[1]),tot=Object.values(obj).reduce((s,v)=>s+v,0);
     if(!e.length)return `<div class="meta">sem dados no período</div>`;
     return e.map(([k,v])=>{const its=(map[k]||[]).slice().sort((a,b)=>(a.data||'')<(b.data||'')?1:-1);
@@ -759,9 +763,10 @@ function vRelatorios(){
     ${relExtrato?`<div class="card"><div class="sec" style="margin-top:0">🧾 Extrato de caixa <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— tipo extrato bancário</span></div>${extratoHtml()}</div>`:''}
     <div class="card"><div class="sec" style="margin-top:0">📈 Linha do tempo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— toque nos fluxos pra escolher · toque no período pra abrir</span></div>${granSel}${timelineHtml()}</div>
     <div class="card"><div class="sec" style="margin-top:0">Por jogo</div>${jb}</div>
-    <div class="card"><div class="sec" style="margin-top:0">💰 Estoque parado por coleção <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— saldo hoje</span></div>${relDet?barDet(estCol,estColM,'var(--blue)'):bar(estCol,'var(--blue)')}</div>
-    <div class="card"><div class="sec" style="margin-top:0">📥 Comprei de cada fornecedor <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— no período</span></div>${relDet?barDet(forn,fornM,'var(--red)'):bar(forn,'var(--red)')}</div>
-    <div class="card"><div class="sec" style="margin-top:0">📤 Vendi pra cada cliente <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— no período</span></div>${relDet?barDet(cli,cliM,'var(--green)',true):bar(cli,'var(--green)')}</div>
+    ${cardComp('💰','Estoque parado','saldo hoje','est',comp.filter(m=>sitDe(m)==='Em estoque'),'var(--blue)',false,'fornecedor')}
+    ${cardComp('⭐','Na coleção','custo do guardado, hoje','col',comp.filter(m=>sitDe(m)==='Coleção'),'var(--amber)',false,'fornecedor')}
+    ${cardComp('📥','Comprei','no período','compra',compPer,'var(--red)',false,'fornecedor')}
+    ${cardComp('📤','Vendi','no período · líquido','venda',vendPer,'var(--green)',true,'cliente')}
     <div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button><button class="btn g" onclick="baixarBackup()">⬇ Backup</button></div>`;
 }
 function salvar(){
