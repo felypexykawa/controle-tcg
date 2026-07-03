@@ -105,12 +105,14 @@ let despCats=get('tcg_despcats',['Luz','Aluguel','Advogado','Internet','Sleeves'
 let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
 let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
 let tela='simular',tipoSel='COMPRA',editId=null,perDe='',perAte='',perSel='tudo',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
-let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:''};
+let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
 let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='',relExtrato=false;
 let consOrd='emissao',consGrupoFech={},_gKeys=[],ctAgrupo='mes',ctPess='',ctExp={},_ctKeys=[],relFOpen=false,relDet=false;
 let _preSel=null,vendaJogoF='',vvOrig='avulso',selMode=false,selIds={},ctJogo='',relChart=false;
-let relDimAll='colecao',extConta='',extOrdem='desc',cadTab='';
+let relDimAll='colecao',extConta='',extOrdem='desc',cadTab='',ctFOpen=false,consFOpen=false;
+function perRotTxt(){return perSel==='custom'?((perDe?perDe.split('-').reverse().join('/'):'…')+' → '+(perAte?perAte.split('-').reverse().join('/'):'hoje')):((PERS.find(p=>p[0]===perSel)||['','Tudo'])[1]);}
+function fBtnMini(aberto,resumo,click){return `<div class="mini click" style="margin-bottom:8px;padding:9px 12px;${aberto?'outline:1.5px solid var(--blue)':''}" onclick="${click}"><div class="k">🔎 Filtros ${aberto?'▾':'▸'}</div><div class="s">${resumo||'tudo'}</div></div>`;}
 function togSel(id){if(selIds[id])delete selIds[id];else selIds[id]=1;render();}
 let fxSelMode=false,fxSel={},ctConta='';
 function togFxSel(id){if(fxSel[id])delete fxSel[id];else fxSel[id]=1;render();}
@@ -333,8 +335,8 @@ function vLancar(){
       campos+= !editId?`<label style="margin-top:0">De onde sai a carta?</label><div class="toggle" id="vdetog"><div class="o ${vendaDe==='estoque'?'on':''}" onclick="setVendaDe('estoque')">📦 Estoque</div><div class="o ${vendaDe==='colecao'?'on':''}" onclick="setVendaDe('colecao')">⭐ Coleção</div><div class="o ${vendaDe==='avulsa'?'on':''}" onclick="setVendaDe('avulsa')">✍ Avulsa</div></div>`:'';
       if(avulso){campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125">`;}
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125">
+      <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>`;}
       else{let itens=vendaDe==='estoque'?motor().disp:movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
         const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
         if(vendaJogoF&&jgsIt.includes(vendaJogoF))itens=itens.filter(d=>(d.jogo||'Pokémon')===vendaJogoF);
@@ -368,6 +370,7 @@ function vLancar(){
       <div class="row2"><div><label>Valor (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}"></div>
         <div><label>Situação</label><div class="toggle" id="stattog"><div class="o ${despStat==='pago'?'on':''}" data-v="pago" onclick="togStat('pago')">Pago</div><div class="o ${despStat==='apagar'?'on':''}" data-v="apagar" onclick="togStat('apagar')">A pagar</div></div></div></div>
       <label>Pra quem paguei (opcional)</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pess,e?.contraparte)}</select>
+      <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="f_conta" onchange="novo(this,'pg')">${selOpts(pgs,e?.conta)}</select>
       <label>Observação (opcional)</label><input id="f_obs" value="${e?.obs||''}">
       ${!editId?`<label>Repetição</label>
       <div class="toggle" id="fixtog"><div class="o ${!despFixa?'on':''}" data-v="0" onclick="togFixa(0)">Avulsa · uma vez</div><div class="o ${despFixa?'on':''}" data-v="1" onclick="togFixa(1)">Fixa · repete</div></div>
@@ -407,6 +410,7 @@ function notaForm(){
     <div class="calc" id="ratPrev" style="margin-top:10px">${ratTexto()}</div>
     <label>Fornecedor</label><select id="n_cp" onchange="novo(this,'pess');notaHead.cp=this.value">${selOpts(pess,notaHead.cp)}</select>
     <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="n_conta" onchange="novo(this,'pg');notaHead.conta=this.value">${selOpts(pgs,notaHead.conta)}</select>
+    <label>Observação da nota (opcional)</label><input id="n_obs" value="${notaHead.obs||''}" oninput="notaHead.obs=this.value">
     <div class="row2"><div><label>Nº da nota <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="n_num" value="${notaHead.num||''}" placeholder="ex: NF 1234" oninput="notaHead.num=this.value"></div>
       <div><label>Situação</label><select id="n_sit" onchange="notaHead.sit=this.value">${['Em estoque','Vendido','Coleção'].map(x=>`<option ${notaHead.sit===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
     <label>Pagamento da nota <span style="color:var(--mut);font-size:10px">(um pagamento só — a nota inteira)</span></label><div class="toggle" id="npgtog"><div class="o ${notaHead.pg!=='Parcelado'?'on':''}" onclick="notaHead.pg='À vista';render()">À vista</div><div class="o ${notaHead.pg==='Parcelado'?'on':''}" onclick="notaHead.pg='Parcelado';render()">Parcelado</div></div>
@@ -434,8 +438,8 @@ function salvarNota(){
   const sit=notaHead.sit||'Em estoque',cp=(notaHead.cp&&notaHead.cp!=='__add__')?notaHead.cp:'',data=notaHead.data||new Date().toISOString().slice(0,10);
   const nid='n'+Date.now();let k=0;
   notaItens.forEach(it=>{const r=tot>0?(it.valor/tot)*extra:0,custo=Math.round((it.valor+r)*100)/100;
-    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:r>0?`nota · +${fmt(r)} frete/taxa`:'nota'});});
-  const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
+    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:(r>0?`nota · +${fmt(r)} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});});
+  const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
   const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.origemId?'📦 ':''}${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span>${it.origemId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd+(it.un==='boo'?' boosters':''):''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
   const tot=vendaItens.reduce((s,it)=>s+(+it.valor||0),0),app=vendaHead.canal==='App';
@@ -450,7 +454,7 @@ function vendaForm(){
       :`<div class="meta">Nada em estoque — use "avulso".</div>`)
       :`<div class="row2"><div><label style="margin-top:0">Jogo</label><select id="v_jogo" onchange="reColV(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label style="margin-top:0">Tipo de produto</label><select id="v_cat" onchange="novo(this,'cat')">${selOpts(cats)}</select></div></div>
-      <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="v_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
+      <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('v_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="v_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
       <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="v_cod" placeholder="ex: SV3-125">
       <div class="row2"><div><label>Idioma</label><select id="v_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Qtd</label><input id="v_qtd" type="number" inputmode="numeric" value="1"></div></div>
@@ -503,9 +507,12 @@ function trocaForm(){
       <div class="row2"><div><label style="margin-top:0">O que recebi</label><input id="r_desc" placeholder="ex: SAR Kubone"></div>
         <div><label style="margin-top:0">Vale (mercado, R$)</label><input id="r_val" type="number" inputmode="decimal"></div></div>
       <div class="row2"><div><label>Jogo</label><select id="r_jogo" onchange="reColR(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
-        <div><label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="r_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select></div></div>
+        <div><label>Tipo de produto</label><select id="r_cat" onchange="novo(this,'cat')">${selOpts(cats,'Single/Carta')}</select></div></div>
+      <label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="r_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="r_cod" placeholder="ex: SV3-125">
       <div class="row2"><div><label>Idioma</label><select id="r_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Situação</label><select id="r_sit">${['Em estoque','Coleção'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
+      <div class="row2"><div><label>Boosters / un. <span style="color:var(--mut);font-size:10px">(se caixa/ETB)</span></label><input id="r_boo" type="number" inputmode="numeric" value="0"></div><div></div></div>
       <button class="btn g" style="margin-top:10px" onclick="addRecebi()">+ adicionar recebido</button></div>
     <label>Com quem troquei</label><select id="t_cp" onchange="novo(this,'pess')">${selOpts(pess)}</select>
     <div class="calc" id="trocaRat" style="margin-top:10px">${trocaRatTxt()}</div>`;
@@ -516,7 +523,7 @@ function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_it
   if(q>dispM){alert('Você só tem '+dispM+(boo?' boosters':' em estoque')+' desse item.');return;}
   trocaDei.push({desc:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))).slice(0,40)+(boo?' ('+q+' boosters)':(dispM>1?' ('+q+' un)':'')),custo:Math.round(vU*q*100)/100,estoqueId:id,estoqueQtd:q,deiBoo:boo});}else{const desc=document.getElementById('d_desc')?.value||'material',custo=+document.getElementById('d_custo')?.value||0;trocaDei.push({desc,custo});}render();}
 function removeDei(i){trocaDei.splice(i,1);render();}
-function addRecebi(){const desc=document.getElementById('r_desc')?.value||'item',val=+document.getElementById('r_val')?.value||0,col=document.getElementById('r_col')?.value,sit=document.getElementById('r_sit')?.value||'Em estoque',jogo=document.getElementById('r_jogo')?.value||'Pokémon',idi=document.getElementById('r_idi')?.value||'—';trocaRecebi.push({desc,valorMercado:val,colecao:(col&&col!=='__add__')?col:'',sit,jogo,idioma:idi});render();}
+function addRecebi(){const g=id=>document.getElementById(id)?.value;const desc=g('r_desc')||'item',val=+g('r_val')||0,col=g('r_col'),sit=g('r_sit')||'Em estoque',jogo=g('r_jogo')||'Pokémon',idi=g('r_idi')||'—';const cat=(g('r_cat')&&g('r_cat')!=='__add__')?g('r_cat'):'Single/Carta';trocaRecebi.push({desc,valorMercado:val,colecao:(col&&col!=='__add__')?col:'',sit,jogo,idioma:idi,cat,codigo:(g('r_cod')||'').trim(),boosters:+g('r_boo')||0});render();}
 function removeRecebi(i){trocaRecebi.splice(i,1);render();}
 function trocaRatPrev(){const el=document.getElementById('trocaRat');if(el)el.innerHTML=trocaRatTxt();}
 function trocaRatTxt(){const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+(+trocaDin||0),vTot=trocaRecebi.reduce((s,r)=>s+(+r.valorMercado||0),0);
@@ -532,23 +539,25 @@ function salvarTroca(){
   trocaDei.forEach(d=>{if(d.estoqueId){const ex={dataSaida:data};if(d.deiBoo)baixarBoosters(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);else baixarLote(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);}});
   const deiDesc=trocaDei.map(d=>d.desc).join(' + ')||'dinheiro';
   trocaRecebi.forEach(r=>{const c=vTot>0?custoTot*(r.valorMercado/vTot):custoTot/trocaRecebi.length;
-    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:'Single/Carta',colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
+    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:r.cat||'Single/Carta',codigo:r.codigo||'',boosters:+r.boosters||0,colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
   const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
 function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulação',custo:Math.round(v.custoMat*100)/100}];trocaDin=v.din||0;trocaRecebi=[{desc:'carta',valorMercado:v.V,colecao:'',sit:'Em estoque'}];deiModo='avulso';tipoSel='TROCA';go('lancar');toast('Troca pré-preenchida — ajuste e registre');}
 
 function vConsultar(){
   const jogosUsados=[...new Set(movs.map(m=>m.jogo||'Pokémon'))];
   const segJogo=jogosUsados.length>1?`<div class="seg" style="margin-top:6px">${[['todos','Todos']].concat(jogosUsados.map(j=>[j,j])).map(([k,l])=>`<button class="${consJogo===k?'on':''}" onclick="consJogo='${k}';render()">${l}</button>`).join('')}</div>`:'';
+  const resCons=[perRotTxt(),(jogosUsados.length>1&&consJogo!=='todos')?consJogo:''].filter(Boolean).join(' · ');
+  const fCons=fBtnMini(consFOpen,resCons,'consFOpen=!consFOpen;render()')+(consFOpen?selPeriodo()+segJogo+`<button class="btn g" style="margin:8px 0" onclick="consFOpen=false;render()">fechar filtros</button>`:'');
   if(consMenu){
     const cards=[['tudo','🗂','Tudo','todos os lançamentos'],['COMPRA','🛒','Compras','o que você comprou'],['VENDA','💰','Vendas','o que você vendeu'],['ESTOQUE','📦','Estoque','parado pra vender'],['COLECAO','⭐','Coleção','o que você guardou'],['DESPESA','🧾','Despesas','custos do negócio'],['CADASTRO','👤','Cadastros','clientes, contas, coleções']];
     const grid=cards.map(([k,ic,t,d])=>`<div class="mini click" style="text-align:center;padding:15px 8px" onclick="verFiltro('${k}')"><div style="font-size:25px;line-height:1">${ic}</div><div style="font-weight:700;margin-top:6px">${t}</div><div class="s" style="margin-top:1px">${d}</div></div>`).join('');
-    return `${selPeriodo()}${segJogo}<div class="ctx">O que você quer consultar?</div><div class="grid2">${grid}</div>`;
+    return `${fCons}<div class="ctx">O que você quer consultar?</div><div class="grid2">${grid}</div>`;
   }
   const voltar=`<div class="lnk" onclick="consMenu=true;consQ='';render()" style="margin-bottom:2px">← filtros</div>`;
   if(consF==='CADASTRO')return voltar+vCadastros();
   if(movs.length===0)return `<div class="card"><div class="empty">Nada lançado ainda.</div></div>`;
   const q=consQ.toLowerCase();
-  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(jogosUsados.length<=1||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')).toLowerCase().includes(q));
+  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(jogosUsados.length<=1||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
   const doTipo=movs.filter(porTipo);
   let ord=doTipo.filter(m=>noPer(m.data));
   const cmpData=(a,b)=>(a.data||'')<(b.data||'')?1:-1;
@@ -593,7 +602,7 @@ function vConsultar(){
   const totBar=ord.length?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);color:var(--ink)"><span style="color:var(--mut)">${ord.length} ${ord.length===1?'lançamento':'lançamentos'}${rotuloTot?' · '+rotuloTot:''}</span>${rotuloTot?`<b style="font-size:15px">${fmt(totConsulta)}</b>`:''}</div>`:'';
   const ordBar=ord.length?`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><select style="flex:1" onchange="consOrd=this.value;consGrupoFech={};render()">${[['emissao','Ordenar por: data de emissão'],['jogo','Ordenar por: jogo'],['pessoa','Ordenar por: cliente / fornecedor'],['conta','Ordenar por: conta']].map(([v,l])=>`<option value="${v}" ${consOrd===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="selMode=!selMode;selIds={};render()">${selMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosGrupos()">${Object.keys(consGrupoFech).length?'expandir tudo':'recolher tudo'}</span></div>`:'';
   const selBar=selMode?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;background:var(--infobg);color:var(--blue)"><span>${Object.keys(selIds).length} marcado(s) — toque nas COMPRAS pra marcar</span><button class="x" style="color:var(--blue);font-weight:700" onclick="juntarNota()">🧾 juntar em nota</button></div>`:'';
-  return `${selPeriodo()}${voltar}${segJogo}${chip}${aviso}${ordBar}${selBar}${totBar}${lista}${ord.length?`<div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button></div>`:''}`;
+  return `${voltar}${fCons}${chip}${aviso}${ordBar}${selBar}${totBar}${lista}${ord.length?`<div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button></div>`:''}`;
 }
 function vContas(){
   const ap=aPagar(),ar=aReceber();const apT=ap.reduce((s,x)=>s+x.valor,0),arT=ar.reduce((s,x)=>s+x.valor,0);
@@ -616,16 +625,20 @@ function vContas(){
     const keys=Object.keys(gI).sort();keys.forEach(k=>_ctKeys.push(k));
     return keys.map(k=>{const its=gI[k],t=its.reduce((s,x)=>s+x.valor,0),open=!!ctExp[k];
       return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);border-radius:9px;padding:9px 12px;margin:8px 0 5px;cursor:pointer;font-weight:700" onclick="togCt(this.dataset.k)" data-k="${k.replace(/"/g,'&quot;')}"><span>${open?'▾':'▸'} ${gR(k.slice(2))} <span style="color:var(--mut);font-weight:400;font-size:11px">· ${its.length} ${its.length===1?'conta':'contas'}</span></span><b style="color:${cor}">${fmt(t)}</b></div>${open?its.map(x=>linha(x.venc||x.data,x.valor,x.m,cor,x.nota)).join(''):''}`;}).join('');};
-  const controles=`<div style="display:flex;gap:8px;align-items:center;margin:8px 0"><select style="flex:1" onchange="ctAgrupo=this.value;ctExp={};render()">${[['mes','Agrupar por: mês de vencimento'],['pessoa','Agrupar por: fornecedor / cliente']].map(([v,l])=>`<option value="${v}" ${ctAgrupo===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="fxSelMode=!fxSelMode;fxSel={};if(fxSelMode){ctExp={};_ctKeys.forEach(k=>ctExp[k]=true);}render()">${fxSelMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosCt()">${Object.keys(ctExp).length?'recolher tudo':'expandir tudo'}</span></div>
+  const resCt=[perRotTxt(),ctJogo,ctPess,ctConta].filter(Boolean).join(' · ');
+  const fPanel=ctFOpen?`${selPeriodo()}
     <div class="row2"><div><select onchange="ctJogo=this.value;render()"><option value="">todos os jogos</option>${jgsCt.map(j=>`<option ${ctJogo===j?'selected':''}>${j}</option>`).join('')}</select></div>
       <div><select onchange="ctPess=this.value;render()"><option value="">todos fornec. / clientes</option>${pessTodos.map(p=>`<option ${ctPess===p?'selected':''}>${p}</option>`).join('')}</select></div></div>
     <select style="margin-top:6px" onchange="ctConta=this.value;render()"><option value="">todas as contas (Pix, cartão…)</option>${ctasCt.map(c=>`<option ${ctConta===c?'selected':''}>${c}</option>`).join('')}</select>
-    ${(ctPess||ctJogo||ctConta)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:6px" onclick="ctPess='';ctJogo='';ctConta='';render()">filtrando: ${[ctJogo,ctPess,ctConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}`;
+    ${(ctPess||ctJogo||ctConta)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:6px" onclick="ctPess='';ctJogo='';ctConta='';render()">filtrando: ${[ctJogo,ctPess,ctConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
+    <button class="btn g" style="margin-top:8px" onclick="ctFOpen=false;render()">fechar filtros</button>`:'';
+  const controles=`<div style="margin-top:8px">${fBtnMini(ctFOpen,resCt,'ctFOpen=!ctFOpen;render()')}</div>${fPanel}
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0 0"><select style="flex:1" onchange="ctAgrupo=this.value;ctExp={};render()">${[['mes','Agrupar por: mês de vencimento'],['pessoa','Agrupar por: fornecedor / cliente']].map(([v,l])=>`<option value="${v}" ${ctAgrupo===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="fxSelMode=!fxSelMode;fxSel={};if(fxSelMode){ctExp={};_ctKeys.forEach(k=>ctExp[k]=true);}render()">${fxSelMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosCt()">${Object.keys(ctExp).length?'recolher tudo':'expandir tudo'}</span></div>`;
   const filtrado=(ctPess||ctJogo||ctConta||perDe||perAte)?' (filtrado)':'';
   const fxBar=fxSelMode?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;background:var(--infobg);color:var(--blue)"><span>${Object.keys(fxSel).length} marcada(s) — toque nas compras soltas pra marcar</span><button class="x" style="color:var(--blue);font-weight:700" onclick="juntarFx()">🧾 juntar em nota</button></div>`:'';
   return `<div class="card"><div class="head">Fluxo de caixa</div>
     <div class="grid2" style="margin-top:10px"><div class="mini"><div class="k">A pagar${filtrado}</div><div class="v" style="color:var(--red)">${fmt(fApT)}</div></div>
-      <div class="mini"><div class="k">A receber${filtrado}</div><div class="v" style="color:var(--amber)">${fmt(fArT)}</div></div></div>${selPeriodo()}${controles}</div>
+      <div class="mini"><div class="k">A receber${filtrado}</div><div class="v" style="color:var(--amber)">${fmt(fArT)}</div></div></div>${controles}</div>
     ${fxBar}
     <div class="sec">A pagar — toque no grupo pra abrir</div>${bloco(fAp,'var(--red)','Nada a pagar. 🎉','p:')}
     <div class="sec">A receber — vendas no app</div>${bloco(fAr,'var(--amber)','Nada a receber agora.','r:')}
@@ -794,7 +807,7 @@ function salvar(){
     const bpu=Math.max(1,+m.boosters||1),boo=(consUn==='boo'&&bpu>1);
     const disp=boo?(+m.qtd||1)*bpu:(+m.qtd||1);let n=+g('f_qtdbaixa')||1;
     if(n>disp){alert('Você só tem '+disp+(boo?' boosters':' em estoque')+' desse item.');return;}
-    const o=g('f_obs');const ex={dataSaida:new Date().toISOString().slice(0,10)};if(o)ex.obs=(m.obs?m.obs+' · ':'')+o;
+    const o=g('f_obs');const ex={dataSaida:g('f_data')||new Date().toISOString().slice(0,10)};if(o)ex.obs=(m.obs?m.obs+' · ':'')+o;
     if(boo)baixarBoosters(m.id,n,'Coleção',ex);else baixarLote(m.id,n,'Coleção',ex);
     save();toast('Guardado na coleção — '+n+(boo?' boosters':' un')+' ✓');editId=null;go('consultar');return;}
   if(tipoSel==='TROCA'){const custou=+g('f_custou')||0,din=+g('f_din')||0,recebi=g('f_desc')||'item de troca';
@@ -803,9 +816,9 @@ function salvar(){
     save();toast('Troca registrada ✓');editId=null;render();return;}
   if(tipoSel==='DESPESA'){const val=+g('f_val')||0;const cat=g('f_dcat');if(!cat||cat==='__add__'){alert('Escolha a categoria da despesa.');return;}
     const cp=(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',ob=g('f_obs')||'';
-    const base={tipo:'DESPESA',natureza:despNat,cat,valor:val,contraparte:cp,obs:ob};
+    const base={tipo:'DESPESA',natureza:despNat,cat,valor:val,contraparte:cp,obs:ob,conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):''};
     if(editId){const old=movs.find(m=>m.id===editId);
-      if(old&&old.serieId){movs.forEach(m=>{if(m.serieId===old.serieId&&m.data>=old.data&&m.status==='apagar'){m.natureza=despNat;m.cat=cat;m.valor=val;m.contraparte=cp;m.obs=ob;}});
+      if(old&&old.serieId){movs.forEach(m=>{if(m.serieId===old.serieId&&m.data>=old.data&&m.status==='apagar'){m.natureza=despNat;m.cat=cat;m.valor=val;m.contraparte=cp;m.obs=ob;m.conta=base.conta;}});
         const i=movs.findIndex(m=>m.id===editId);movs[i]={...movs[i],...base,id:editId,status:despStat};
         save();toast('Despesa fixa: alteração vale desta pra frente ✓');editId=null;go('consultar');return;}
       const i=movs.findIndex(m=>m.id===editId);movs[i]={...base,id:editId,data:g('f_data'),status:despStat};
@@ -908,11 +921,11 @@ function vCadastros(){
   const cbAutos=[...new Set([...pgs,...Object.keys(pgInfo)])].filter(n=>n&&!temCB[n.toLowerCase()]).map(n=>({id:'auto:'+n,nome:n,auto:true,nmov:pgInfo[n]||0}));
   const cbTodos=contasBanc.map(c=>({...c,nmov:pgInfo[c.nome]||0})).concat(cbAutos).sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
   const linCB=cbTodos.length?cbTodos.map(c=>{const mv=c.nmov?c.nmov+' lanç.':'';
-    if(c.auto)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="flex:1"><div class="ttl"><b>${c.nome}</b></div><div class="meta" style="color:var(--mut)">sem dados bancários${mv?' · '+mv:''}</div></div><button class="x" style="color:var(--blue)" onclick="abrirConta('auto:${esc(c.nome)}')">✏️ editar</button></div></div>`;
+    if(c.auto)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="flex:1"><div class="ttl"><b>${c.nome}</b></div><div class="meta" style="color:var(--mut)">sem dados bancários${mv?' · '+mv:''}</div></div><div style="display:flex;gap:12px;flex:none"><button class="x" onclick="historicoDe('${esc(c.nome)}')">🗂 histórico</button><button class="x" style="color:var(--blue)" onclick="abrirConta('auto:${esc(c.nome)}')">✏️ editar</button></div></div></div>`;
     return `<div class="item" style="display:block">
     <div style="display:flex;justify-content:space-between;gap:10px;cursor:pointer" onclick="toggleExp('${c.id}')"><div style="flex:1"><div class="ttl"><b>${c.nome}</b></div><div class="meta">${[c.banco,c.numero?'conta '+c.numero:'',c.titular].filter(Boolean).join(' · ')||'sem dados'}${mv?' · '+mv:''} <span class="chev" style="color:var(--mut)">${expandId===c.id?'▾':'›'}</span></div></div></div>
     ${expandId===c.id?`<div style="font-size:12px;margin-top:8px;line-height:1.7">${c.banco?`🏦 ${c.banco}${c.nbanco?' ('+c.nbanco+')':''}<br>`:''}${c.agencia?`ag. ${c.agencia} · `:''}${c.numero?`conta ${c.numero}<br>`:''}${c.titular?`👤 ${c.titular}<br>`:''}${c.obs?`📝 ${c.obs}`:''}</div>
-      <div style="display:flex;gap:16px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line)"><button class="x" style="color:var(--blue)" onclick="abrirConta('${c.id}')">✏️ editar</button><button class="x" onclick="excluirConta('${c.id}')">🗑 excluir</button></div>`:''}
+      <div style="display:flex;gap:16px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line)"><button class="x" onclick="historicoDe('${esc(c.nome)}')">🗂 histórico</button><button class="x" style="color:var(--blue)" onclick="abrirConta('${c.id}')">✏️ editar</button><button class="x" onclick="excluirConta('${c.id}')">🗑 excluir</button></div>`:''}
   </div>`;}).join(''):`<div class="empty" style="padding:12px">Nenhuma conta ainda.</div>`;
   const nCols=jogos.reduce((s,j)=>s+colsDe(j).length,0);
   const volta=`<div class="lnk" onclick="cadTab='';render()" style="margin-bottom:6px">← cadastros</div>`;
