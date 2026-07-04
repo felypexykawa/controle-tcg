@@ -191,8 +191,9 @@ function abrirFotosPend(){const old=document.getElementById('modal');if(old)old.
     <div class="sec" style="margin-top:0">📷 Fotos deste lançamento</div>
     <div class="ctx">Elas ficam junto quando você salvar o lançamento.</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0">${thumbs}</div>
+    <input type="file" id="fotoFilePendCam" accept="image/*" capture="environment" style="display:none" onchange="fotoPendEscolhida(this)">
     <input type="file" id="fotoFilePend" accept="image/*" style="display:none" onchange="fotoPendEscolhida(this)">
-    <button class="btn" onclick="document.getElementById('fotoFilePend').click()">📷 adicionar foto</button>
+    <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFilePendCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFilePend').click()">🖼 da galeria</button></div></div>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal();render()">pronto</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
 function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
@@ -221,8 +222,9 @@ function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
     <div class="sec" style="margin-top:0">📷 Fotos do lançamento</div>
     <div class="ctx">Nota, boleto, comprovante ou a própria carta — fica guardado junto do lançamento${USAR_NUVEM?' na nuvem (você e a Laura veem em qualquer aparelho)':' neste aparelho'}.</div>
     <div id="fotoGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0"><div class="meta" style="grid-column:1/-1">carregando…</div></div>
+    <input type="file" id="fotoFileCam" accept="image/*" capture="environment" style="display:none" onchange="fotoEscolhida('${movId}',this)">
     <input type="file" id="fotoFile" accept="image/*" style="display:none" onchange="fotoEscolhida('${movId}',this)">
-    <button class="btn" onclick="document.getElementById('fotoFile').click()">📷 adicionar foto</button>
+    <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFileCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFile').click()">🖼 da galeria</button></div></div>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal();render()">fechar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);
   fotoRefresh(movId);}
@@ -255,14 +257,15 @@ function motor(filtrar){
   const compras=todasC.filter(m=>noPer(m.data));
   const vendas=movs.filter(m=>m.tipo==='VENDA'&&(!F||F(m))&&noPer(m.data)).map(m=>({data:m.data,receita:(+m.valor||0)*(1-(+m.taxa||0)/100),bruto:+m.valor||0,m}));
   let investido=0,cmv=0;
-  for(const m of compras){const v=+m.valor||0;const s=sitDe(m);if(s==='Trocado')continue;investido+=v;if(s==='Vendido')cmv+=v;}
+  for(const m of compras){const v=+m.valor||0;const s=sitDe(m);if(s==='Trocado'||s==='Aberto')continue;investido+=v;if(s==='Vendido')cmv+=v;}
   let estoque=0,colCusto=0;
-  for(const m of todasC){const v=+m.valor||0;const s=sitDe(m);if(s==='Em estoque')estoque+=v;else if(s==='Coleção')colCusto+=v;}
+  let pedido=0;
+  for(const m of todasC){const v=+m.valor||0;const s=sitDe(m);if(s==='Em estoque')estoque+=v;else if(s==='Coleção')colCusto+=v;else if(s==='Pedido')pedido+=v;}
   const vendasLiq=vendas.reduce((s,x)=>s+x.receita,0);
   const disp=todasC.filter(m=>sitDe(m)==='Em estoque');
   let despOrd=0,despMat=0;const hojeISO2=new Date().toISOString().slice(0,10);for(const m of movs){if(m.tipo!=='DESPESA'||!noPer(m.data))continue;if(filtrar&&!mRelX(m))continue;if(m.status==='apagar'&&!perAte&&m.data>hojeISO2)continue;const v=+m.valor||0;if(m.natureza==='material')despMat+=v;else despOrd+=v;}
   const despTotal=despOrd+despMat;
-  return {compras,vendas,investido,cmv,estoque,colCusto,vendasLiq,lucro:vendasLiq-cmv,disp,despOrd,despMat,despTotal,liquido:vendasLiq-cmv-despTotal};
+  return {compras,vendas,investido,cmv,estoque,colCusto,pedido,vendasLiq,lucro:vendasLiq-cmv,disp,despOrd,despMat,despTotal,liquido:vendasLiq-cmv-despTotal};
 }
 function aPagar(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   const parc=movs.filter(m=>m.tipo==='COMPRA'&&m.pgTipo==='Parcelado'&&+m.nParc>0);
@@ -360,6 +363,7 @@ function vPainel(){
       <div class="mini click" onclick="consF='VENDA';go('consultar')"><div class="k">Vendido ${per?'(período)':'(tudo)'}</div><div class="v" style="color:var(--green)">${fmt(r.vendasLiq)}</div><div class="s">líquido →</div></div>
       <div class="mini click" onclick="consF='ESTOQUE';go('consultar')"><div class="k">Estoque pra vender</div><div class="v" style="color:var(--blue)">${fmt(r.estoque)}</div><div class="s">a custo · hoje →</div></div>
       <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div></div>
+      ${r.pedido>0?`<div class="mini click" onclick="consF='PEDIDO';go('consultar')"><div class="k">🚚 A caminho</div><div class="v" style="color:var(--amber)">${fmt(r.pedido)}</div><div class="s">pedido feito, ainda não chegou →</div></div>`:''}
       ${contasBanc.length?`<div class="mini click" onclick="go('contas')"><div class="k">💼 Saldo em contas</div><div class="v" style="color:${contasBanc.reduce((s,cb)=>s+saldoConta(cb),0)>=0?'var(--green)':'var(--red)'}">${fmt(contasBanc.reduce((s,cb)=>s+saldoConta(cb),0))}</div><div class="s">${contasBanc.length} conta${contasBanc.length===1?'':'s'} · detalhe no Fluxo →</div></div>`:''}</div>
     <div class="sec">Contas <span style="text-transform:none;font-weight:400">(o que falta pagar e receber)</span></div>
     <div class="grid2">
@@ -410,7 +414,7 @@ function vLancar(){
       <div id="parcDiv" style="display:${pgTipo==='Parcelado'?'block':'none'}"><div class="row2"><div><label>Nº de parcelas</label><input id="f_nparc" type="number" inputmode="numeric" value="${e?.nParc??2}"></div><div><label>1ª vence em</label><input id="f_venc1" type="date" value="${e?.venc1||hoje}"></div></div></div>
       <label>Fornecedor</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pessOrd(),e?.contraparte)}</select>
       <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="f_conta" onchange="novo(this,'pg')">${selOpts(pgs,e?.conta)}</select>
-      <label>Situação</label><select id="f_sit">${['Em estoque','Vendido','Coleção'].map(x=>`<option ${(e?.situacao||(e?.destino==='Coleção'?'Coleção':'Em estoque'))===x?'selected':''}>${x}</option>`).join('')}</select>
+      <label>Situação</label><select id="f_sit">${[['Em estoque','Em estoque'],['Pedido','🚚 Pedido · a caminho'],['Vendido','Vendido'],['Coleção','Coleção']].map(([v,l])=>`<option value="${v}" ${(e?.situacao||(e?.destino==='Coleção'?'Coleção':'Em estoque'))===v?'selected':''}>${l}</option>`).join('')}</select>
       <label>Observação (opcional)</label><input id="f_obs" value="${e?.obs||''}">
       <div class="calc" id="calc"></div>`;}
   } else if(t==='VENDA'){
@@ -499,7 +503,7 @@ function notaForm(){
     <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="n_conta" onchange="novo(this,'pg');notaHead.conta=this.value">${selOpts(pgs,notaHead.conta)}</select>
     <label>Observação da nota (opcional)</label><input id="n_obs" value="${notaHead.obs||''}" oninput="notaHead.obs=this.value">
     <div class="row2"><div><label>Nº da nota <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="n_num" value="${notaHead.num||''}" placeholder="ex: NF 1234" oninput="notaHead.num=this.value"></div>
-      <div><label>Situação</label><select id="n_sit" onchange="notaHead.sit=this.value">${['Em estoque','Vendido','Coleção'].map(x=>`<option ${notaHead.sit===x?'selected':''}>${x}</option>`).join('')}</select></div></div>
+      <div><label>Situação</label><select id="n_sit" onchange="notaHead.sit=this.value">${[['Em estoque','Em estoque'],['Pedido','🚚 Pedido · a caminho'],['Vendido','Vendido'],['Coleção','Coleção']].map(([v,l])=>`<option value="${v}" ${notaHead.sit===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
     <label>Pagamento da nota <span style="color:var(--mut);font-size:10px">(um pagamento só — a nota inteira)</span></label><div class="toggle" id="npgtog"><div class="o ${notaHead.pg!=='Parcelado'?'on':''}" onclick="notaHead.pg='À vista';render()">À vista</div><div class="o ${notaHead.pg==='Parcelado'?'on':''}" onclick="notaHead.pg='Parcelado';render()">Parcelado</div></div>
     ${notaHead.pg==='Parcelado'?`<div class="row2"><div><label>Nº de parcelas</label><input id="n_nparc" type="number" inputmode="numeric" value="${notaHead.nParc||3}" oninput="notaHead.nParc=+this.value||1"></div><div><label>1ª vence em</label><input id="n_venc1" type="date" value="${notaHead.venc1||new Date().toISOString().slice(0,10)}" onchange="notaHead.venc1=this.value"></div></div><div class="ctx">Nas <b>Contas a pagar</b> a nota aparece <b>reunida</b>: uma parcela só por vencimento, com os produtos dentro.</div>`:''}
     <label>Data de emissão</label><input id="n_data" type="date" value="${notaHead.data||new Date().toISOString().slice(0,10)}" onchange="notaHead.data=this.value">`;
@@ -650,16 +654,16 @@ function vConsultar(){
     ${filtroAtivo?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:8px" onclick="consJogo='todos';consCol='';consPess='';consConta='';render()">filtrando: ${[(consJogo!=='todos'?consJogo:''),consCol,consPess,consConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
     <button class="btn g" style="margin:8px 0" onclick="consFOpen=false;render()">fechar filtros</button>`:'');
   if(consMenu){
-    const cards=[['tudo','🗂','Tudo','todos os lançamentos'],['COMPRA','🛒','Compras','o que você comprou'],['VENDA','💰','Vendas','o que você vendeu'],['ESTOQUE','📦','Estoque','parado pra vender'],['COLECAO','⭐','Coleção','o que foi pra coleção'],['DESPESA','🧾','Despesas','custos do negócio'],['CADASTRO','👤','Cadastros','clientes, contas, coleções']];
+    const cards=[['tudo','🗂','Tudo','todos os lançamentos'],['COMPRA','🛒','Compras','o que você comprou'],['VENDA','💰','Vendas','o que você vendeu'],['ESTOQUE','📦','Estoque','parado pra vender'],['PEDIDO','🚚','Pedidos','comprado, a caminho'],['COLECAO','⭐','Coleção','o que foi pra coleção'],['DESPESA','🧾','Despesas','custos do negócio'],['CADASTRO','👤','Cadastros','clientes, contas, coleções']];
     const grid=cards.map(([k,ic,t,d])=>`<div class="mini click" style="text-align:center;padding:15px 8px" onclick="verFiltro('${k}')"><div style="font-size:25px;line-height:1">${ic}</div><div style="font-weight:700;margin-top:6px">${t}</div><div class="s" style="margin-top:1px">${d}</div></div>`).join('');
     return `${fCons}<div class="ctx">O que você quer consultar?</div><div class="grid2">${grid}</div>`;
   }
-  const TITF={tudo:'🗂 Tudo',COMPRA:'🛒 Compras',VENDA:'💰 Vendas',ESTOQUE:'📦 Estoque',COLECAO:'⭐ Coleção',DESPESA:'🧾 Despesas',CADASTRO:'👤 Cadastros'};
+  const TITF={tudo:'🗂 Tudo',COMPRA:'🛒 Compras',VENDA:'💰 Vendas',ESTOQUE:'📦 Estoque',PEDIDO:'🚚 Pedidos',COLECAO:'⭐ Coleção',DESPESA:'🧾 Despesas',CADASTRO:'👤 Cadastros'};
   const voltar=`<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px"><span class="lnk" onclick="consMenu=true;consQ='';render()">← filtros</span><span style="font-weight:800;font-size:16px">${TITF[consF]||''}</span></div>`;
   if(consF==='CADASTRO')return voltar+vCadastros();
   if(movs.length===0)return `<div class="card"><div class="empty">Nada lançado ainda.</div></div>`;
   const q=consQ.toLowerCase();
-  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
+  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='PEDIDO'?(m.tipo==='COMPRA'&&sitDe(m)==='Pedido'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
   const doTipo=movs.filter(porTipo);
   let ord=doTipo.filter(m=>noPer(m.data));
   const cmpData=(a,b)=>(a.data||'')<(b.data||'')?1:-1;
@@ -672,7 +676,7 @@ function vConsultar(){
   const gTot={},gN={};ord.forEach(m=>{const k=gKey(m);gTot[k]=(gTot[k]||0)+(+m.valor||0);gN[k]=(gN[k]||0)+1;});
   _gKeys=Object.keys(gTot);let _lastK=null;
   const escondidos=doTipo.length-ord.length;
-  const ST={'Em estoque':['c','📦 estoque'],'Vendido':['v','✓ vendido'],'Coleção':['k','★ coleção']};
+  const ST={'Em estoque':['c','📦 estoque'],'Vendido':['v','✓ vendido'],'Coleção':['k','★ coleção'],'Pedido':['c','🚚 pedido'],'Aberto':['c','🔓 aberto'],'Trocado':['c','🔄 trocado']};
   const lista=ord.length?ord.map(m=>{const venda=m.tipo==='VENDA',total=+m.valor||0;
     const gk=gKey(m);let head='';
     if(gk!==_lastK){_lastK=gk;head=`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);border-radius:9px;padding:8px 12px;margin:10px 0 6px;cursor:pointer;font-weight:700" onclick="togGrupo(this.dataset.k)" data-k="${gk.replace(/"/g,'&quot;')}"><span>${consGrupoFech[gk]?'▸':'▾'} ${gRot(gk)} <span style="color:var(--mut);font-weight:400;font-size:11px">· ${gN[gk]} lanç.</span></span><b>${fmt(gTot[gk])}</b></div>`;}
@@ -693,7 +697,7 @@ function vConsultar(){
           <div style="font-size:11px;font-weight:600;color:${venda?'var(--green)':'var(--red)'}">${pg}</div></div>
       </div>
       ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
-        ${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
+        ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
         <button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${(+m.nFotos||0)>0?' ('+m.nFotos+')':''}</button>
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
@@ -702,7 +706,7 @@ function vConsultar(){
   const aviso=(escondidos>0&&(perDe||perAte))?`<div class="soon" style="cursor:pointer" onclick="setPer('tudo')">+${escondidos} lançamento${escondidos>1?'s':''} fora deste período · toque pra ver tudo</div>`:'';
   const chip=consQ?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer" onclick="consQ='';render()">filtrando: "${consQ}" · limpar ✕</div>`:'';
   const totConsulta=ord.reduce((s,v)=>s+(+v.valor||0),0);
-  const rotuloTot=consF==='VENDA'?'total vendido':consF==='ESTOQUE'?'total em estoque (custo)':consF==='COLECAO'?'total na coleção (custo)':consF==='COMPRA'?'total comprado':consF==='DESPESA'?'total de despesas':'';
+  const rotuloTot=consF==='VENDA'?'total vendido':consF==='ESTOQUE'?'total em estoque (custo)':consF==='PEDIDO'?'total a caminho (custo)':consF==='COLECAO'?'total na coleção (custo)':consF==='COMPRA'?'total comprado':consF==='DESPESA'?'total de despesas':'';
   const totBar=ord.length?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);color:var(--ink)"><span style="color:var(--mut)">${ord.length} ${ord.length===1?'lançamento':'lançamentos'}${rotuloTot?' · '+rotuloTot:''}</span>${rotuloTot?`<b style="font-size:15px">${fmt(totConsulta)}</b>`:''}</div>`:'';
   const ordBar=ord.length?`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><select style="flex:1" onchange="consOrd=this.value;consGrupoFech={};render()">${[['emissao','Ordenar por: data de emissão'],['jogo','Ordenar por: jogo'],['pessoa','Ordenar por: cliente / fornecedor'],['conta','Ordenar por: conta']].map(([v,l])=>`<option value="${v}" ${consOrd===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="selMode=!selMode;selIds={};render()">${selMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosGrupos()">${Object.keys(consGrupoFech).length?'expandir tudo':'recolher tudo'}</span></div>`:'';
   const selBar=selMode?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--infobg);color:var(--blue)"><span>${Object.keys(selIds).length} marcado(s) — soltas + item de 1 nota: entram nela · de 2+ notas: fundem</span><button class="x" style="color:var(--blue);font-weight:700;flex:none" onclick="juntarNota()">🧾 juntar</button></div>`:'';
@@ -826,7 +830,7 @@ function fluxoBuckets(){const B={},hoje=new Date().toISOString().slice(0,10);
     if(!m.origem)add(m.data,'din_out',v);
     const di=dIni(m),s=sitDe(m);
     add(m.data,di==='Coleção'?'col_in':'est_in',v);
-    if(s==='Trocado')add(m.dataSaida||m.data,'est_out',v);
+    if(s==='Trocado'||s==='Aberto')add(m.dataSaida||m.data,di==='Coleção'?'col_out':'est_out',v);
     else if(s==='Coleção'&&di!=='Coleção'){add(m.dataSaida||m.data,'col_in',v);add(m.dataSaida||m.data,'est_out',v);}
   });return B;}
 const FLUXOS=[['din_in','💰 dinheiro entrou','var(--green)'],['din_out','💰 dinheiro saiu','var(--red)'],['est_in','📦 estoque entrou','var(--blue)'],['est_out','📦 estoque saiu','#7ea8dd'],['col_in','⭐ coleção entrou','var(--amber)'],['col_out','⭐ coleção saiu','#c9964f']];
@@ -1221,7 +1225,46 @@ function excluir(id){const m=movs.find(x=>x.id===id);
   if(confirm('Excluir este lançamento?')){movs=movs.filter(x=>x.id!==id);save();render();}}
 function marcarPago(id){const m=movs.find(x=>x.id===id);if(m){m.status='pago';m.dataPagamento=new Date().toISOString().slice(0,10);save();render();}}
 function toggleExp(id){expandId=expandId===id?null:id;render();}
-function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;const ORD=['Em estoque','Vendido','Coleção'];const px=ORD[(ORD.indexOf(sitDe(m))+1)%3];m.situacao=px;m.destino=px==='Coleção'?'Coleção':'Vender';save();toast('Agora: '+px);render();}
+function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;const ORD=['Em estoque','Pedido','Vendido','Coleção'];const px=ORD[(ORD.indexOf(sitDe(m))+1)%ORD.length];m.situacao=px;m.destino=px==='Coleção'?'Coleção':'Vender';save();toast('Agora: '+px);render();}
+function chegouPedido(id){const m=movs.find(x=>x.id===id);if(!m)return;
+  if(!confirm('Confirmar que o pedido chegou? Ele entra no estoque disponível hoje.'))return;
+  m.situacao='Em estoque';m.destino='Vender';m.dataChegada=new Date().toISOString().slice(0,10);
+  save();toast('Chegou — está no estoque ✓');render();}
+let _abrirId=null,abertoItens=[];
+function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;_abrirId=id;abertoItens=[];renderAbrir();}
+function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const old=document.getElementById('modal');if(old)old.remove();
+  const sit=sitDe(m);const tot=+m.valor||0;
+  const somaM=abertoItens.reduce((s,x)=>s+(+x.vm||0),0);
+  const lin=abertoItens.length?abertoItens.map((x,i)=>{const c=somaM>0?tot*(+x.vm||0)/somaM:tot/abertoItens.length;
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:8px 12px"><div><b>${x.desc}</b>${x.cod?' <span style="color:var(--mut);font-size:10px">#'+x.cod+'</span>':''}<div class="meta">${x.qtd} un · entra a <b style="color:var(--green)">${fmt(c)}</b>${(+x.vm>0)?' · vale '+fmt(+x.vm):''}</div></div><button class="x" onclick="abertoItens.splice(${i},1);renderAbrir()">remover</button></div>`;}).join('')
+    :'<div class="meta">Nada ainda — adicione o que saiu de dentro.</div>';
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🔓 Abrir — o que saiu de dentro?</div>
+    <div class="ctx">O item <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'')}</b> (custou <b>${fmt(tot)}</b>) deixa de existir e vira os itens abaixo — o custo é dividido entre eles (proporcional ao "vale"; sem valores, divide igual). Tudo continua na <b>${sit==='Coleção'?'coleção':'prateleira do estoque'}</b>.</div>
+    ${lin}
+    <div class="card" style="background:var(--card2);margin:8px 0">
+      <div class="row2"><div><label style="margin-top:0">O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie"></div><div><label style="margin-top:0">Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
+      <div class="row2"><div><label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="ab_cod" placeholder="ex: 245/198"></div><div><label>Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
+      <button class="btn g" style="margin-top:10px" onclick="addAbertoItem()">+ adicionar</button></div>
+    <button class="btn" onclick="transformarItem()">🔓 confirmar abertura · ${abertoItens.length} ${abertoItens.length===1?'item':'itens'}</button>
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal()">cancelar</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);}
+function addAbertoItem(){const g=id=>document.getElementById(id)?.value;const desc=(g('ab_desc')||'').trim();if(!desc){alert('Diga o que saiu (ex: nome da carta).');return;}
+  const cat=g('ab_cat');abertoItens.push({desc,cat:(cat&&cat!=='__add__')?cat:'Single/Carta',cod:(g('ab_cod')||'').trim(),qtd:+g('ab_qtd')||1,vm:+g('ab_vm')||0});renderAbrir();}
+function transformarItem(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;
+  if(!abertoItens.length){alert('Adicione ao menos 1 item que saiu de dentro.');return;}
+  const tot=+m.valor||0,somaM=abertoItens.reduce((s,x)=>s+(+x.vm||0),0),sit=sitDe(m)==='Coleção'?'Coleção':'Em estoque';
+  const comVm=abertoItens.filter(x=>+x.vm>0).length;
+  if(comVm>0&&comVm<abertoItens.length){alert('Atenção: '+(abertoItens.length-comVm)+' item(ns) estão SEM o "vale" — no rateio proporcional eles entrariam com custo R$ 0,00.\n\nPreencha o "vale" de todos (mesmo que estimado) OU deixe todos vazios (aí divide igual).');return;}
+  if(!confirm('Abrir '+((m.colecao?m.colecao+' · ':'')+(m.cat||''))+' em '+abertoItens.length+' item(ns)? O custo de '+fmt(tot)+' é dividido entre eles.'))return;
+  const hoje=new Date().toISOString().slice(0,10);let acum=0;
+  abertoItens.forEach((x,i)=>{let c;
+    if(i===abertoItens.length-1)c=Math.round((tot-acum)*100)/100;
+    else{c=somaM>0?Math.round(tot*(+x.vm||0)/somaM*100)/100:Math.round(tot/abertoItens.length*100)/100;acum=Math.round((acum+c)*100)/100;}
+    movs.push({id:'m'+Date.now()+i,tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:m.colecao||'',jogo:m.jogo||'Pokémon',idioma:m.idioma||'—',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit,contraparte:m.contraparte||'',loteOrigem:m.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(m.cat||'item')+')'});});
+  m.situacao='Aberto';m.destino='Aberto';m.dataSaida=hoje;m.obs=(m.obs?m.obs+' · ':'')+'🔓 aberto em '+abertoItens.length+' item(ns)';
+  const n=abertoItens.length;_abrirId=null;abertoItens=[];save();fecharModal();toast('Aberto ✓ — custo '+fmt(tot)+' distribuído em '+n+' item(ns)');render();}
 function salvarNuvem(){if(!_db||!_syncReady)return;_db.collection('controle').doc('dados').set({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,_upd:Date.now(),_by:_userEmail}).catch(e=>console.warn('nuvem:',e&&e.message));}
 function aplicarNuvem(d){if(!d)return;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;localStorage.setItem(MK,JSON.stringify(movs));render();}
 function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
