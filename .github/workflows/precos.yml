@@ -1,0 +1,47 @@
+name: precos-liga
+# Robo de precos: busca na Liga Pokemon os precos das cartas do arquivo
+# robo/codigos.txt e grava precos.json (que o app le do proprio dominio).
+# Roda 2x por dia e tambem manualmente pelo botao "Run workflow".
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 10,22 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  precos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: instalar navegador
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: buscar precos na Liga
+        run: python robo/precos_liga.py
+
+      - name: diagnostico (html+print de cada busca)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostico-liga
+          path: robo/diag/
+          retention-days: 5
+
+      - name: publicar precos.json
+        run: |
+          git config user.name 'preco-bot'
+          git config user.email 'preco-bot@users.noreply.github.com'
+          git add precos.json
+          git commit -m "robo: atualiza precos da Liga" || echo "sem mudanca"
+          git push

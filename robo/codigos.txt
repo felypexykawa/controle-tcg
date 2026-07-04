@@ -1,0 +1,5 @@
+# Codigos de carta para o robo precificar (um por linha, formato NUM/TOTAL)
+# Esta lista de TESTE valida o acesso a Liga. Depois o robo passa a ler
+# os codigos direto do estoque (Firebase) — precisa da chave de servico do Felype.
+188/172
+245/198
