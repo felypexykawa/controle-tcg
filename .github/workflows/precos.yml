@@ -3,10 +3,13 @@ name: precos-liga
 # robo/codigos.txt e grava precos.json (que o app le do proprio dominio).
 # Roda 2x por dia e tambem manualmente pelo botao "Run workflow".
 
+# AGENDAMENTO DESATIVADO 2026-07-04: a Liga (Cloudflare) bloqueia o endereco do
+# GitHub Actions — confirmado na 1a execucao (Access denied nas 2 buscas).
+# O coletor oficial roda LOCAL, pelo Chrome do Felype (que a Liga aceita — validado
+# ao vivo: Gardevoir 245/198 retornou precos reais). Este workflow fica so manual,
+# como diagnostico/fallback.
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 10,22 * * *'
 
 permissions:
   contents: write
