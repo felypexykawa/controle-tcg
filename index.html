@@ -397,7 +397,7 @@ function vLancar(){
         <div><label>Boosters / un.</label><input id="f_boo" type="number" inputmode="numeric" value="${e?.boosters??(CATB[e?.cat]||0)}"></div></div>
       <label>Pagamento</label><div class="toggle" id="pgtog"><div class="o ${pgTipo==='À vista'?'on':''}" data-v="À vista" onclick="togPg('À vista')">À vista</div><div class="o ${pgTipo==='Parcelado'?'on':''}" data-v="Parcelado" onclick="togPg('Parcelado')">Parcelado</div></div>
       <div id="parcDiv" style="display:${pgTipo==='Parcelado'?'block':'none'}"><div class="row2"><div><label>Nº de parcelas</label><input id="f_nparc" type="number" inputmode="numeric" value="${e?.nParc??2}"></div><div><label>1ª vence em</label><input id="f_venc1" type="date" value="${e?.venc1||hoje}"></div></div></div>
-      <label>Fornecedor</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pess,e?.contraparte)}</select>
+      <label>Fornecedor</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pessOrd(),e?.contraparte)}</select>
       <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="f_conta" onchange="novo(this,'pg')">${selOpts(pgs,e?.conta)}</select>
       <label>Situação</label><select id="f_sit">${['Em estoque','Vendido','Coleção'].map(x=>`<option ${(e?.situacao||(e?.destino==='Coleção'?'Coleção':'Em estoque'))===x?'selected':''}>${x}</option>`).join('')}</select>
       <label>Observação (opcional)</label><input id="f_obs" value="${e?.obs||''}">
@@ -424,7 +424,7 @@ function vLancar(){
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}"></div></div>${vun}
       <label>Canal</label><div class="toggle" id="cntog"><div class="o ${canal==='Pix'?'on':''}" data-v="Pix" onclick="togCanal('Pix')">Pix / na hora</div><div class="o ${canal==='App'?'on':''}" data-v="App" onclick="togCanal('App')">App / a prazo</div></div>
       <div id="appDiv" style="display:${canal==='App'?'block':'none'}"><div class="row2"><div><label>Taxa do app (%)</label><input id="f_tax" type="number" inputmode="decimal" value="${e?.taxa??15}" oninput="vcalc()"></div><div><label>Recebo em (dias)</label><input id="f_recdias" type="number" inputmode="numeric" value="${e?.recDias??28}"></div></div></div>
-      <label class="req">Cliente</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pess,e?.contraparte)}</select>
+      <label class="req">Cliente</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pessOrd(),e?.contraparte)}</select>
       <label>Conta / onde recebi</label><select id="f_conta" onchange="novo(this,'pg')">${selOpts(pgs,e?.conta)}</select>
       <div class="calc" id="calc"></div>`;}
   } else if(t==='TROCA'){
@@ -444,7 +444,7 @@ function vLancar(){
       <label>Categoria</label><select id="f_dcat" onchange="novo(this,'despcat')">${selOpts(despCats,e?.cat)}</select>
       <div class="row2"><div><label>Valor (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}"></div>
         <div><label>Situação</label><div class="toggle" id="stattog"><div class="o ${despStat==='pago'?'on':''}" data-v="pago" onclick="togStat('pago')">Pago</div><div class="o ${despStat==='apagar'?'on':''}" data-v="apagar" onclick="togStat('apagar')">A pagar</div></div></div></div>
-      <label>Pra quem paguei (opcional)</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pess,e?.contraparte)}</select>
+      <label>Pra quem paguei (opcional)</label><select id="f_cp" onchange="novo(this,'pess')">${selOpts(pessOrd(),e?.contraparte)}</select>
       <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="f_conta" onchange="novo(this,'pg')">${selOpts(pgs,e?.conta)}</select>
       <label>Observação (opcional)</label><input id="f_obs" value="${e?.obs||''}">
       ${!editId?`<label>Repetição</label>
@@ -484,7 +484,7 @@ function notaForm(){
     <div class="row2"><div><label>Frete total (R$)</label><input id="n_frete" type="number" inputmode="decimal" value="${notaHead.frete||0}" oninput="notaHead.frete=+this.value||0;rateioPreview()"></div>
       <div><label>Taxa Wise (R$)</label><input id="n_taxa" type="number" inputmode="decimal" value="${notaHead.taxa||0}" oninput="notaHead.taxa=+this.value||0;rateioPreview()"></div></div>
     <div class="calc" id="ratPrev" style="margin-top:10px">${ratTexto()}</div>
-    <label>Fornecedor</label><select id="n_cp" onchange="novo(this,'pess');notaHead.cp=this.value">${selOpts(pess,notaHead.cp)}</select>
+    <label>Fornecedor</label><select id="n_cp" onchange="novo(this,'pess');notaHead.cp=this.value">${selOpts(pessOrd(),notaHead.cp)}</select>
     <label>Conta / forma de pagamento <span style="color:var(--mut);font-size:10px">(de onde saiu)</span></label><select id="n_conta" onchange="novo(this,'pg');notaHead.conta=this.value">${selOpts(pgs,notaHead.conta)}</select>
     <label>Observação da nota (opcional)</label><input id="n_obs" value="${notaHead.obs||''}" oninput="notaHead.obs=this.value">
     <div class="row2"><div><label>Nº da nota <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="n_num" value="${notaHead.num||''}" placeholder="ex: NF 1234" oninput="notaHead.num=this.value"></div>
@@ -540,7 +540,7 @@ function vendaForm(){
     <div class="calc" style="margin:6px 0">Total da venda: <b>${fmt(tot)}</b></div>
     <label>Canal</label><div class="toggle"><div class="o ${!app?'on':''}" onclick="vendaHead.canal='Pix';render()">Pix / na hora</div><div class="o ${app?'on':''}" onclick="vendaHead.canal='App';render()">App / a prazo</div></div>
     ${app?`<div class="row2"><div><label>Taxa do app (%)</label><input type="number" value="${vendaHead.taxa}" oninput="vendaHead.taxa=+this.value||0"></div><div><label>Recebo em (dias)</label><input type="number" value="${vendaHead.recDias}" oninput="vendaHead.recDias=+this.value||0"></div></div>`:''}
-    <label class="req">Cliente</label><select id="v_cp" onchange="novo(this,'pess');vendaHead.cp=this.value">${selOpts(pess,vendaHead.cp)}</select>
+    <label class="req">Cliente</label><select id="v_cp" onchange="novo(this,'pess');vendaHead.cp=this.value">${selOpts(pessOrd(),vendaHead.cp)}</select>
     <label>Conta / onde recebi</label><select id="v_conta" onchange="novo(this,'pg');vendaHead.conta=this.value">${selOpts(pgs,vendaHead.conta)}</select>
     <label>Data de emissão</label><input id="v_data" type="date" value="${vendaHead.data||new Date().toISOString().slice(0,10)}" onchange="vendaHead.data=this.value">`;
 }
@@ -592,7 +592,7 @@ function trocaForm(){
         <div><label>Situação</label><select id="r_sit">${['Em estoque','Coleção'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
       <div class="row2"><div><label>Boosters / un. <span style="color:var(--mut);font-size:10px">(se caixa/ETB)</span></label><input id="r_boo" type="number" inputmode="numeric" value="0"></div><div></div></div>
       <button class="btn g" style="margin-top:10px" onclick="addRecebi()">+ adicionar recebido</button></div>
-    <label>Com quem troquei</label><select id="t_cp" onchange="novo(this,'pess')">${selOpts(pess)}</select>
+    <label>Com quem troquei</label><select id="t_cp" onchange="novo(this,'pess')">${selOpts(pessOrd())}</select>
     <div class="calc" id="trocaRat" style="margin-top:10px">${trocaRatTxt()}</div>`;
 }
 function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_item')?.value;const m=movs.find(x=>x.id===id);if(!m){alert('Nada em estoque pra escolher.');return;}
@@ -643,7 +643,8 @@ function vConsultar(){
     const grid=cards.map(([k,ic,t,d])=>`<div class="mini click" style="text-align:center;padding:15px 8px" onclick="verFiltro('${k}')"><div style="font-size:25px;line-height:1">${ic}</div><div style="font-weight:700;margin-top:6px">${t}</div><div class="s" style="margin-top:1px">${d}</div></div>`).join('');
     return `${fCons}<div class="ctx">O que você quer consultar?</div><div class="grid2">${grid}</div>`;
   }
-  const voltar=`<div class="lnk" onclick="consMenu=true;consQ='';render()" style="margin-bottom:2px">← filtros</div>`;
+  const TITF={tudo:'🗂 Tudo',COMPRA:'🛒 Compras',VENDA:'💰 Vendas',ESTOQUE:'📦 Estoque',COLECAO:'⭐ Coleção',DESPESA:'🧾 Despesas',CADASTRO:'👤 Cadastros'};
+  const voltar=`<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px"><span class="lnk" onclick="consMenu=true;consQ='';render()">← filtros</span><span style="font-weight:800;font-size:16px">${TITF[consF]||''}</span></div>`;
   if(consF==='CADASTRO')return voltar+vCadastros();
   if(movs.length===0)return `<div class="card"><div class="empty">Nada lançado ainda.</div></div>`;
   const q=consQ.toLowerCase();
@@ -700,8 +701,8 @@ function vContas(){
   const ap=aPagar(),ar=aReceber();const apT=ap.reduce((s,x)=>s+x.valor,0),arT=ar.reduce((s,x)=>s+x.valor,0);
   const hoje=new Date();hoje.setHours(0,0,0,0);
   const linha=(x,cor)=>{const data=x.venc||x.data,valor=x.valor,m=x.m,nota=x.nota;const atras=data<hoje;const podePagar=m.tipo==='DESPESA'&&m.status==='apagar';
-    if(nota)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px">${fxSelMode?`<div style="flex:none;align-self:center;font-size:19px;cursor:pointer;color:${fxSel[m.id]?'var(--blue)':'var(--mut)'}" onclick="togFxSel('${m.id}')">${fxSel[m.id]?'☑':'☐'}</div>`:''}<div onclick="${fxSelMode?`togFxSel('${m.id}')`:`abrirNota('${nota.id}')`}" style="flex:1;cursor:pointer"><div class="ttl">${dBR(data)}${atras?' <span style="color:var(--red);font-size:11px">• atrasado</span>':''} · 🧾 Nota${nota.num?' '+nota.num:''}</div><div class="meta">${nota.n} ${nota.n===1?'produto':'produtos'} · ${m.contraparte||'—'} · ${fxSelMode?'toque pra marcar a NOTA':'toque pra ver a nota'}</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${cor}">${fmt(valor)}</div>${nota.nP>1?`<div style="font-size:11px;font-weight:700;color:var(--ink)">${nota.parcela} de ${nota.nP}</div>`:''}<div style="font-size:10px;color:var(--mut)">total ${fmt(nota.tot)}</div></div></div></div>`;
-    return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px">${fxSelMode&&m.tipo==='COMPRA'&&!m.notaId?`<div style="flex:none;align-self:center;font-size:19px;cursor:pointer;color:${fxSel[m.id]?'var(--blue)':'var(--mut)'}" onclick="togFxSel('${m.id}')">${fxSel[m.id]?'☑':'☐'}</div>`:''}<div onclick="${fxSelMode&&m.tipo==='COMPRA'&&!m.notaId?`togFxSel('${m.id}')`:`abrir('${m.id}')`}" style="flex:1;cursor:pointer"><div class="ttl">${dBR(data)}${atras?' <span style="color:var(--red);font-size:11px">• atrasado</span>':''}</div><div class="meta">${m.obs||m.colecao||m.cat||'—'} · ${m.contraparte||'—'}${m.conta?' · '+m.conta:''}</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${cor}">${fmt(valor)}</div>${(x.pn>1)?`<div style="font-size:11px;font-weight:700;color:var(--ink)">${x.pi} de ${x.pn}</div><div style="font-size:10px;color:var(--mut)">total ${fmt(+m.valor||0)}</div>`:''}${podePagar?`<button class="x" style="color:var(--green);margin-top:4px" onclick="event.stopPropagation();marcarPago('${m.id}')">✓ paguei</button>`:''}</div></div></div>`;};
+    if(nota)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px">${fxSelMode?`<div style="flex:none;align-self:center;font-size:19px;cursor:pointer;color:${fxSel[m.id]?'var(--blue)':'var(--mut)'}" onclick="togFxSel('${m.id}')">${fxSel[m.id]?'☑':'☐'}</div>`:''}<div onclick="${fxSelMode?`togFxSel('${m.id}')`:`abrirNota('${nota.id}')`}" style="flex:1;cursor:pointer"><div class="ttl">${dBR(data)}${atras?' <span style="color:var(--red);font-size:11px">• atrasado</span>':''} · <b>${m.contraparte||'—'}</b> <span style="color:var(--blue);font-size:11px;font-weight:400">🧾 Nota${nota.num?' '+nota.num:''}</span></div><div class="meta">${nota.n} ${nota.n===1?'produto':'produtos'} · ${fxSelMode?'toque pra marcar a NOTA':'toque pra ver a nota'}</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${cor}">${fmt(valor)}</div>${nota.nP>1?`<div style="font-size:11px;font-weight:700;color:var(--ink)">${nota.parcela} de ${nota.nP}</div>`:''}<div style="font-size:10px;color:var(--mut)">total ${fmt(nota.tot)}</div></div></div></div>`;
+    return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px">${fxSelMode&&m.tipo==='COMPRA'&&!m.notaId?`<div style="flex:none;align-self:center;font-size:19px;cursor:pointer;color:${fxSel[m.id]?'var(--blue)':'var(--mut)'}" onclick="togFxSel('${m.id}')">${fxSel[m.id]?'☑':'☐'}</div>`:''}<div onclick="${fxSelMode&&m.tipo==='COMPRA'&&!m.notaId?`togFxSel('${m.id}')`:`abrir('${m.id}')`}" style="flex:1;cursor:pointer"><div class="ttl">${dBR(data)}${atras?' <span style="color:var(--red);font-size:11px">• atrasado</span>':''} · <b>${m.contraparte||'—'}</b></div><div class="meta">${m.obs||m.colecao||m.cat||'—'}${m.conta?' · '+m.conta:''}</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${cor}">${fmt(valor)}</div>${(x.pn>1)?`<div style="font-size:11px;font-weight:700;color:var(--ink)">${x.pi} de ${x.pn}</div><div style="font-size:10px;color:var(--mut)">total ${fmt(+m.valor||0)}</div>`:''}${podePagar?`<button class="x" style="color:var(--green);margin-top:4px" onclick="event.stopPropagation();marcarPago('${m.id}')">✓ paguei</button>`:''}</div></div></div>`;};
   const pg=contasPagas();
   const pessTodos=[...new Set(ap.concat(ar).concat(pg).map(x=>x.m.contraparte||'—'))].sort();
   const jgsCt=[...new Set(ap.concat(ar).concat(pg).map(x=>x.m.jogo).filter(Boolean))].sort();
@@ -875,9 +876,10 @@ function graficoSvg(entDesc,on){const ent=entDesc.slice(0,12).reverse();
   [0,.25,.5,.75,1].forEach(f=>{const yy=y(mx*f);g+=`<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${padL-6}" y="${yy+3}" text-anchor="end" font-size="9" fill="var(--mut)">${abbr(mx*f)}</text>`;});
   ent.forEach(([k,b],i)=>{const cx=padL+i*iw+iw/2;
     on.forEach(([s,l,c],j)=>{const v=b[s]||0;if(v>0){g+=`<rect x="${(cx-(on.length*bw)/2+j*bw).toFixed(1)}" y="${y(v).toFixed(1)}" width="${(bw-1.5).toFixed(1)}" height="${((H-padT-padB)*(v/mx)).toFixed(1)}" rx="2" fill="${c}"/>`;}});
-    g+=`<text x="${cx}" y="${H-padB+15}" text-anchor="middle" font-size="9" fill="var(--mut)">${rotuloPer(k,relGran)}</text>`;});
+    g+=`<text x="${cx}" y="${H-padB+15}" text-anchor="middle" font-size="9" fill="var(--mut)">${rotuloPer(k,relGran)} →</text>`;
+    g+=`<rect x="${(padL+i*iw).toFixed(1)}" y="0" width="${iw.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="irPer('${k}')"/>`;});
   const legenda=`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;justify-content:center">${on.map(([s,l,c])=>`<span style="font-size:11px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c};margin-right:5px;vertical-align:-1px"></span>${l}</span>`).join('')}</div>`;
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg>${legenda}<div class="meta" style="margin-top:5px;text-align:center">últimos ${ent.length} períodos (${relGran==='mes'?'mês a mês':relGran}) · imprime como está</div>`;}
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg>${legenda}<div class="meta" style="margin-top:5px;text-align:center">últimos ${ent.length} períodos (${relGran==='mes'?'mês a mês':relGran}) · período: ${perRotTxt()} · toque na coluna pra abrir · imprime como está</div>`;}
 function graficoCompSvg(series){
   const score={};series.forEach(S=>Object.entries(S.o).forEach(([k,v])=>{score[k]=(score[k]||0)+v;}));
   const chaves=Object.keys(score).sort((a,b)=>score[b]-score[a]).slice(0,8);
@@ -891,9 +893,10 @@ function graficoCompSvg(series){
   chaves.forEach((k,i)=>{const cx=padL+i*iw+iw/2;
     series.forEach((S,j)=>{const v=S.o[k]||0;if(v>0)g+=`<rect x="${(cx-(series.length*bw)/2+j*bw).toFixed(1)}" y="${y(v).toFixed(1)}" width="${(bw-1.5).toFixed(1)}" height="${((H-padT-padB)*(v/mx)).toFixed(1)}" rx="2" fill="${S.cor}"/>`;});
     const esc=k.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    g+=`<text x="${cx}" y="${H-padB+15}" text-anchor="middle" font-size="9" fill="var(--mut)" style="cursor:pointer" onclick="consQ='${esc}';consF='tudo';go('consultar')">${k.length>11?k.slice(0,10)+'…':k} →</text>`;});
+    g+=`<text x="${cx}" y="${H-padB+15}" text-anchor="middle" font-size="9" fill="var(--mut)">${k.length>11?k.slice(0,10)+'…':k} →</text>`;
+    g+=`<rect x="${(padL+i*iw).toFixed(1)}" y="0" width="${iw.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="consQ='${esc}';consF='tudo';go('consultar')"/>`;});
   const legenda=`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;justify-content:center">${series.map(S=>`<span style="font-size:11px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${S.cor};margin-right:5px;vertical-align:-1px"></span>${S.nome}</span>`).join('')}</div>`;
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg>${legenda}<div class="meta" style="margin-top:5px;text-align:center">${Object.keys(score).length>8?'top 8 · ':''}toque no nome pra abrir · imprime como está</div>`;}
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">${g}</svg>${legenda}<div class="meta" style="margin-top:5px;text-align:center">${Object.keys(score).length>8?'top 8 · ':''}período: ${perRotTxt()} · toque na coluna pra abrir · imprime como está</div>`;}
 function tabelaComp(o,M){const e=Object.entries(o).sort((a,b)=>b[1]-a[1]);if(!e.length)return '<div class="meta">sem dados no período</div>';
   const tot=Object.values(o).reduce((s,v)=>s+v,0);
   const td='padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px';
@@ -1057,7 +1060,7 @@ function vCadastros(){
   const full=cadastros.map(c=>({...c,nmov:(info[c.nome]||{}).n||0}));
   const todos=full.concat(autos).sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
   const lin=todos.length?todos.map(c=>{const movTxt=c.nmov?c.nmov+' lanç.':'';
-    if(c.auto)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="flex:1"><div class="ttl"><b>${c.nome}</b> ${tag(c.tipo)}</div><div class="meta" style="color:var(--mut)">sem dados de contato${movTxt?' · '+movTxt:''}</div></div><div style="display:flex;gap:12px;flex:none"><button class="x" onclick="historicoDe('${esc(c.nome)}')">🗂 histórico</button><button class="x" style="color:var(--blue)" onclick="abrirCadastro('auto:${esc(c.nome)}')">✏️ editar</button></div></div></div>`;
+    if(c.auto)return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="flex:1"><div class="ttl"><b>${c.nome}</b> ${tag(c.tipo)}</div><div class="meta" style="color:var(--mut)">sem dados de contato${movTxt?' · '+movTxt:''}</div></div><div style="display:flex;gap:12px;flex:none"><button class="x" onclick="historicoDe('${esc(c.nome)}')">🗂 histórico</button><button class="x" style="color:var(--blue)" onclick="abrirCadastro('auto:${esc(c.nome)}')">✏️ editar</button><button class="x" onclick="excluirPess('${esc(c.nome)}')">🗑 excluir</button></div></div></div>`;
     return `<div class="item" style="display:block">
     <div style="display:flex;justify-content:space-between;gap:10px;cursor:pointer" onclick="toggleExp('${c.id}')"><div style="flex:1"><div class="ttl"><b>${c.nome}</b> ${tag(c.tipo)}</div><div class="meta">${[c.doc,c.tel,c.email].filter(Boolean).join(' · ')||'sem dados'}${movTxt?' · '+movTxt:''} <span class="chev" style="color:var(--mut)">${expandId===c.id?'▾':'›'}</span></div></div></div>
     ${expandId===c.id?`<div style="font-size:12px;color:var(--ink);margin-top:8px;line-height:1.7">${c.doc?`📄 ${c.doc}<br>`:''}${c.tel?`📞 ${c.tel}<br>`:''}${c.email?`✉️ ${c.email}<br>`:''}${c.site?`🌐 ${c.site}<br>`:''}${c.end?`📍 ${c.end}<br>`:''}${c.obs?`📝 ${c.obs}`:''}${!(c.doc||c.tel||c.email||c.site||c.end||c.obs)?'<span style="color:var(--mut)">sem dados preenchidos</span>':''}</div>
@@ -1081,8 +1084,11 @@ function vCadastros(){
     <div class="mini click" style="text-align:center;padding:15px 8px" onclick="cadTab='pess';render()"><div style="font-size:25px;line-height:1">👥</div><div style="font-weight:700;margin-top:6px">Clientes & fornecedores</div><div class="s">${todos.length} cadastro${todos.length===1?'':'s'}${nA?' · '+nA+' sem dados':''}</div></div>
     <div class="mini click" style="text-align:center;padding:15px 8px" onclick="cadTab='contas';render()"><div style="font-size:25px;line-height:1">🏦</div><div style="font-weight:700;margin-top:6px">Contas</div><div class="s">${cbTodos.length} conta${cbTodos.length===1?'':'s'}</div></div>
     <div class="mini click" style="text-align:center;padding:15px 8px" onclick="cadTab='cols';render()"><div style="font-size:25px;line-height:1">📚</div><div style="font-weight:700;margin-top:6px">Coleções</div><div class="s">${nCols} em ${jogos.length} jogo${jogos.length===1?'':'s'}</div></div></div>`;
-  if(cadTab==='pess')return `${volta}<div class="sec" style="margin-top:0">👥 Clientes & fornecedores${nA?` <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— ${nA} sem dados de contato</span>`:''}</div>
-    <button class="btn g" onclick="abrirCadastro()">+ novo cliente / fornecedor</button><div style="margin-top:10px">${lin}</div>`;
+  if(cadTab==='pess'){const dups={};todos.forEach(c=>{const k=(c.nome||'').toLowerCase().trim();(dups[k]=dups[k]||[]).push(c.nome);});
+    const pares=Object.values(dups).filter(a=>a.length>1);
+    const avisoDup=pares.length?`<div class="soon" style="background:var(--infobg);color:var(--amber);margin-bottom:8px">⚠️ Nomes duplicados distorcem os relatórios: <b>${pares.map(a=>a.join(' / ')).join(' · ')}</b> — toque no 🗑 do nome errado e informe o certo como destino (mescla os lançamentos).</div>`:'';
+    return `${volta}<div class="sec" style="margin-top:0">👥 Clientes & fornecedores${nA?` <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— ${nA} sem dados de contato</span>`:''}</div>
+    ${avisoDup}<button class="btn g" onclick="abrirCadastro()">+ novo cliente / fornecedor</button><div style="margin-top:10px">${lin}</div>`;}
   if(cadTab==='contas')return `${volta}<div class="sec" style="margin-top:0">🏦 Contas <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— bancos, Pix, cartão (aparecem nos lançamentos)</span></div>
     <button class="btn g" onclick="abrirConta()">+ nova conta</button><div style="margin-top:10px">${linCB}</div>`;
   return `${volta}<div class="sec" style="margin-top:0">📚 Coleções por jogo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— grupos/anos, renomear, excluir</span></div>
@@ -1142,7 +1148,18 @@ function salvarCadastro(id){const g=id=>document.getElementById(id)?.value;const
   if(antigo&&antigo!==nome){const pi=pess.indexOf(antigo);if(pi>=0)pess[pi]=nome;else if(!pess.includes(nome))pess.push(nome);movs.forEach(m=>{if(m.contraparte===antigo)m.contraparte=nome;});save();}
   else if(!pess.includes(nome))pess.push(nome);
   saveL();salvarCad();fecharModal();render();}
-function excluirCadastro(id){if(confirm('Excluir este cadastro?')){cadastros=cadastros.filter(x=>x.id!==id);salvarCad();render();}}
+function excluirCadastro(id){const c=cadastros.find(x=>x.id===id);if(c)excluirPess(c.nome);}
+function excluirPess(nome){const n=movs.filter(m=>(m.contraparte||'')===nome).length;
+  if(n>0){const dest=(prompt('"'+nome+'" tem '+n+' lançamento(s).\n\nPra excluir, esses lançamentos passam pra OUTRO nome (mesclar). Digite o nome de destino EXATAMENTE como aparece na lista:')||'').trim();
+    if(!dest)return;if(dest===nome){alert('O destino é o mesmo nome.');return;}
+    if(!pess.includes(dest)&&!confirm('"'+dest+'" não está na lista — criar e mover mesmo assim?'))return;
+    if(!confirm('Mover '+n+' lançamento(s) de "'+nome+'" pra "'+dest+'" e excluir "'+nome+'"?'))return;
+    movs.forEach(m=>{if((m.contraparte||'')===nome)m.contraparte=dest;});
+    if(!pess.includes(dest))pess.push(dest);}
+  else if(!confirm('Excluir "'+nome+'" da lista de clientes/fornecedores?'))return;
+  pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
+  salvarCad();save();saveL();toast('"'+nome+'" excluído ✓');render();}
+const pessOrd=()=>pess.slice().sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base'}));
 function restaurarBackup(ts){const x=get('tcg_backups',[]).find(y=>y.ts===ts);if(!x)return;if(confirm('Voltar ao ponto de '+new Date(ts).toLocaleString('pt-BR')+'? O estado atual será substituído.')){movs=x.dados.map(m=>({...m}));localStorage.setItem(MK,JSON.stringify(movs));fecharModal();go('painel');toast('Restaurado ✓');}}
 function todasFotos(cb){
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb([]));}
