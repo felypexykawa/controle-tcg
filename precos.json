@@ -1,42 +1,48 @@
 {
- "atualizadoEm": "2026-07-05T00:18:52Z",
- "fonte": "Chrome local (coleta ao vivo)",
+ "atualizadoEm": "2026-07-05T12:45:00Z",
+ "fonte": "Chrome local — extrator v2 (bloco 'Preço Médio de Venda no Marketplace', por versão)",
  "cartas": {
   "135/108": {
    "codigo": "135/108",
    "status": "OK",
    "titulo": "Revavroom ex (135/108)",
-   "menor": 5.0,
-   "listagens": [
-    5.0,
-    26.99,
-    37.9
+   "versoes": [
+    {"v": "Normal", "mn": 79.98, "md": 164.94, "mx": 249.9}
    ],
+   "menor": 79.98,
+   "medio": 164.94,
+   "maior": 249.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=135%2F108"
   },
   "245/198": {
    "codigo": "245/198",
    "status": "OK",
    "titulo": "Gardevoir ex (245/198)",
-   "menor": 318.75,
-   "listagens": [
-    318.75,
-    318.75,
-    365.5
+   "versoes": [
+    {"v": "Normal", "mn": 425.0, "md": 425.0, "mx": 425.0},
+    {"v": "Foil", "mn": 318.75, "md": 397.07, "mx": 679.99}
    ],
+   "menor": 425.0,
+   "medio": 425.0,
+   "maior": 425.0,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=245%2F198"
   },
   "188/172": {
    "codigo": "188/172",
    "status": "AMBIGUO",
-   "titulo": "188/172 — mais de uma carta (escolher na Liga)",
-   "menor": 9.87,
-   "listagens": [
-    9.87,
-    19.99,
-    25.0
-   ],
+   "titulo": "188/172 — 60 cartas com esse número (abrir a busca e escolher)",
+   "versoes": [],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=188%2F172"
   }
- }
+ },
+ "historico": {
+  "135/108": {
+   "Normal": [{"d": "2026-07-05", "mn": 79.98, "md": 164.94, "mx": 249.9}]
+  },
+  "245/198": {
+   "Normal": [{"d": "2026-07-05", "mn": 425.0, "md": 425.0, "mx": 425.0}],
+   "Foil": [{"d": "2026-07-05", "mn": 318.75, "md": 397.07, "mx": 679.99}]
+  }
+ },
+ "nota": "v2 2026-07-05: preços anteriores (5,00/318,75/9,87) descartados conscientemente — o extrator v1 lia anúncios 'À partir de' da página de busca, que misturam acessórios (o R$ 5,00 do 135/108 era um sleeve, não a carta). Baseline do histórico começa aqui, com dados do bloco oficial por versão. Primeira entrada de cada versão é IMUTÁVEL (cap 40 preserva o ponto [0])."
 }

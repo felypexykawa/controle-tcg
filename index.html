@@ -67,7 +67,7 @@ nav button{font-size:10.5px}
 </style>
 </head>
 <body>
-<header style="display:flex;align-items:center;gap:8px"><button id="btnVoltar" onclick="voltar()" style="display:none;background:none;border:none;color:#fff;font-size:28px;line-height:1;cursor:pointer;padding:0 4px">‹</button><div style="flex:1"><h1>🃏 Controle TCG</h1><div class="sub">seu controle, no seu bolso <span id="buildTag" style="opacity:.5"></span></div></div><button class="htop" data-t="simular" onclick="go('simular')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h8"/></svg>Simular</button><button class="htop main" data-t="lancar" onclick="go('lancar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Lançar</button></header>
+<header style="display:flex;align-items:center;gap:8px"><button id="btnVoltar" onclick="voltar()" style="display:none;background:none;border:none;color:#fff;font-size:28px;line-height:1;cursor:pointer;padding:0 4px">‹</button><div style="flex:1"><h1>🃏 Controle TCG</h1><div class="sub">seu controle, no seu bolso <span id="buildTag" style="opacity:.5"></span> <span id="syncDot" style="font-size:10px"></span></div></div><button class="htop" data-t="simular" onclick="go('simular')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h8"/></svg>Simular</button><button class="htop main" data-t="lancar" onclick="go('lancar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Lançar</button></header>
 <div class="wrap" id="view"></div>
 <div id="toast"></div>
 <nav>
@@ -107,10 +107,10 @@ let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>localStorage.setItem('tc
 let tela='simular',tipoSel='COMPRA',editId=null,perDe='',perAte='',perSel='tudo',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
-let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='',relExtrato=false;
+let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='',relCat='',relExtrato=false;
 let consOrd='emissao',consGrupoFech={},_gKeys=[],ctAgrupo='mes',ctPess='',ctExp={},_ctKeys=[],relFOpen=false,relDet=false;
 let _preSel=null,vendaJogoF='',vvOrig='avulso',selMode=false,selIds={},ctJogo='',relChart=false;
-let relDimAll='colecao',extConta='',extOrdem='desc',cadTab='',ctFOpen=false,consFOpen=false,consCol='',consPess='',consConta='',relCompView='lista',relTLView='lista';
+let relDimAll='colecao',extConta='',extOrdem='desc',cadTab='',ctFOpen=false,consFOpen=false,consCol='',consPess='',consConta='',consCat='',ctCat='',relCompView='lista',relTLView='lista';
 function perRotTxt(){return perSel==='custom'?((perDe?perDe.split('-').reverse().join('/'):'…')+' → '+(perAte?perAte.split('-').reverse().join('/'):'hoje')):((PERS.find(p=>p[0]===perSel)||['','Tudo'])[1]);}
 function fBtnMini(aberto,resumo,click){return `<div class="mini click" style="margin-bottom:8px;padding:9px 12px;${aberto?'outline:1.5px solid var(--blue)':''}" onclick="${click}"><div class="k">🔎 Filtros ${aberto?'▾':'▸'}</div><div class="s">${resumo||'tudo'}</div></div>`;}
 function togSel(id){if(selIds[id])delete selIds[id];else selIds[id]=1;render();}
@@ -124,7 +124,7 @@ function juntarNotaCore(ids){const its=movs.filter(m=>ids.includes(m.id)&&m.tipo
     save();toast('Nota'+(num?' '+num:'')+' — total '+fmt(tot)+(nP>1?' em '+nP+'× de '+fmt(Math.round(tot/nP*100)/100):' à vista')+' ✓');};
   if(notasSel.length===0){
     if(soltas.length<2){alert('Marque pelo menos 2 compras pra juntar numa nota.');return false;}
-    const num=(prompt('Nº da nota (opcional):')||'').trim();aplica('n'+Date.now(),num,soltas[0],soltas);return true;}
+    const num=(prompt('Nº da nota (opcional):')||'').trim();aplica(novoId('n'),num,soltas[0],soltas);return true;}
   if(notasSel.length===1){
     if(!soltas.length){alert('Isso já é uma nota só. Marque também as compras soltas que devem entrar nela.');return false;}
     const nid=notasSel[0],h=movs.find(m=>m.notaId===nid);
@@ -155,11 +155,13 @@ const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();if(USAR_N
 const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStorage.setItem('tcg_cols',JSON.stringify(cols));localStorage.setItem('tcg_pess',JSON.stringify(pess));localStorage.setItem('tcg_pgs',JSON.stringify(pgs));localStorage.setItem('tcg_jogos',JSON.stringify(jogos));localStorage.setItem('tcg_despcats',JSON.stringify(despCats));localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));localStorage.setItem('tcg_colsg',JSON.stringify(colsG));localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
+/* id único: base36 do relógio + 5 chars aleatórios — dois aparelhos lançando no mesmo milissegundo não colidem */
+function novoId(pfx){return (pfx||'m')+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function baixarLote(loteId,qtdBaixa,novaSit,extras){const lote=movs.find(m=>m.id===loteId);if(!lote)return null;const qtd=+lote.qtd||1,vUnit=(+lote.valor||0)/qtd;qtdBaixa=Math.max(1,Math.min(qtdBaixa,qtd));const destDe=s=>s==='Coleção'?'Coleção':(s==='Vendido'||s==='Trocado'?'Vender':lote.destino);
   if(!lote.destIni)lote.destIni=(sitDe(lote)==='Coleção'?'Coleção':'Em estoque');
   if(qtdBaixa>=qtd){lote.situacao=novaSit;lote.destino=destDe(novaSit);if(extras)Object.assign(lote,extras);return lote;}
   lote.qtd=qtd-qtdBaixa;lote.valor=Math.round((qtd-qtdBaixa)*vUnit*100)/100;
-  const ped=Object.assign({},lote,{id:'m'+Date.now()+Math.floor(Math.random()*1e4),qtd:qtdBaixa,valor:Math.round(qtdBaixa*vUnit*100)/100,situacao:novaSit,destino:destDe(novaSit),loteOrigem:loteId});if(extras)Object.assign(ped,extras);movs.push(ped);return ped;}
+  const ped=Object.assign({},lote,{id:novoId(),qtd:qtdBaixa,valor:Math.round(qtdBaixa*vUnit*100)/100,situacao:novaSit,destino:destDe(novaSit),loteOrigem:loteId});if(extras)Object.assign(ped,extras);movs.push(ped);return ped;}
 function baixarBoosters(loteId,nBoo,novaSit,extras){const lote=movs.find(m=>m.id===loteId);if(!lote)return null;
   const qtd=+lote.qtd||1,bpu=Math.max(1,+lote.boosters||1),tot=qtd*bpu,vLote=+lote.valor||0,vb=vLote/tot;
   nBoo=Math.max(1,Math.min(nBoo,tot));
@@ -167,12 +169,12 @@ function baixarBoosters(loteId,nBoo,novaSit,extras){const lote=movs.find(m=>m.id
   const destDe=s=>s==='Coleção'?'Coleção':(s==='Vendido'||s==='Trocado'?'Vender':lote.destino);
   if(nBoo>=tot){lote.situacao=novaSit;lote.destino=destDe(novaSit);if(extras)Object.assign(lote,extras);return lote;}
   const rem=tot-nBoo,remCx=Math.floor(rem/bpu),remBoo=rem%bpu,vPed=Math.round(nBoo*vb*100)/100;
-  const ped=Object.assign({},lote,{id:'m'+Date.now()+Math.floor(Math.random()*1e4),qtd:nBoo,valor:vPed,cat:'Booster',boosters:1,vUnit:Math.round(vb*100)/100,situacao:novaSit,destino:destDe(novaSit),loteOrigem:loteId});
+  const ped=Object.assign({},lote,{id:novoId(),qtd:nBoo,valor:vPed,cat:'Booster',boosters:1,vUnit:Math.round(vb*100)/100,situacao:novaSit,destino:destDe(novaSit),loteOrigem:loteId});
   if(extras)Object.assign(ped,extras);
   if(remCx===0){lote.qtd=remBoo;lote.valor=Math.round((vLote-vPed)*100)/100;lote.cat='Booster';lote.boosters=1;lote.vUnit=Math.round(vb*100)/100;lote.obs=(lote.obs?lote.obs+' · ':'')+'aberto em boosters';}
   else{lote.qtd=remCx;
     if(remBoo>0){const vSol=Math.round(remBoo*vb*100)/100;
-      const solto=Object.assign({},lote,{id:'m'+Date.now()+Math.floor(Math.random()*1e4)+1,qtd:remBoo,valor:vSol,cat:'Booster',boosters:1,vUnit:Math.round(vb*100)/100,loteOrigem:loteId,obs:(lote.obs?lote.obs+' · ':'')+'aberto de '+(lote.cat||'caixa')});
+      const solto=Object.assign({},lote,{id:novoId(),qtd:remBoo,valor:vSol,cat:'Booster',boosters:1,vUnit:Math.round(vb*100)/100,loteOrigem:loteId,obs:(lote.obs?lote.obs+' · ':'')+'aberto de '+(lote.cat||'caixa')});
       movs.push(solto);lote.valor=Math.round((vLote-vPed-vSol)*100)/100;}
     else lote.valor=Math.round((vLote-vPed)*100)/100;}
   movs.push(ped);return ped;}
@@ -201,7 +203,7 @@ function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)retu
 function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',1);
   rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});};
   rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);}catch(e){cb(null);}}
-function fotoAdd(movId,b64,cb){const fid='f'+Date.now()+Math.floor(Math.random()*1e4);
+function fotoAdd(movId,b64,cb){const fid=novoId('f');
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId,b64,ts:Date.now()}).then(()=>cb(true)).catch(e=>{alert('A nuvem recusou a foto — quase certo que falta publicar a REGRA de fotos no Firebase (está no chat do Claude). Detalhe: '+(e&&e.message));cb(false);});}
   else idbOpen(db=>{if(!db){alert('Não consegui abrir o armazenamento de fotos deste aparelho.');cb(false);return;}
     const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId,b64,ts:Date.now()});tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
@@ -310,20 +312,22 @@ function contasPagas(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   movs.filter(m=>m.tipo==='DESPESA'&&m.status!=='apagar'&&(m.dataPagamento||m.data)).forEach(m=>{L.push({venc:new Date((m.dataPagamento||m.data)+'T00:00:00'),valor:+m.valor||0,m});});
   return L.sort((a,b)=>b.venc-a.venc);}
 function noPer(d){if(!d)return true;if(perDe&&d<perDe)return false;if(perAte&&d>perAte)return false;return true;}
-function mRel(m){return (!relJogo||(m.jogo||'Pokémon')===relJogo)&&(!relCol||(m.colecao||'')===relCol)&&(!relPess||(m.contraparte||'')===relPess);}
-function mRelX(m){if(m.tipo==='DESPESA')return(!relJogo&&!relCol)&&(!relPess||(m.contraparte||'')===relPess);return mRel(m);}
-function filtroResumoTxt(){const perRot=perSel==='custom'?((perDe?perDe.split('-').reverse().join('/'):'…')+' → '+(perAte?perAte.split('-').reverse().join('/'):'hoje')):((PERS.find(p=>p[0]===perSel)||['','Tudo'])[1]);return [perRot,relJogo,relCol,relPess].filter(Boolean).join(' · ');}
+function mRel(m){return (!relJogo||(m.jogo||'Pokémon')===relJogo)&&(!relCol||(m.colecao||'')===relCol)&&(!relPess||(m.contraparte||'')===relPess)&&(!relCat||(m.cat||'')===relCat);}
+function mRelX(m){if(m.tipo==='DESPESA')return(!relJogo&&!relCol&&!relCat)&&(!relPess||(m.contraparte||'')===relPess);return mRel(m);}
+function filtroResumoTxt(){const perRot=perSel==='custom'?((perDe?perDe.split('-').reverse().join('/'):'…')+' → '+(perAte?perAte.split('-').reverse().join('/'):'hoje')):((PERS.find(p=>p[0]===perSel)||['','Tudo'])[1]);return [perRot,relJogo,relCol,relPess,relCat].filter(Boolean).join(' · ');}
 function filtrosRelCard(){
   const jgsU=[...new Set(movs.filter(m=>m.tipo==='COMPRA'||m.tipo==='VENDA').map(m=>m.jogo||'Pokémon'))].sort();
   const colsU=[...new Set(movs.filter(m=>(m.tipo==='COMPRA'||m.tipo==='VENDA')&&(!relJogo||(m.jogo||'Pokémon')===relJogo)&&m.colecao).map(m=>m.colecao))].sort();
   const pessU=[...new Set(movs.map(m=>m.contraparte).filter(Boolean))].sort();
+  const catsU=[...new Set(movs.filter(m=>m.tipo==='COMPRA'||m.tipo==='VENDA').map(m=>m.cat).filter(Boolean))].sort();
   const opt=(arr,val)=>arr.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('');
   return `<div class="card"><div class="sec" style="margin-top:0">🔎 Filtros</div>
     ${selPeriodo()}
     <div class="row2"><div><label style="margin-top:0">Jogo</label><select onchange="relJogo=this.value;relCol='';render()"><option value="">todos</option>${opt(jgsU,relJogo)}</select></div>
       <div><label style="margin-top:0">Coleção</label><select onchange="relCol=this.value;render()"><option value="">todas</option>${opt(colsU,relCol)}</select></div></div>
-    <label>Cliente / fornecedor</label><select onchange="relPess=this.value;render()"><option value="">todos</option>${opt(pessU,relPess)}</select>
-    ${(relJogo||relCol||relPess)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:8px" onclick="relJogo='';relCol='';relPess='';render()">filtrando: ${[relJogo,relCol,relPess].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
+    <div class="row2"><div><label>Cliente / fornecedor</label><select onchange="relPess=this.value;render()"><option value="">todos</option>${opt(pessU,relPess)}</select></div>
+      <div><label>Tipo de produto</label><select onchange="relCat=this.value;render()"><option value="">todos</option>${opt(catsU,relCat)}</select></div></div>
+    ${(relJogo||relCol||relPess||relCat)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:8px" onclick="relJogo='';relCol='';relPess='';relCat='';render()">filtrando: ${[relJogo,relCol,relPess,relCat].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
     <button class="btn g" style="margin-top:10px" onclick="relFOpen=false;render()">fechar filtros</button></div>`;}
 function setPer(k){perSel=k;const h=new Date(),iso=x=>x.toISOString().slice(0,10);
   if(k==='d30'){const a=new Date(h);a.setDate(a.getDate()-30);perDe=iso(a);perAte='';}
@@ -532,9 +536,9 @@ function salvarNota(){
   if(!notaItens.length){alert('Adicione pelo menos um item à nota.');return;}
   const extra=(+notaHead.frete||0)+(+notaHead.taxa||0),tot=notaItens.reduce((s,it)=>s+(+it.valor||0),0);
   const sit=notaHead.sit||'Em estoque',cp=(notaHead.cp&&notaHead.cp!=='__add__')?notaHead.cp:'',data=notaHead.data||new Date().toISOString().slice(0,10);
-  const nid='n'+Date.now();let k=0;
+  const nid=novoId('n');let k=0;
   notaItens.forEach(it=>{const r=tot>0?(it.valor/tot)*extra:0,custo=Math.round((it.valor+r)*100)/100;
-    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:(r>0?`nota · +${fmt(r)} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});});
+    movs.push({id:novoId(),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:(r>0?`nota · +${fmt(r)} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});});
   const f1=movs.find(m=>m.notaId===nid);aplicarFotosPend(f1&&f1.id);
   const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
@@ -581,8 +585,8 @@ function removeItemVenda(i){vendaItens.splice(i,1);render();}
 function salvarVendaVarios(){
   if(!vendaItens.length){alert('Adicione pelo menos um item à venda.');return;}
   const cp=(vendaHead.cp&&vendaHead.cp!=='__add__')?vendaHead.cp:'';if(!cp){alert('O cliente é obrigatório.');return;}
-  const app=vendaHead.canal==='App',data=vendaHead.data||new Date().toISOString().slice(0,10),conta=(vendaHead.conta&&vendaHead.conta!=='__add__')?vendaHead.conta:'',vid='v'+Date.now();let k=0;
-  vendaItens.forEach(it=>{const base={id:'m'+Date.now()+(k++),tipo:'VENDA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:it.valor,codigo:it.codigo||'',canal:vendaHead.canal,taxa:app?(+vendaHead.taxa||0):0,recDias:app?(+vendaHead.recDias||0):0,conta,contraparte:cp,destino:'Vender',vendaId:vid,obs:''};
+  const app=vendaHead.canal==='App',data=vendaHead.data||new Date().toISOString().slice(0,10),conta=(vendaHead.conta&&vendaHead.conta!=='__add__')?vendaHead.conta:'',vid=novoId('v');let k=0;
+  vendaItens.forEach(it=>{const base={id:novoId(),tipo:'VENDA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:it.valor,codigo:it.codigo||'',canal:vendaHead.canal,taxa:app?(+vendaHead.taxa||0):0,recDias:app?(+vendaHead.recDias||0):0,conta,contraparte:cp,destino:'Vender',vendaId:vid,obs:''};
     if(it.origemId){const src=movs.find(m=>m.id===it.origemId);
       if(src&&sitDe(src)==='Em estoque'){const bpu=Math.max(1,+src.boosters||1),boo=(it.un==='boo'&&bpu>1);
         const dispI=boo?(+src.qtd||1)*bpu:(+src.qtd||1),vU=(+src.valor||0)/dispI,qv=Math.min(it.qtd,dispI);
@@ -637,11 +641,11 @@ function salvarTroca(){
   if(!trocaRecebi.length){alert('Informe o que você recebeu.');return;}
   const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+(+trocaDin||0),vTot=trocaRecebi.reduce((s,r)=>s+(+r.valorMercado||0),0);
   const cp=document.getElementById('t_cp')?.value,cont=(cp&&cp!=='__add__')?cp:'';
-  const data=new Date().toISOString().slice(0,10),tid='t'+Date.now();let k=0;
+  const data=new Date().toISOString().slice(0,10),tid=novoId('t');let k=0;
   trocaDei.forEach(d=>{if(d.estoqueId){const ex={dataSaida:data};if(d.deiBoo)baixarBoosters(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);else baixarLote(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);}});
   const deiDesc=trocaDei.map(d=>d.desc).join(' + ')||'dinheiro';
   trocaRecebi.forEach(r=>{const c=vTot>0?custoTot*(r.valorMercado/vTot):custoTot/trocaRecebi.length;
-    movs.push({id:'m'+Date.now()+(k++),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:r.cat||'Single/Carta',codigo:r.codigo||'',boosters:+r.boosters||0,colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
+    movs.push({id:novoId(),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:r.cat||'Single/Carta',codigo:r.codigo||'',boosters:+r.boosters||0,colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
   const ft1=movs.find(m=>m.trocaId===tid);aplicarFotosPend(ft1&&ft1.id);
   const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
 function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulação',custo:Math.round(v.custoMat*100)/100}];trocaDin=v.din||0;trocaRecebi=[{desc:'carta',valorMercado:v.V,colecao:'',sit:'Em estoque'}];deiModo='avulso';tipoSel='TROCA';go('lancar');toast('Troca pré-preenchida — ajuste e registre');}
@@ -649,18 +653,20 @@ function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulaç�
 function vConsultar(){
   const jogosUsados=[...new Set(movs.map(m=>m.jogo||'Pokémon'))];
   const segJogo=jogosUsados.length>1?`<div class="seg" style="margin-top:6px">${[['todos','Todos']].concat(jogosUsados.map(j=>[j,j])).map(([k,l])=>`<button class="${consJogo===k?'on':''}" onclick="consJogo='${k}';render()">${l}</button>`).join('')}</div>`:'';
-  const resCons=[perRotTxt(),(consJogo&&consJogo!=='todos')?consJogo:'',consCol,consPess,consConta].filter(Boolean).join(' · ');
+  const resCons=[perRotTxt(),(consJogo&&consJogo!=='todos')?consJogo:'',consCol,consCat,consPess,consConta].filter(Boolean).join(' · ');
   const colsUc=[...new Set(movs.filter(m=>(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&m.colecao).map(m=>m.colecao))].sort();
   const pessUc=[...new Set(movs.map(m=>m.contraparte).filter(Boolean))].sort();
   const ctasUc=[...new Set(movs.map(m=>m.conta).filter(Boolean))].sort();
+  const catsUc=[...new Set(movs.filter(m=>m.tipo==='COMPRA'||m.tipo==='VENDA').map(m=>m.cat).filter(Boolean))].sort();
   const optC=(arr,val)=>arr.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('');
-  const filtroAtivo=(consJogo&&consJogo!=='todos')||consCol||consPess||consConta;
+  const filtroAtivo=(consJogo&&consJogo!=='todos')||consCol||consPess||consConta||consCat;
   const fCons=fBtnMini(consFOpen,resCons,'consFOpen=!consFOpen;render()')+(consFOpen?`${selPeriodo()}
     <div class="row2"><div><label style="margin-top:0">Jogo</label><select onchange="consJogo=this.value||'todos';consCol='';render()"><option value="">todos</option>${optC(jogosUsados,(consJogo==='todos'?'':consJogo))}</select></div>
       <div><label style="margin-top:0">Coleção</label><select onchange="consCol=this.value;render()"><option value="">todas</option>${optC(colsUc,consCol)}</select></div></div>
+    <label>Tipo de produto</label><select onchange="consCat=this.value;render()"><option value="">todos</option>${optC(catsUc,consCat)}</select>
     <div class="row2"><div><label>Cliente / fornecedor</label><select onchange="consPess=this.value;render()"><option value="">todos</option>${optC(pessUc,consPess)}</select></div>
       <div><label>Conta</label><select onchange="consConta=this.value;render()"><option value="">todas</option>${optC(ctasUc,consConta)}</select></div></div>
-    ${filtroAtivo?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:8px" onclick="consJogo='todos';consCol='';consPess='';consConta='';render()">filtrando: ${[(consJogo!=='todos'?consJogo:''),consCol,consPess,consConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
+    ${filtroAtivo?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:8px" onclick="consJogo='todos';consCol='';consPess='';consConta='';consCat='';render()">filtrando: ${[(consJogo!=='todos'?consJogo:''),consCol,consCat,consPess,consConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
     <button class="btn g" style="margin:8px 0" onclick="consFOpen=false;render()">fechar filtros</button>`:'');
   if(consMenu){
     const cards=[['tudo','🗂','Tudo','todos os lançamentos'],['COMPRA','🛒','Compras','o que você comprou'],['VENDA','💰','Vendas','o que você vendeu'],['ESTOQUE','📦','Estoque','parado pra vender'],['PEDIDO','🚚','Pedidos','comprado, a caminho'],['COLECAO','⭐','Coleção','o que foi pra coleção'],['DESPESA','🧾','Despesas','custos do negócio'],['CADASTRO','👤','Cadastros','clientes, contas, coleções']];
@@ -672,7 +678,7 @@ function vConsultar(){
   if(consF==='CADASTRO')return voltar+vCadastros();
   if(movs.length===0)return `<div class="card"><div class="empty">Nada lançado ainda.</div></div>`;
   const q=consQ.toLowerCase();
-  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='PEDIDO'?(m.tipo==='COMPRA'&&sitDe(m)==='Pedido'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
+  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='PEDIDO'?(m.tipo==='COMPRA'&&sitDe(m)==='Pedido'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consCat||(m.cat||'')===consCat)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
   const doTipo=movs.filter(porTipo);
   let ord=doTipo.filter(m=>noPer(m.data));
   const cmpData=(a,b)=>(a.data||'')<(b.data||'')?1:-1;
@@ -708,7 +714,8 @@ function vConsultar(){
       ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
         ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
-        ${(function(){const pl=precoLigaDe(m.codigo);if(!pl)return '';return `<span class="meta" style="flex-basis:100%;color:${pl.status==='AMBIGUO'?'var(--amber)':'var(--green)'}">🔍 Liga: ${pl.status==='AMBIGUO'?'código com mais de uma carta — toque em "preço Liga" pra escolher':`<b>${pl.titulo.split(' (')[0]}</b> · menor ${fmt(pl.menor)}${pl.medio?' · méd '+fmt(pl.medio):''}${pl.maior?' · máx '+fmt(pl.maior):''}${pl.listagens&&pl.listagens.length>1?' · listagens '+pl.listagens.map(v=>fmt(v)).join(' / '):''}`} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
+        ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
+        ${(function(){const pl=precoLigaDe(m.codigo);if(!pl)return '';const vs=ligaVersoes(pl);return `<span class="meta" style="flex-basis:100%;color:${pl.status==='AMBIGUO'?'var(--amber)':'var(--green)'}">🔍 Liga: ${pl.status==='AMBIGUO'?(pl.titulo&&pl.titulo.indexOf('—')>0?pl.titulo:'código com mais de uma carta')+' — toque em "preço Liga" pra escolher':`<b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')}`} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
         <button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${(+m.nFotos||0)>0?' ('+m.nFotos+')':''}</button>
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
@@ -733,7 +740,8 @@ function vContas(){
   const pessTodos=[...new Set(ap.concat(ar).concat(pg).map(x=>x.m.contraparte||'—'))].sort();
   const jgsCt=[...new Set(ap.concat(ar).concat(pg).map(x=>x.m.jogo).filter(Boolean))].sort();
   const ctasCt=[...new Set(ap.concat(ar).concat(pg).map(x=>x.m.conta).filter(Boolean))].sort();
-  const okCt=x=>(!ctPess||(x.m.contraparte||'—')===ctPess)&&(!ctJogo||(x.m.jogo||'')===ctJogo)&&(!ctConta||(x.m.conta||'')===ctConta)&&noPer((x.venc||x.data).toISOString().slice(0,10));
+  const catsCt=[...new Set(movs.filter(m=>m.tipo==='COMPRA'||m.tipo==='VENDA').map(m=>m.cat).filter(Boolean))].sort();
+  const okCt=x=>(!ctPess||(x.m.contraparte||'—')===ctPess)&&(!ctJogo||(x.m.jogo||'')===ctJogo)&&(!ctConta||(x.m.conta||'')===ctConta)&&(!ctCat||(x.nota?movs.some(mm=>mm.notaId===x.nota.id&&(mm.cat||'')===ctCat):(x.m.cat||'')===ctCat))&&noPer((x.venc||x.data).toISOString().slice(0,10));
   const fAp=ap.filter(okCt),fAr=ar.filter(okCt),fPg=pg.filter(okCt);
   const fApT=fAp.reduce((s,x)=>s+x.valor,0),fArT=fAr.reduce((s,x)=>s+x.valor,0);
   const gK=x=>ctAgrupo==='pessoa'?(x.m.contraparte||'—'):((x.venc||x.data).toISOString().slice(0,7));
@@ -744,16 +752,17 @@ function vContas(){
     const keys=Object.keys(gI).sort();keys.forEach(k=>_ctKeys.push(k));
     return keys.map(k=>{const its=gI[k],t=its.reduce((s,x)=>s+x.valor,0),open=!!ctExp[k];
       return `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);border-radius:9px;padding:9px 12px;margin:8px 0 5px;cursor:pointer;font-weight:700" onclick="togCt(this.dataset.k)" data-k="${k.replace(/"/g,'&quot;')}"><span>${open?'▾':'▸'} ${gR(k.slice(2))} <span style="color:var(--mut);font-weight:400;font-size:11px">· ${its.length} ${its.length===1?'conta':'contas'}</span></span><b style="color:${cor}">${fmt(t)}</b></div>${open?its.map(x=>linha(x,cor)).join(''):''}`;}).join('');};
-  const resCt=[perRotTxt(),ctJogo,ctPess,ctConta].filter(Boolean).join(' · ');
+  const resCt=[perRotTxt(),ctJogo,ctCat,ctPess,ctConta].filter(Boolean).join(' · ');
   const fPanel=ctFOpen?`${selPeriodo()}
     <div class="row2"><div><select onchange="ctJogo=this.value;render()"><option value="">todos os jogos</option>${jgsCt.map(j=>`<option ${ctJogo===j?'selected':''}>${j}</option>`).join('')}</select></div>
       <div><select onchange="ctPess=this.value;render()"><option value="">todos fornec. / clientes</option>${pessTodos.map(p=>`<option ${ctPess===p?'selected':''}>${p}</option>`).join('')}</select></div></div>
-    <select style="margin-top:6px" onchange="ctConta=this.value;render()"><option value="">todas as contas (Pix, cartão…)</option>${ctasCt.map(c=>`<option ${ctConta===c?'selected':''}>${c}</option>`).join('')}</select>
-    ${(ctPess||ctJogo||ctConta)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:6px" onclick="ctPess='';ctJogo='';ctConta='';render()">filtrando: ${[ctJogo,ctPess,ctConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
+    <div class="row2" style="margin-top:6px"><div><select onchange="ctConta=this.value;render()"><option value="">todas as contas (Pix, cartão…)</option>${ctasCt.map(c=>`<option ${ctConta===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div><select onchange="ctCat=this.value;render()"><option value="">todos os tipos de produto</option>${catsCt.map(c=>`<option ${ctCat===c?'selected':''}>${c}</option>`).join('')}</select></div></div>
+    ${(ctPess||ctJogo||ctConta||ctCat)?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer;margin-top:6px" onclick="ctPess='';ctJogo='';ctConta='';ctCat='';render()">filtrando: ${[ctJogo,ctCat,ctPess,ctConta].filter(Boolean).join(' · ')} — limpar ✕</div>`:''}
     <button class="btn g" style="margin-top:8px" onclick="ctFOpen=false;render()">fechar filtros</button>`:'';
   const controles=`<div style="margin-top:8px">${fBtnMini(ctFOpen,resCt,'ctFOpen=!ctFOpen;render()')}</div>${fPanel}
     <div style="display:flex;gap:8px;align-items:center;margin:8px 0 0"><select style="flex:1" onchange="ctAgrupo=this.value;ctExp={};render()">${[['mes','Agrupar por: mês de vencimento'],['pessoa','Agrupar por: fornecedor / cliente']].map(([v,l])=>`<option value="${v}" ${ctAgrupo===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="fxSelMode=!fxSelMode;fxSel={};if(fxSelMode){ctExp={};_ctKeys.forEach(k=>ctExp[k]=true);}render()">${fxSelMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosCt()">${Object.keys(ctExp).length?'recolher tudo':'expandir tudo'}</span></div>`;
-  const filtrado=(ctPess||ctJogo||ctConta||perDe||perAte)?' (filtrado)':'';
+  const filtrado=(ctPess||ctJogo||ctConta||ctCat||perDe||perAte)?' (filtrado)':'';
   const fxBar=fxSelMode?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--infobg);color:var(--blue)"><span>${Object.keys(fxSel).length} marcada(s) — soltas + 1 nota: entram nela · 2+ notas: fundem</span><button class="x" style="color:var(--blue);font-weight:700;flex:none" onclick="juntarFx()">🧾 juntar</button></div>`:'';
   return `<div class="card"><div class="head">Fluxo de caixa</div>
     <div class="grid2" style="margin-top:10px"><div class="mini"><div class="k">A pagar${filtrado}</div><div class="v" style="color:var(--red)">${fmt(fApT)}</div></div>
@@ -986,7 +995,7 @@ function salvar(){
     const pedC=boo?baixarBoosters(m.id,n,'Coleção',ex):baixarLote(m.id,n,'Coleção',ex);aplicarFotosPend(pedC&&pedC.id);
     save();toast('Foi pra coleção — '+n+(boo?' boosters':' un')+' ✓');editId=null;go('consultar');return;}
   if(tipoSel==='TROCA'){const custou=+g('f_custou')||0,din=+g('f_din')||0,recebi=g('f_desc')||'item de troca';
-    let o={id:editId||('m'+Date.now()),tipo:'COMPRA',origem:'TROCA',data:g('f_data'),qtd:1,valor:custou+din,cat:'Single/Carta',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:'—',situacao:g('f_sit')||'Em estoque',destino:(g('f_sit')==='Coleção')?'Coleção':'Vender',destIni:(g('f_sit')==='Coleção')?'Coleção':'Em estoque',contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',deu:g('f_deu')||'',custou,din,recebi,taxa:0,pgTipo:'À vista',obs:recebi+' (🔄 troca: dei '+(g('f_deu')||'?')+(din>0?' + '+fmt(din):'')+')'};
+    let o={id:editId||novoId(),tipo:'COMPRA',origem:'TROCA',data:g('f_data'),qtd:1,valor:custou+din,cat:'Single/Carta',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:'—',situacao:g('f_sit')||'Em estoque',destino:(g('f_sit')==='Coleção')?'Coleção':'Vender',destIni:(g('f_sit')==='Coleção')?'Coleção':'Em estoque',contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',deu:g('f_deu')||'',custou,din,recebi,taxa:0,pgTipo:'À vista',obs:recebi+' (🔄 troca: dei '+(g('f_deu')||'?')+(din>0?' + '+fmt(din):'')+')'};
     if(editId){const i=movs.findIndex(m=>m.id===editId);movs[i]=o;}else movs.push(o);
     if(!editId)aplicarFotosPend(o.id);save();toast('Troca registrada ✓');editId=null;render();return;}
   if(tipoSel==='DESPESA'){const val=+g('f_val')||0;const cat=g('f_dcat');if(!cat||cat==='__add__'){alert('Escolha a categoria da despesa.');return;}
@@ -998,15 +1007,15 @@ function salvar(){
         save();toast('Despesa fixa: alteração vale desta pra frente ✓');editId=null;go('consultar');return;}
       const i=movs.findIndex(m=>m.id===editId);movs[i]={...base,id:editId,data:g('f_data'),status:despStat};
       save();toast('Despesa atualizada ✓');editId=null;go('consultar');return;}
-    if(despFixa){const sid='s'+Date.now(),fq=despFreq,intD=+g('f_int')||30,d0=g('f_data');
-      for(let i=0;i<12;i++)movs.push({...base,id:'m'+Date.now()+i,data:proxData(d0,fq,intD,i),status:i===0?despStat:'apagar',serieId:sid,freq:fq});
+    if(despFixa){const sid=novoId('s'),fq=despFreq,intD=+g('f_int')||30,d0=g('f_data');
+      for(let i=0;i<12;i++)movs.push({...base,id:novoId(),data:proxData(d0,fq,intD,i),status:i===0?despStat:'apagar',serieId:sid,freq:fq});
       aplicarFotosPend((movs.find(m=>m.serieId===sid)||{}).id);
       save();toast('Despesa fixa criada — 12 previsões ✓');editId=null;go('consultar');return;}
-    const dId='m'+Date.now();movs.push({...base,id:dId,data:g('f_data'),status:despStat});aplicarFotosPend(dId);
+    const dId=novoId();movs.push({...base,id:dId,data:g('f_data'),status:despStat});aplicarFotosPend(dId);
     save();toast(despStat==='apagar'?'Despesa registrada · a pagar ✓':'Despesa registrada ✓');editId=null;go('consultar');return;}
   const val=+g('f_val')||0;
   if(val===0&&!confirm('O valor está R$ 0. Foi de graça / brinde? Toque OK pra salvar mesmo assim.'))return;
-  let obj={id:editId||('m'+Date.now()),tipo:tipoSel,data:g('f_data'),qtd:+g('f_qtd')||1,valor:val};
+  let obj={id:editId||novoId(),tipo:tipoSel,data:g('f_data'),qtd:+g('f_qtd')||1,valor:val};
   if(tipoSel==='COMPRA'){const cat=g('f_cat');if(!cat||cat==='__add__'){alert('Escolha o tipo de produto.');return;}
     const sit=g('f_sit')||'Em estoque';
     Object.assign(obj,{cat,codigo:g('f_cod')||'',jogo:g('f_jogo')||'Pokémon',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:g('f_idi'),boosters:+g('f_boo')||0,contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',taxa:0,pgTipo,nParc:pgTipo==='Parcelado'?(+g('f_nparc')||1):0,venc1:pgTipo==='Parcelado'?g('f_venc1'):'',conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):'',obs:g('f_obs')||''});
@@ -1139,7 +1148,7 @@ function abrirConta(id){let c;if(id&&id.indexOf('auto:')===0){c={nome:id.slice(5
   document.body.insertAdjacentHTML('beforeend',h);}
 function salvarConta(id){const g=k=>document.getElementById('cb_'+k)?.value;const nome=(g('nome')||'').trim();if(!nome){alert('Informe o nome da conta.');return;}
   const antigo=id?(contasBanc.find(x=>x.id===id)?.nome||null):null;
-  const o={id:id||('b'+Date.now()),nome,banco:g('banco')||'',nbanco:g('nbanco')||'',agencia:g('agencia')||'',numero:g('numero')||'',titular:g('titular')||'',saldoIni:(g('saldoIni')===''||g('saldoIni')==null)?null:+g('saldoIni'),saldoData:g('saldoData')||'',obs:g('obs')||''};
+  const o={id:id||novoId('b'),nome,banco:g('banco')||'',nbanco:g('nbanco')||'',agencia:g('agencia')||'',numero:g('numero')||'',titular:g('titular')||'',saldoIni:(g('saldoIni')===''||g('saldoIni')==null)?null:+g('saldoIni'),saldoData:g('saldoData')||'',obs:g('obs')||''};
   if(id){const i=contasBanc.findIndex(x=>x.id===id);if(i>=0)contasBanc[i]=o;}else contasBanc.push(o);
   if(antigo&&antigo!==nome){const pi=pgs.indexOf(antigo);if(pi>=0)pgs[pi]=nome;else if(!pgs.includes(nome))pgs.push(nome);movs.forEach(m=>{if(m.conta===antigo)m.conta=nome;});save();}
   else if(!pgs.includes(nome))pgs.push(nome);
@@ -1169,7 +1178,7 @@ function abrirCadastro(id){let c;if(id&&id.indexOf('auto:')===0){const pre=id.sl
   document.body.insertAdjacentHTML('beforeend',h);}
 function salvarCadastro(id){const g=id=>document.getElementById(id)?.value;const nome=(g('cad_nome')||'').trim();if(!nome){alert('Informe ao menos o nome.');return;}
   const antigo=id?(cadastros.find(x=>x.id===id)?.nome||null):null;
-  const o={id:id||('c'+Date.now()),tipo:cadTip,nome,doc:g('cad_doc')||'',tel:g('cad_tel')||'',email:g('cad_email')||'',site:g('cad_site')||'',end:g('cad_end')||'',obs:g('cad_obs')||''};
+  const o={id:id||novoId('c'),tipo:cadTip,nome,doc:g('cad_doc')||'',tel:g('cad_tel')||'',email:g('cad_email')||'',site:g('cad_site')||'',end:g('cad_end')||'',obs:g('cad_obs')||''};
   if(id){const i=cadastros.findIndex(x=>x.id===id);if(i>=0)cadastros[i]=o;}else cadastros.push(o);
   if(antigo&&antigo!==nome){const pi=pess.indexOf(antigo);if(pi>=0)pess[pi]=nome;else if(!pess.includes(nome))pess.push(nome);movs.forEach(m=>{if(m.contraparte===antigo)m.contraparte=nome;});save();}
   else if(!pess.includes(nome))pess.push(nome);
@@ -1190,7 +1199,7 @@ function restaurarBackup(ts){const x=get('tcg_backups',[]).find(y=>y.ts===ts);if
 function todasFotos(cb){
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb([]));}
   else idbOpen(db=>{if(!db){cb([]);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else cb(L);};cur.onerror=()=>cb(L);});}
-function restaurarFotos(L,done){let i=0,ok=0;const next=()=>{if(i>=L.length){done(ok);return;}const f=L[i++];const fid=f.id||('f'+Date.now()+i);
+function restaurarFotos(L,done){let i=0,ok=0;const next=()=>{if(i>=L.length){done(ok);return;}const f=L[i++];const fid=f.id||novoId('f');
   if(!f||!f.b64){next();return;}
   if(USAR_NUVEM&&_db)_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId:f.movId||'',b64:f.b64,ts:f.ts||Date.now()}).then(()=>{ok++;next();}).catch(()=>next());
   else idbOpen(db=>{if(!db){next();return;}const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId:f.movId||'',b64:f.b64,ts:f.ts||Date.now()});tx.oncomplete=()=>{ok++;next();};tx.onerror=()=>next();});};next();}
@@ -1286,10 +1295,25 @@ function transformarItem(){const pai=movs.find(x=>x.id===_abrirId);if(!pai)retur
   abertoItens.forEach((x,i)=>{let c;
     if(i===abertoItens.length-1)c=Math.round((tot-acum)*100)/100;
     else{c=somaM>0?Math.round(tot*(+x.vm||0)/somaM*100)/100:Math.round(tot/abertoItens.length*100)/100;acum=Math.round((acum+c)*100)/100;}
-    movs.push({id:'m'+Date.now()+i,tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:pai.colecao||'',jogo:pai.jogo||'Pokémon',idioma:pai.idioma||'—',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit,contraparte:pai.contraparte||'',loteOrigem:alvo.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(pai.cat||'item')+')'});});
+    movs.push({id:novoId(),tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:pai.colecao||'',jogo:pai.jogo||'Pokémon',idioma:pai.idioma||'—',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit,contraparte:pai.contraparte||'',loteOrigem:alvo.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(pai.cat||'item')+')'});});
   alvo.obs=(alvo.obs?alvo.obs+' · ':'')+'🔓 aberto em '+abertoItens.length+' item(ns)';
   const n=abertoItens.length;_abrirId=null;abertoItens=[];save();fecharModal();toast('Aberto ✓ — custo '+fmt(tot)+' distribuído em '+n+' item(ns)');render();}
-function salvarNuvem(){if(!_db||!_syncReady)return;_db.collection('controle').doc('dados').set({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,_upd:Date.now(),_by:_userEmail}).catch(e=>console.warn('nuvem:',e&&e.message));}
+/* Status de sincronização visível — falha de save NUNCA pode ser silenciosa */
+let _syncErrAt=0;
+function setSync(st,msg){const el=document.getElementById('syncDot');if(!el)return;
+  if(st==='ok'){el.textContent='☁️';el.title='sincronizado com a nuvem';el.style.opacity='.55';el.style.color='';}
+  else if(st==='saving'){el.textContent='☁️…';el.title='salvando…';el.style.opacity='.8';el.style.color='';}
+  else if(st==='erro'){el.textContent='☁️⚠ não salvou';el.title=msg||'erro ao salvar na nuvem';el.style.opacity='1';el.style.color='var(--red)';}
+  else{el.textContent='';el.title='';}}
+function salvarNuvem(){if(!_db||!_syncReady)return;
+  const payload={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,_upd:Date.now(),_by:_userEmail};
+  try{const kb=Math.round(JSON.stringify(payload).length/1024);
+    if(kb>700&&!window._doc1mbAviso){window._doc1mbAviso=true;toast('⚠ Seus dados estão em '+kb+'KB — perto do limite de 1MB da gaveta da nuvem. Me avise pra planejarmos a divisão.');}}catch(e){}
+  setSync('saving');
+  _db.collection('controle').doc('dados').set(payload)
+    .then(()=>setSync('ok'))
+    .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
+      if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
 function aplicarNuvem(d){if(!d)return;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;localStorage.setItem(MK,JSON.stringify(movs));render();}
 function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
 function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
@@ -1297,18 +1321,52 @@ function telaLogin(msg){const v=document.getElementById('view');if(v)v.innerHTML
 function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth=firebase.auth();_db=firebase.firestore();telaLogin('');
   _auth.onAuthStateChanged(u=>{
     if(u&&EMAILS_OK.map(x=>(x||'').toLowerCase()).includes((u.email||'').toLowerCase())){_userEmail=u.email;
-      _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');go('painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
+      _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');setSync('ok');go('painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='04/07 22h25';
+const BUILD_TAG='05/07 10h20';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
-let _precosLiga=null;
+let _precosLiga=null,_glVer='';
 fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.cartas){_precosLiga=j;if(document.getElementById('view'))render();}}).catch(()=>{});
 function precoLigaDe(cod){if(!_precosLiga||!cod)return null;return _precosLiga.cartas[(''+cod).trim()]||null;}
+function ligaVersoes(pl){if(!pl)return[];if(Array.isArray(pl.versoes)&&pl.versoes.length)return pl.versoes;if(pl.menor!=null)return[{v:'',mn:pl.menor,md:pl.medio||null,mx:pl.maior||null}];return[];}
+function ligaHistDe(cod){const h=_precosLiga&&_precosLiga.historico&&_precosLiga.historico[(''+cod).trim()];if(!h)return null;return (typeof h==='object'&&!Array.isArray(h))?h:{'':h};}
 function precosLigaQuando(){if(!_precosLiga||!_precosLiga.atualizadoEm)return '';const d=new Date(_precosLiga.atualizadoEm);const h=Math.round((Date.now()-d.getTime())/36e5);return h<1?'agora há pouco':h<48?('há '+h+'h'):d.toLocaleDateString('pt-BR');}
-function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return;const pl=precoLigaDe(cod);el.innerHTML=pl?(pl.status==='AMBIGUO'?'🔍 Liga: mais de uma carta com esse código':'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(pl.menor)+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>'):'';}
+function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return;const pl=precoLigaDe(cod);const vs=ligaVersoes(pl);
+  el.innerHTML=pl?(pl.status==='AMBIGUO'?'🔍 Liga: mais de uma carta com esse código':(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':'')):'';}
+/* Gráfico de evolução do preço (historico do precos.json) — menor/médio/maior no tempo */
+function graficoLiga(cod){const pl=precoLigaDe(cod),hist=ligaHistDe(cod);if(!hist){toast('Sem histórico ainda pra esse código');return;}
+  const vers=Object.keys(hist).filter(v=>Array.isArray(hist[v])&&hist[v].length);if(!vers.length){toast('Sem histórico ainda pra esse código');return;}
+  if(!vers.includes(_glVer))_glVer=vers[0];
+  const pts=hist[_glVer];
+  const tabs=vers.length>1?`<div class="seg" style="margin-bottom:8px">${vers.map(v=>`<button class="${_glVer===v?'on':''}" onclick="_glVer='${v.replace(/'/g,"\\'")}';graficoLiga('${(''+cod).replace(/'/g,"\\'")}')">${v||'única'}</button>`).join('')}</div>`:'';
+  const W=340,H=170,PL=44,PR=8,PT=12,PB=26,iw=W-PL-PR,ih=H-PT-PB;
+  const series=[['mn','menor','var(--green)'],['md','médio','var(--blue)'],['mx','maior','var(--amber)']];
+  const todos=pts.flatMap(p=>series.map(([k])=>p[k]).filter(v=>v!=null&&isFinite(v)));
+  let lo=Math.min(...todos),hi=Math.max(...todos);if(!isFinite(lo)){toast('Histórico sem valores');return;}
+  if(hi-lo<hi*0.05){const pad=Math.max(hi*0.05,1);lo=Math.max(0,lo-pad);hi=hi+pad;}
+  const X=i=>pts.length===1?PL+iw/2:PL+iw*i/(pts.length-1);
+  const Y=v=>PT+ih-(ih*(v-lo)/((hi-lo)||1));
+  const linha=(k,cor)=>{const seg=pts.map((p,i)=>p[k]!=null?[X(i),Y(p[k])]:null);
+    const poly=seg.filter(Boolean).length>1?`<polyline fill="none" stroke="${cor}" stroke-width="2" points="${seg.filter(Boolean).map(c=>c[0].toFixed(1)+','+c[1].toFixed(1)).join(' ')}"/>`:'';
+    return poly+seg.map((c,i)=>c?`<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="3" fill="${cor}"><title>${dBR(new Date(pts[i].d+'T00:00:00'))} · ${fmt(pts[i][k])}</title></circle>`:'').join('');};
+  const dRot=s=>s.slice(8,10)+'/'+s.slice(5,7);
+  const eixoX=pts.length===1?`<text x="${X(0)}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--mut)">${dRot(pts[0].d)}</text>`
+    :`<text x="${PL}" y="${H-8}" text-anchor="start" font-size="9" fill="var(--mut)">${dRot(pts[0].d)}</text><text x="${W-PR}" y="${H-8}" text-anchor="end" font-size="9" fill="var(--mut)">${dRot(pts[pts.length-1].d)}</text>`;
+  const eixoY=`<text x="${PL-4}" y="${Y(hi)+3}" text-anchor="end" font-size="9" fill="var(--mut)">${fmt(hi)}</text><text x="${PL-4}" y="${Y(lo)+3}" text-anchor="end" font-size="9" fill="var(--mut)">${fmt(lo)}</text>`;
+  const leg=series.filter(([k])=>pts.some(p=>p[k]!=null)).map(([k,n,c])=>`<span style="color:${c};font-size:11px;font-weight:700">● ${n}</span>`).join(' &nbsp; ');
+  const base=pts[0];
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;background:var(--card2);border-radius:10px">${eixoY}${eixoX}${series.map(([k,,c])=>linha(k,c)).join('')}</svg>`;
+  const old=document.getElementById('modal');if(old)old.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">📈 Evolução na Liga — ${pl&&pl.titulo?pl.titulo.split(' | ')[0]:cod}</div>
+    ${tabs}${svg}
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:8px">${leg}</div>
+    <div class="meta" style="margin-top:8px">1ª conferência (guardada pra sempre): ${dRot(base.d)} — menor ${fmt(base.mn)}${base.md!=null?' · médio '+fmt(base.md):''}${base.mx!=null?' · maior '+fmt(base.mx):''}</div>
+    ${pts.length<3?`<div class="meta" style="margin-top:4px">Histórico começando — a rotina adiciona um ponto a cada coleta (de 4 em 4 dias).</div>`:''}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`);}
 if(USAR_NUVEM){bootNuvem();}
 else{if(!localStorage.getItem('tcg_seed_v1')&&Array.isArray(SEED)&&SEED.length){movs=SEED.map(m=>({...m}));save();localStorage.setItem('tcg_seed_v1','1');}render();}
 </script>
