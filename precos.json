@@ -1,17 +1,42 @@
 {
- "atualizadoEm": "2026-07-04T09:24:21Z",
+ "atualizadoEm": "2026-07-05T00:18:52Z",
+ "fonte": "Chrome local (coleta ao vivo)",
  "cartas": {
-  "188/172": {
-   "codigo": "188/172",
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=%2B188/172",
-   "status": "BLOQUEADO",
-   "tamanho_texto": 521
+  "135/108": {
+   "codigo": "135/108",
+   "status": "OK",
+   "titulo": "Revavroom ex (135/108)",
+   "menor": 5.0,
+   "listagens": [
+    5.0,
+    26.99,
+    37.9
+   ],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=135%2F108"
   },
   "245/198": {
    "codigo": "245/198",
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=%2B245/198",
-   "status": "BLOQUEADO",
-   "tamanho_texto": 521
+   "status": "OK",
+   "titulo": "Gardevoir ex (245/198)",
+   "menor": 318.75,
+   "listagens": [
+    318.75,
+    318.75,
+    365.5
+   ],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=245%2F198"
+  },
+  "188/172": {
+   "codigo": "188/172",
+   "status": "AMBIGUO",
+   "titulo": "188/172 — mais de uma carta (escolher na Liga)",
+   "menor": 9.87,
+   "listagens": [
+    9.87,
+    19.99,
+    25.0
+   ],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=188%2F172"
   }
  }
 }
