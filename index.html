@@ -1362,13 +1362,14 @@ function chegouPedido(id){const m=movs.find(x=>x.id===id);if(!m)return;
   if(!confirm('Confirmar que o pedido chegou? Ele entra no estoque disponível hoje.'))return;
   m.situacao='Em estoque';m.destino='Vender';m.dataChegada=new Date().toISOString().slice(0,10);
   save();toast('Chegou — está no estoque ✓');render();}
-let _abrirId=null,abertoItens=[],_abQtdA='',_abUnA='un';
-function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;_abrirId=id;abertoItens=[];_abQtdA='';_abUnA='un';renderAbrir();}
+let _abrirId=null,abertoItens=[],_abQtdA='',_abUnA='un',abItemSit='vender';
+function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;_abrirId=id;abertoItens=[];_abQtdA='';_abUnA='un';abItemSit=sitDe(m)==='Coleção'?'colecao':'vender';renderAbrir();}
+function togAbItemSit(v){abItemSit=v;document.querySelectorAll('#abitog .o').forEach(o=>o.classList.toggle('on',o.dataset.v===v));}
 function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const old=document.getElementById('modal');if(old)old.remove();
   const sit=sitDe(m);const tot=+m.valor||0;
   const somaM=abertoItens.reduce((s,x)=>s+(+x.vm||0),0);
   const lin=abertoItens.length?abertoItens.map((x,i)=>{const c=somaM>0?tot*(+x.vm||0)/somaM:tot/abertoItens.length;
-    return `<div class="item" style="justify-content:space-between;align-items:center;padding:8px 12px"><div><b>${x.desc}</b>${x.cod?' <span style="color:var(--mut);font-size:10px">#'+x.cod+'</span>':''}<div class="meta">${x.qtd} un · entra a <b style="color:var(--green)">${fmt(c)}</b>${(+x.vm>0)?' · vale '+fmt(+x.vm):''}</div></div><button class="x" onclick="abertoItens.splice(${i},1);renderAbrir()">remover</button></div>`;}).join('')
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:8px 12px"><div><b>${x.desc}</b>${x.cod?' <span style="color:var(--mut);font-size:10px">#'+x.cod+'</span>':''}${x.sitItem==='colecao'?' <span style="color:var(--amber);font-size:10px">⭐ vai pra coleção</span>':' <span style="color:var(--blue);font-size:10px">📦 vai pra vender</span>'}<div class="meta">${x.qtd} un · entra a <b style="color:var(--green)">${fmt(c)}</b>${(+x.vm>0)?' · vale '+fmt(+x.vm):''}</div></div><button class="x" onclick="abertoItens.splice(${i},1);renderAbrir()">remover</button></div>`;}).join('')
     :'<div class="meta">Nada ainda — adicione o que saiu de dentro.</div>';
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="sec" style="margin-top:0">🔓 Abrir — o que saiu de dentro?</div>
@@ -1382,15 +1383,15 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
       <div class="meta" id="abCodHint" style="margin-bottom:6px"></div>
       <div class="row2"><div><label>O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie (ou deixe o código preencher)"></div><div><label>Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
+      <label style="margin-top:8px">Essa carta vai pra</label><div class="toggle" id="abitog"><div class="o ${abItemSit==='vender'?'on':''}" data-v="vender" onclick="togAbItemSit('vender')">📦 vender (estoque)</div><div class="o ${abItemSit==='colecao'?'on':''}" data-v="colecao" onclick="togAbItemSit('colecao')">⭐ coleção (sobra/não vou vender)</div></div>
       <button class="btn g" style="margin-top:10px" onclick="addAbertoItem()">+ adicionar</button></div>
     <button class="btn" onclick="transformarItem()">🔓 confirmar abertura · ${abertoItens.length} ${abertoItens.length===1?'item':'itens'}</button>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal()">cancelar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
 function addAbertoItem(){const g=id=>document.getElementById(id)?.value;const desc=(g('ab_desc')||'').trim();if(!desc){alert('Diga o que saiu (ex: nome da carta).');return;}
-  const cat=g('ab_cat');abertoItens.push({desc,cat:(cat&&cat!=='__add__')?cat:'Single/Carta',cod:(g('ab_cod')||'').trim(),qtd:+g('ab_qtd')||1,vm:+g('ab_vm')||0});renderAbrir();}
+  const cat=g('ab_cat');abertoItens.push({desc,cat:(cat&&cat!=='__add__')?cat:'Single/Carta',cod:(g('ab_cod')||'').trim(),qtd:+g('ab_qtd')||1,vm:+g('ab_vm')||0,sitItem:abItemSit});renderAbrir();}
 function transformarItem(){const pai=movs.find(x=>x.id===_abrirId);if(!pai)return;
   if(!abertoItens.length){alert('Adicione ao menos 1 item que saiu de dentro.');return;}
-  const sit=sitDe(pai)==='Coleção'?'Coleção':'Em estoque';
   const somaM=abertoItens.reduce((s,x)=>s+(+x.vm||0),0);
   const comVm=abertoItens.filter(x=>+x.vm>0).length;
   if(comVm>0&&comVm<abertoItens.length){alert('Atenção: '+(abertoItens.length-comVm)+' item(ns) estão SEM o "vale" — no rateio proporcional eles entrariam com custo R$ 0,00.\n\nPreencha o "vale" de todos (mesmo que estimado) OU deixe todos vazios (aí divide igual).');return;}
@@ -1409,7 +1410,8 @@ function transformarItem(){const pai=movs.find(x=>x.id===_abrirId);if(!pai)retur
   abertoItens.forEach((x,i)=>{let c;
     if(i===abertoItens.length-1)c=Math.round((tot-acum)*100)/100;
     else{c=somaM>0?Math.round(tot*(+x.vm||0)/somaM*100)/100:Math.round(tot/abertoItens.length*100)/100;acum=Math.round((acum+c)*100)/100;}
-    movs.push({id:novoId(),tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:pai.colecao||'',jogo:pai.jogo||'Pokémon',idioma:pai.idioma||'—',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit,contraparte:pai.contraparte||'',loteOrigem:alvo.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(pai.cat||'item')+')'});});
+    const sitX=x.sitItem==='colecao'?'Coleção':'Em estoque';
+    movs.push({id:novoId(),tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:pai.colecao||'',jogo:pai.jogo||'Pokémon',idioma:pai.idioma||'—',situacao:sitX,destino:sitX==='Coleção'?'Coleção':'Vender',destIni:sitX,contraparte:pai.contraparte||'',loteOrigem:alvo.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(pai.cat||'item')+')'});});
   alvo.obs=(alvo.obs?alvo.obs+' · ':'')+'🔓 aberto em '+abertoItens.length+' item(ns)';
   const n=abertoItens.length;_abrirId=null;abertoItens=[];save();fecharModal();toast('Aberto ✓ — custo '+fmt(tot)+' distribuído em '+n+' item(ns)');render();}
 /* Status de sincronização visível — falha de save NUNCA pode ser silenciosa */
@@ -1439,7 +1441,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='05/07 20h20';
+const BUILD_TAG='05/07 20h38';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
