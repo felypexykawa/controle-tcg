@@ -420,7 +420,7 @@ function proxData(iso,freq,intD,i){const d=new Date(iso+'T00:00:00');if(freq==='
 function vLancar(){
   const t=tipoSel,hoje=new Date().toISOString().slice(0,10),e=editId?movs.find(m=>m.id===editId):null;
   if(e){pgTipo=e.pgTipo||'À vista';canal=e.canal||'Pix';despNat=e.natureza||'ordinaria';despStat=e.status||'pago';despFixa=!!e.serieId;despFreq=e.freq||'mensal';}else{despFixa=false;despFreq='mensal';}
-  const tipos=[['COMPRA','🛒','Comprei'],['VENDA','💰','Vendi'],['TROCA','🔄','Troquei'],['CONSUMO','📥','Consumi'],['DESPESA','🧾','Despesa']];
+  const tipos=[['COMPRA','🛒','Comprei'],['VENDA','💰','Vendi'],['TROCA','🔄','Troquei'],['CONSUMO','📥','Consumi'],['DESPESA','🧾','Despesa'],['ABRIR','🔓','Abrir']];
   let campos='';
   if(t==='COMPRA'){
     campos=`<div class="toggle" style="margin-bottom:12px"><div class="o ${compraModo==='item'||editId?'on':''}" onclick="compraModo='item';render()">1 item</div><div class="o ${compraModo==='nota'&&!editId?'on':''}" onclick="if(!editId){compraModo='nota';render()}">Nota · vários + frete</div></div>`;
@@ -487,10 +487,16 @@ function vLancar(){
       ${!editId?`<label>Repetição</label>
       <div class="toggle" id="fixtog"><div class="o ${!despFixa?'on':''}" data-v="0" onclick="togFixa(0)">Avulsa · uma vez</div><div class="o ${despFixa?'on':''}" data-v="1" onclick="togFixa(1)">Fixa · repete</div></div>
       <div id="freqbox" style="display:${despFixa?'block':'none'}"><div class="row2"><div><label>Frequência</label><select id="f_freq" onchange="freqChg(this.value)">${[['mensal','todo mês'],['semanal','toda semana'],['anual','todo ano'],['dias','a cada X dias']].map(([v,l])=>`<option value="${v}" ${despFreq===v?'selected':''}>${l}</option>`).join('')}</select></div><div id="intbox" style="display:${despFreq==='dias'?'block':'none'}"><label>A cada quantos dias</label><input id="f_int" type="number" value="30"></div></div><div class="ctx">Gero as próximas <b>12 previsões</b> como "a pagar" — você confirma cada pagamento, nada vira pago sozinho.</div></div>`:(e&&e.serieId?`<div class="ctx" style="background:var(--infobg);color:var(--blue)">✎ Despesa fixa: o que mudar aqui vale <b>desta data pra frente</b>; as já pagas não mudam.</div>`:'')}`;
+  } else if(t==='ABRIR'){
+    const dispA=movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção'));
+    if(!dispA.length)campos=`<div class="soon">Nada em estoque ou na coleção pra abrir. Lance uma compra primeiro.</div>`;
+    else campos=`<div class="ctx" style="margin-bottom:8px">Transforma um lote (caixa, ETB, booster) nas cartas que saíram de dentro — o custo é dividido entre elas. Mesmo gesto do "🔓 abrir" no item expandido da Consultar.</div>
+      <label>O que você vai abrir?</label><select id="ab_pick">${dispA.map(d=>`<option value="${d.id}">${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}${sitDe(d)==='Coleção'?' · ⭐ coleção':' · 📦 estoque'}</option>`).join('')}</select>
+      <button class="btn" style="margin-top:12px" onclick="abrirTransf(document.getElementById('ab_pick').value)">🔓 abrir isso</button>`;
   } else campos='';
   const pode=(t==='COMPRA'||t==='VENDA'||t==='TROCA'||t==='DESPESA'||(t==='CONSUMO'&&motor().disp.length>0));const ehNota=(t==='COMPRA'&&compraModo==='nota'&&!editId);const ehVV=(t==='VENDA'&&vendaModo==='varios'&&!editId);
   return `<div class="card"><div class="types">${tipos.map(([k,ic,l])=>`<div class="tbtn ${t===k?'on':''}" onclick="tipoSel='${k}';editId=${editId?`'${editId}'`:'null'};render()"><span style="font-size:16px;margin-right:3px">${ic}</span>${l}</div>`).join('')}</div>
-    ${ehNota||ehVV?'':`<label>Data de emissão</label><input id="f_data" type="date" value="${e?.data||hoje}">`}${campos}
+    ${ehNota||ehVV||t==='ABRIR'?'':`<label>Data de emissão</label><input id="f_data" type="date" value="${e?.data||hoje}">`}${campos}
     ${(pode||ehNota||ehVV)?`<button class="btn g" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">📷 fotos do lançamento${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')} <span style="color:var(--mut);font-size:10px">nota, boleto, a carta…</span></button>`:''}
     ${ehNota?`<button class="btn" onclick="salvarNota()">Salvar nota · ${notaItens.length} ${notaItens.length===1?'item':'itens'}</button>`:ehVV?`<button class="btn" onclick="salvarVendaVarios()">Salvar venda · ${vendaItens.length} ${vendaItens.length===1?'item':'itens'}</button>`:t==='TROCA'?`<button class="btn" onclick="salvarTroca()">Registrar troca</button>`:(pode?`<button class="btn" onclick="salvar()">${e?'Salvar alteração':'Salvar e lançar outro'}</button>`:'')}
     ${e?`<button class="btn g" onclick="editId=null;go('consultar')">Cancelar</button>`:''}</div>`;
@@ -628,7 +634,7 @@ function trocaForm(){
       <div class="row2"><div><label>Jogo</label><select id="r_jogo" onchange="reColR(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Tipo de produto</label><select id="r_cat" onchange="novo(this,'cat')">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="r_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="r_cod" placeholder="ex: SV3-125">
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional — preenche nome/vale sozinho)</span></label><input id="r_cod" placeholder="ex: SV3-125" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
       <div class="row2"><div><label>Idioma</label><select id="r_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Situação</label><select id="r_sit">${['Em estoque','Coleção'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
       <div class="row2"><div><label>Boosters / un. <span style="color:var(--mut);font-size:10px">(se caixa/ETB)</span></label><input id="r_boo" type="number" inputmode="numeric" value="0"></div><div></div></div>
@@ -1372,8 +1378,9 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
     ${Math.max(1,+m.boosters||1)>1?'':`<div class="meta" style="margin:2px 0 6px">Pra abrir só alguns boosters (sem abrir a unidade inteira), diga quantos boosters tem cada unidade:</div><div class="row2" style="margin-bottom:8px"><div><input id="abtog_bpu" type="number" inputmode="numeric" placeholder="ex: 36"></div><div><button class="btn g" style="margin:0" onclick="setBpu('${m.id}','abtog_bpu')">aplicar</button></div></div>`}
     ${lin}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="row2"><div><label style="margin-top:0">O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie"></div><div><label style="margin-top:0">Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
-      <div class="row2"><div><label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="ab_cod" placeholder="ex: 245/198"></div><div><label>Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <div class="row2"><div><label style="margin-top:0">Código <span style="color:var(--mut);font-size:10px">(digite p/ preencher nome/vale sozinho)</span></label><input id="ab_cod" placeholder="ex: 245/198" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <div class="meta" id="abCodHint" style="margin-bottom:6px"></div>
+      <div class="row2"><div><label>O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie (ou deixe o código preencher)"></div><div><label>Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
       <button class="btn g" style="margin-top:10px" onclick="addAbertoItem()">+ adicionar</button></div>
     <button class="btn" onclick="transformarItem()">🔓 confirmar abertura · ${abertoItens.length} ${abertoItens.length===1?'item':'itens'}</button>
@@ -1432,7 +1439,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='05/07 14h54';
+const BUILD_TAG='05/07 20h20';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
@@ -1443,6 +1450,20 @@ function ligaHistDe(cod){const h=_precosLiga&&_precosLiga.historico&&_precosLiga
 function precosLigaQuando(){if(!_precosLiga||!_precosLiga.atualizadoEm)return '';const d=new Date(_precosLiga.atualizadoEm);const h=Math.round((Date.now()-d.getTime())/36e5);return h<1?'agora há pouco':h<48?('há '+h+'h'):d.toLocaleDateString('pt-BR');}
 function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return;const pl=precoLigaDe(cod);const vs=ligaVersoes(pl);
   el.innerHTML=pl?(pl.status==='AMBIGUO'?'🔍 Liga: mais de uma carta com esse código':(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':'')):'';}
+/* Assist de preço p/ campos "vale (mercado)" — nunca mexe em "valor" de compra/venda
+   (isso é o que você pagou/recebeu, não o preço da Liga). Preenche NOME e VALE só se
+   estiverem vazios (não sobrescreve o que você já digitou); dispara junto de digitar
+   o código, sem esperar salvar. Só funciona pra código já coletado (precos.json) —
+   código novo segue precisando do "🔎 preço Liga" manual. */
+function assistCod(codId,descId,valId,hintId){const cod=(document.getElementById(codId)?.value||'').trim();
+  const hintEl=document.getElementById(hintId);const pl=precoLigaDe(cod);
+  if(!pl){if(hintEl)hintEl.innerHTML='';return;}
+  if(pl.status==='AMBIGUO'){if(hintEl)hintEl.innerHTML='🔍 Liga: código com mais de uma carta — confira o nome certo antes de salvar (não preenchi sozinho).';return;}
+  const vs=ligaVersoes(pl),nome=pl.titulo.split(' (')[0];
+  const descEl=document.getElementById(descId),valEl=document.getElementById(valId);const feito=[];
+  if(descEl&&!descEl.value.trim()){descEl.value=nome;feito.push('nome');}
+  if(valEl&&(!valEl.value||+valEl.value===0)&&vs.length){const sug=vs[0].md!=null?vs[0].md:vs[0].mn;valEl.value=sug;feito.push('valor');}
+  if(hintEl)hintEl.innerHTML='🔍 Liga: <b>'+nome+'</b>'+(vs.length?' · sugestão '+fmt(vs[0].md!=null?vs[0].md:vs[0].mn):'')+(feito.length?` <span style="color:var(--green)">— preenchi ${feito.join(' e ')} ✓ (pode ajustar)</span>`:'');}
 /* Link direto da Liga — resolve código ambíguo (60 cartas com o mesmo número) e produto selado:
    você cola 1x o link da página certa; a rotina passa a coletar direto nela */
 function setCodigoUrl(id){const m=movs.find(x=>x.id===id);if(!m)return;
