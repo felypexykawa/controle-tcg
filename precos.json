@@ -1,5 +1,5 @@
 {
- "atualizadoEm": "2026-07-05T12:45:00Z",
+ "atualizadoEm": "2026-07-06T00:57:00Z",
  "fonte": "Chrome local — extrator v2 (bloco 'Preço Médio de Venda no Marketplace', por versão)",
  "cartas": {
   "135/108": {
@@ -33,6 +33,19 @@
    "titulo": "188/172 — 60 cartas com esse número (abrir a busca e escolher)",
    "versoes": [],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=188%2F172"
+  },
+  "244/217": {
+   "codigo": "244/217",
+   "status": "OK",
+   "titulo": "Spiritomb da Cíntia / Cynthia's Spiritomb (244/217)",
+   "versoes": [
+    {"v": "Normal", "mn": 80.0, "md": 102.45, "mx": 124.9},
+    {"v": "Foil", "mn": 48.89, "md": 84.98, "mx": 149.9}
+   ],
+   "menor": 80.0,
+   "medio": 102.45,
+   "maior": 124.9,
+   "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Cynthia%27s+Spiritomb%20(244/217)&ed=ASC&num=244"
   }
  },
  "historico": {
@@ -42,6 +55,10 @@
   "245/198": {
    "Normal": [{"d": "2026-07-05", "mn": 425.0, "md": 425.0, "mx": 425.0}],
    "Foil": [{"d": "2026-07-05", "mn": 318.75, "md": 397.07, "mx": 679.99}]
+  },
+  "244/217": {
+   "Normal": [{"d": "2026-07-06", "mn": 80.0, "md": 102.45, "mx": 124.9}],
+   "Foil": [{"d": "2026-07-06", "mn": 48.89, "md": 84.98, "mx": 149.9}]
   }
  },
  "nota": "v2 2026-07-05: preços anteriores (5,00/318,75/9,87) descartados conscientemente — o extrator v1 lia anúncios 'À partir de' da página de busca, que misturam acessórios (o R$ 5,00 do 135/108 era um sleeve, não a carta). Baseline do histórico começa aqui, com dados do bloco oficial por versão. Primeira entrada de cada versão é IMUTÁVEL (cap 40 preserva o ponto [0])."
