@@ -202,15 +202,20 @@ function aplicarFotosPend(movId){if(!_fotosPend.length||!movId)return;const L=_f
   if(m){m.nFotos=(+m.nFotos||0)+L.length;fotoThumbDe(L[0],t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}}
 function abrirFotosPend(){const old=document.getElementById('modal');if(old)old.remove();
   const thumbs=_fotosPend.length?_fotosPend.map((b,i)=>`<div style="position:relative"><img src="${b}" style="width:100%;height:92px;object-fit:cover;border-radius:8px"><button class="x" style="position:absolute;top:2px;right:4px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 7px" onclick="_fotosPend.splice(${i},1);abrirFotosPend()">✕</button></div>`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda — adicione abaixo.</div>';
-  const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();render()}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();atualizarBadgeFotos()}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="sec" style="margin-top:0">📷 Fotos deste lançamento</div>
     <div class="ctx">Elas ficam junto quando você salvar o lançamento.</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0">${thumbs}</div>
     <input type="file" id="fotoFilePendCam" accept="image/*" capture="environment" style="display:none" onchange="fotoPendEscolhida(this)">
     <input type="file" id="fotoFilePend" accept="image/*" style="display:none" onchange="fotoPendEscolhida(this)">
     <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFilePendCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFilePend').click()">🖼 da galeria</button></div></div>
-    <button class="btn g" style="margin-top:8px" onclick="fecharModal();render()">pronto</button></div></div>`;
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal();atualizarBadgeFotos()">pronto</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
+/* Atualiza SÓ o numerozinho do botão de fotos — nunca um render() aqui, senão apaga
+   o que o Felype já digitou no formulário de lançamento ainda não salvo (era o bug). */
+function atualizarBadgeFotos(){const s=document.getElementById('fotosLancTxt');if(!s)return;
+  const n=editId?(+((movs.find(m=>m.id===editId)||{}).nFotos)||0):_fotosPend.length;
+  s.textContent=n>0?' ('+n+')':'';}
 function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
   fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');return;}_fotosPend.push(b64);abrirFotosPend();});}
 function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',1);
@@ -240,7 +245,7 @@ function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
     <input type="file" id="fotoFileCam" accept="image/*" capture="environment" style="display:none" onchange="fotoEscolhida('${movId}',this)">
     <input type="file" id="fotoFile" accept="image/*" style="display:none" onchange="fotoEscolhida('${movId}',this)">
     <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFileCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFile').click()">🖼 da galeria</button></div></div>
-    <button class="btn g" style="margin-top:8px" onclick="fecharModal();render()">fechar</button></div></div>`;
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal();atualizarBadgeFotos()">fechar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);
   fotoRefresh(movId);}
 function fotoRefresh(movId){fotoList(movId,L=>{_fotosCache=L;const g=document.getElementById('fotoGrid');
@@ -497,7 +502,7 @@ function vLancar(){
   const pode=(t==='COMPRA'||t==='VENDA'||t==='TROCA'||t==='DESPESA'||(t==='CONSUMO'&&motor().disp.length>0));const ehNota=(t==='COMPRA'&&compraModo==='nota'&&!editId);const ehVV=(t==='VENDA'&&vendaModo==='varios'&&!editId);
   return `<div class="card"><div class="types">${tipos.map(([k,ic,l])=>`<div class="tbtn ${t===k?'on':''}" onclick="tipoSel='${k}';editId=${editId?`'${editId}'`:'null'};render()"><span style="font-size:16px;margin-right:3px">${ic}</span>${l}</div>`).join('')}</div>
     ${ehNota||ehVV||t==='ABRIR'?'':`<label>Data de emissão</label><input id="f_data" type="date" value="${e?.data||hoje}">`}${campos}
-    ${(pode||ehNota||ehVV)?`<button class="btn g" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">📷 fotos do lançamento${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')} <span style="color:var(--mut);font-size:10px">nota, boleto, a carta…</span></button>`:''}
+    ${(pode||ehNota||ehVV)?`<button class="btn g" id="btnFotosLanc" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">📷 fotos do lançamento<span id="fotosLancTxt">${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')}</span> <span style="color:var(--mut);font-size:10px">nota, boleto, a carta…</span></button>`:''}
     ${ehNota?`<button class="btn" onclick="salvarNota()">Salvar nota · ${notaItens.length} ${notaItens.length===1?'item':'itens'}</button>`:ehVV?`<button class="btn" onclick="salvarVendaVarios()">Salvar venda · ${vendaItens.length} ${vendaItens.length===1?'item':'itens'}</button>`:t==='TROCA'?`<button class="btn" onclick="salvarTroca()">Registrar troca</button>`:(pode?`<button class="btn" onclick="salvar()">${e?'Salvar alteração':'Salvar e lançar outro'}</button>`:'')}
     ${e?`<button class="btn g" onclick="editId=null;go('consultar')">Cancelar</button>`:''}</div>`;
 }
@@ -1441,7 +1446,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='05/07 20h38';
+const BUILD_TAG='05/07 21h09';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
