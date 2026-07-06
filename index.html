@@ -743,8 +743,11 @@ function vConsultar(){
         ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
         ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
-        ${(function(){if(!m.codigo)return '';const pl=precoLigaDe(m.codigo);if(m.codigoUrl||!pl||pl.status==='AMBIGUO')return `<button class="x" style="color:${m.codigoUrl?'var(--green)':'var(--blue)'}" onclick="setCodigoUrl('${m.id}')">🔗 ${m.codigoUrl?'link direto ✓':'usar link direto'}</button>`;return '';})()}
-        ${(function(){const pl=precoLigaDe(m.codigo);if(!pl)return '';const vs=ligaVersoes(pl);return `<span class="meta" style="flex-basis:100%;color:${pl.status==='AMBIGUO'?'var(--amber)':'var(--green)'}">🔍 Liga: ${pl.status==='AMBIGUO'?(m.codigoUrl?'código com várias cartas — 🔗 link direto definido, a próxima coleta pega o preço da página certa':(pl.titulo&&pl.titulo.indexOf('—')>0?pl.titulo:'código com mais de uma carta')+' — abra "preço Liga", ache a carta certa e cole o link em 🔗'):`<b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')}`} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
+        ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;
+          if(!(m.codigoUrl||!m.codigo||!pl||pl.status==='AMBIGUO'))return '';
+          return `<button class="x" style="color:${m.codigoUrl?'var(--green)':'var(--blue)'}" onclick="setCodigoUrl('${m.id}')">🔗 ${m.codigoUrl?'link direto ✓':'usar link direto'}</button>`;})()}
+        ${(function(){if(!m.codigo)return '';const pl=precoLigaDe(m.codigo);if(!pl)return '';const vs=ligaVersoes(pl);return `<span class="meta" style="flex-basis:100%;color:${pl.status==='AMBIGUO'?'var(--amber)':'var(--green)'}">🔍 Liga: ${pl.status==='AMBIGUO'?(m.codigoUrl?'código com várias cartas — 🔗 link direto definido, a próxima coleta pega o preço da página certa':(pl.titulo&&pl.titulo.indexOf('—')>0?pl.titulo:'código com mais de uma carta')+' — abra "preço Liga", ache a carta certa e cole o link em 🔗 (dica: buscar <b>Nome (código)</b> na Liga, ex. Pikachu (173/165), costuma cair direto na carta certa)'):`<b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')}`} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
+        ${(!m.codigo&&!m.codigoUrl)?`<span class="meta" style="flex-basis:100%">💡 Sem código — normal em cartas antigas. Busque à mão em ligapokemon.com.br pelo nome (formato <b>Nome (código-se-tiver)</b>) e cole o link em 🔗.</span>`:''}
         <button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${(+m.nFotos||0)>0?' ('+m.nFotos+')':''}</button>
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
@@ -1450,7 +1453,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='05/07 21h15';
+const BUILD_TAG='05/07 21h49';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
@@ -1479,7 +1482,7 @@ function assistCod(codId,descId,valId,hintId){const cod=(document.getElementById
    você cola 1x o link da página certa; a rotina passa a coletar direto nela */
 function setCodigoUrl(id){const m=movs.find(x=>x.id===id);if(!m)return;
   const atual=m.codigoUrl||'';
-  const u=prompt('Cole o LINK da página certa na Liga (abra "preço Liga", ache a carta/produto exato, copie o endereço):',atual);
+  const u=prompt('Cole o LINK da página certa na Liga: busque em ligapokemon.com.br por "Nome (código)" — ex. Pikachu (173/165) — ou só o nome se não tiver código; abra a carta certa e copie o endereço:',atual);
   if(u===null)return;
   const url=(u||'').trim();
   if(!url){if(atual&&confirm('Remover o link direto deste item?')){delete m.codigoUrl;save();toast('Link removido');render();}return;}
