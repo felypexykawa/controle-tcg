@@ -490,7 +490,7 @@ function vLancar(){
     if(compraModo==='nota'&&!editId){campos+=notaForm();}
     else{campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo selecionado)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <div class="row2"><div><label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${e?.idioma===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}" oninput="bcalc()"></div></div>
       <div class="row2"><div><label>Valor total (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}" oninput="bcalc()"></div>
@@ -510,7 +510,7 @@ function vLancar(){
       campos+= !editId?`<label style="margin-top:0">De onde sai a carta?</label><div class="toggle" id="vdetog"><div class="o ${vendaDe==='estoque'?'on':''}" onclick="setVendaDe('estoque')">📦 Estoque</div><div class="o ${vendaDe==='colecao'?'on':''}" onclick="setVendaDe('colecao')">⭐ Coleção</div><div class="o ${vendaDe==='avulsa'?'on':''}" onclick="setVendaDe('avulsa')">✍ Avulsa</div></div>`:'';
       if(avulso){campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>`;}
       else{let itens=vendaDe==='estoque'?motor().disp:movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
         const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
@@ -580,7 +580,7 @@ function notaForm(){
       <div class="row2"><div><label style="margin-top:0">Jogo</label><select id="n_jogo" onchange="reColN(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label style="margin-top:0">Tipo de produto</label><select id="n_cat" onchange="novo(this,'cat');nbooDef()">${selOpts(cats)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('n_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="n_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span></label><input id="n_cod" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCodN')"><div class="meta" id="ligaHintCodN"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('n_cod')">🔎 ver na Liga</span></label><input id="n_cod" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCodN')"><div class="meta" id="ligaHintCodN"></div>
       <div class="row2"><div><label>Idioma</label><select id="n_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Qtd</label><input id="n_qtd" type="number" inputmode="numeric" value="1" oninput="ncalc('q')"></div></div>
       <div class="row2"><div><label>Valor de cada (R$)</label><input id="n_unit" type="number" inputmode="decimal" placeholder="0,00" oninput="ncalc('u')"></div>
@@ -697,7 +697,7 @@ function trocaForm(){
       <div class="row2"><div><label>Jogo</label><select id="r_jogo" onchange="reColR(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Tipo de produto</label><select id="r_cat" onchange="novo(this,'cat')">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="r_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional — preenche nome/vale sozinho)</span></label><input id="r_cod" placeholder="ex: SV3-125" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional — preenche nome/vale sozinho)</span> <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('r_cod')">🔎 ver na Liga</span></label><input id="r_cod" placeholder="ex: SV3-125" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
       <div class="row2"><div><label>Idioma</label><select id="r_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Situação</label><select id="r_sit">${['Em estoque','Coleção'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
       <div class="row2"><div><label>Boosters / un. <span style="color:var(--mut);font-size:10px">(se caixa/ETB)</span></label><input id="r_boo" type="number" inputmode="numeric" value="0"></div><div></div></div>
@@ -1443,11 +1443,10 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
     <div class="sec" style="margin-top:0">🔓 Abrir — o que saiu de dentro?</div>
     <div class="ctx">O que você abrir de <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'')}</b> (lote de <b>${fmt(tot)}</b>) deixa de existir e vira os itens abaixo — o custo da parte aberta é dividido entre eles (proporcional ao "vale"; sem valores, divide igual). Tudo continua na <b>${sit==='Coleção'?'coleção':'prateleira do estoque'}</b>.</div>
     <div class="row2"><div><label style="margin-top:0">Abrir quanto?</label><input id="ab_qtdA" type="number" inputmode="numeric" min="1" value="${_abQtdA||((+m.qtd||1)>1?1:(+m.qtd||1))}" oninput="_abQtdA=this.value"></div>
-      <div><label style="margin-top:0">Em</label><select id="ab_unA" onchange="_abUnA=this.value">${Math.max(1,+m.boosters||1)>1?`<option value="un" ${_abUnA!=='boo'?'selected':''}>unidades (tem ${+m.qtd||1})</option><option value="boo" ${_abUnA==='boo'?'selected':''}>boosters (tem ${(+m.qtd||1)*Math.max(1,+m.boosters||1)})</option>`:`<option value="un">unidades (tem ${+m.qtd||1})</option>`}</select></div></div>
-    ${Math.max(1,+m.boosters||1)>1?'':`<div class="meta" style="margin:2px 0 6px">Pra abrir só alguns boosters (sem abrir a unidade inteira), diga quantos boosters tem cada unidade:</div><div class="row2" style="margin-bottom:8px"><div><input id="abtog_bpu" type="number" inputmode="numeric" placeholder="ex: 36"></div><div><button class="btn g" style="margin:0" onclick="setBpu('${m.id}','abtog_bpu')">aplicar</button></div></div>`}
+      <div><label style="margin-top:0">Em</label><select id="ab_unA" onchange="abUnAChange(this,'${m.id}')">${Math.max(1,+m.boosters||1)>1?`<option value="un" ${_abUnA!=='boo'?'selected':''}>unidades (tem ${+m.qtd||1})</option><option value="boo" ${_abUnA==='boo'?'selected':''}>boosters (tem ${(+m.qtd||1)*Math.max(1,+m.boosters||1)})</option>`:`<option value="un">unidades (tem ${+m.qtd||1})</option><option value="boo">🃏 boosters avulsos…</option>`}</select></div></div>
     ${lin}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="row2"><div><label style="margin-top:0">Código <span style="color:var(--mut);font-size:10px">(digite p/ preencher nome/vale sozinho)</span></label><input id="ab_cod" placeholder="ex: 245/198" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('ab_cod')">🔎 ver na Liga</span></label><input id="ab_cod" placeholder="ex: 245/198" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
       <div class="meta" id="abCodHint" style="margin-bottom:6px"></div>
       <div class="row2"><div><label>O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie (ou deixe o código preencher)"></div><div><label>Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
@@ -1456,6 +1455,19 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
     <button class="btn" onclick="transformarItem()">🔓 confirmar abertura · ${abertoItens.length} ${abertoItens.length===1?'item':'itens'}</button>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal()">cancelar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
+/* Escolher "boosters avulsos" num lote sem o número preenchido pergunta na hora —
+   mesmo padrão da venda "vários". Cancelou/valor inválido: volta pra unidades. */
+function abUnAChange(sel,movId){const m=movs.find(x=>x.id===movId);if(!m)return;
+  const bpu=Math.max(1,+m.boosters||1);
+  if(sel.value==='boo'&&bpu<=1){
+    const n=+((prompt('Quantos boosters tem cada unidade deste item? (ex: 36)')||'').trim())||0;
+    if(n<2){sel.value='un';_abUnA='un';return;}
+    m.boosters=n;save();_abUnA='boo';toast('Boosters/un. = '+n+' ✓');renderAbrir();return;}
+  _abUnA=sel.value;}
+/* Abre a busca da Liga com o que estiver digitado no campo — pro cadastro, antes de salvar */
+function buscarLigaCampo(inputId){const v=(document.getElementById(inputId)?.value||'').trim();
+  if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
+  window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent(v),'_blank');}
 function addAbertoItem(){const g=id=>document.getElementById(id)?.value;const desc=(g('ab_desc')||'').trim();if(!desc){alert('Diga o que saiu (ex: nome da carta).');return;}
   const cat=g('ab_cat');abertoItens.push({desc,cat:(cat&&cat!=='__add__')?cat:'Single/Carta',cod:(g('ab_cod')||'').trim(),qtd:+g('ab_qtd')||1,vm:+g('ab_vm')||0,sitItem:abItemSit});renderAbrir();}
 function transformarItem(){const pai=movs.find(x=>x.id===_abrirId);if(!pai)return;
@@ -1509,7 +1521,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='11/07 23h18';
+const BUILD_TAG='11/07 23h37';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
