@@ -182,18 +182,30 @@ function renderVinculo(){const m=movs.find(x=>x.id===_vincId);if(!m)return;
     ${lin}
     <button class="btn g" style="margin-top:12px" onclick="fecharModalVinculo()">cancelar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
-function fecharModalVinculo(){_vincId=null;_vincModo=null;fecharModal();}
+function fecharModalVinculo(){_vincId=null;_vincModo=null;_vincUnPend=null;fecharModal();}
+let _vincUnPend=null;
 function confirmVinculo(otherId){const m=movs.find(x=>x.id===_vincId);const outro=movs.find(x=>x.id===otherId);if(!m||!outro)return;
   const compra=_vincModo==='deCompra'?m:outro,venda=_vincModo==='deCompra'?outro:m;
   if(venda.origemId){alert('Essa venda já está vinculada a outro item.');return;}
-  const dispQ=+compra.qtd||1,vQ=Math.max(1,Math.min(+venda.qtd||1,dispQ));
+  const bpu=Math.max(1,+compra.boosters||1);
+  if(bpu>1&&_vincUnPend===null){perguntarUnidadeVinculo(otherId,bpu,compra,venda);return;}
+  const boo=(_vincUnPend==='boo'&&bpu>1);_vincUnPend=null;
+  const dispQ=boo?(+compra.qtd||1)*bpu:(+compra.qtd||1),vQ=Math.max(1,Math.min(+venda.qtd||1,dispQ));
   const vU=(+compra.valor||0)/dispQ,custo=Math.round(vU*vQ*100)/100;
-  const parcial=vQ<dispQ?` (${vQ} de ${dispQ} unidade${dispQ>1?'s':''} — o resto continua ativo)`:'';
+  const unidRot=boo?'booster':'unidade';
+  const parcial=vQ<dispQ?` (${vQ} de ${dispQ} ${unidRot}${dispQ>1?'s':''} — o resto continua ativo)`:'';
   if(!confirm('Vincular "'+((compra.colecao?compra.colecao+' · ':'')+(compra.cat||'item'))+'" (custo '+fmt(compra.valor)+') com a venda de '+fmt(venda.valor)+' em '+(venda.data?dBR(new Date(venda.data+'T00:00:00')):'—')+'?'+parcial+'\n\nCusto atribuído: '+fmt(custo)))return;
   const sitAntes=sitDe(compra);
-  const alvo=baixarLote(compra.id,vQ,'Vendido',{dataVenda:venda.data,dataSaida:venda.data});
+  const alvo=boo?baixarBoosters(compra.id,vQ,'Vendido',{dataVenda:venda.data,dataSaida:venda.data}):baixarLote(compra.id,vQ,'Vendido',{dataVenda:venda.data,dataSaida:venda.data});
   venda.origemId=alvo.id;venda.custoOrigem=custo;venda.vendaTipo=sitAntes==='Coleção'?'colecao':'material';venda.vendaDe=sitAntes==='Coleção'?'colecao':'estoque';
   save();_vincId=null;_vincModo=null;fecharModal();toast('🔗 Vinculado — custo '+fmt(custo)+' ✓');render();}
+function perguntarUnidadeVinculo(otherId,bpu,compra,venda){const old=document.getElementById('modal');if(old)old.remove();
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModalVinculo()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px">
+    <div class="sec" style="margin-top:0">Essa venda foi em unidades ou boosters?</div>
+    <div class="ctx">O lote "${(compra.colecao?compra.colecao+' · ':'')+(compra.cat||'item')}" tem ${bpu} boosters por unidade (${compra.qtd} un = ${compra.qtd*bpu} boosters). A venda de ${fmt(+venda.valor||0)} · ${venda.qtd} ${venda.qtd===1?'':'itens'} foi em quê?</div>
+    <div class="row2"><div><button class="btn g" onclick="_vincUnPend='un';confirmVinculo('${otherId}')">📦 unidades (caixa/pote inteiro)</button></div><div><button class="btn g" onclick="_vincUnPend='boo';confirmVinculo('${otherId}')">🃏 boosters avulsos</button></div></div>
+    <button class="btn g" style="margin-top:8px" onclick="fecharModalVinculo()">cancelar</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);}
 function togGrupo(k){consGrupoFech[k]=!consGrupoFech[k];render();}
 function togTodosGrupos(){if(Object.keys(consGrupoFech).length)consGrupoFech={};else _gKeys.forEach(k=>consGrupoFech[k]=true);render();}
 function togCt(k){ctExp[k]=!ctExp[k];render();}
@@ -1497,7 +1509,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='11/07 23h12';
+const BUILD_TAG='11/07 23h18';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
