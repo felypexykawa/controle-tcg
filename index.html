@@ -152,6 +152,48 @@ function juntarFx(){if(juntarNotaCore(Object.keys(fxSel))){fxSelMode=false;fxSel
 function separarDaNota(id){const m=movs.find(x=>x.id===id);if(!m)return;delete m.notaId;delete m.notaNum;save();toast('Item separado da nota ✓');render();}
 function venderDe(id){const m=movs.find(x=>x.id===id);if(!m)return;_preSel=id;vendaJogoF='';tipoSel='VENDA';vendaModo='item';vendaDe=(sitDe(m)==='Coleção')?'colecao':'estoque';editId=null;go('lancar');}
 function guardarDe(id){_preSel=id;tipoSel='CONSUMO';editId=null;go('lancar');}
+/* Vínculo retroativo compra↔venda — pra quando a venda já foi lançada solta (nota antiga,
+   migração da planilha, etc.) e o item continua "fantasma" no estoque/coleção. Não cria
+   lançamento novo: só liga os dois que já existem e move o item pra Vendido. */
+let _vincId=null,_vincModo=null,_vincQ='';
+function abrirVinculo(id,modo){const m=movs.find(x=>x.id===id);if(!m)return;_vincId=id;_vincModo=modo;_vincQ='';renderVinculo();}
+function renderVinculo(){const m=movs.find(x=>x.id===_vincId);if(!m)return;
+  const old=document.getElementById('modal');if(old)old.remove();
+  const q=_vincQ.toLowerCase();
+  let cands,titulo,ctx;
+  if(_vincModo==='deCompra'){
+    cands=movs.filter(v=>v.tipo==='VENDA'&&!v.origemId&&(v.jogo||'Pokémon')===(m.jogo||'Pokémon')&&(!q||((v.colecao||'')+' '+(v.cat||'')+' '+(v.contraparte||'')+' '+(v.obs||'')).toLowerCase().includes(q)));
+    titulo='🔗 Vincular a uma venda existente';
+    ctx=`Escolha a venda que corresponde a <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'item')}</b> (custo ${fmt(+m.valor||0)}). O item some do ${sitDe(m)==='Coleção'?'coleção':'estoque'} — a compra continua registrada.`;
+  }else{
+    cands=movs.filter(c=>c.tipo==='COMPRA'&&(sitDe(c)==='Em estoque'||sitDe(c)==='Coleção')&&(c.jogo||'Pokémon')===(m.jogo||'Pokémon')&&(!q||((c.colecao||'')+' '+(c.cat||'')+' '+(c.contraparte||'')+' '+(c.obs||'')).toLowerCase().includes(q)));
+    titulo='🔗 Vincular a um item do estoque/coleção';
+    ctx=`Escolha de onde saiu <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'item')}</b> (vendida por ${fmt(+m.valor||0)}). O item escolhido some do estoque/coleção — nada é apagado.`;
+  }
+  cands.sort((a,b)=>(b.data||'')<(a.data||'')?-1:1);
+  const lin=cands.length?cands.slice(0,60).map(c=>{const rot=_vincModo==='deCompra'?'vendida por':'custou';
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="confirmVinculo('${c.id}')"><div><b>${(c.colecao?c.colecao+' · ':'')+(c.cat||'item')}</b>${c.codigo?' <span style="color:var(--mut);font-size:10px">#'+c.codigo+'</span>':''}<div class="meta">${c.data?dBR(new Date(c.data+'T00:00:00')):'—'} · ${c.contraparte||'—'} · ${(+c.qtd||1)} un · ${rot} ${fmt(+c.valor||0)}</div></div><span class="lnk">vincular</span></div>`;}).join('')
+    :'<div class="empty">Nenhum candidato com esse filtro (mesmo jogo).</div>';
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModalVinculo()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">${titulo}</div>
+    <div class="ctx">${ctx}</div>
+    <input value="${_vincQ.replace(/"/g,'&quot;')}" oninput="_vincQ=this.value;renderVinculo()" placeholder="buscar por coleção, cliente/fornecedor..." style="margin-bottom:6px">
+    <div class="meta" style="margin-bottom:6px">${cands.length} candidato(s) — mesmo jogo (${m.jogo||'Pokémon'})${cands.length>60?', mostrando 60':''}</div>
+    ${lin}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModalVinculo()">cancelar</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);}
+function fecharModalVinculo(){_vincId=null;_vincModo=null;fecharModal();}
+function confirmVinculo(otherId){const m=movs.find(x=>x.id===_vincId);const outro=movs.find(x=>x.id===otherId);if(!m||!outro)return;
+  const compra=_vincModo==='deCompra'?m:outro,venda=_vincModo==='deCompra'?outro:m;
+  if(venda.origemId){alert('Essa venda já está vinculada a outro item.');return;}
+  const dispQ=+compra.qtd||1,vQ=Math.max(1,Math.min(+venda.qtd||1,dispQ));
+  const vU=(+compra.valor||0)/dispQ,custo=Math.round(vU*vQ*100)/100;
+  const parcial=vQ<dispQ?` (${vQ} de ${dispQ} unidade${dispQ>1?'s':''} — o resto continua ativo)`:'';
+  if(!confirm('Vincular "'+((compra.colecao?compra.colecao+' · ':'')+(compra.cat||'item'))+'" (custo '+fmt(compra.valor)+') com a venda de '+fmt(venda.valor)+' em '+(venda.data?dBR(new Date(venda.data+'T00:00:00')):'—')+'?'+parcial+'\n\nCusto atribuído: '+fmt(custo)))return;
+  const sitAntes=sitDe(compra);
+  const alvo=baixarLote(compra.id,vQ,'Vendido',{dataVenda:venda.data,dataSaida:venda.data});
+  venda.origemId=alvo.id;venda.custoOrigem=custo;venda.vendaTipo=sitAntes==='Coleção'?'colecao':'material';venda.vendaDe=sitAntes==='Coleção'?'colecao':'estoque';
+  save();_vincId=null;_vincModo=null;fecharModal();toast('🔗 Vinculado — custo '+fmt(custo)+' ✓');render();}
 function togGrupo(k){consGrupoFech[k]=!consGrupoFech[k];render();}
 function togTodosGrupos(){if(Object.keys(consGrupoFech).length)consGrupoFech={};else _gKeys.forEach(k=>consGrupoFech[k]=true);render();}
 function togCt(k){ctExp[k]=!ctExp[k];render();}
@@ -740,7 +782,9 @@ function vConsultar(){
           <div style="font-size:11px;font-weight:600;color:${venda?'var(--green)':'var(--red)'}">${pg}</div></div>
       </div>
       ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
-        ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
+        ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button><button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deCompra')">🔗 vincular venda</button>`:''}${venda&&!m.origemId?`<button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deVenda')">🔗 vincular estoque/coleção</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
+        ${venda&&m.origemId&&m.custoOrigem!=null?(function(){const custo=+m.custoOrigem||0,receb=Math.round(total*(1-(+m.taxa||0)/100)*100)/100,lucro=Math.round((receb-custo)*100)/100,pct=custo>0?Math.round(lucro/custo*1000)/10:null,pctTxt=pct!=null?' ('+(pct>=0?'+':'')+pct+'%)':'';
+          return `<span class="meta" style="flex-basis:100%">💰 comprei por <b>${fmt(custo)}</b> · vendi líquido por <b>${fmt(receb)}</b> · lucro <b style="color:${lucro>=0?'var(--green)':'var(--red)'}">${fmt(lucro)}${pctTxt}</b></span>`;})():''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
         ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
         ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;
@@ -1453,7 +1497,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='05/07 21h49';
+const BUILD_TAG='11/07 23h12';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
