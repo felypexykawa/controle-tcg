@@ -1521,8 +1521,21 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='11/07 23h37';
+const BUILD_TAG='11/07 23h48';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
+/* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
+   O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
+   aqui, mostra a barra "toque pra atualizar" (recarrega com query única, que fura o cache). */
+(function(){if(location.search.indexOf('atualiza=')>=0)history.replaceState(null,'',location.pathname);})();
+let _versaoAvisada=false;
+function checarVersao(){if(BUILD_TAG==='dev'||_versaoAvisada)return;
+  fetch('versao.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
+    if(!j||!j.tag||j.tag===BUILD_TAG||_versaoAvisada)return;
+    _versaoAvisada=true;
+    document.body.insertAdjacentHTML('beforeend',`<div id="verNova" onclick="location.href=location.pathname+'?atualiza='+Date.now()" style="position:fixed;top:0;left:0;right:0;z-index:50;background:var(--blue);color:#fff;text-align:center;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.35)">🔄 Versão nova disponível (v ${j.tag}) — toque aqui pra atualizar</div>`);
+  }).catch(()=>{});}
+checarVersao();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checarVersao();});
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
 fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.cartas){_precosLiga=j;if(document.getElementById('view'))render();}}).catch(()=>{});
