@@ -2,24 +2,57 @@
 # Alimentado pela leitura do estoque real (tcg_movs_v2, COMPRA ativa) + fallback manual.
 # Uniao ADITIVA: o estoque ADICIONA codigos, nunca remove (anti-regressao, CLAUDE.md Regra 13).
 # Formato aceito: "NUM/TOTAL" puro OU "Nome (NUM/TOTAL)" (padrao validado que cai direto na carta).
-# Atualizado 2026-07-08 pela leitura do estoque (16 itens). Coleta de preco NAO rodou nesta
-# janela: dominio ligapokemon.com.br sem permissao na extensao do Chrome (ver backlog).
+# Atualizado 2026-07-16 pela leitura do estoque (45 itens ativos). Coleta de preco NAO rodou
+# nesta janela: dominio ligapokemon.com.br SEM permissao na extensao do Chrome (JS/page-text/
+# read_page todos negados) + Cloudflare challenge ("Um momento...") na 1a busca. Ver backlog.
 135/108
 122/086
 Kingdra (tg03/tg30)
 Cynthia's spiritomb (244/217)
 Psyduck (226/217)
-Cynthia's roserade (184/182)
+Cynthia’s roserade (184/182)
 Ivysaur (167jp/165)
+Mew (052
 Gyarados (040/098)
 Flareon (tg01/tg30)
+Jolteon
 Eevee (tg11/tg30)
 Mega gardevoir ex (032/♾️)
 Mega charizard x ex (109/094)
 Meowth (106/094)
 Mega zygarde ex (120/088)
+Charizard (211/172)
+Flareon-v (swsh179)
+Jolteon-v (swsh183/71)
+Vaporeon-v (swsh181-71)
+Pikachu (160/159)
+Vaporeon (tg02-tg30)
+Starmie-v (tg13/tg30)
+Mega greninja ex
+036/08
+053/081
+043/081
+063/081
+026/081
+084/081
+083/081
+087/081
+097/081
+096/081
+093/081
+015/081
+094/081
+104/081
+103/081
+(0106-07/196)
+087/084
+097/084
+094/084
+Bulk
+217/217
 188/172
 245/198
 # --- Nao coletaveis automaticamente (nao inventar busca sem identificador) ---
 # Jolteon            -> cadastrado SEM codigo; so coletavel via link direto (codigoUrl no app)
 # Mew (052           -> codigo truncado no cadastro (falta /TOTAL e o fecha-parenteses); corrigir no app
+# Bulk / Mega greninja ex -> sem codigo; nao coletaveis sem identificador
