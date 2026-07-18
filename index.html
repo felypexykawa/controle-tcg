@@ -490,7 +490,7 @@ function vLancar(){
     if(compraModo==='nota'&&!editId){campos+=notaForm();}
     else{campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo selecionado)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:10px" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:10px;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <div class="row2"><div><label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${e?.idioma===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}" oninput="bcalc()"></div></div>
       <div class="row2"><div><label>Valor total (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}" oninput="bcalc()"></div>
@@ -680,8 +680,8 @@ function salvarVendaVarios(){
   const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
 function trocaForm(){
   const dispc=motor().disp;trocaUn='un';const dit0=dispc[0],dbpu0=dit0?Math.max(1,+dit0.boosters||1):1;
-  const dei=trocaDei.length?trocaDei.map((d,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${d.desc}</b>${d.estoqueId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">custou ${fmt(d.custo)}</div></div><button class="x" onclick="removeDei(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
-  const recebi=trocaRecebi.length?trocaRecebi.map((r,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${r.desc}</b>${r.colecao?' · '+r.colecao:''}<div class="meta">vale ${fmt(r.valorMercado)} · ${r.sit}</div></div><button class="x" onclick="removeRecebi(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
+  const dei=trocaDei.length?trocaDei.map((d,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${d.desc}</b>${d.estoqueId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">custou ${fmt(d.custo)}</div></div><div style="flex:none;display:flex;gap:10px"><button class="x" style="color:var(--blue)" onclick="editDei(${i})">✎ corrigir</button><button class="x" onclick="removeDei(${i})">remover</button></div></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
+  const recebi=trocaRecebi.length?trocaRecebi.map((r,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${r.desc}</b>${r.colecao?' · '+r.colecao:''}<div class="meta">vale ${fmt(r.valorMercado)} · ${r.sit}</div></div><div style="flex:none;display:flex;gap:10px"><button class="x" style="color:var(--blue)" onclick="editRecebi(${i})">✎ corrigir</button><button class="x" onclick="removeRecebi(${i})">remover</button></div></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
   return `<div class="ctx">Troca de vários × vários. O custo do que você deu é rateado nas cartas que recebeu, proporcional ao valor de cada uma.</div>
     <div class="sec">📤 O que eu dei (${trocaDei.length})</div>${dei}
     <div class="card" style="background:var(--card2);margin:8px 0">
@@ -697,7 +697,7 @@ function trocaForm(){
       <div class="row2"><div><label>Jogo</label><select id="r_jogo" onchange="reColR(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Tipo de produto</label><select id="r_cat" onchange="novo(this,'cat')">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="r_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional — preenche nome/vale sozinho)</span> <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('r_cod')">🔎 ver na Liga</span></label><input id="r_cod" placeholder="ex: SV3-125" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
+      <label>Código <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('r_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:10px" onclick="colarLinkLiga('r_cod','r_desc','rCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:10px;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="r_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
       <div class="row2"><div><label>Idioma</label><select id="r_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Situação</label><select id="r_sit">${['Em estoque','Coleção'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
       <div class="row2"><div><label>Boosters / un. <span style="color:var(--mut);font-size:10px">(se caixa/ETB)</span></label><input id="r_boo" type="number" inputmode="numeric" value="0"></div><div></div></div>
@@ -711,7 +711,29 @@ function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_it
   if(q>dispM){alert('Você só tem '+dispM+(boo?' boosters':' em estoque')+' desse item.');return;}
   trocaDei.push({desc:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))).slice(0,40)+(boo?' ('+q+' boosters)':(dispM>1?' ('+q+' un)':'')),custo:Math.round(vU*q*100)/100,estoqueId:id,estoqueQtd:q,deiBoo:boo});}else{const desc=document.getElementById('d_desc')?.value||'material',custo=+document.getElementById('d_custo')?.value||0;trocaDei.push({desc,custo});}render();}
 function removeDei(i){trocaDei.splice(i,1);render();}
-function addRecebi(){const g=id=>document.getElementById(id)?.value;const desc=g('r_desc')||'item',val=+g('r_val')||0,col=g('r_col'),sit=g('r_sit')||'Em estoque',jogo=g('r_jogo')||'Pokémon',idi=g('r_idi')||'—';const cat=(g('r_cat')&&g('r_cat')!=='__add__')?g('r_cat'):'Single/Carta';trocaRecebi.push({desc,valorMercado:val,colecao:(col&&col!=='__add__')?col:'',sit,jogo,idioma:idi,cat,codigo:(g('r_cod')||'').trim(),boosters:+g('r_boo')||0});render();}
+/* Corrigir item já adicionado nas listas da troca: volta pros campos (em vez de redigitar tudo) */
+function editDei(i){const d=trocaDei.splice(i,1)[0];
+  if(d.estoqueId){deiModo='estoque';trocaUn=d.deiBoo?'boo':'un';render();
+    const s=document.getElementById('d_item');if(s){s.value=d.estoqueId;trocaUnHint();}
+    const q=document.getElementById('d_qtd');if(q)q.value=d.estoqueQtd||1;}
+  else{deiModo='avulso';render();
+    const dd=document.getElementById('d_desc'),dc=document.getElementById('d_custo');
+    if(dd)dd.value=d.desc||'';if(dc)dc.value=d.custo||'';}
+  toast('De volta nos campos — corrija e toque em "+ adicionar" de novo');}
+function editRecebi(i){const r=trocaRecebi.splice(i,1)[0];render();
+  const s=id=>document.getElementById(id);
+  if(s('r_jogo')){s('r_jogo').value=r.jogo||'Pokémon';reColR(r.jogo||'Pokémon');}
+  if(s('r_desc'))s('r_desc').value=r.desc||'';
+  if(s('r_val'))s('r_val').value=r.valorMercado||'';
+  if(s('r_cat'))s('r_cat').value=r.cat||'Single/Carta';
+  if(s('r_col'))s('r_col').value=r.colecao||'';
+  if(s('r_cod'))s('r_cod').value=r.codigo||'';
+  if(s('r_idi'))s('r_idi').value=r.idioma||'—';
+  if(s('r_sit'))s('r_sit').value=r.sit||'Em estoque';
+  if(s('r_boo'))s('r_boo').value=r.boosters||0;
+  if(r.linkUrl)_linkPend['r_cod']=r.linkUrl;
+  toast('De volta nos campos — corrija e toque em "+ adicionar" de novo');}
+function addRecebi(){const g=id=>document.getElementById(id)?.value;const desc=g('r_desc')||'item',val=+g('r_val')||0,col=g('r_col'),sit=g('r_sit')||'Em estoque',jogo=g('r_jogo')||'Pokémon',idi=g('r_idi')||'—';const cat=(g('r_cat')&&g('r_cat')!=='__add__')?g('r_cat'):'Single/Carta';trocaRecebi.push({desc,valorMercado:val,colecao:(col&&col!=='__add__')?col:'',sit,jogo,idioma:idi,cat,codigo:(g('r_cod')||'').trim(),boosters:+g('r_boo')||0,linkUrl:_linkPend['r_cod']||''});delete _linkPend['r_cod'];render();}
 function removeRecebi(i){trocaRecebi.splice(i,1);render();}
 function trocaRatPrev(){const el=document.getElementById('trocaRat');if(el)el.innerHTML=trocaRatTxt();}
 function trocaRatTxt(){const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+(+trocaDin||0),vTot=trocaRecebi.reduce((s,r)=>s+(+r.valorMercado||0),0);
@@ -727,7 +749,9 @@ function salvarTroca(){
   trocaDei.forEach(d=>{if(d.estoqueId){const ex={dataSaida:data};if(d.deiBoo)baixarBoosters(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);else baixarLote(d.estoqueId,d.estoqueQtd||1,'Trocado',ex);}});
   const deiDesc=trocaDei.map(d=>d.desc).join(' + ')||'dinheiro';
   trocaRecebi.forEach(r=>{const c=vTot>0?custoTot*(r.valorMercado/vTot):custoTot/trocaRecebi.length;
-    movs.push({id:novoId(),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:r.cat||'Single/Carta',codigo:r.codigo||'',boosters:+r.boosters||0,colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`});});
+    const nvT={id:novoId(),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:r.cat||'Single/Carta',codigo:r.codigo||'',boosters:+r.boosters||0,colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`};
+    if(r.linkUrl)nvT.codigoUrl=r.linkUrl;
+    movs.push(nvT);});
   const ft1=movs.find(m=>m.trocaId===tid);aplicarFotosPend(ft1&&ft1.id);
   const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
 function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulação',custo:Math.round(v.custoMat*100)/100}];trocaDin=v.din||0;trocaRecebi=[{desc:'carta',valorMercado:v.V,colecao:'',sit:'Em estoque'}];deiModo='avulso';tipoSel='TROCA';go('lancar');toast('Troca pré-preenchida — ajuste e registre');}
@@ -1137,6 +1161,7 @@ function salvar(){
   if(tipoSel==='COMPRA'){const cat=g('f_cat');if(!cat||cat==='__add__'){alert('Escolha o tipo de produto.');return;}
     const sit=g('f_sit')||'Em estoque';
     Object.assign(obj,{cat,codigo:g('f_cod')||'',jogo:g('f_jogo')||'Pokémon',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):'',idioma:g('f_idi'),boosters:+g('f_boo')||0,contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',taxa:0,pgTipo,nParc:pgTipo==='Parcelado'?(+g('f_nparc')||1):0,venc1:pgTipo==='Parcelado'?g('f_venc1'):'',conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):'',obs:g('f_obs')||''});
+    if(_linkPend['f_cod']){obj.codigoUrl=_linkPend['f_cod'];delete _linkPend['f_cod'];}
   } else {const cp=g('f_cp');if(!cp||cp==='__add__'){alert('O cliente é obrigatório na venda.');return;}
     const comum={obs:g('f_desc')||'',canal,taxa:canal==='App'?(+g('f_tax')||0):0,recDias:canal==='App'?(+g('f_recdias')||0):0,conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):'',contraparte:cp,destino:'Vender'};
     if(!editId&&vendaDe!=='avulsa'){const it=movs.find(m=>m.id===g('f_origem'));if(!it){alert('Escolha o item que você vendeu (ou use Avulsa).');return;}
@@ -1446,7 +1471,7 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
       <div><label style="margin-top:0">Em</label><select id="ab_unA" onchange="abUnAChange(this,'${m.id}')">${Math.max(1,+m.boosters||1)>1?`<option value="un" ${_abUnA!=='boo'?'selected':''}>unidades (tem ${+m.qtd||1})</option><option value="boo" ${_abUnA==='boo'?'selected':''}>boosters (tem ${(+m.qtd||1)*Math.max(1,+m.boosters||1)})</option>`:`<option value="un">unidades (tem ${+m.qtd||1})</option><option value="boo">🃏 boosters avulsos…</option>`}</select></div></div>
     ${lin}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('ab_cod')">🔎 ver na Liga</span></label><input id="ab_cod" placeholder="ex: 245/198" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:10px" onclick="buscarLigaCampo('ab_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:10px" onclick="colarLinkLiga('ab_cod','ab_desc','abCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:10px;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="ab_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
       <div class="meta" id="abCodHint" style="margin-bottom:6px"></div>
       <div class="row2"><div><label>O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie (ou deixe o código preencher)"></div><div><label>Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
@@ -1468,8 +1493,37 @@ function abUnAChange(sel,movId){const m=movs.find(x=>x.id===movId);if(!m)return;
 function buscarLigaCampo(inputId){const v=(document.getElementById(inputId)?.value||'').trim();
   if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
   window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent(v),'_blank');}
+/* Colinha dos padrões de código (definidos por Felype e Laura) — consulta rápida no cadastro.
+   Tem id próprio (modalPad) pra poder abrir POR CIMA do modal Abrir sem destruí-lo. */
+function abrirPadroesCod(){document.getElementById('modalPad')?.remove();
+  document.body.insertAdjacentHTML('beforeend',`<div id="modalPad" onclick="if(event.target.id==='modalPad')document.getElementById('modalPad').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:45;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">❔ Padrões de código</div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Carta normal (EN/PT)</b><div class="meta">número/total da coleção — ex: <b>245/198</b></div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Japonesa OU coreana</b><div class="meta"><b>JP</b> colado no número — ex: <b>167JP/165</b><br>coreana usa o MESMO código JP (mesmo valor de mercado)</div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Chinesa</b><div class="meta"><b>C</b> colado no número — ex: <b>173C/151</b></div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Achar a carta na Liga sem erro</b><div class="meta">buscar <b>Nome (código)</b> — ex: <b>Pikachu (173/165)</b> — cai direto na carta certa</div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Carta antiga sem código</b><div class="meta">deixe o código vazio, ache a carta na Liga pelo nome e use <b>🔗 colar link</b> — o app preenche pelo link</div></div>
+    <button class="btn g" style="margin-top:10px" onclick="document.getElementById('modalPad').remove()">fechar</button></div></div>`);}
+/* Colar o link da carta (achada na Liga) → preenche nome e código sozinho, e guarda o link
+   no item ao salvar (a coleta passa a acompanhar o valor por ele). O nome vem DENTRO da
+   própria URL da Liga (parâmetro card=Nome (código)) — zero digitação. */
+let _linkPend={};
+function parseLinkLiga(url){try{const u=new URL(url);if(!/ligapokemon\.com\.br$/i.test(u.hostname.replace(/^www\./,'')))return null;
+  const card=u.searchParams.get('card');if(!card)return null;
+  const mm=card.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+  return mm?{nome:mm[1].trim(),cod:mm[2].trim(),url}:{nome:card.trim(),cod:'',url};}catch(e){return null;}}
+function colarLinkLiga(codId,descId,hintId){
+  const u=prompt('Cole o LINK da página da carta na Liga (ache pelo 🔎, abra a carta certa, copie o endereço):','');
+  if(u===null)return;const p=parseLinkLiga((u||'').trim());
+  if(!p){alert('Não reconheci esse link — precisa ser o endereço de uma carta na ligapokemon.com.br.');return;}
+  const codEl=document.getElementById(codId),descEl=document.getElementById(descId),hintEl=document.getElementById(hintId);
+  if(codEl&&p.cod&&!codEl.value.trim())codEl.value=p.cod;
+  if(descEl&&p.nome&&!descEl.value.trim())descEl.value=p.nome;
+  _linkPend[codId]=p.url;
+  if(hintEl)hintEl.innerHTML='🔗 <b>'+p.nome+'</b>'+(p.cod?' · #'+p.cod:'')+' <span style="color:var(--green)">— preenchi pelo link ✓ (valor: veja na página e digite no vale; a coleta acompanha por esse link)</span>';
+  if(codEl)assistCod(codId,descId,codId==='ab_cod'?'ab_vm':(codId==='r_cod'?'r_val':''),hintId);}
 function addAbertoItem(){const g=id=>document.getElementById(id)?.value;const desc=(g('ab_desc')||'').trim();if(!desc){alert('Diga o que saiu (ex: nome da carta).');return;}
-  const cat=g('ab_cat');abertoItens.push({desc,cat:(cat&&cat!=='__add__')?cat:'Single/Carta',cod:(g('ab_cod')||'').trim(),qtd:+g('ab_qtd')||1,vm:+g('ab_vm')||0,sitItem:abItemSit});renderAbrir();}
+  const cat=g('ab_cat');abertoItens.push({desc,cat:(cat&&cat!=='__add__')?cat:'Single/Carta',cod:(g('ab_cod')||'').trim(),qtd:+g('ab_qtd')||1,vm:+g('ab_vm')||0,sitItem:abItemSit,linkUrl:_linkPend['ab_cod']||''});delete _linkPend['ab_cod'];renderAbrir();}
 function transformarItem(){const pai=movs.find(x=>x.id===_abrirId);if(!pai)return;
   if(!abertoItens.length){alert('Adicione ao menos 1 item que saiu de dentro.');return;}
   const somaM=abertoItens.reduce((s,x)=>s+(+x.vm||0),0);
@@ -1491,7 +1545,9 @@ function transformarItem(){const pai=movs.find(x=>x.id===_abrirId);if(!pai)retur
     if(i===abertoItens.length-1)c=Math.round((tot-acum)*100)/100;
     else{c=somaM>0?Math.round(tot*(+x.vm||0)/somaM*100)/100:Math.round(tot/abertoItens.length*100)/100;acum=Math.round((acum+c)*100)/100;}
     const sitX=x.sitItem==='colecao'?'Coleção':'Em estoque';
-    movs.push({id:novoId(),tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:pai.colecao||'',jogo:pai.jogo||'Pokémon',idioma:pai.idioma||'—',situacao:sitX,destino:sitX==='Coleção'?'Coleção':'Vender',destIni:sitX,contraparte:pai.contraparte||'',loteOrigem:alvo.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(pai.cat||'item')+')'});});
+    const nv={id:novoId(),tipo:'COMPRA',origem:'ABERTURA',data:hoje,qtd:x.qtd,valor:c,vUnit:Math.round(c/(x.qtd||1)*100)/100,cat:x.cat,codigo:x.cod||'',colecao:pai.colecao||'',jogo:pai.jogo||'Pokémon',idioma:pai.idioma||'—',situacao:sitX,destino:sitX==='Coleção'?'Coleção':'Vender',destIni:sitX,contraparte:pai.contraparte||'',loteOrigem:alvo.id,valorMercado:+x.vm||0,taxa:0,pgTipo:'À vista',obs:x.desc+' (🔓 de '+(pai.cat||'item')+')'};
+    if(x.linkUrl)nv.codigoUrl=x.linkUrl;
+    movs.push(nv);});
   alvo.obs=(alvo.obs?alvo.obs+' · ':'')+'🔓 aberto em '+abertoItens.length+' item(ns)';
   const n=abertoItens.length;_abrirId=null;abertoItens=[];save();fecharModal();toast('Aberto ✓ — custo '+fmt(tot)+' distribuído em '+n+' item(ns)');render();}
 /* Status de sincronização visível — falha de save NUNCA pode ser silenciosa */
@@ -1521,7 +1577,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='11/07 23h48';
+const BUILD_TAG='17/07 23h42';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
