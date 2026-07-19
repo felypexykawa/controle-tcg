@@ -490,7 +490,7 @@ function vLancar(){
     if(compraModo==='nota'&&!editId){campos+=notaForm();}
     else{campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo selecionado)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <div class="row2"><div><label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${e?.idioma===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}" oninput="bcalc()"></div></div>
       <div class="row2"><div><label>Valor total (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}" oninput="bcalc()"></div>
@@ -697,7 +697,7 @@ function trocaForm(){
       <div class="row2"><div><label>Jogo</label><select id="r_jogo" onchange="reColR(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Tipo de produto</label><select id="r_cat" onchange="novo(this,'cat')">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Coleção <span style="color:var(--mut);font-size:10px">(do jogo)</span></label><select id="r_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('r_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('r_cod','r_desc','rCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('r_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="r_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
+      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('r_cod','r_idi','r_desc','r_val','rCodHint')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('r_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('r_cod','r_desc','rCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('r_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="r_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('r_cod','r_desc','r_val','rCodHint')"><div class="meta" id="rCodHint"></div>
       <div class="row2"><div><label>Idioma</label><select id="r_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Situação</label><select id="r_sit">${['Em estoque','Coleção'].map(x=>`<option>${x}</option>`).join('')}</select></div></div>
       <div class="row2"><div><label>Boosters / un. <span style="color:var(--mut);font-size:10px">(se caixa/ETB)</span></label><input id="r_boo" type="number" inputmode="numeric" value="0"></div><div></div></div>
@@ -1473,7 +1473,7 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
       <div><label style="margin-top:0">Em</label><select id="ab_unA" onchange="abUnAChange(this,'${m.id}')">${Math.max(1,+m.boosters||1)>1?`<option value="un" ${_abUnA!=='boo'?'selected':''}>unidades (tem ${+m.qtd||1})</option><option value="boo" ${_abUnA==='boo'?'selected':''}>boosters (tem ${(+m.qtd||1)*Math.max(1,+m.boosters||1)})</option>`:`<option value="un">unidades (tem ${+m.qtd||1})</option><option value="boo">🃏 boosters avulsos…</option>`}</select></div></div>
     ${lin}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('ab_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('ab_cod','ab_desc','abCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('ab_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="ab_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('ab_cod','','ab_desc','ab_vm','abCodHint')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('ab_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('ab_cod','ab_desc','abCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('ab_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="ab_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
       <div class="meta" id="abCodHint" style="margin-bottom:6px"></div>
       <div class="row2"><div><label>O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie (ou deixe o código preencher)"></div><div><label>Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
@@ -1495,6 +1495,67 @@ function abUnAChange(sel,movId){const m=movs.find(x=>x.id===movId);if(!m)return;
 function buscarLigaCampo(inputId){const v=(document.getElementById(inputId)?.value||'').trim();
   if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
   window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent(v),'_blank');}
+/* ── Scanner de carta (fase 1): foto → leitor local (arquivos no PRÓPRIO site, pasta ocr/)
+   → lê o CÓDIGO na base da carta + detecta a ESCRITA (latina/japonesa/coreana/chinesa)
+   → monta o código no padrão da casa (JP colado p/ japonesa OU coreana; C p/ chinesa)
+   → mostra como SUGESTÃO com "✔ usar" — nunca aplica às cegas. O leitor (~20MB) só
+   baixa na primeira vez que alguém escaneia; depois fica no cache do navegador. */
+let _ocrWorker=null,_ocrCarregando=false;
+function ocrWorker(cb){
+  if(_ocrWorker){cb(_ocrWorker);return;}
+  if(_ocrCarregando){setTimeout(()=>ocrWorker(cb),500);return;}
+  _ocrCarregando=true;
+  const s=document.createElement('script');s.src='ocr/tesseract.min.js';
+  s.onload=async()=>{try{
+    const base=location.origin+location.pathname.replace(/[^/]*$/,'')+'ocr';
+    const w=await Tesseract.createWorker('eng',2,{workerPath:base+'/worker.min.js',corePath:base,langPath:base+'/lang'});
+    _ocrWorker=w;_ocrCarregando=false;cb(w);
+  }catch(e){_ocrCarregando=false;alert('Não consegui ligar o leitor de cartas: '+(String((e&&e.message)||e)).slice(0,80));cb(null);}};
+  s.onerror=()=>{_ocrCarregando=false;alert('Não consegui baixar o leitor (ocr/). Confere a internet e tenta de novo.');cb(null);};
+  document.head.appendChild(s);}
+function escanearCod(codId,idiSelId,descId,valId,hintId){
+  let inp=document.getElementById('scanFile');
+  if(!inp){document.body.insertAdjacentHTML('beforeend','<input type="file" id="scanFile" accept="image/*" capture="environment" style="display:none">');inp=document.getElementById('scanFile');}
+  inp.onchange=()=>{const f=inp.files&&inp.files[0];inp.value='';if(!f)return;
+    const hint=document.getElementById(hintId);if(hint)hint.innerHTML='📷 lendo… <span style="color:var(--mut)">(1ª vez baixa o leitor, ~20MB — depois é rápido)</span>';
+    const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{
+      const W=Math.min(1400,img.width),esc=W/img.width,H=Math.round(img.height*esc);
+      const cv=document.createElement('canvas');cv.width=W;cv.height=H;cv.getContext('2d').drawImage(img,0,0,W,H);
+      const baixo=document.createElement('canvas');const bh=Math.round(H*0.30);
+      baixo.width=W;baixo.height=bh;baixo.getContext('2d').drawImage(cv,0,H-bh,W,bh,0,0,W,bh);
+      const meio=document.createElement('canvas');const mh=Math.round(H*0.40);
+      meio.width=W;meio.height=mh;meio.getContext('2d').drawImage(cv,0,Math.round(H*0.42),W,mh,0,0,W,mh);
+      ocrWorker(async w=>{if(!w){if(hint)hint.innerHTML='';return;}
+        try{
+          await w.setParameters({tessedit_char_whitelist:'0123456789/JPC∞ '});
+          const r=await w.recognize(baixo);
+          await w.setParameters({tessedit_char_whitelist:''});
+          const bruto=((r&&r.data&&r.data.text)||'').replace(/\s+/g,' ');
+          const m=bruto.match(/(\d{1,3})\s*(JP|C)?\s*\/\s*(\d{1,3}|∞)/i);
+          let escrita='latina';
+          try{const d=await w.detect(meio);const sc=((d&&d.data&&d.data.script)||'')+'';
+            if(/jap/i.test(sc))escrita='japonesa';else if(/hangul|kor/i.test(sc))escrita='coreana';else if(/^han|chin/i.test(sc))escrita='chinesa';}catch(e2){}
+          if(!m){if(hint)hint.innerHTML='📷 Não achei o código — tente de novo com a BASE da carta bem visível e iluminada (ou digite à mão).';return;}
+          const sufLido=(m[2]||'').toUpperCase(),num=m[1],tot=m[3];
+          /* se a escrita foi cravada (ou o sufixo veio impresso), sugere direto; senão, 3 chips de 1 toque */
+          const chip=(suf,rot,idi)=>{const c=num+suf+'/'+tot;
+            return '<span class="lnk" style="font-weight:800;border:1px solid var(--blue);border-radius:8px;padding:2px 9px;display:inline-block;margin:2px 3px 0 0" onclick="aplicarScan(\''+codId+'\',\''+c+'\',\''+idiSelId+'\',\''+idi+'\',\''+hintId+'\')">'+rot+'</span>';};
+          if(hint){
+            if(sufLido||escrita!=='latina'){
+              const suf=sufLido||((escrita==='japonesa'||escrita==='coreana')?'JP':'C');
+              const cod=num+suf+'/'+tot;
+              const idiSug=escrita==='japonesa'?'Japonês':escrita==='coreana'?'Coreano':escrita==='chinesa'?'Chinês':'';
+              hint.innerHTML='📷 Li: <b>'+cod+'</b>'+(idiSug?' · escrita '+escrita:'')+' '+chip(suf,'✔ usar '+cod,idiSug)+' <span style="color:var(--mut)">· confira com a carta na mão</span>';
+            }else{
+              hint.innerHTML='📷 Li: <b>'+num+'/'+tot+'</b> — a carta é: '+chip('','normal','')+chip('JP','🇯🇵 japonesa','Japonês')+chip('JP','🇰🇷 coreana','Coreano')+chip('C','🇨🇳 chinesa','Chinês')+' <span style="color:var(--mut)">· 1 toque monta o código certo</span>';
+            }}
+        }catch(e3){if(hint)hint.innerHTML='📷 A leitura falhou ('+(((e3&&e3.message)||'')+'').slice(0,50)+') — tenta outra foto ou digita.';}
+      });};img.src=e.target.result;};rd.readAsDataURL(f);};
+  inp.click();}
+function aplicarScan(codId,cod,idiSelId,idi,hintId){
+  const el=document.getElementById(codId);if(el){el.value=cod;el.dispatchEvent(new Event('input',{bubbles:true}));}
+  if(idi&&idiSelId){const s=document.getElementById(idiSelId);if(s)s.value=idi;}
+  toast('📷 Código aplicado: '+cod);}
 /* Insere um símbolo que não existe no teclado (∞ dos códigos promocionais, ex. 032/∞)
    na posição do cursor, e dispara o evento de digitação pro assist reagir normal. */
 function insSimbolo(inputId,ch){const el=document.getElementById(inputId);if(!el)return;
@@ -1587,7 +1648,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='18/07 03h54';
+const BUILD_TAG='18/07 11h44';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
