@@ -206,6 +206,37 @@ function perguntarUnidadeVinculo(otherId,bpu,compra,venda){const old=document.ge
     <div class="row2"><div><button class="btn g" onclick="_vincUnPend='un';confirmVinculo('${otherId}')">📦 unidades (caixa/pote inteiro)</button></div><div><button class="btn g" onclick="_vincUnPend='boo';confirmVinculo('${otherId}')">🃏 boosters avulsos</button></div></div>
     <button class="btn g" style="margin-top:8px" onclick="fecharModalVinculo()">cancelar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
+/* Consultar o vínculo nos DOIS sentidos: da venda enxergo de onde veio (item, compra, nota);
+   do item vendido enxergo a venda. E desfazer vínculo errado sem apagar nada. */
+function verMov(id){const t=movs.find(x=>x.id===id);if(!t){toast('Lançamento não encontrado');return;}
+  navHist.push(snap());if(navHist.length>40)navHist.shift();
+  tela='consultar';consMenu=false;consF=t.tipo==='VENDA'?'VENDA':'COMPRA';
+  consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';
+  perDe='';perAte='';perSel='tudo';expandId=id;editId=null;render();
+  setTimeout(()=>{const el=document.getElementById('mv-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);}
+function vinculoInfoVenda(m){const alvo=movs.find(x=>x.id===m.origemId);
+  if(!alvo)return `<span class="meta" style="flex-basis:100%">🔗 Esta venda tem vínculo registrado, mas o item de origem não existe mais (foi excluído). Use ✂ desvincular pra limpar a referência.</span>`;
+  const raiz=raizDe(alvo)||alvo;
+  const rot=(alvo.colecao?alvo.colecao+' · ':'')+(alvo.cat||'item');
+  const dataC=raiz.data?dBR(new Date(raiz.data+'T00:00:00')):'—';
+  const forn=raiz.contraparte?' de <b>'+raiz.contraparte+'</b>':'';
+  return `<span class="meta" style="flex-basis:100%">🔗 veio de: <b>${rot}</b> — compra ${dataC}${forn}${raiz.notaId?` · <span class="lnk" onclick="abrirNota('${raiz.notaId}')">🧾 ver nota</span>`:''} · <span class="lnk" onclick="verMov('${alvo.id}')">ver item</span></span>`;}
+function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)return;
+  const alvo=movs.find(x=>x.id===v.origemId);
+  const limpa=()=>{delete v.origemId;delete v.custoOrigem;delete v.vendaDe;save();toast('✂ Vínculo desfeito ✓');render();};
+  if(!alvo){if(confirm('O item de origem não existe mais. Limpar só a referência desta venda? (nada mais muda)'))limpa();return;}
+  /* dois formatos de vínculo convivem: retroativo aponta pro pedaço Vendido; venda criada
+     já vinculada aponta pro lote-PAI (o pedaço é um irmão com loteOrigem) — achar o certo */
+  let peca=null;
+  if(sitDe(alvo)==='Vendido')peca=alvo;
+  else{const cands=movs.filter(x=>x.loteOrigem===alvo.id&&sitDe(x)==='Vendido'&&x.dataVenda===v.data&&Math.abs((+x.valor||0)-(+v.custoOrigem||0))<0.02&&!movs.some(o=>o.tipo==='VENDA'&&o.origemId===x.id));
+    if(cands.length)peca=cands[0];}
+  if(!peca){alert('Não achei o pedaço vendido correspondente (o item de origem está "'+sitDe(alvo)+'" e nenhum pedaço bate com esta venda). Se algo foi mexido depois do vínculo, corrija o item primeiro.');return;}
+  const volta=v.vendaTipo==='colecao'?'Coleção':'Em estoque';
+  const rot=(peca.colecao?peca.colecao+' · ':'')+(peca.cat||'item');
+  if(!confirm('Desfazer o vínculo?\n\n"'+rot+'" (custo '+fmt(+peca.valor||0)+') volta pra '+(volta==='Coleção'?'coleção':'o estoque')+' como estava. A venda continua registrada, só perde o lucro calculado. Nada é apagado.'))return;
+  peca.situacao=volta;peca.destino=volta==='Coleção'?'Coleção':'Vender';
+  delete peca.dataVenda;delete peca.dataSaida;limpa();}
 function togGrupo(k){consGrupoFech[k]=!consGrupoFech[k];render();}
 function togTodosGrupos(){if(Object.keys(consGrupoFech).length)consGrupoFech={};else _gKeys.forEach(k=>consGrupoFech[k]=true);render();}
 function togCt(k){ctExp[k]=!ctExp[k];render();}
@@ -808,11 +839,11 @@ function vConsultar(){
     else if(venda)pg=m.canal==='App'?`app · ${m.recDias||0}d${m.taxa?' −'+m.taxa+'%':''}`:'Pix · na hora';
     else pg=(m.pgTipo==='Parcelado'&&+m.nParc>1)?`${m.nParc}× ${fmt(total/m.nParc)}`:'à vista';
     const st=venda?null:m.tipo==='DESPESA'?['c',m.natureza==='material'?'🧰 material':'🧾 ordinária']:ST[sitDe(m)];
-    return head+`<div class="item" style="display:block">
+    return head+`<div class="item" style="display:block" id="mv-${m.id}">
       <div style="display:flex;justify-content:space-between;gap:10px;cursor:pointer" onclick="${selMode&&m.tipo==='COMPRA'?`togSel('${m.id}')`:`toggleExp('${m.id}')`}">
         ${selMode&&m.tipo==='COMPRA'?`<div style="flex:none;align-self:center;font-size:19px;color:${selIds[m.id]?'var(--blue)':'var(--mut)'}">${selIds[m.id]?'☑':'☐'}</div>`:''}${m.fotoThumb?`<img src="${m.fotoThumb}" style="width:36px;height:36px;object-fit:cover;border-radius:7px;flex:none;align-self:center" onclick="event.stopPropagation();abrirFotos('${m.id}')">`:''}<div style="flex:1">
           <div class="ttl"><b>${dataBR}</b>${m.notaId?' <span style="color:var(--blue);font-size:10px">🧾nota</span>':''}${m.obs?` · <span style="color:var(--amber);font-style:italic;font-weight:400">${m.obs}</span>`:''}</div>
-          <div class="meta">${prod}${m.codigo?` <span style="color:var(--mut)">#${m.codigo}</span>`:''}${m.qtd>1?` <span style="color:var(--mut)">×${m.qtd}</span>`:''} · ${m.contraparte||'—'} ${st?`<span class="tag ${st[0]}">${st[1]}</span>`:''} <span class="chev" style="color:var(--mut);font-size:13px">${expandId===m.id?'▾':'›'}</span></div>
+          <div class="meta">${prod}${m.codigo?` <span style="color:var(--mut)">#${m.codigo}</span>`:''}${m.qtd>1?` <span style="color:var(--mut)">×${m.qtd}</span>`:''} · ${m.contraparte||'—'} ${st?`<span class="tag ${st[0]}">${st[1]}</span>`:''}${venda?(m.origemId?' <span class="tag v">🔗 vinculada</span>':' <span class="tag c">sem vínculo</span>'):''} <span class="chev" style="color:var(--mut);font-size:13px">${expandId===m.id?'▾':'›'}</span></div>
         </div>
         <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(total)}</div>
           <div style="font-size:11px;font-weight:600;color:${venda?'var(--green)':'var(--red)'}">${pg}</div></div>
@@ -821,6 +852,12 @@ function vConsultar(){
         ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button><button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deCompra')">🔗 vincular venda</button>`:''}${venda&&!m.origemId?`<button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deVenda')">🔗 vincular estoque/coleção</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
         ${venda&&m.origemId&&m.custoOrigem!=null?(function(){const custo=+m.custoOrigem||0,receb=Math.round(total*(1-(+m.taxa||0)/100)*100)/100,lucro=Math.round((receb-custo)*100)/100,pct=custo>0?Math.round(lucro/custo*1000)/10:null,pctTxt=pct!=null?' ('+(pct>=0?'+':'')+pct+'%)':'';
           return `<span class="meta" style="flex-basis:100%">💰 comprei por <b>${fmt(custo)}</b> · vendi líquido por <b>${fmt(receb)}</b> · lucro <b style="color:${lucro>=0?'var(--green)':'var(--red)'}">${fmt(lucro)}${pctTxt}</b></span>`;})():''}
+        ${venda&&m.origemId?vinculoInfoVenda(m)+`<button class="x" onclick="desvincular('${m.id}')">✂ desvincular</button>`:''}
+        ${venda&&!m.origemId?`<span class="meta" style="flex-basis:100%">⚠ Venda sem vínculo com o estoque — o app não sabe de onde ela saiu, por isso não mostra lucro nem deu baixa no material. Toque <b>🔗 vincular estoque/coleção</b>: você escolhe o item de origem (ex.: o que restou da coleção), a quantidade certa sai dele e o lucro aparece. Nada é apagado.</span>`:''}
+        ${m.tipo==='COMPRA'?(function(){const vds=movs.filter(v=>v.tipo==='VENDA'&&v.origemId===m.id);
+          if(!vds.length)return '';
+          const lin=vds.slice(0,3).map(vd=>`vendido em <b>${vd.data?dBR(new Date(vd.data+'T00:00:00')):'—'}</b> por <b>${fmt(+vd.valor||0)}</b>${vd.contraparte?' pra <b>'+vd.contraparte+'</b>':''} · <span class="lnk" onclick="verMov('${vd.id}')">ver venda</span>`).join('<br>');
+          return `<span class="meta" style="flex-basis:100%">💰 ${lin}${vds.length>3?'<br>+'+(vds.length-3)+' venda(s) vinculada(s) a este item':''}</span>`;})():''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
         ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
         ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;
@@ -837,11 +874,13 @@ function vConsultar(){
   const aviso=(escondidos>0&&(perDe||perAte))?`<div class="soon" style="cursor:pointer" onclick="setPer('tudo')">+${escondidos} lançamento${escondidos>1?'s':''} fora deste período · toque pra ver tudo</div>`:'';
   const chip=consQ?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer" onclick="consQ='';render()">filtrando: "${consQ}" · limpar ✕</div>`:'';
   const totConsulta=ord.reduce((s,v)=>s+(+v.valor||0),0);
+  const nSemVinc=consF==='VENDA'?ord.filter(v=>v.tipo==='VENDA'&&!v.origemId).length:0;
+  const semVincBar=nSemVinc>0?`<div class="soon" style="background:var(--infobg);color:var(--blue)">🔗 ${nSemVinc} venda${nSemVinc>1?'s':''} sem vínculo com o estoque (etiqueta "sem vínculo") — abra a venda e toque "🔗 vincular estoque/coleção" pra ligar ao material de origem. Nada é apagado.</div>`:'';
   const rotuloTot=consF==='VENDA'?'total vendido':consF==='ESTOQUE'?'total em estoque (custo)':consF==='PEDIDO'?'total a caminho (custo)':consF==='COLECAO'?'total na coleção (custo)':consF==='COMPRA'?'total comprado':consF==='DESPESA'?'total de despesas':'';
   const totBar=ord.length?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;background:var(--card2);color:var(--ink)"><span style="color:var(--mut)">${ord.length} ${ord.length===1?'lançamento':'lançamentos'}${rotuloTot?' · '+rotuloTot:''}</span>${rotuloTot?`<b style="font-size:15px">${fmt(totConsulta)}</b>`:''}</div>`:'';
   const ordBar=ord.length?`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><select style="flex:1" onchange="consOrd=this.value;consGrupoFech={};render()">${[['emissao','Ordenar por: data de emissão'],['jogo','Ordenar por: jogo'],['pessoa','Ordenar por: cliente / fornecedor'],['conta','Ordenar por: conta']].map(([v,l])=>`<option value="${v}" ${consOrd===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="selMode=!selMode;selIds={};render()">${selMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosGrupos()">${Object.keys(consGrupoFech).length?'expandir tudo':'recolher tudo'}</span></div>`:'';
   const selBar=selMode?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--infobg);color:var(--blue)"><span>${Object.keys(selIds).length} marcado(s) — soltas + item de 1 nota: entram nela · de 2+ notas: fundem</span><button class="x" style="color:var(--blue);font-weight:700;flex:none" onclick="juntarNota()">🧾 juntar</button></div>`:'';
-  return `${voltar}${fCons}${chip}${aviso}${ordBar}${selBar}${totBar}${lista}${ord.length?`<div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button></div>`:''}`;
+  return `${voltar}${fCons}${chip}${aviso}${ordBar}${selBar}${semVincBar}${totBar}${lista}${ord.length?`<div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button></div>`:''}`;
 }
 /* filtro das linhas do Fluxo (compartilhado com a tabela de impressão) */
 function okCtG(x){return (!ctPess||(x.m.contraparte||'—')===ctPess)&&(!ctJogo||(x.m.jogo||'')===ctJogo)&&(!ctConta||(x.m.conta||'')===ctConta)&&(!ctCat||(x.nota?movs.some(mm=>mm.notaId===x.nota.id&&(mm.cat||'')===ctCat):(x.m.cat||'')===ctCat))&&noPer((x.venc||x.data).toISOString().slice(0,10));}
@@ -1648,7 +1687,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='18/07 11h44';
+const BUILD_TAG='28/07 10h55';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
