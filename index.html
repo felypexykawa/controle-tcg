@@ -211,7 +211,7 @@ function perguntarUnidadeVinculo(otherId,bpu,compra,venda){const old=document.ge
 function verMov(id){const t=movs.find(x=>x.id===id);if(!t){toast('Lançamento não encontrado');return;}
   navHist.push(snap());if(navHist.length>40)navHist.shift();
   tela='consultar';consMenu=false;consF=t.tipo==='VENDA'?'VENDA':'COMPRA';
-  consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';
+  consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';consGrupoFech={};
   perDe='';perAte='';perSel='tudo';expandId=id;editId=null;render();
   setTimeout(()=>{const el=document.getElementById('mv-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);}
 function vinculoInfoVenda(m){const alvo=movs.find(x=>x.id===m.origemId);
@@ -229,7 +229,7 @@ function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)retu
      já vinculada aponta pro lote-PAI (o pedaço é um irmão com loteOrigem) — achar o certo */
   let peca=null;
   if(sitDe(alvo)==='Vendido')peca=alvo;
-  else{const cands=movs.filter(x=>x.loteOrigem===alvo.id&&sitDe(x)==='Vendido'&&x.dataVenda===v.data&&Math.abs((+x.valor||0)-(+v.custoOrigem||0))<0.02&&!movs.some(o=>o.tipo==='VENDA'&&o.origemId===x.id));
+  else{const cands=movs.filter(x=>x.loteOrigem===alvo.id&&sitDe(x)==='Vendido'&&x.dataVenda===v.data&&(+x.qtd||1)===(+v.qtd||1)&&Math.abs((+x.valor||0)-(+v.custoOrigem||0))<0.02&&!movs.some(o=>o.tipo==='VENDA'&&o.origemId===x.id));
     if(cands.length)peca=cands[0];}
   if(!peca){alert('Não achei o pedaço vendido correspondente (o item de origem está "'+sitDe(alvo)+'" e nenhum pedaço bate com esta venda). Se algo foi mexido depois do vínculo, corrija o item primeiro.');return;}
   const volta=v.vendaTipo==='colecao'?'Coleção':'Em estoque';
@@ -1687,7 +1687,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='28/07 10h55';
+const BUILD_TAG='28/07 11h09';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
