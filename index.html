@@ -325,6 +325,91 @@ function verLote(id){const m=movs.find(x=>x.id===id);if(!m)return;
     <div class="calc" style="margin-top:10px">Custo total do lote: <b>${fmt(totLote)}</b></div>
     <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
   document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+/* ===== PROVA REAL — o app confere as próprias contas e aponta onde não fecham. Nada se
+   corrige sozinho: cada achado tem o botão que leva ao gesto certo (você decide). Roda no
+   boot (aviso no Painel quando há achado) e sob demanda pelo botão 🩺. ===== */
+let _provaCache=null;
+function provaReal(){
+  const A=[];
+  const add=(sev,titulo,detalhe,acaoRot,acaoJs,acao2Js)=>A.push({sev,titulo,detalhe,acaoRot:acaoRot||'',acaoJs:acaoJs||'',acao2Js:acao2Js||''});
+  const rotDe=m=>((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))+(m.data?' ('+String(m.data).split('-').reverse().join('/')+')':'');
+  /* 1. IDs duplicados (corrompe edição — crítico) */
+  const vist={};movs.forEach(m=>{if(vist[m.id])add('vermelho','ID duplicado: dois lançamentos com o mesmo código interno','"'+rotDe(vist[m.id])+'" e "'+rotDe(m)+'" — edições podem cair no registro errado. Baixe um backup e me chame pra separar.','',''); else vist[m.id]=m;});
+  /* 2. Dados inválidos */
+  movs.forEach(m=>{
+    if(m.tipo==='COMPRA'||m.tipo==='VENDA'){
+      if(!(+m.qtd>0))add('vermelho','Quantidade inválida em '+rotDe(m),'qtd = '+m.qtd+' — todo lançamento precisa de quantidade positiva.','abrir o lançamento',`verMov('${m.id}')`);
+      if(+m.valor<0)add('vermelho','Valor negativo em '+rotDe(m),'valor = '+fmt(+m.valor)+'.','abrir o lançamento',`verMov('${m.id}')`);
+      if(!m.data||!/^\d{4}-\d{2}-\d{2}$/.test(m.data))add('amarelo','Data ausente ou inválida em '+rotDe(m),'Sem data válida o lançamento some das visões por período.','abrir o lançamento',`verMov('${m.id}')`);
+    }});
+  /* 3. Conservação por família de lote (raiz com referência de origem).
+     Maps pré-computados (byId/filhos) — sem eles o raizDe aninhado vira O(n²) e trava com
+     milhares de lançamentos. Membro "Aberto" com filhos de ABERTURA sai da soma: o valor
+     dele foi REDISTRIBUÍDO nos filhos (contar os dois é dupla contagem, falso vermelho). */
+  const byId=new Map();movs.forEach(m=>byId.set(m.id,m));
+  const filhos=new Map();movs.forEach(m=>{if(m.tipo==='COMPRA'&&m.loteOrigem){if(!filhos.has(m.loteOrigem))filhos.set(m.loteOrigem,[]);filhos.get(m.loteOrigem).push(m);}});
+  movs.filter(m=>m.tipo==='COMPRA'&&!m.loteOrigem&&filhos.has(m.id)).forEach(rz=>{
+    const fam=[];const fila=[rz];
+    while(fila.length){const x=fila.pop();fam.push(x);(filhos.get(x.id)||[]).forEach(f=>fila.push(f));}
+    const soma=Math.round(fam.reduce((s,x)=>{
+      const redistribuido=sitDe(x)==='Aberto'&&(filhos.get(x.id)||[]).some(f=>f.origem==='ABERTURA');
+      return redistribuido?s:s+(+x.valor||0);},0)*100)/100;
+    const ref=rz.valorOrig!=null?Math.round((+rz.valorOrig)*100)/100
+      :(rz.valorProduto!=null?Math.round(((+rz.valorProduto||0)+(+rz.freteRateio||0)+(+rz.taxaRateio||0))*100)/100:null);
+    if(ref==null){add('info','Lote fracionado sem valor de origem gravado: '+rotDe(rz),'Lote antigo, dividido antes da prova real existir — sem a referência não dá pra conferir a soma dos pedaços. Lotes novos já nascem conferíveis.','ver o lote',`verLote('${rz.id}')`);return;}
+    if(Math.abs(soma-ref)>0.02)add('vermelho','Conservação violada no lote '+rotDe(rz),'A soma dos pedaços ('+fmt(soma)+') difere do valor original ('+fmt(ref)+') em '+fmt(Math.abs(soma-ref))+'. Se você EDITOU um valor de propósito, aceite a soma nova como referência; senão, confira o lote.','ver o lote completo',`verLote('${rz.id}')`,`aceitarConservacao('${rz.id}')`);});
+  /* 4. Vínculos de venda */
+  movs.filter(v=>v.tipo==='VENDA'&&v.origemId).forEach(v=>{
+    const alvo=movs.find(x=>x.id===v.origemId);
+    if(!alvo){add('amarelo','Venda vinculada a item que não existe mais: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O item de origem foi excluído — o lucro mostrado perdeu o lastro. Abrir e ✂ desvincular limpa a referência.','abrir a venda',`verMov('${v.id}')`);return;}
+    if(v.semOrigem)add('amarelo','Venda ao mesmo tempo "histórica" e vinculada: '+fmt(+v.valor||0),'Estados contraditórios — abra e desfaça um dos dois.','abrir a venda',`verMov('${v.id}')`);
+    const alvoTemFilhos=movs.some(x=>x.tipo==='COMPRA'&&x.loteOrigem===alvo.id);
+    /* vínculo apontando pro PAI fracionado: o custo da venda vive num pedaço-irmão — comparar
+       com o valor RESTANTE do pai é falso alarme; a família é conferida pela conservação */
+    if(sitDe(alvo)==='Vendido'&&!alvoTemFilhos&&(+v.custoOrigem||0)>(+alvo.valor||0)+0.02)add('vermelho','Custo do vínculo maior que o custo do material: venda de '+fmt(+v.valor||0),'Custo registrado '+fmt(+v.custoOrigem||0)+' > pedaço '+fmt(+alvo.valor||0)+' — o lucro dessa venda está subestimado.','abrir a venda',`verMov('${v.id}')`);
+    if((v.custoOrigem==null||+v.custoOrigem===0)&&(+alvo.valor||0)>0.02&&!alvoTemFilhos)add('amarelo','Venda vinculada sem custo registrado: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O vínculo existe mas o custo está vazio — o lucro aparece maior do que é. (Brinde de custo zero de verdade não gera este aviso.)','abrir a venda',`verMov('${v.id}')`);});
+  /* 5. Material vendido órfão (saiu do estoque, nenhuma venda aponta) */
+  movs.filter(x=>fragOrfao(x)).forEach(f=>{
+    add('amarelo','Material vendido sem venda apontando: '+rotDe(f),'Saiu como vendido ('+fmt(+f.valor||0)+(f.dataVenda?' em '+String(f.dataVenda).split('-').reverse().join('/'):', sem data de saída')+') mas nenhuma venda está ligada a ele — ou a venda correspondente está sem vínculo, ou foi excluída.','ver o item (dali dá pra vincular)',`verMov('${f.id}')`);});
+  /* 6. Referência de venda quebrada */
+  movs.filter(x=>x.vendaRef&&!movs.some(v=>v.id===x.vendaRef)).forEach(f=>{
+    add('amarelo','Referência de venda quebrada em '+rotDe(f),'O pedaço aponta pra uma venda que não existe mais (excluída).','ver o item',`verMov('${f.id}')`);});
+  /* 7. Vendas sem vínculo (não-históricas) — resumo único */
+  const nsv=movs.filter(v=>v.tipo==='VENDA'&&!v.origemId&&v.semOrigem!=='historico').length;
+  if(nsv)add('amarelo',nsv+' venda(s) sem vínculo com o estoque','Sem vínculo o custo delas não entra na conta do lucro. Em cada uma: 🔍 procurar origem sozinho, 🔗 escolher à mão, ou 📜 marcar histórica (venda de antes do app).','abrir as vendas',`consF='VENDA';consVer='itens';go('consultar')`);
+  /* 8. Notas: coerência interna */
+  const porNotaPR={};movs.forEach(m=>{if(m.tipo==='COMPRA'&&m.notaId&&!m.loteOrigem)(porNotaPR[m.notaId]=porNotaPR[m.notaId]||[]).push(m);});
+  Object.entries(porNotaPR).forEach(([nid,its])=>{const h=its[0];
+    if(its.some(x=>(x.pgTipo||'')!==(h.pgTipo||'')||(+x.nParc||0)!==(+h.nParc||0)||(x.venc1||'')!==(h.venc1||'')))
+      add('amarelo','Nota '+(h.notaNum||'(sem nº)')+' com pagamento divergente entre itens','Itens da mesma nota com parcelamento ou vencimento diferentes — as contas a pagar usam o 1º item e podem mentir.','ver a nota',`abrirNota('${nid}')`);
+    its.forEach(m=>{const vp=+m.valorProduto||0;
+      if(vp>0&&!movs.some(x=>x.loteOrigem===m.id)&&sitDe(m)!=='Vendido'&&Math.abs(vp+(+m.freteRateio||0)+(+m.taxaRateio||0)-(+m.valor||0))>0.02)
+        add('amarelo','Item de nota com conta interna divergente: '+rotDe(m),'produto + frete + taxa ('+fmt(vp+(+m.freteRateio||0)+(+m.taxaRateio||0))+') ≠ valor do lançamento ('+fmt(+m.valor||0)+') — ✏️ editar a nota realinha.','ver a nota',`abrirNota('${nid}')`);});});
+  /* 9. Parcela paga além do parcelamento */
+  movs.filter(m=>m.pgParcelas).forEach(m=>{const nP=+m.nParc||0;
+    Object.keys(m.pgParcelas).forEach(k=>{if(+k>nP)add('amarelo','Parcela paga além do parcelamento em '+rotDe(m),'Está marcada a parcela '+k+' mas a compra tem só '+nP+'× — sobra de uma edição.','abrir o lançamento',`verMov('${m.id}')`);});});
+  const n={vermelho:A.filter(x=>x.sev==='vermelho').length,amarelo:A.filter(x=>x.sev==='amarelo').length,info:A.filter(x=>x.sev==='info').length};
+  _provaCache={A,n};
+  return _provaCache;}
+/* Dispensa consciente do achado de conservação: o dono declara "editei de propósito" e a
+   soma atual vira a nova referência da família — com confirm, reversível editando de novo. */
+function aceitarConservacao(rzId){const rz=movs.find(x=>x.id===rzId);if(!rz)return;
+  const byId2=new Map();movs.forEach(m=>byId2.set(m.id,m));
+  const filhos2=new Map();movs.forEach(m=>{if(m.tipo==='COMPRA'&&m.loteOrigem){if(!filhos2.has(m.loteOrigem))filhos2.set(m.loteOrigem,[]);filhos2.get(m.loteOrigem).push(m);}});
+  const fam=[];const fila=[rz];while(fila.length){const x=fila.pop();fam.push(x);(filhos2.get(x.id)||[]).forEach(f=>fila.push(f));}
+  const soma=Math.round(fam.reduce((s,x)=>{const rd=sitDe(x)==='Aberto'&&(filhos2.get(x.id)||[]).some(f=>f.origem==='ABERTURA');return rd?s:s+(+x.valor||0);},0)*100)/100;
+  if(!confirm('Aceitar '+fmt(soma)+' como o novo valor de referência deste lote?\n\nUse só se VOCÊ editou algum valor de propósito — a prova real passa a conferir contra esse número.'))return;
+  rz.valorOrig=soma;save();toast('Referência do lote atualizada ✓');abrirProvaReal();}
+function abrirProvaReal(){const p=provaReal();
+  const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência'],info:['ℹ️','informativo']};
+  const bloco=sev=>{const its=p.A.filter(x=>x.sev===sev);if(!its.length)return '';
+    return `<div class="sec">${SEV[sev][0]} ${SEV[sev][1]} (${its.length})</div>`+its.map(x=>`<div class="item" style="display:block;padding:10px 12px"><b>${x.titulo}</b><div class="meta" style="margin-top:3px">${x.detalhe}</div>${x.acaoJs?`<div class="lnk" style="margin-top:5px" onclick="fecharModal();${x.acaoJs}">→ ${x.acaoRot}</div>`:''}${x.acao2Js?`<div class="lnk" style="margin-top:3px" onclick="${x.acao2Js}">→ aceitar a soma atual como nova referência (fui eu que editei)</div>`:''}</div>`).join('');};
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🩺 Prova real — o app confere as próprias contas</div>
+    <div class="ctx">${p.A.length?`<b>${p.A.length} achado(s)</b>: ${p.n.vermelho} 🔴 conta quebrada · ${p.n.amarelo} 🟡 pendência · ${p.n.info} ℹ️ informativo. Nada é corrigido sozinho — cada achado leva ao lugar certo e você decide.`:'<b>Tudo fechou ✓</b> — conservação dos lotes, vínculos, notas, parcelas e dados conferidos: nenhuma conta quebrada, nenhuma pendência.'}</div>
+    ${bloco('vermelho')}${bloco('amarelo')}${bloco('info')}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 function togGrupo(k){consGrupoFech[k]=!consGrupoFech[k];render();}
 function togTodosGrupos(){if(Object.keys(consGrupoFech).length)consGrupoFech={};else _gKeys.forEach(k=>consGrupoFech[k]=true);render();}
 function togCt(k){ctExp[k]=!ctExp[k];render();}
@@ -337,7 +422,7 @@ if(!colsJ){colsJ={};jogos.forEach(j=>colsJ[j]=[]);movs.forEach(m=>{const j=m.jog
 const fmt=n=>'R$ '+(Math.round(n*100)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=n=>(n>=0?'+':'')+Math.round(n*100)+'%';
 const dBR=d=>d.toLocaleDateString('pt-BR');
-const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM&&_syncReady)salvarNuvem();};
 const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStorage.setItem('tcg_cols',JSON.stringify(cols));localStorage.setItem('tcg_pess',JSON.stringify(pess));localStorage.setItem('tcg_pgs',JSON.stringify(pgs));localStorage.setItem('tcg_jogos',JSON.stringify(jogos));localStorage.setItem('tcg_despcats',JSON.stringify(despCats));localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));localStorage.setItem('tcg_colsg',JSON.stringify(colsG));localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
@@ -345,6 +430,7 @@ const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 function novoId(pfx){return (pfx||'m')+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function baixarLote(loteId,qtdBaixa,novaSit,extras){const lote=movs.find(m=>m.id===loteId);if(!lote)return null;const qtd=+lote.qtd||1,vUnit=(+lote.valor||0)/qtd;qtdBaixa=Math.max(1,Math.min(qtdBaixa,qtd));const destDe=s=>s==='Coleção'?'Coleção':(s==='Vendido'||s==='Trocado'?'Vender':lote.destino);
   if(!lote.destIni)lote.destIni=(sitDe(lote)==='Coleção'?'Coleção':'Em estoque');
+  if(!lote.loteOrigem&&lote.valorOrig==null)lote.valorOrig=+lote.valor||0; /* referência da conservação: valor ANTES da 1ª divisão (prova real confere a família contra ele) */
   if(qtdBaixa>=qtd){lote.situacao=novaSit;lote.destino=destDe(novaSit);if(extras)Object.assign(lote,extras);return lote;}
   /* conservação EXATA: pedaço arredondado, pai = original − pedaço (pai absorve o resíduo).
      Arredondar os dois lados separado perdia 1 centavo em casos tipo 1.126,85 ÷ 2 (float). */
@@ -355,6 +441,7 @@ function baixarBoosters(loteId,nBoo,novaSit,extras){const lote=movs.find(m=>m.id
   const qtd=+lote.qtd||1,bpu=Math.max(1,+lote.boosters||1),tot=qtd*bpu,vLote=+lote.valor||0,vb=vLote/tot;
   nBoo=Math.max(1,Math.min(nBoo,tot));
   if(!lote.destIni)lote.destIni=(sitDe(lote)==='Coleção'?'Coleção':'Em estoque');
+  if(!lote.loteOrigem&&lote.valorOrig==null)lote.valorOrig=vLote;
   const destDe=s=>s==='Coleção'?'Coleção':(s==='Vendido'||s==='Trocado'?'Vender':lote.destino);
   if(nBoo>=tot){lote.situacao=novaSit;lote.destino=destDe(novaSit);if(extras)Object.assign(lote,extras);return lote;}
   const rem=tot-nBoo,remCx=Math.floor(rem/bpu),remBoo=rem%bpu,vPed=Math.round(nBoo*vb*100)/100;
@@ -576,6 +663,7 @@ function vPainel(){
     <div class="grid2">
       <div class="mini click" onclick="go('contas')"><div class="k">A pagar (parcelas)</div><div class="v" style="color:var(--red)">${fmt(apT)}</div><div class="s">${apMes>0?fmt(apMes)+' vence este mês':'nada vence este mês'} →</div></div>
       <div class="mini click" onclick="go('contas')"><div class="k">A receber (app)</div><div class="v" style="color:var(--amber)">${fmt(arT)}</div><div class="s">${arMes>0?fmt(arMes)+' cai este mês':'nada cai este mês'} →</div></div></div>
+    <div class="lnk" onclick="abrirProvaReal()">🩺 prova real — o app confere as próprias contas${_provaCache&&_provaCache.A.length?` <b style="color:${_provaCache.n.vermelho?'var(--red)':_provaCache.n.amarelo?'var(--amber)':'var(--mut)'}">· ${_provaCache.A.length} achado${_provaCache.A.length>1?'s':''}</b>`:_provaCache?' <span style="color:var(--green)">· tudo fechou ✓</span>':''}</div>
     <div class="lnk" onclick="imprimir()">🖨 imprimir este resumo</div>
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
     <div class="lnk" onclick="if(confirm('Apagar TODOS os lançamentos?')){movs=[];save();render()}">limpar tudo</div>`;
@@ -1498,6 +1586,12 @@ function salvar(){
        mudou (mudar situação em edição é corrigir lançamento errado, o histórico recalcula). */
     movs[i]=(e&&e.tipo===obj.tipo)?Object.assign({},e,obj):obj;
     if(e&&e.destIni&&(e.situacao||'')===(obj.situacao||''))movs[i].destIni=e.destIni;
+    /* corrigir preço de propósito NÃO pode virar alarme de conservação: o delta da edição
+       acompanha a referência da família (raiz.valorOrig) */
+    if(e&&e.tipo===obj.tipo&&obj.tipo==='COMPRA'&&Math.abs((+obj.valor||0)-(+e.valor||0))>0.001){
+      const delta=Math.round(((+obj.valor||0)-(+e.valor||0))*100)/100;
+      const rzE=movs[i].loteOrigem?(raizDe(movs[i])||movs[i]):movs[i];
+      if(rzE&&rzE.valorOrig!=null)rzE.valorOrig=Math.round((rzE.valorOrig+delta)*100)/100;}
     save();editId=null;toast('Alteração salva');go('consultar');return;}
   movs.push(obj);aplicarFotosPend(obj.id);save();toast('Salvo ✓ — lance o próximo');render();
 }
@@ -1961,7 +2055,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     .then(()=>setSync('ok'))
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
-function aplicarNuvem(d){if(!d)return;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;localStorage.setItem(MK,JSON.stringify(movs));render();}
+function aplicarNuvem(d){if(!d)return;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;localStorage.setItem(MK,JSON.stringify(movs));render();}
 function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
 function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
 function telaLogin(msg){const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Controle TCG</div><div class="ctx">Entre pra acessar seu controle sincronizado em qualquer aparelho.</div>${msg?`<div class="soon" style="color:var(--red);justify-content:center">${msg}</div>`:''}<button class="btn" style="margin-top:16px" onclick="loginGoogle()">Entrar com Google</button></div>`;document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');const bv=document.getElementById('btnVoltar');if(bv)bv.style.display='none';}
@@ -1976,7 +2070,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='28/07 22h38';
+const BUILD_TAG='29/07 01h01';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
@@ -1991,6 +2085,9 @@ function checarVersao(){if(BUILD_TAG==='dev'||_versaoAvisada)return;
   }).catch(()=>{});}
 checarVersao();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checarVersao();});
+/* Prova real roda 1x na abertura (depois que os dados da nuvem chegam) — o Painel mostra
+   o resultado no link 🩺; o botão sempre re-roda na hora. */
+setTimeout(()=>{try{if(movs.length){provaReal();if(tela==='painel')render();}}catch(e){}},6000);
 /* Preços da Liga — coletados pelo robô (precos.json no mesmo endereço do app) */
 let _precosLiga=null,_glVer='';
 fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.cartas){_precosLiga=j;if(document.getElementById('view'))render();}}).catch(()=>{});
