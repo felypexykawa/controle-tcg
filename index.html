@@ -211,6 +211,7 @@ function perguntarUnidadeVinculo(otherId,bpu,compra,venda){const old=document.ge
 /* Consultar o vínculo nos DOIS sentidos: da venda enxergo de onde veio (item, compra, nota);
    do item vendido enxergo a venda. E desfazer vínculo errado sem apagar nada. */
 function verMov(id){const t=movs.find(x=>x.id===id);if(!t){toast('Lançamento não encontrado');return;}
+  fecharModal(); /* chamado de dentro de modais (ficha/venda completa) — sem isto o modal fica aberto por cima da lista trocada */
   navHist.push(snap());if(navHist.length>40)navHist.shift();
   tela='consultar';consMenu=false;consF=t.tipo==='VENDA'?'VENDA':'COMPRA';
   consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';consGrupoFech={};
@@ -317,6 +318,32 @@ function aplicarHistoricasMassa(){
   if(!alvo.length)return;
   alvo.forEach(v=>v.semOrigem='historico');
   _hmSel={};save();fecharModal();toast('📜 '+alvo.length+' venda'+(alvo.length>1?'s':'')+' marcada'+(alvo.length>1?'s':'')+' como histórica'+(alvo.length>1?'s':'')+' ✓ (desfazível por venda)');render();}
+/* FICHA de um lançamento único (modal) — clicar num card do modo agrupado abre SÓ ele,
+   sem trocar a vista inteira ("eu só cliquei pra visualizar uma venda; mudar tudo ao redor
+   me faz perder onde eu estava" — Felype). Dali dá pra ir pra lista detalhada COM scroll. */
+function irDetalhe(id){fecharModal();consVer='itens';consGrupoFech={};expandId=id;render();
+  setTimeout(()=>{const el=document.getElementById('mv-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);}
+function verFicha(id){const m=movs.find(x=>x.id===id);if(!m)return;
+  const venda=m.tipo==='VENDA';const dataBR2=m.data?m.data.split('-').reverse().join('/'):'—';
+  const prod=((m.colecao?m.colecao+' · ':'')+(m.cat||''))||'(sem produto)';
+  let corpo='';
+  if(venda){const liq=Math.round((+m.valor||0)*(1-(+m.taxa||0)/100)*100)/100;
+    corpo=`<div class="meta" style="margin:6px 0">${prod}${m.qtd>1?' ×'+m.qtd:''} · ${m.canal==='App'?'app · '+(m.recDias||0)+'d'+(m.taxa?' −'+m.taxa+'%':''):'Pix · na hora'}${liq<(+m.valor||0)-0.01?' · líquido '+fmt(liq):''}</div>`;
+    if(m.origemId&&m.custoOrigem!=null){const cu=+m.custoOrigem||0,lu=Math.round((liq-cu)*100)/100;
+      corpo+=`<div class="meta">💰 comprei por <b>${fmt(cu)}</b> · lucro <b style="color:${lu>=0?'var(--green)':'var(--red)'}">${fmt(lu)}${cu>0?' ('+(lu>=0?'+':'')+(Math.round(lu/cu*1000)/10)+'%)':''}</b></div>`;
+      corpo+=vinculoInfoVenda(m);}
+    else if(m.semOrigem==='historico')corpo+=`<div class="meta">📜 venda histórica — sem custo rastreado (de antes do app)</div>`;
+    else corpo+=`<div class="meta">⚠ sem vínculo — o lucro não entra na conta. Os botões de vínculo estão na lista detalhada.</div>`;
+  }else{const s=sitDe(m);
+    corpo=`<div class="meta" style="margin:6px 0">${prod}${m.qtd>1?' ×'+m.qtd:''} · ${s}${m.notaId?' · 🧾 tem nota':''}${m.pgTipo==='Parcelado'&&+m.nParc>1?' · '+m.nParc+'× de '+fmt((+m.valor||0)/m.nParc):''}</div>`;}
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:80vh;overflow:auto">
+    <div class="sec" style="margin-top:0">${venda?'💰 Venda':'🛒 Compra'} — ${dataBR2}${m.contraparte?' · '+m.contraparte:''}</div>
+    <div style="font-size:22px;font-weight:800;margin:2px 0 4px">${fmt(+m.valor||0)}</div>
+    ${corpo}
+    <div class="acoes" style="margin-top:12px"><button class="btn g" onclick="irDetalhe('${m.id}')">☰ abrir na lista (todas as ações)</button><button class="btn g" onclick="fecharModal();abrir('${m.id}')">✏️ editar</button></div>
+    ${m.notaId?`<button class="btn g" style="margin-top:8px" onclick="fecharModal();abrirNota('${m.notaId}')">🧾 ver a nota</button>`:''}
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal()">fechar — voltar pra lista</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 /* A venda INTEIRA (multi-item da mesma vendaId): o total que o cliente pagou + cada item
    dissecado — "precisa parecer UMA venda e ao mesmo tempo dissecar quando eu entrar". */
 function verVenda(vid){const its=movs.filter(x=>x.tipo==='VENDA'&&x.vendaId===vid);if(!its.length){toast('Venda não encontrada');return;}
@@ -661,7 +688,7 @@ function selPeriodo(){return `<div class="perbox"><div class="seg" style="margin
   <div class="row2"><div><label style="margin:0 0 3px">De</label><input type="date" value="${perDe}" onchange="perDe=this.value;perSel='custom';render()"></div>
     <div><label style="margin:0 0 3px">Até</label><input type="date" value="${perAte}" onchange="perAte=this.value;perSel='custom';render()"></div></div></div>`;}
 function snap(){return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel};}
-function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];}tela=t;editId=null;render();}
+function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];}selMode=false;selIds={};tela=t;editId=null;render();}
 function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
 function verFiltro(f){consF=f;consMenu=false;consQ='';expandId=null;render();}
 function voltar(){const s=navHist.pop();if(!s)return;tela=s.tela;consF=s.consF;consQ=s.consQ;consMenu=s.consMenu;perDe=s.perDe;perAte=s.perAte;perSel=s.perSel;editId=s.editId;tipoSel=s.tipoSel;render();}
@@ -1170,11 +1197,12 @@ function vConsultar(){
           <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--red)">${pg}</div></div>
         </div></div>`;}).join('');
     const cardsS=soltos.map(m=>{const dataBR2=m.data?m.data.split('-').reverse().join('/'):'—';const s=sitDe(m);
-      return `<div class="item" style="display:block;cursor:pointer" onclick="consVer='itens';expandId='${m.id}';render()">
+      return `<div class="item" style="display:block;cursor:pointer" onclick="verFicha('${m.id}')">
         <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${m.contraparte||'—'} <span style="color:var(--mut);font-size:10px">avulso, sem nota</span></div>
         <div class="meta">${((m.colecao?m.colecao+' · ':'')+(m.cat||''))||'(sem produto)'}${m.qtd>1?' ×'+m.qtd:''} · ${(EMO[s]||'')+' '+s.toLowerCase()}</div></div>
         <div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+m.valor||0)}</div></div></div>`;}).join('');
-    vistaNotas=`<div class="ctx">🧾 <b>${nidsVis.length} nota${nidsVis.length!==1?'s':''}</b>${soltos.length?' + '+soltos.length+' item(ns) avulso(s)':''} — toque na nota pra abrir os itens com produto, frete e taxa de cada um (a prova real contra a nota do fornecedor). O valor do card é a nota INTEIRA, mesmo quando esta aba mostra só parte dela.</div>${cardsN}${cardsS}`;
+    const dicaJuntar=soltos.length>1?` Itens avulsos que na verdade eram UMA nota? <span class="lnk" style="font-weight:700" onclick="consVer='itens';selMode=true;selIds={};render()">junte aqui</span>: marque ☑ os itens e toque 🧾 juntar.`:'';
+    vistaNotas=`<div class="ctx">🧾 <b>${nidsVis.length} nota${nidsVis.length!==1?'s':''}</b>${soltos.length?' + '+soltos.length+' item(ns) avulso(s)':''} — toque na nota pra abrir os itens com produto, frete e taxa de cada um (a prova real contra a nota do fornecedor). O valor do card é a nota INTEIRA, mesmo quando esta aba mostra só parte dela.${dicaJuntar}</div>${cardsN}${cardsS}`;
   }
   /* Aba Vendas agrupada POR VENDA (vendaId) por padrão — a venda como o cliente pagou */
   if(modoVendaG&&ord.length){
@@ -1193,7 +1221,7 @@ function vConsultar(){
           <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--green)">${h.canal==='App'?'app':'Pix'}</div></div>
         </div></div>`;}).join('');
     const cardsSV=soltosV.map(m=>{const dataBR2=m.data?m.data.split('-').reverse().join('/'):'—';
-      return `<div class="item" style="display:block;cursor:pointer" onclick="consVer='itens';expandId='${m.id}';render()">
+      return `<div class="item" style="display:block;cursor:pointer" onclick="verFicha('${m.id}')">
         <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${m.contraparte||'—'}</div>
         <div class="meta">${((m.colecao?m.colecao+' · ':'')+(m.cat||''))||'(sem produto)'}${m.qtd>1?' ×'+m.qtd:''}${m.origemId?' · <span class="tag v" style="font-size:9px">🔗 vinculada</span>':m.semOrigem==='historico'?' · <span class="tag" style="font-size:9px;background:var(--card2);color:var(--mut)">📜 histórica</span>':' · <span class="tag c" style="font-size:9px">sem vínculo</span>'}</div></div>
         <div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+m.valor||0)}</div></div></div>`;}).join('');
@@ -2110,7 +2138,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='29/07 10h22';
+const BUILD_TAG='29/07 11h48';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
