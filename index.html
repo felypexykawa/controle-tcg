@@ -478,9 +478,13 @@ function aPagar(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
     for(let i=0;i<nP;i++){const d=new Date(d0);d.setMonth(d.getMonth()+i);if(d>=hoje&&!pg[i+1])L.push({venc:d,valor:v,m:h,pi:i+1,pn:nP,cobrar:true,nota:{id:h.notaId,num:h.notaNum||'',n:itens.length,tot,parcela:i+1,nP}});}});
   movs.filter(m=>m.tipo==='DESPESA'&&m.status==='apagar').forEach(m=>{L.push({venc:new Date((m.data||'')+'T00:00:00'),valor:+m.valor||0,m});});
   return L.sort((a,b)=>a.venc-b.venc);}
+/* Parcela paga guarda DATA e VALOR do dia do pagamento — editar a nota depois não pode
+   reescrever o histórico do que já saiu do bolso. Legado (só a data em string) segue válido. */
+const pgData=x=>typeof x==='string'?x:(x&&x.d)||'';
+const pgValor=(x,fallback)=>(x&&typeof x==='object'&&x.v!=null)?+x.v:fallback;
 function pagarParcela(id,pi,pn,valor){const m=movs.find(x=>x.id===id);if(!m)return;
   if(!confirm('Marcar a parcela '+pi+' de '+pn+' ('+fmt(valor)+') como PAGA hoje?'))return;
-  m.pgParcelas=m.pgParcelas||{};m.pgParcelas[pi]=new Date().toISOString().slice(0,10);
+  m.pgParcelas=m.pgParcelas||{};m.pgParcelas[pi]={d:new Date().toISOString().slice(0,10),v:Math.round((+valor||0)*100)/100};
   save();toast('Parcela '+pi+'/'+pn+' paga ✓');render();}
 function desmarcarParcela(id,pi){const m=movs.find(x=>x.id===id);if(!m||!m.pgParcelas)return;
   if(!confirm('Desmarcar o pagamento da parcela '+pi+'? Ela volta pro "a pagar".'))return;
@@ -493,11 +497,11 @@ function contasPagas(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   const notas={},solo=[];parc.forEach(m=>{if(m.notaId)(notas[m.notaId]=notas[m.notaId]||[]).push(m);else solo.push(m);});
   solo.forEach(m=>{const v=(+m.valor||0)/m.nParc,d0=new Date((m.venc1||m.data)+'T00:00:00'),pg=m.pgParcelas||{};
     for(let i=0;i<+m.nParc;i++){const d=new Date(d0);d.setMonth(d.getMonth()+i);
-      if(pg[i+1])L.push({venc:new Date(pg[i+1]+'T00:00:00'),valor:v,m,pi:i+1,pn:+m.nParc,pagaManual:true});
+      if(pg[i+1])L.push({venc:new Date(pgData(pg[i+1])+'T00:00:00'),valor:pgValor(pg[i+1],v),m,pi:i+1,pn:+m.nParc,pagaManual:true});
       else if(d<hoje)L.push({venc:d,valor:v,m,pi:i+1,pn:+m.nParc});}});
   Object.values(notas).forEach(itens=>{const h=itens[0],tot=itens.reduce((s,x)=>s+(+x.valor||0),0),nP=+h.nParc||1,v=tot/nP,d0=new Date((h.venc1||h.data)+'T00:00:00'),pg=h.pgParcelas||{};
     for(let i=0;i<nP;i++){const d=new Date(d0);d.setMonth(d.getMonth()+i);const nt={id:h.notaId,num:h.notaNum||'',n:itens.length,tot,parcela:i+1,nP};
-      if(pg[i+1])L.push({venc:new Date(pg[i+1]+'T00:00:00'),valor:v,m:h,pi:i+1,pn:nP,pagaManual:true,nota:nt});
+      if(pg[i+1])L.push({venc:new Date(pgData(pg[i+1])+'T00:00:00'),valor:pgValor(pg[i+1],v),m:h,pi:i+1,pn:nP,pagaManual:true,nota:nt});
       else if(d<hoje)L.push({venc:d,valor:v,m:h,nota:nt});}});
   const seen={};movs.forEach(m=>{if(m.tipo!=='COMPRA'||m.origem||m.pgTipo==='Parcelado'||!m.data)return;
     const rz=raizDe(m),key=m.notaId||rz.id;
@@ -721,10 +725,11 @@ function notaForm(){
     ${notaHead.pg==='Parcelado'?`<div class="row2"><div><label>Nº de parcelas</label><input id="n_nparc" type="number" inputmode="numeric" value="${notaHead.nParc||3}" oninput="notaHead.nParc=+this.value||1"></div><div><label>1ª vence em</label><input id="n_venc1" type="date" value="${notaHead.venc1||new Date().toISOString().slice(0,10)}" onchange="notaHead.venc1=this.value"></div></div><div class="ctx">Nas <b>Contas a pagar</b> a nota aparece <b>reunida</b>: uma parcela só por vencimento, com os produtos dentro.</div>`:''}
     <label>Data de emissão</label><input id="n_data" type="date" value="${notaHead.data||new Date().toISOString().slice(0,10)}" onchange="notaHead.data=this.value">`;
 }
-function ratTexto(){const extra=(+notaHead.frete||0)+(+notaHead.taxa||0),tot=notaItens.reduce((s,it)=>s+(+it.valor||0),0);
+function ratTexto(){const frete=Math.max(0,+notaHead.frete||0),taxa=Math.max(0,+notaHead.taxa||0),extra=frete+taxa,tot=notaItens.reduce((s,it)=>s+(+it.valor||0),0);
   if(!notaItens.length)return 'Adicione itens pra ver o rateio.';
-  let h=`Nota: ${fmt(tot)} em itens + ${fmt(extra)} de frete/taxa = <b>${fmt(tot+extra)}</b>.`;
-  if(extra>0&&tot>0)h+='<br>'+notaItens.map(it=>{const r=(+it.valor/tot)*extra;return `• ${it.cat}${it.colecao?' '+it.colecao:''}: ${fmt(it.valor)} <span style="color:var(--amber)">+${fmt(r)}</span> = <b>${fmt(+it.valor+r)}</b>`;}).join('<br>');
+  let h=`Nota: ${fmt(tot)} em itens${frete>0?' + frete '+fmt(frete):''}${taxa>0?' + taxa '+fmt(taxa):''} = <b>${fmt(tot+extra)}</b>.`;
+  if(extra>0&&tot>0){const vals=notaItens.map(it=>+it.valor||0),rF=ratearExato(frete,vals),rT=ratearExato(taxa,vals);
+    h+='<br>'+notaItens.map((it,i)=>`• ${it.cat}${it.colecao?' '+it.colecao:''}: ${fmt(it.valor)} <span style="color:var(--amber)">+${fmt(rF[i]+rT[i])}</span> = <b>${fmt(+it.valor+rF[i]+rT[i])}</b>`).join('<br>');}
   return h;}
 function ncalc(src){const qE=document.getElementById('n_qtd'),uE=document.getElementById('n_unit'),tE=document.getElementById('n_val');if(!qE||!uE||!tE)return;const q=+qE.value||0,u=+uE.value||0,t=+tE.value||0;if(src==='t'){if(q>0)uE.value=(t/q).toFixed(2);}else{if(q>0&&u>0)tE.value=(q*u).toFixed(2);}}
 function nbooDef(){const c=document.getElementById('n_cat')?.value,b=document.getElementById('n_boo');if(b&&typeof CATB!=='undefined')b.value=CATB[c]||0;}
@@ -736,13 +741,23 @@ function addItemNota(){const g=id=>document.getElementById(id);const cat=g('n_ca
   const col=g('n_col')?.value,cod=(g('n_cod')?.value||'').trim();notaItens.push({jogo:g('n_jogo').value,cat,colecao:(col&&col!=='__add__')?col:'',idioma:g('n_idi').value,qtd,valor:val,vUnit:unit,codigo:cod,boosters:+g('n_boo')?.value||0});render();}
 function removeItemNota(i){notaItens.splice(i,1);render();}
 function rateioPreview(){const el=document.getElementById('ratPrev');if(el)el.innerHTML=ratTexto();}
+/* Rateio de um valor extra (frete OU taxa) proporcional ao produto de cada item, com o
+   RESÍDUO de arredondamento absorvido no último — Σ rateios = extra EXATO (classe do
+   antipadrão 31: arredondar cada item separado deixava a soma divergir uns centavos). */
+function ratearExato(extra,valores){const tot=valores.reduce((s,v)=>s+v,0);if(!(extra>0)||!(tot>0))return valores.map(()=>0);
+  /* floor nos não-últimos: a soma deles nunca passa do extra → o resíduo do último é sempre ≥ 0
+     (com round, frete pequeno em muitos itens dava último NEGATIVO — ex.: 0,13 em 18 itens) */
+  let acum=0;return valores.map((v,i)=>{if(i===valores.length-1)return Math.round((extra-acum)*100)/100;
+    const r=Math.floor(extra*v/tot*100)/100;acum=Math.round((acum+r)*100)/100;return r;});}
 function salvarNota(){
   if(!notaItens.length){alert('Adicione pelo menos um item à nota.');return;}
-  const extra=(+notaHead.frete||0)+(+notaHead.taxa||0),tot=notaItens.reduce((s,it)=>s+(+it.valor||0),0);
+  const frete=Math.max(0,+notaHead.frete||0),taxa=Math.max(0,+notaHead.taxa||0);
   const sit=notaHead.sit||'Em estoque',cp=(notaHead.cp&&notaHead.cp!=='__add__')?notaHead.cp:'',data=notaHead.data||new Date().toISOString().slice(0,10);
-  const nid=novoId('n');let k=0;
-  notaItens.forEach(it=>{const r=tot>0?(it.valor/tot)*extra:0,custo=Math.round((it.valor+r)*100)/100;
-    movs.push({id:novoId(),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:Math.round(r*100)/100,situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:(r>0?`nota · +${fmt(r)} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});});
+  const nid=novoId('n');
+  const vals=notaItens.map(it=>+it.valor||0);
+  const rF=ratearExato(frete,vals),rT=ratearExato(taxa,vals);
+  notaItens.forEach((it,i)=>{const custo=Math.round((it.valor+rF[i]+rT[i])*100)/100;
+    movs.push({id:novoId(),tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:rF[i],taxaRateio:rT[i],situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:((rF[i]+rT[i])>0?`nota · +${fmt(rF[i]+rT[i])} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});});
   const f1=movs.find(m=>m.notaId===nid);aplicarFotosPend(f1&&f1.id);
   const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
@@ -1018,6 +1033,7 @@ function vConsultar(){
       const h=origs[0]||todos[0];
       const tot=todos.reduce((s,x)=>s+(+x.valor||0),0);
       const frete=origs.reduce((s,x)=>s+(+x.freteRateio||0),0);
+      const taxaC=origs.reduce((s,x)=>s+(+x.taxaRateio||0),0);
       const noFiltro=ord.filter(x=>x.notaId===nid).length;
       const cols=[...new Set(origs.map(x=>x.colecao).filter(Boolean))];
       const resumo=(cols.slice(0,2).join(', ')+(cols.length>2?' +'+(cols.length-2):''))||[...new Set(origs.map(x=>x.cat).filter(Boolean))].slice(0,2).join(', ');
@@ -1029,7 +1045,7 @@ function vConsultar(){
       return `<div class="item" style="display:block;cursor:pointer" onclick="abrirNota('${nid}')">
         <div style="display:flex;justify-content:space-between;gap:10px">
           <div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · <b>${h.contraparte||'—'}</b>${h.notaNum?' <span style="color:var(--mut);font-size:10px">'+h.notaNum+'</span>':''}</div>
-          <div class="meta">🧾 ${origs.length} produto${origs.length>1?'s':''}${resumo?' · '+resumo:''}${frete>0?` · <span style="color:var(--amber)">+${fmt(frete)} frete/taxa incluído</span>`:''} · ${sitTxt}${parcial}</div></div>
+          <div class="meta">🧾 ${origs.length} produto${origs.length>1?'s':''}${resumo?' · '+resumo:''}${taxaC>0?` · <span style="color:var(--amber)">+${fmt(frete)} frete +${fmt(taxaC)} taxa incluídos</span>`:frete>0?` · <span style="color:var(--amber)">+${fmt(frete)} frete/taxa incluído</span>`:''} · ${sitTxt}${parcial}</div></div>
           <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--red)">${pg}</div></div>
         </div></div>`;}).join('');
     const cardsS=soltos.map(m=>{const dataBR2=m.data?m.data.split('-').reverse().join('/'):'—';const s=sitDe(m);
@@ -1125,14 +1141,17 @@ function abrirNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.len
   const itens=todos.filter(m=>!m.loteOrigem),pedacos=todos.filter(m=>m.loteOrigem);
   const h=itens[0]||todos[0];
   const tot=todos.reduce((s,x)=>s+(+x.valor||0),0);const nP=+h.nParc||0;
-  const prodT=itens.reduce((s,x)=>s+(+x.valorProduto||0),0),freteT=itens.reduce((s,x)=>s+(+x.freteRateio||0),0);
-  const lin=itens.map(m=>{const vp=+m.valorProduto||0,fr=+m.freteRateio||0,vAtual=+m.valor||0;
-    const raiz=vp>0?`produto ${fmt(vp)}${fr>0?' + frete/taxa '+fmt(fr):''} = <b>${fmt(vp+fr)}</b>`:`${(+m.qtd||1)}× ${fmt(vAtual/(+m.qtd||1))}`;
-    const mudou=vp>0&&Math.abs(vp+fr-vAtual)>0.02?`<br><span style="color:var(--amber)">hoje neste lançamento: ${fmt(vAtual)} — parte já saiu do lote (ver 🧩 no item)</span>`:'';
+  const prodT=itens.reduce((s,x)=>s+(+x.valorProduto||0),0),freteT=itens.reduce((s,x)=>s+(+x.freteRateio||0),0),taxaT=itens.reduce((s,x)=>s+(+x.taxaRateio||0),0);
+  const rotFT=(fr,tx)=>tx>0?`frete ${fmt(fr)} + taxa ${fmt(tx)}`:(fr>0?`frete/taxa ${fmt(fr)}`:'');
+  const lin=itens.map(m=>{const vp=+m.valorProduto||0,fr=+m.freteRateio||0,tx=+m.taxaRateio||0,vAtual=+m.valor||0;
+    const ft=rotFT(fr,tx);
+    const raiz=vp>0?`produto ${fmt(vp)}${ft?' + '+ft:''} = <b>${fmt(vp+fr+tx)}</b>`:`${(+m.qtd||1)}× ${fmt(vAtual/(+m.qtd||1))}`;
+    const mudou=vp>0&&Math.abs(vp+fr+tx-vAtual)>0.02?`<br><span style="color:var(--amber)">hoje neste lançamento: ${fmt(vAtual)} — parte já saiu do lote (ver 🧩 no item)</span>`:'';
     return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();abrir('${m.id}')"><div><b>${m.cat||'item'}</b>${m.colecao?' · '+m.colecao:''}${m.codigo?' <span style="color:var(--mut);font-size:10px">#'+m.codigo+'</span>':''}<div class="meta">${(+m.qtd||1)} un · ${raiz}${mudou}</div></div><div style="display:flex;gap:10px;align-items:center;flex:none"><b>${fmt(vAtual)}</b><button class="x" title="tirar da nota" onclick="event.stopPropagation();separarDaNota('${m.id}');fecharModal()">✂</button></div></div>`;}).join('');
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:85vh;overflow:auto">
     <div class="sec" style="margin-top:0">🧾 Nota${h.notaNum?' '+h.notaNum:''} — original</div>
-    <div class="ctx">Emitida em <b>${dBR(new Date(h.data+'T00:00:00'))}</b> · ${h.contraparte||'—'} · custou <b>${fmt(tot)}</b>${prodT>0?` <span style="color:var(--mut)">(produto ${fmt(prodT)} + frete/taxa ${fmt(freteT)})</span>`:''}${nP>1?` · paga em <b>${nP}×</b> de <b>${fmt(tot/nP)}</b> (1ª em ${dBR(new Date((h.venc1||h.data)+'T00:00:00'))})`:' · à vista'} — confira com a nota do fornecedor: produto e frete/taxa separados são a prova real.</div>
+    <div class="ctx">Emitida em <b>${dBR(new Date(h.data+'T00:00:00'))}</b> · ${h.contraparte||'—'} · custou <b>${fmt(tot)}</b>${prodT>0?` <span style="color:var(--mut)">(produto ${fmt(prodT)}${rotFT(freteT,taxaT)?' + '+rotFT(freteT,taxaT):''})</span>`:''}${nP>1?` · paga em <b>${nP}×</b> de <b>${fmt(tot/nP)}</b> (1ª em ${dBR(new Date((h.venc1||h.data)+'T00:00:00'))})`:' · à vista'} — confira com a nota do fornecedor: produto e frete/taxa separados são a prova real.</div>
+    <button class="btn g" style="margin-bottom:8px" onclick="editarNota('${nid}')">✏️ editar a nota — quantidades, valores, frete e taxa</button>
     ${lin}
     ${pedacos.length?`<div class="meta" style="padding:4px 12px">🧩 +${pedacos.length} pedaço(s) de saída (venda/abertura/troca) contando no total — toque num produto e use "ver o lote completo" pra rastrear.</div>`:''}
     <div style="display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:8px;padding-top:8px;font-weight:700"><span>Total (${itens.length} ${itens.length===1?'produto':'produtos'})</span><span>${fmt(tot)}</span></div>
@@ -1140,7 +1159,63 @@ function abrirNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.len
     <button class="btn g" style="margin-top:4px" onclick="desfazerNota('${nid}')">✂ desfazer nota — cada produto vira compra solta</button>
     <button class="btn g" style="margin-top:8px;color:var(--red)" onclick="excluirNotaInteira('${nid}')">🗑 excluir a nota INTEIRA — apaga os lançamentos</button>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal()">fechar</button></div></div>`;
-  document.body.insertAdjacentHTML('beforeend',hh);}
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+/* Edição PELA NOTA: quantidades, produto por item, frete e taxa da nota — re-rateio exato
+   ao salvar, mutação direta nos lançamentos (preserva parcelas pagas, fotos, vínculos).
+   Guarda: nota com pedaços já fracionados trava valores (mexer na base quebraria a
+   conservação da família) — só data/nº ficam livres nesse caso. */
+function notaTemSaidas(todos,itens){return todos.some(m=>m.loteOrigem)
+  ||itens.some(m=>movs.some(x=>x.loteOrigem===m.id))
+  ||itens.some(m=>['Vendido','Trocado','Aberto'].includes(sitDe(m))||movs.some(v=>v.tipo==='VENDA'&&v.origemId===m.id));}
+function editarNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.length)return;
+  const itens=todos.filter(m=>!m.loteOrigem);const h=itens[0]||todos[0];
+  const temPedacos=notaTemSaidas(todos,itens);
+  const freteAt=Math.round(itens.reduce((s,x)=>s+(+x.freteRateio||0),0)*100)/100;
+  const taxaAt=Math.round(itens.reduce((s,x)=>s+(+x.taxaRateio||0),0)*100)/100;
+  const linI=itens.map(m=>{const vp=+m.valorProduto||Math.round(((+m.valor||0)-(+m.freteRateio||0)-(+m.taxaRateio||0))*100)/100;
+    return temPedacos
+      ?`<div class="item" style="display:block;padding:9px 12px"><b>${m.cat||'item'}</b>${m.colecao?' · '+m.colecao:''}<div class="meta">🧩 nota com saídas — quantidades e valores travados (${(+m.qtd||1)} un · produto ${fmt(vp)})</div></div>`
+      :`<div class="item" style="display:block;padding:9px 12px"><b>${m.cat||'item'}</b>${m.colecao?' · '+m.colecao:''}${m.codigo?' <span style="color:var(--mut);font-size:10px">#'+m.codigo+'</span>':''}
+        <div class="row2" style="margin-top:6px"><div><label style="margin-top:0">Qtd</label><input id="ne_q_${m.id}" type="number" inputmode="numeric" value="${+m.qtd||1}" min="1"></div>
+        <div><label style="margin-top:0">Produto — total do item (R$)</label><input id="ne_p_${m.id}" type="number" inputmode="decimal" value="${vp}" step="0.01"></div></div></div>`;}).join('');
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">✏️ Editar nota${h.notaNum?' '+h.notaNum:''}</div>
+    <div class="ctx">Corrija aqui e o app refaz o rateio de frete e taxa proporcional ao produto de cada item — parcelas pagas, fotos e vínculos ficam como estão.${temPedacos?' <b>Esta nota já tem saídas (venda/abertura): quantidades, valores, frete e taxa estão travados — só data e nº liberados.</b>':''}</div>
+    <div class="row2"><div><label style="margin-top:0">Data de emissão</label><input id="ne_data" type="date" value="${h.data||''}"></div>
+      <div><label style="margin-top:0">Nº da nota</label><input id="ne_num" value="${(h.notaNum||'').replace(/"/g,'&quot;')}" placeholder="opcional"></div></div>
+    ${(+h.nParc||0)>1?`<div class="row2"><div><label>1ª parcela vence em</label><input id="ne_venc1" type="date" value="${h.venc1||h.data||''}"></div><div></div></div>`:''}
+    ${temPedacos?'':`<div class="row2"><div><label>Frete da nota (R$)</label><input id="ne_frete" type="number" inputmode="decimal" value="${freteAt}" step="0.01" min="0"></div>
+      <div><label>Taxa da nota (R$) <span style="color:var(--mut);font-size:10px">(Wise, câmbio, IOF…)</span></label><input id="ne_taxa" type="number" inputmode="decimal" value="${taxaAt}" step="0.01" min="0"></div></div>`}
+    <div class="sec">Produtos</div>
+    ${linI}
+    <button class="btn" style="margin-top:12px" onclick="salvarEdicaoNota('${nid}')">Salvar alterações</button>
+    <button class="btn g" style="margin-top:8px" onclick="abrirNota('${nid}')">cancelar — voltar pra nota</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+function salvarEdicaoNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.length)return;
+  const itens=todos.filter(m=>!m.loteOrigem);
+  const temPedacos=notaTemSaidas(todos,itens);
+  const g=id=>document.getElementById(id);
+  const dataN=g('ne_data')?.value||itens[0].data,numN=(g('ne_num')?.value||'').trim();
+  const venc1N=g('ne_venc1')?.value||'';
+  if(!temPedacos){
+    const frete=Math.max(0,+g('ne_frete')?.value||0),taxa=Math.max(0,+g('ne_taxa')?.value||0);
+    const novos=itens.map(m=>({m,q:Math.max(1,+g('ne_q_'+m.id)?.value||1),p:Math.round((+g('ne_p_'+m.id)?.value||0)*100)/100}));
+    if(novos.some(x=>x.p<=0)){alert('Todo item precisa de um valor de produto maior que zero.');return;}
+    const rF=ratearExato(frete,novos.map(x=>x.p)),rT=ratearExato(taxa,novos.map(x=>x.p));
+    const totN=Math.round((novos.reduce((s,x)=>s+x.p,0)+frete+taxa)*100)/100;
+    if(!confirm('Salvar a nota corrigida?\n\nProduto '+fmt(novos.reduce((s,x)=>s+x.p,0))+' + frete '+fmt(frete)+' + taxa '+fmt(taxa)+' = TOTAL '+fmt(totN)+'\n\nO rateio refaz proporcional; parcelas pagas, fotos e vínculos não mudam.'))return;
+    novos.forEach((x,i)=>{const m=x.m;
+      m.qtd=x.q;m.valorProduto=x.p;m.freteRateio=rF[i];m.taxaRateio=rT[i];
+      m.valor=Math.round((x.p+rF[i]+rT[i])*100)/100;m.vUnit=Math.round(m.valor/x.q*100)/100;
+      /* obs: substitui SÓ o prefixo padrão "nota · +R$X frete/taxa"; obs de item juntado
+         (que não segue o padrão) é preservada inteira com separador — nunca colada/comida */
+      const pref=((rF[i]+rT[i])>0?`nota · +${fmt(rF[i]+rT[i])} frete/taxa`:'nota');
+      const mObs=(m.obs||'').match(/^nota( · \+R\$ [\d.,]+ frete\/taxa)?(?=( · )|$)/);
+      const resto=mObs?(m.obs||'').slice(mObs[0].length):((m.obs||'')?' · '+(m.obs||''):'');
+      m.obs=pref+resto;});
+  }
+  todos.forEach(m=>{m.data=dataN;m.notaNum=numN;if(venc1N&&(+m.nParc||0)>1)m.venc1=venc1N;});
+  save();toast('Nota corrigida ✓');fecharModal();abrirNota(nid);render();}
 function excluirNotaInteira(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   const tot=its.reduce((s,x)=>s+(+x.valor||0),0);
   if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números, como se nunca tivessem existido.\n\nUse pra relançar do zero. Excluir?'))return;
@@ -1901,7 +1976,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='28/07 21h21';
+const BUILD_TAG='28/07 22h38';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
