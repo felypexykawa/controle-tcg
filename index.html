@@ -598,6 +598,38 @@ function consUnHint(){unHintGen('f_item','cunrow','cuntog','cunhint',consUn,'set
 function setConsUn(v){consUn=v;consUnHint();}
 function trocaUnHint(){unHintGen('d_item','dunrow','duntog','dunhint',trocaUn,'setTrocaUn');}
 function setTrocaUn(v){trocaUn=v;trocaUnHint();}
+/* ===== SELECT COM BUSCA (typeahead) — escolher ITEM em lista grande: digita e filtra por
+   TODAS as palavras, sem acento/caixa ("pitch tr" acha "Pitch black · Triple"). O ID escolhido
+   vive num hidden com o MESMO id que o select antigo usava — quem lê g('f_origem') não muda. */
+let _sbDados={};
+function sbNorm(s){return (''+(s||'')).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
+function selBusca(idBase,itens,preSelId,placeholder,onPick){
+  _sbDados[idBase]={itens,onPick:onPick||null};
+  const pre=itens.find(x=>x.id===preSelId);
+  return `<div style="position:relative">
+    <input id="${idBase}_q" placeholder="${placeholder||'digite pra filtrar… (ex.: pitch triple)'}" autocomplete="off" value="${pre?pre.rot.replace(/&/g,'&amp;').replace(/"/g,'&quot;'):''}" oninput="sbFiltra('${idBase}')" onfocus="sbFiltra('${idBase}')">
+    <input type="hidden" id="${idBase}" value="${pre?pre.id:''}">
+    <div id="${idBase}_dd" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--card);border:1px solid var(--inpb);border-radius:10px;max-height:260px;overflow:auto;box-shadow:0 8px 22px rgba(0,0,0,.35)"></div></div>`;}
+function sbFiltra(idBase){const d=_sbDados[idBase];if(!d)return;
+  const qEl=document.getElementById(idBase+'_q'),dd=document.getElementById(idBase+'_dd'),hid=document.getElementById(idBase);
+  if(!qEl||!dd)return;
+  const q=sbNorm(qEl.value);
+  /* digitou por cima = desfez a escolha — o hidden zera até um novo toque na lista */
+  if(hid){const atual=d.itens.find(x=>x.id===hid.value);if(!atual||sbNorm(atual.rot)!==q)hid.value='';}
+  const termos=q.split(/\s+/).filter(Boolean);
+  const hits=termos.length?d.itens.filter(x=>{const r=sbNorm(x.rot);return termos.every(t=>r.includes(t));}):d.itens;
+  const MAX=40;
+  dd.innerHTML=hits.slice(0,MAX).map(x=>`<div style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px" onmousedown="sbPick('${idBase}','${x.id}')">${x.rot.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`).join('')
+    +(hits.length>MAX?`<div style="padding:8px 12px;color:var(--mut);font-size:11px">+${hits.length-MAX} escondidos — continue digitando pra afinar</div>`:'')
+    +(hits.length?'':'<div style="padding:10px 12px;color:var(--mut);font-size:12px">nada com esse texto — confira a grafia ou apague pra ver tudo</div>');
+  dd.style.display='block';}
+function sbPick(idBase,id){const d=_sbDados[idBase];if(!d)return;const x=d.itens.find(y=>y.id===id);if(!x)return;
+  const hid=document.getElementById(idBase),qEl=document.getElementById(idBase+'_q'),dd=document.getElementById(idBase+'_dd');
+  if(hid)hid.value=id;if(qEl)qEl.value=x.rot;if(dd)dd.style.display='none';
+  if(d.onPick){try{d.onPick(id);}catch(e){}}}
+document.addEventListener('click',ev=>{document.querySelectorAll('div[id$="_dd"]').forEach(dd=>{
+  const base=dd.id.slice(0,-3);const qEl=document.getElementById(base+'_q');
+  if(ev.target!==qEl&&!dd.contains(ev.target))dd.style.display='none';});});
 function motor(filtrar){
   const F=filtrar?mRel:null;
   const todasC=movs.filter(m=>m.tipo==='COMPRA'&&(!F||F(m)));
@@ -790,9 +822,10 @@ function vLancar(){
         const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
         if(vendaJogoF&&jgsIt.includes(vendaJogoF))itens=itens.filter(d=>(d.jogo||'Pokémon')===vendaJogoF);
         const selJg=jgsIt.length>1?`<label>Jogo <span style="color:var(--mut);font-size:10px">(filtra a lista abaixo)</span></label><select onchange="vendaJogoF=this.value;render()"><option value="">todos os jogos</option>${jgsIt.map(j=>`<option ${vendaJogoF===j?'selected':''}>${j}</option>`).join('')}</select>`:'';
-        campos+= itens.length?`${selJg}<label>Qual item você vendeu? <span style="color:var(--mut);font-size:10px">(baixa sozinho · na quantidade que vender · 🚚 = pedido a caminho, dá pra vender antes de chegar)</span></label><select id="f_origem" onchange="vendaUnHint()">${itens.map(d=>`<option value="${d.id}" ${_preSel===d.id?'selected':''}>${sitDe(d)==='Pedido'?'🚚 ':''}${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>`:selJg+`<div class="soon">Nada ${vendaDe==='estoque'?'em estoque':'na coleção'} ${vendaJogoF?'desse jogo':''} ainda — use "Avulsa".</div>`;
-        const it0=itens.find(d=>d.id===_preSel)||itens[0],bpu0=it0?Math.max(1,+it0.boosters||1):1;
-        vun=itens.length?`<div id="vunrow" data-rot="Vender em"><label>Vender em</label>${unMiolo(it0,'vuntog','vunhint','setVendaUn',vendaUn)}</div>`:'';}
+        const sbIt=itens.map(d=>({id:d.id,rot:`${sitDe(d)==='Pedido'?'🚚 ':''}${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — custou ${fmt(+d.valor||0)}`}));
+        campos+= itens.length?`${selJg}<label>Qual item você vendeu? <span style="color:var(--mut);font-size:10px">(digite pra filtrar · baixa sozinho · 🚚 = a caminho, dá pra vender antes de chegar)</span></label>${selBusca('f_origem',sbIt,_preSel,'digite pra filtrar… (ex.: pitch triple)',()=>vendaUnHint())}`:selJg+`<div class="soon">Nada ${vendaDe==='estoque'?'em estoque':'na coleção'} ${vendaJogoF?'desse jogo':''} ainda — use "Avulsa".</div>`;
+        const it0=itens.find(d=>d.id===_preSel),bpu0=it0?Math.max(1,+it0.boosters||1):1;
+        vun=itens.length?`<div id="vunrow" data-rot="Vender em" style="display:${it0?'block':'none'}"><label>Vender em</label>${it0?unMiolo(it0,'vuntog','vunhint','setVendaUn',vendaUn):''}</div>`:'';}
       campos+=`<label>Descrição (opcional)</label><input id="f_desc" placeholder="detalhe extra: holo, edição…" value="${(e?.obs||'').replace(/"/g,'&quot;')}">
       <div class="row2"><div><label>Valor da venda (R$)</label><input id="f_val" type="number" inputmode="decimal" placeholder="0,00" value="${e?.valor??''}" oninput="vcalc()"></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}"></div></div>${vun}
@@ -806,11 +839,12 @@ function vLancar(){
   } else if(t==='CONSUMO'){
     const dispc=motor().disp;
     if(!dispc.length)campos=`<div class="soon">Nada em estoque pra mandar pra coleção. Lance uma compra primeiro.</div>`;
-    else{consUn='un';const cit0=dispc.find(d=>d.id===_preSel)||dispc[0],cbpu0=cit0?Math.max(1,+cit0.boosters||1):1;
+    else{consUn='un';const cit0=dispc.find(d=>d.id===_preSel),cbpu0=cit0?Math.max(1,+cit0.boosters||1):1;
+      const sbIt=dispc.map(d=>({id:d.id,rot:`${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,38)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}`}));
       campos=`<div class="ctx" style="margin-bottom:8px">Tirar do estoque pra sua <b>coleção pessoal</b> — foi pra coleção, não foi vendido.</div>
-      <label>O que foi pra coleção? <span style="color:var(--mut);font-size:10px">(do estoque)</span></label><select id="f_item" onchange="consUnHint()">${dispc.map(d=>`<option value="${d.id}" ${_preSel===d.id?'selected':''}>${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,38)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select>
+      <label>O que foi pra coleção? <span style="color:var(--mut);font-size:10px">(do estoque · digite pra filtrar)</span></label>${selBusca('f_item',sbIt,_preSel,'digite pra filtrar…',()=>consUnHint())}
       <div class="row2"><div><label>Quantas pra coleção?</label><input id="f_qtdbaixa" type="number" inputmode="numeric" value="1" min="1"></div><div></div></div>
-      <div id="cunrow" data-rot="Pra coleção em"><label>Pra coleção em</label>${unMiolo(cit0,'cuntog','cunhint','setConsUn',consUn)}</div>
+      <div id="cunrow" data-rot="Pra coleção em" style="display:${cit0?'block':'none'}"><label>Pra coleção em</label>${cit0?unMiolo(cit0,'cuntog','cunhint','setConsUn',consUn):''}</div>
       <label>Observação (opcional)</label><input id="f_obs" value="">`;}
   } else if(t==='DESPESA'){
     campos=`<div class="ctx" style="margin-bottom:8px">Custo que <b>não é mercadoria</b> de revenda — entra no resultado, não no estoque.</div>
@@ -828,8 +862,8 @@ function vLancar(){
     const dispA=movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção'));
     if(!dispA.length)campos=`<div class="soon">Nada em estoque ou na coleção pra abrir. Lance uma compra primeiro.</div>`;
     else campos=`<div class="ctx" style="margin-bottom:8px">Transforma um lote (caixa, ETB, booster) nas cartas que saíram de dentro — o custo é dividido entre elas. Mesmo gesto do "🔓 abrir" no item expandido da Consultar.</div>
-      <label>O que você vai abrir?</label><select id="ab_pick">${dispA.map(d=>`<option value="${d.id}">${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}${sitDe(d)==='Coleção'?' · ⭐ coleção':' · 📦 estoque'}</option>`).join('')}</select>
-      <button class="btn" style="margin-top:12px" onclick="abrirTransf(document.getElementById('ab_pick').value)">🔓 abrir isso</button>`;
+      <label>O que você vai abrir? <span style="color:var(--mut);font-size:10px">(digite pra filtrar)</span></label>${selBusca('ab_pick',dispA.map(d=>({id:d.id,rot:`${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}${sitDe(d)==='Coleção'?' · ⭐ coleção':' · 📦 estoque'}`})),null,'digite pra filtrar…',null)}
+      <button class="btn" style="margin-top:12px" onclick="const _ab=document.getElementById('ab_pick').value;if(!_ab){alert('Escolha na lista o que vai abrir (digite pra filtrar e toque no item).');}else abrirTransf(_ab)">🔓 abrir isso</button>`;
   } else campos='';
   const pode=(t==='COMPRA'||t==='VENDA'||t==='TROCA'||t==='DESPESA'||(t==='CONSUMO'&&motor().disp.length>0));const ehNota=(t==='COMPRA'&&compraModo==='nota'&&!editId);const ehVV=(t==='VENDA'&&vendaModo==='varios'&&!editId);
   return `<div class="card"><div class="types">${tipos.map(([k,ic,l])=>`<div class="tbtn ${t===k?'on':''}" onclick="tipoSel='${k}';editId=${editId?`'${editId}'`:'null'};render()"><span style="font-size:16px;margin-right:3px">${ic}</span>${l}</div>`).join('')}</div>
@@ -916,7 +950,7 @@ function vendaForm(){
     <div class="sec">Itens da venda (${vendaItens.length})</div>${itens}
     <div class="card" style="background:var(--card2);margin:8px 0">
       <div class="toggle" style="margin-bottom:8px"><div class="o ${vvOrig==='estoque'?'on':''}" onclick="vvOrig='estoque';render()">📦 do estoque</div><div class="o ${vvOrig==='avulso'?'on':''}" onclick="vvOrig='avulso';render()">✍ avulso</div></div>
-      ${vvOrig==='estoque'?(dispV.length?`<label style="margin-top:0">Item do estoque <span style="color:var(--mut);font-size:10px">(baixa sozinho)</span></label><select id="v_orig">${dispV.map(d=>`<option value="${d.id}">${sitDe(d)==='Pedido'?'🚚 ':''}${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''}${(+d.boosters||0)>1?' ('+d.boosters+' boo/un)':''} — custou ${fmt(+d.valor||0)}</option>`).join('')}</select>
+      ${vvOrig==='estoque'?(dispV.length?`<label style="margin-top:0">Item do estoque <span style="color:var(--mut);font-size:10px">(digite pra filtrar · baixa sozinho)</span></label>${selBusca('v_orig',dispV.map(d=>({id:d.id,rot:`${sitDe(d)==='Pedido'?'🚚 ':''}${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.colecao?d.colecao+' · ':'')+(d.cat||'item')}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''}${(+d.boosters||0)>1?' ('+d.boosters+' boo/un)':''} — custou ${fmt(+d.valor||0)}`})),null,'digite pra filtrar… (ex.: pitch triple)',null)}
       <div class="row2"><div><label>Vender em</label><select id="v_un"><option value="un">unidades</option><option value="boo">boosters</option></select></div><div><label>Qtd</label><input id="v_qtd2" type="number" inputmode="numeric" value="1" min="1"></div></div>
       <label>Valor da venda deste item (R$)</label><input id="v_val2" type="number" inputmode="decimal" placeholder="0,00">`
       :`<div class="meta">Nada em estoque — use "avulso".</div>`)
@@ -977,7 +1011,7 @@ function trocaForm(){
     <div class="sec">📤 O que eu dei (${trocaDei.length})</div>${dei}
     <div class="card" style="background:var(--card2);margin:8px 0">
       <div class="toggle" style="margin-bottom:8px"><div class="o ${deiModo==='estoque'?'on':''}" onclick="deiModo='estoque';render()">do estoque</div><div class="o ${deiModo==='avulso'?'on':''}" onclick="deiModo='avulso';render()">avulso</div></div>
-      ${deiModo==='estoque'?(dispc.length?`<div class="row2"><div><label style="margin-top:0">Material (baixa sozinho)</label><select id="d_item" onchange="trocaUnHint()">${dispc.map(d=>`<option value="${d.id}">${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}</option>`).join('')}</select></div><div><label style="margin-top:0">Quantas?</label><input id="d_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div><div id="dunrow" data-rot="Dar em" style="margin-top:6px"><label>Dar em</label>${unMiolo(dit0,'duntog','dunhint','setTrocaUn',trocaUn)}</div>`:`<div class="meta">Nada em estoque — use "avulso".</div>`)
+      ${deiModo==='estoque'?(dispc.length?`<label style="margin-top:0">Material <span style="color:var(--mut);font-size:10px">(digite pra filtrar · baixa sozinho)</span></label>${selBusca('d_item',dispc.map(d=>({id:d.id,rot:`${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}`})),null,'digite pra filtrar…',()=>trocaUnHint())}<div class="row2" style="margin-top:6px"><div><label style="margin-top:0">Quantas?</label><input id="d_qtd" type="number" inputmode="numeric" value="1" min="1"></div><div></div></div><div id="dunrow" data-rot="Dar em" style="margin-top:6px;display:none"><label>Dar em</label></div>`:`<div class="meta">Nada em estoque — use "avulso".</div>`)
       :`<div class="row2"><div><label style="margin-top:0">O que dei</label><input id="d_desc" placeholder="ex: 14 quads"></div><div><label style="margin-top:0">Me custou (R$)</label><input id="d_custo" type="number" inputmode="decimal"></div></div>`}
       <button class="btn g" style="margin-top:10px" onclick="addDei()">+ adicionar material</button></div>
     <label>+ dinheiro que eu dei (R$)</label><input type="number" inputmode="decimal" value="${trocaDin||0}" oninput="trocaDin=+this.value||0;trocaRatPrev()">
@@ -1004,8 +1038,9 @@ function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_it
 function removeDei(i){trocaDei.splice(i,1);render();}
 /* Corrigir item já adicionado nas listas da troca: volta pros campos (em vez de redigitar tudo) */
 function editDei(i){const d=trocaDei.splice(i,1)[0];
-  if(d.estoqueId){deiModo='estoque';trocaUn=d.deiBoo?'boo':'un';render();
-    const s=document.getElementById('d_item');if(s){s.value=d.estoqueId;trocaUnHint();}
+  if(d.estoqueId){deiModo='estoque';render();
+    trocaUn=d.deiBoo?'boo':'un'; /* DEPOIS do render — trocaForm reseta trocaUn='un' a cada render; setar antes perdia o modo boosters e o custo inflava 36× em silêncio */
+    sbPick('d_item',d.estoqueId); /* typeahead: pick preenche texto+id e dispara o hint (que redesenha o toggle já com o modo certo) */
     const q=document.getElementById('d_qtd');if(q)q.value=d.estoqueQtd||1;}
   else{deiModo='avulso';render();
     const dd=document.getElementById('d_desc'),dc=document.getElementById('d_custo');
@@ -2138,7 +2173,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='29/07 11h48';
+const BUILD_TAG='08/08 00h06';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
