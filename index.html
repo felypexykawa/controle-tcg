@@ -117,6 +117,10 @@ let jogos=get('tcg_jogos',['Pokémon','Yu-Gi-Oh','One Piece']);
 let despCats=get('tcg_despcats',['Luz','Aluguel','Advogado','Internet','Sleeves','Toploader','Sacolas','Fita','Caixas']);
 let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
 let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
+/* código ambíguo (2+ cartas na Liga p/ o mesmo código) resolvido 1x — vale pra TODOS os
+   itens com esse código, atuais e futuros (a rotina de coleta lê isto pra navegar direto,
+   sem passar pela página "Busca:" de novo). Chave = código LIMPO (codLimpo). */
+let codigosResolvidos=get('tcg_codres',{});const salvarCodRes=()=>localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
@@ -1236,12 +1240,19 @@ function vConsultar(){
           return `<span class="meta" style="flex-basis:100%">🧾 A nota inteira tem <b>${its.length} itens · ${fmt(tot)}</b> — ${fora} item(ns) em outra situação NÃO aparecem nesta aba (por isso a soma daqui pode ser menor que o que você pagou) · <span class="lnk" onclick="abrirNota('${m.notaId}')">ver a nota completa</span></span>`;})():''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
         ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
-        ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;
-          if(!(m.codigoUrl||!m.codigo||!pl||pl.status==='AMBIGUO'))return '';
-          return `<button class="x" style="color:${m.codigoUrl?'var(--green)':'var(--blue)'}" onclick="setCodigoUrl('${m.id}')">🔗 ${m.codigoUrl?'link direto ✓':'usar link direto'}</button>`;})()}
-        ${(function(){if(!m.codigo)return '';const pl=precoLigaDe(m.codigo);
-          if(!pl)return `<span class="meta" style="flex-basis:100%">🔍 Liga: <b>#${codLimpo(m.codigo)}</b> ainda não coletada${m.codigoUrl?' — 🔗 link direto definido, a próxima coleta traz o valor':' — a coleta traz o valor na próxima rodada (ou cole o 🔗 link direto pra garantir a carta certa)'}</span>`;
-          const vs=ligaVersoes(pl);return `<span class="meta" style="flex-basis:100%;color:${pl.status==='AMBIGUO'?'var(--amber)':'var(--green)'}">🔍 Liga: ${pl.status==='AMBIGUO'?(m.codigoUrl?'código com várias cartas — 🔗 link direto definido, a próxima coleta pega o preço da página certa':(pl.titulo&&pl.titulo.indexOf('—')>0?pl.titulo:'código com mais de uma carta')+' — abra "preço Liga", ache a carta certa e cole o link em 🔗 (dica: buscar <b>Nome (código)</b> na Liga, ex. Pikachu (173/165), costuma cair direto na carta certa)'):`<b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')}`} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
+        ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;const codC=m.codigo?codLimpo(m.codigo):'';
+          const ambig=pl&&pl.status==='AMBIGUO';const resolvGlobal=ambig&&codigosResolvidos[codC];
+          if(!(m.codigoUrl||!m.codigo||!pl||ambig))return '';
+          if(ambig&&!m.codigoUrl)return `<button class="x" style="color:${resolvGlobal?'var(--green)':'var(--blue)'}" onclick="abrirEscolhaAmbigua('${codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">🔗 ${resolvGlobal?'código resolvido ✓':'escolher carta'}</button>`;
+          return `<button class="x" style="color:${m.codigoUrl?'var(--green)':'var(--blue)'}" onclick="setCodigoUrl('${m.id}')">🔗 ${m.codigoUrl?'link direto (este item) ✓':'usar link direto'}</button>`;})()}
+        ${(function(){if(!m.codigo)return '';const pl=precoLigaDe(m.codigo);const codC=codLimpo(m.codigo);
+          if(!pl)return `<span class="meta" style="flex-basis:100%">🔍 Liga: <b>#${codC}</b> ainda não coletada${m.codigoUrl?' — 🔗 link direto definido, a próxima coleta traz o valor':' — a coleta traz o valor na próxima rodada (ou cole o 🔗 link direto pra garantir a carta certa)'}</span>`;
+          const vs=ligaVersoes(pl);
+          if(pl.status==='AMBIGUO'){const globR=codigosResolvidos[codC],resolv=globR||m.codigoUrl;
+            const diverge=globR&&m.codigoUrl&&globR!==m.codigoUrl;
+            if(diverge)return `<span class="meta" style="flex-basis:100%;color:var(--red)">🔍 Liga: ⚠ este item tem um link PRÓPRIO diferente do link resolvido pro código ${codC} — confira qual carta é a certa (toque em 🔗 pra ver/trocar a deste item).</span>`;
+            return `<span class="meta" style="flex-basis:100%;color:var(--amber)">🔍 Liga: código com mais de uma carta${resolv?' — 🔗 resolvido, a próxima coleta pega o preço da página certa':(pl.opcoes&&pl.opcoes.length?' — toque em 🔗 pra escolher qual das '+pl.opcoes.length+' cartas é a sua':' — ainda sem as opções pra escolher na tela; toque em 🔗 e cole o link manualmente (dica: buscar <b>Nome (código)</b> na Liga, ex. Pikachu (173/165), costuma cair direto na carta certa)')}</span>`;}
+          return `<span class="meta" style="flex-basis:100%;color:var(--green)">🔍 Liga: <b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
         ${(!m.codigo&&!m.codigoUrl)?`<span class="meta" style="flex-basis:100%">💡 Sem código — normal em cartas antigas. Busque à mão em ligapokemon.com.br pelo nome (formato <b>Nome (código-se-tiver)</b>) e cole o link em 🔗.</span>`:''}
         ${(function(){const nP=+m.nFotos||0;
           if(nP>0||!venda||!m.origemId)return `<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${nP>0?' ('+nP+')':''}</button>`;
@@ -2076,7 +2087,7 @@ function restaurarFotos(L,done){let i=0,ok=0;const next=()=>{if(i>=L.length){don
   if(!f||!f.b64){next();return;}
   if(USAR_NUVEM&&_db)_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId:f.movId||'',b64:f.b64,ts:f.ts||Date.now()}).then(()=>{ok++;next();}).catch(()=>next());
   else idbOpen(db=>{if(!db){next();return;}const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId:f.movId||'',b64:f.b64,ts:f.ts||Date.now()});tx.oncomplete=()=>{ok++;next();};tx.onerror=()=>next();});};next();}
-function montarBackup(comFotos,cb){const base={v:2,geradoEm:new Date().toISOString(),movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc};
+function montarBackup(comFotos,cb){const base={v:2,geradoEm:new Date().toISOString(),movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos};
   if(!comFotos){cb(base);return;}todasFotos(L=>{base.fotos=L;cb(base);});}
 function descargaJson(obj,nome){const blob=new Blob([JSON.stringify(obj)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();a.remove();}
 function baixarBackup(){montarBackup(false,d=>{descargaJson(d,'controle-tcg-'+new Date().toISOString().slice(0,10)+'.json');toast('Backup baixado ✓ (dados, sem fotos)');});}
@@ -2088,7 +2099,7 @@ function importarBackup(){const inp=document.createElement('input');inp.type='fi
       if(!confirm('Importar '+arr.length+' lançamentos? Isso SUBSTITUI o que está no app agora.'))return;
       movs=arr.map(m=>({...m}));
       arr.forEach(m=>{const j=m.jogo||'Pokémon';if(!jogos.includes(j))jogos.push(j);if(!colsJ[j])colsJ[j]=[];if(m.colecao){if(!colsJ[j].includes(m.colecao))colsJ[j].push(m.colecao);if(!cols.includes(m.colecao))cols.push(m.colecao);}if(m.cat&&!cats.includes(m.cat))cats.push(m.cat);if(m.contraparte&&!pess.includes(m.contraparte))pess.push(m.contraparte);if(m.conta&&!pgs.includes(m.conta))pgs.push(m.conta);});
-      if(d&&!Array.isArray(d)){if(Array.isArray(d.jogos))jogos=[...new Set([...jogos,...d.jogos])];if(Array.isArray(d.cats))cats=[...new Set([...cats,...d.cats])];if(Array.isArray(d.cols))cols=[...new Set([...cols,...d.cols])];if(d.colsJ&&typeof d.colsJ==='object')Object.keys(d.colsJ).forEach(j=>{colsJ[j]=[...new Set([...(colsJ[j]||[]),...(d.colsJ[j]||[])])];});if(d.colsG&&typeof d.colsG==='object')Object.keys(d.colsG).forEach(j=>{colsG[j]=Object.assign(colsG[j]||{},d.colsG[j]);});if(Array.isArray(d.pess))pess=[...new Set([...pess,...d.pess])];if(Array.isArray(d.pgs))pgs=[...new Set([...pgs,...d.pgs])];if(Array.isArray(d.despCats))despCats=[...new Set([...despCats,...d.despCats])];if(Array.isArray(d.cadastros)&&d.cadastros.length)cadastros=d.cadastros;if(Array.isArray(d.contasBanc)&&d.contasBanc.length)contasBanc=d.contasBanc;salvarCad();salvarCB();salvarColsG();}
+      if(d&&!Array.isArray(d)){if(Array.isArray(d.jogos))jogos=[...new Set([...jogos,...d.jogos])];if(Array.isArray(d.cats))cats=[...new Set([...cats,...d.cats])];if(Array.isArray(d.cols))cols=[...new Set([...cols,...d.cols])];if(d.colsJ&&typeof d.colsJ==='object')Object.keys(d.colsJ).forEach(j=>{colsJ[j]=[...new Set([...(colsJ[j]||[]),...(d.colsJ[j]||[])])];});if(d.colsG&&typeof d.colsG==='object')Object.keys(d.colsG).forEach(j=>{colsG[j]=Object.assign(colsG[j]||{},d.colsG[j]);});if(Array.isArray(d.pess))pess=[...new Set([...pess,...d.pess])];if(Array.isArray(d.pgs))pgs=[...new Set([...pgs,...d.pgs])];if(Array.isArray(d.despCats))despCats=[...new Set([...despCats,...d.despCats])];if(Array.isArray(d.cadastros)&&d.cadastros.length)cadastros=d.cadastros;if(Array.isArray(d.contasBanc)&&d.contasBanc.length)contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object'&&Object.keys(d.codigosResolvidos).length)codigosResolvidos=d.codigosResolvidos;salvarCad();salvarCB();salvarColsG();salvarCodRes();}
       const fts=(d&&!Array.isArray(d)&&Array.isArray(d.fotos))?d.fotos:null;
       save();saveL();fecharModal();
       if(fts&&fts.length){toast('restaurando '+fts.length+' foto(s)…');restaurarFotos(fts,okN=>{go('painel');toast('Backup importado ✓ — '+arr.length+' lançamentos + '+okN+' foto'+(okN===1?'':'s'));});}
@@ -2357,7 +2368,7 @@ function setSync(st,msg){const el=document.getElementById('syncDot');if(!el)retu
   else if(st==='erro'){el.textContent='☁️⚠ não salvou';el.title=msg||'erro ao salvar na nuvem';el.style.opacity='1';el.style.color='var(--red)';}
   else{el.textContent='';el.title='';}}
 function salvarNuvem(){if(!_db||!_syncReady)return;
-  const payload={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,_upd:Date.now(),_by:_userEmail};
+  const payload={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,_upd:Date.now(),_by:_userEmail};
   try{const kb=Math.round(JSON.stringify(payload).length/1024);
     if(kb>700&&!window._doc1mbAviso){window._doc1mbAviso=true;toast('⚠ Seus dados estão em '+kb+'KB — perto do limite de 1MB da gaveta da nuvem. Avise o Felype pra planejar a divisão.');}}catch(e){}
   setSync('saving');
@@ -2365,7 +2376,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     .then(()=>setSync('ok'))
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
-function aplicarNuvem(d){if(!d)return;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;localStorage.setItem(MK,JSON.stringify(movs));render();}
+function aplicarNuvem(d){if(!d)return;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));render();}
 function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
 function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
 function telaLogin(msg){const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Controle TCG</div><div class="ctx">Entre pra acessar seu controle sincronizado em qualquer aparelho.</div>${msg?`<div class="soon" style="color:var(--red);justify-content:center">${msg}</div>`:''}<button class="btn" style="margin-top:16px" onclick="loginGoogle()">Entrar com Google</button></div>`;document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');const bv=document.getElementById('btnVoltar');if(bv)bv.style.display='none';}
@@ -2380,7 +2391,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 10h18';
+const BUILD_TAG='10/08 10h41';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
@@ -2412,7 +2423,9 @@ function ligaHistDe(cod){if(!_precosLiga||!_precosLiga.historico)return null;
   return (typeof h==='object'&&!Array.isArray(h))?h:{'':h};}
 function precosLigaQuando(){if(!_precosLiga||!_precosLiga.atualizadoEm)return '';const d=new Date(_precosLiga.atualizadoEm);const h=Math.round((Date.now()-d.getTime())/36e5);return h<1?'agora há pouco':h<48?('há '+h+'h'):d.toLocaleDateString('pt-BR');}
 function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return;const pl=precoLigaDe(cod);const vs=ligaVersoes(pl);
-  el.innerHTML=pl?(pl.status==='AMBIGUO'?'🔍 Liga: mais de uma carta com esse código':(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':'')):'';}
+  if(pl&&pl.status==='AMBIGUO'){const codC=codLimpo(cod),resolv=codigosResolvidos[codC];
+    el.innerHTML='🔍 Liga: '+(resolv?'código resolvido ✓':'mais de uma carta com esse código')+' <span class="lnk" style="font-size:11px;padding:1px 4px" onclick="abrirEscolhaAmbigua(\''+codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">'+(resolv?'trocar':((pl.opcoes&&pl.opcoes.length)?'escolher qual →':'colar link →'))+'</span>';return;}
+  el.innerHTML=pl?(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':''):'';}
 /* Assist de preço p/ campos "vale (mercado)" — nunca mexe em "valor" de compra/venda
    (isso é o que você pagou/recebeu, não o preço da Liga). Preenche NOME e VALE só se
    estiverem vazios (não sobrescreve o que você já digitou); dispara junto de digitar
@@ -2421,7 +2434,8 @@ function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return
 function assistCod(codId,descId,valId,hintId){const cod=(document.getElementById(codId)?.value||'').trim();
   const hintEl=document.getElementById(hintId);const pl=precoLigaDe(cod);
   if(!pl){if(hintEl)hintEl.innerHTML='';return;}
-  if(pl.status==='AMBIGUO'){if(hintEl)hintEl.innerHTML='🔍 Liga: código com mais de uma carta — confira o nome certo antes de salvar (não preenchi sozinho).';return;}
+  if(pl.status==='AMBIGUO'){const codC=codLimpo(cod),resolv=codigosResolvidos[codC];
+    if(hintEl)hintEl.innerHTML='🔍 Liga: '+(resolv?'código resolvido ✓ (não preenchi automático — confira antes de salvar)':'código com mais de uma carta — confira o nome certo antes de salvar (não preenchi sozinho)')+' <span class="lnk" style="font-size:11px;padding:1px 4px" onclick="abrirEscolhaAmbigua(\''+codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">'+(resolv?'trocar':((pl.opcoes&&pl.opcoes.length)?'escolher qual →':'colar link →'))+'</span>';return;}
   const vs=ligaVersoes(pl),nome=pl.titulo.split(' (')[0];
   const descEl=document.getElementById(descId),valEl=document.getElementById(valId);const feito=[];
   if(descEl&&!descEl.value.trim()){descEl.value=nome;feito.push('nome');}
@@ -2437,6 +2451,41 @@ function setCodigoUrl(id){const m=movs.find(x=>x.id===id);if(!m)return;
   if(!url){if(atual&&confirm('Remover o link direto deste item?')){delete m.codigoUrl;save();toast('Link removido');render();}return;}
   if(!/^https:\/\/(www\.)?ligapokemon\.com\.br\//i.test(url)){alert('Esse link não é da ligapokemon.com.br — cole o endereço da página da carta/produto na Liga.');return;}
   m.codigoUrl=url;save();toast('🔗 Link direto salvo — a próxima coleta busca nessa página');render();}
+/* FASE 3 do preço ambíguo ("padrão Janet", pedido 2026-07-04, executado 2026-08-10):
+   quando a rotina já capturou as opções da página "Busca:" (precos.json ganha `opcoes`
+   por código — nome/link/miniatura de cada carta candidata), mostra elas aqui pra
+   escolha visual em 1 toque. A escolha é POR CÓDIGO (codigosResolvidos), não por item —
+   resolve UMA vez e vale pra todo item atual e futuro com esse código. Enquanto a rotina
+   ainda não populou `opcoes` (código descoberto ambíguo mas coleta ainda não rodou de
+   novo), cai no fallback manual de sempre (link colado à mão). */
+function abrirEscolhaAmbigua(codigo){
+  const codC=codLimpo(codigo);const pl=precoLigaDe(codC);
+  const ops=(pl&&Array.isArray(pl.opcoes))?pl.opcoes:[];
+  if(!ops.length){setCodigoUrlGlobal(codC);return;}
+  const esc=s=>(''+(s||'')).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  const linhas=ops.map(o=>`<div class="item" style="cursor:pointer;align-items:center;gap:10px" onclick="escolherOpcaoAmbigua('${esc(codC)}','${esc(o.url)}')">
+    ${o.img?`<img src="${esc(o.img)}" style="width:44px;height:44px;object-fit:contain;border-radius:6px;background:var(--card2);flex:none" onerror="this.style.display='none'">`:`<div style="width:44px;height:44px;border-radius:6px;background:var(--card2);flex:none"></div>`}
+    <div style="flex:1"><b>${(o.titulo||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;')}</b></div>
+    <span style="color:var(--blue);font-size:12px;flex:none">escolher →</span></div>`).join('');
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:80vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🔍 Código ${codC.replace(/</g,'&lt;')} tem ${ops.length} cartas — qual é a sua?</div>
+    <div class="ctx" style="margin-bottom:8px">Escolha 1x — as próximas coletas de TODOS os itens com esse código vão direto nessa carta.</div>
+    ${linhas}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModal()">cancelar</button>
+    <div class="lnk" style="margin-top:8px;font-size:12px" onclick="fecharModal();setCodigoUrlGlobal('${esc(codC)}')">✎ nenhuma dessas — colar link manualmente</div>
+    </div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+function escolherOpcaoAmbigua(codC,url){
+  if(!url){toast('Essa opção não tem link salvo — tente colar manualmente.');return;}
+  codigosResolvidos[codC]=url;salvarCodRes();save();fecharModal();toast('🔗 Escolhido — as próximas coletas desse código vão direto ✓');render();}
+function setCodigoUrlGlobal(codC){
+  const atual=codigosResolvidos[codC]||'';
+  const u=prompt('Cole o LINK da página certa na Liga pro código '+codC+' — vale pra TODOS os itens com esse código, atuais e futuros:',atual);
+  if(u===null)return;
+  const url=(u||'').trim();
+  if(!url){if(atual&&confirm('Remover o link resolvido deste código?')){delete codigosResolvidos[codC];salvarCodRes();save();toast('Link removido');render();}return;}
+  if(!/^https:\/\/(www\.)?ligapokemon\.com\.br\//i.test(url)){alert('Esse link não é da ligapokemon.com.br — cole o endereço da página da carta/produto na Liga.');return;}
+  codigosResolvidos[codC]=url;salvarCodRes();save();toast('🔗 Link salvo pro código — a próxima coleta busca nessa página ✓');render();}
 /* Gráfico de evolução do preço (historico do precos.json) — menor/médio/maior no tempo */
 function graficoLiga(cod){const pl=precoLigaDe(cod),hist=ligaHistDe(cod);if(!hist){toast('Sem histórico ainda pra esse código');return;}
   const vers=Object.keys(hist).filter(v=>Array.isArray(hist[v])&&hist[v].length);if(!vers.length){toast('Sem histórico ainda pra esse código');return;}
