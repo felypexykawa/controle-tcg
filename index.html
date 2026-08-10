@@ -1652,6 +1652,19 @@ function tabelaComp(o,M){const e=Object.entries(o).sort((a,b)=>b[1]-a[1]);if(!e.
     <thead><tr><th style="${td};text-align:left;color:var(--mut);font-size:10px;text-transform:uppercase">Item</th><th style="${th}">Lanç.</th><th style="${th}">Valor</th><th style="${th}">%</th></tr></thead>
     <tbody>${e.map(([k,v])=>`<tr style="cursor:pointer" onclick="consQ='${k.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}';consF='tudo';go('consultar')"><td style="${td}">${k} <span style="color:var(--blue);font-size:10px">→</span></td><td style="${td};text-align:right">${(M[k]||[]).length}</td><td style="${td};text-align:right;white-space:nowrap">${fmt(v)}</td><td style="${td};text-align:right">${tot>0?Math.round(v/tot*100):0}%</td></tr>`).join('')}</tbody>
     <tfoot><tr><td style="${td};font-weight:700">Total</td><td style="${td};text-align:right;font-weight:700">${e.reduce((s,x)=>s+((M[x[0]]||[]).length),0)}</td><td style="${td};text-align:right;font-weight:700;white-space:nowrap">${fmt(tot)}</td><td style="${td};text-align:right;font-weight:700">100%</td></tr></tfoot></table>`);}
+/* Lucro real casado por VÍNCULO (origemId/custoOrigem), não por data da compra — pedido do
+   Felype duas vezes ("a base já existe nos vínculos, falta a visão"). Receita conta TODA
+   venda do período (reconcilia com o card "Vendi"); custo só entra onde o vínculo existe —
+   linha com venda sem custo ganha aviso ⚠, nunca finge margem de 100%. */
+function tabelaLucro(o){const e=Object.entries(o).sort((a,b)=>b[1].lucro-a[1].lucro);
+  if(!e.length)return '<div class="meta">sem vendas no período</div>';
+  const totR=e.reduce((s,x)=>s+x[1].receita,0),totC=e.reduce((s,x)=>s+x[1].custo,0),totL=e.reduce((s,x)=>s+x[1].lucro,0);
+  const td='padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px';
+  const th=td+';text-align:right;color:var(--mut);font-size:10px;text-transform:uppercase';
+  return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+    <thead><tr><th style="${td};text-align:left;color:var(--mut);font-size:10px;text-transform:uppercase">Item</th><th style="${th}">Vend.</th><th style="${th}">Receita</th><th style="${th}">Custo</th><th style="${th}">Lucro</th><th style="${th}">Margem</th></tr></thead>
+    <tbody>${e.map(([k,v])=>`<tr style="cursor:pointer" onclick="consQ='${k.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}';consF='VENDA';go('consultar')"><td style="${td}">${k} <span style="color:var(--blue);font-size:10px">→</span></td><td style="${td};text-align:right">${v.n}${v.semVinc?` <span title="${v.semVinc} venda(s) sem vínculo aqui — pendente" style="color:var(--amber)">⚠${v.semVinc}</span>`:''}${v.hist?` <span title="${v.hist} venda(s) histórica(s) aqui — sem custo por definição" style="color:var(--mut)">📜${v.hist}</span>`:''}</td><td style="${td};text-align:right;white-space:nowrap">${fmt(v.receita)}</td><td style="${td};text-align:right;white-space:nowrap">${fmt(v.custo)}</td><td style="${td};text-align:right;white-space:nowrap;font-weight:700;color:${v.lucro>=0?'var(--green)':'var(--red)'}">${fmt(v.lucro)}</td><td style="${td};text-align:right">${v.custo>0?(v.lucro>=0?'+':'')+Math.round(v.lucro/v.custo*1000)/10+'%':'—'}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td style="${td};font-weight:700">Total</td><td style="${td};text-align:right;font-weight:700">${e.reduce((s,x)=>s+x[1].n,0)}</td><td style="${td};text-align:right;font-weight:700;white-space:nowrap">${fmt(totR)}</td><td style="${td};text-align:right;font-weight:700;white-space:nowrap">${fmt(totC)}</td><td style="${td};text-align:right;font-weight:700;white-space:nowrap;color:${totL>=0?'var(--green)':'var(--red)'}">${fmt(totL)}</td><td style="${td};text-align:right;font-weight:700">${totC>0?(totL>=0?'+':'')+Math.round(totL/totC*1000)/10+'%':'—'}</td></tr></tfoot></table></div>`;}
 function vRelatorios(){
   if(!movs.some(m=>m.tipo==='COMPRA'||m.tipo==='VENDA'||m.tipo==='DESPESA'))return `<div class="card"><div class="empty">Sem dados pra relatório ainda.<br>Lance ou carregue seu histórico no Painel.</div></div>`;
   const comp=movs.filter(m=>m.tipo==='COMPRA'&&mRel(m)),vend=movs.filter(m=>m.tipo==='VENDA'&&mRel(m));
@@ -1665,6 +1678,15 @@ function vRelatorios(){
   </div>`;
   const dimK=(m,d)=>d==='pessoa'?(m.contraparte||'—'):d==='jogo'?(m.jogo||'Pokémon'):d==='cat'?(m.cat||'(sem tipo)'):(m.colecao||'(sem coleção)');
   const agg=(lista,d,liq)=>{const o={},M={};lista.forEach(m=>{const k=dimK(m,d);o[k]=(o[k]||0)+(liq?(+m.valor||0)*(1-(+m.taxa||0)/100):(+m.valor||0));(M[k]=M[k]||[]).push(m);});return[o,M];};
+  const aggLucro=(lista,d)=>{const o={};let custoFaltaN=0,custoFaltaR=0,histN=0;
+    lista.forEach(m=>{const liq=(+m.valor||0)*(1-(+m.taxa||0)/100),k=dimK(m,d);
+      if(!o[k])o[k]={receita:0,custo:0,lucro:0,n:0,semVinc:0,hist:0};
+      o[k].receita+=liq;o[k].n++;
+      if(m.origemId&&m.custoOrigem!=null)o[k].custo+=+m.custoOrigem||0;
+      else if(m.semOrigem==='historico'){histN++;o[k].hist++;}
+      else{custoFaltaN++;custoFaltaR+=liq;o[k].semVinc++;}});
+    Object.values(o).forEach(v=>{v.receita=Math.round(v.receita*100)/100;v.custo=Math.round(v.custo*100)/100;v.lucro=Math.round((v.receita-v.custo)*100)/100;});
+    return {o,custoFaltaN,custoFaltaR,histN};};
   const corpoComp=(o,M,cor,liq)=>relCompView==='tab'?tabelaComp(o,M):(relDet?barDet(o,M,cor,liq):bar(o,cor));
   const cardComp=(icone,titulo,sub,lista,cor,liq)=>{const r2=agg(lista,relDimAll,liq),o=r2[0],M=r2[1];
     return `<div class="card"><div class="sec" style="margin-top:0">${icone} ${titulo} <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— ${sub}</span></div>${corpoComp(o,M,cor,liq)}</div>`;};
@@ -1682,12 +1704,24 @@ function vRelatorios(){
     if(!e.length)return `<div class="meta">sem dados no período</div>`;
     return e.map(([k,v])=>`<div style="margin-bottom:9px;cursor:pointer" onclick="consQ='${k.replace(/'/g,"\\'")}';consF='tudo';go('consultar')"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${k} →</span><b>${fmt(v)} <span style="color:var(--mut);font-weight:400">${tot>0?Math.round(v/tot*100):0}%</span></b></div><div class="bar"><div style="width:${Math.round(v/mx*100)}%;background:${cor}"></div></div></div>`).join('')+`<div style="display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:7px;padding-top:7px;font-weight:700"><span>Total${Object.keys(obj).length>6?' ('+Object.keys(obj).length+')':''}</span><span>${fmt(tot)}</span></div>`;};
   const granSel=`<div class="seg" style="margin-bottom:10px">${[['dia','Dia'],['semana','Semana'],['mes','Mês'],['ano','Ano']].map(([k,l])=>`<button class="${relGran===k?'on':''}" onclick="relGran='${k}';render()">${l}</button>`).join('')}</div>`;
+  const lucroAgg=aggLucro(vendPer,relDimAll);
+  const totCustoR=Object.values(lucroAgg.o).reduce((s,v)=>s+v.custo,0);
+  const totLucroR=Object.values(lucroAgg.o).reduce((s,v)=>s+v.lucro,0);
+  const totReceitaR=Object.values(lucroAgg.o).reduce((s,v)=>s+v.receita,0);
+  const margemGeral=totCustoR>0?Math.round(totLucroR/totCustoR*1000)/10:null;
+  const cardLucroReal=`<div class="card"><div class="sec" style="margin-top:0">💰 Lucro real <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— custo × venda casados pelo vínculo, não pela data da compra</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-weight:700">Lucro no período</span><span style="font-size:22px;font-weight:700;color:${totLucroR>=0?'var(--green)':'var(--red)'}">${fmt(totLucroR)}</span></div>
+    <div class="ctx" style="margin-bottom:8px">Receita ${fmt(totReceitaR)} − custo vinculado ${fmt(totCustoR)}${margemGeral!=null?' · margem <b>'+(margemGeral>=0?'+':'')+margemGeral+'%</b> sobre o custo':''}.</div>
+    ${lucroAgg.custoFaltaN>0?`<div class="ctx" style="color:var(--amber);margin-bottom:6px">⚠ ${lucroAgg.custoFaltaN} venda${lucroAgg.custoFaltaN>1?'s':''} sem vínculo (${fmt(lucroAgg.custoFaltaR)} em receita já contada acima, sem custo) — o lucro real é MENOR que o mostrado. <span class="lnk" style="font-size:11px" onclick="consF='VENDA';go('consultar')">ver quais →</span></div>`:''}
+    ${lucroAgg.histN>0?`<div class="ctx" style="color:var(--mut);margin-bottom:6px">📜 ${lucroAgg.histN} venda${lucroAgg.histN>1?'s':''} histórica${lucroAgg.histN>1?'s':''} (de antes do app) também sem custo rastreado.</div>`:''}
+    ${tabelaLucro(lucroAgg.o)}</div>`;
   return `${barra}
     ${relFOpen?filtros:''}
     ${relExtrato?`<div class="card"><div class="sec" style="margin-top:0">🧾 Extrato de caixa <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— tipo extrato bancário</span></div>${extratoHtml()}</div>`:''}
     <div class="card"><div class="sec" style="margin-top:0">📈 Linha do tempo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— toque nos fluxos pra escolher · toque no período pra abrir</span></div>${granSel}${timelineHtml()}</div>
     <div class="card" style="padding:12px 14px"><label style="margin-top:0">Ver os quadros abaixo por</label><select onchange="relDimAll=this.value;render()">${[['colecao','coleção'],['pessoa','fornecedor / cliente'],['jogo','jogo'],['cat','tipo de produto']].map(([v,l])=>`<option value="${v}" ${relDimAll===v?'selected':''}>${l}</option>`).join('')}</select>
     <div class="seg" style="margin-top:8px">${[['lista','☰ lista'],['graf','📊 gráfico'],['tab','▦ tabela']].map(([k,l])=>`<button class="${relCompView===k?'on':''}" onclick="relCompView='${k}';render()">${l}</button>`).join('')}</div></div>
+    ${cardLucroReal}
     ${relCompView==='graf'
       ?`<div class="card"><div class="sec" style="margin-top:0">📊 Comparativo por ${({colecao:'coleção',pessoa:'fornecedor / cliente',jogo:'jogo',cat:'tipo de produto'})[relDimAll]||relDimAll} <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— as 4 medidas lado a lado</span></div>${graficoCompSvg([{nome:'Estoque parado (hoje)',cor:'var(--blue)',o:agg(comp.filter(m=>sitDe(m)==='Em estoque'),relDimAll,false)[0]},{nome:'Na coleção (hoje)',cor:'var(--amber)',o:agg(comp.filter(m=>sitDe(m)==='Coleção'),relDimAll,false)[0]},{nome:'Comprei (período)',cor:'var(--red)',o:agg(compPer,relDimAll,false)[0]},{nome:'Vendi (período)',cor:'var(--green)',o:agg(vendPer,relDimAll,true)[0]}])}</div>`
       :cardComp('💰','Estoque parado','saldo hoje',comp.filter(m=>sitDe(m)==='Em estoque'),'var(--blue)',false)
@@ -2346,7 +2380,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 10h04';
+const BUILD_TAG='10/08 10h18';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
