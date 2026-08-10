@@ -429,7 +429,13 @@ function provaReal(){
     const alvoTemFilhos=movs.some(x=>x.tipo==='COMPRA'&&x.loteOrigem===alvo.id);
     /* vínculo apontando pro PAI fracionado: o custo da venda vive num pedaço-irmão — comparar
        com o valor RESTANTE do pai é falso alarme; a família é conferida pela conservação */
-    if(sitDe(alvo)==='Vendido'&&!alvoTemFilhos&&(+v.custoOrigem||0)>(+alvo.valor||0)+0.02)add('vermelho','Custo do vínculo maior que o custo do material: venda de '+fmt(+v.valor||0),'Custo registrado '+fmt(+v.custoOrigem||0)+' > pedaço '+fmt(+alvo.valor||0)+' — o lucro dessa venda está subestimado.','abrir a venda',`verMov('${v.id}')`);
+    /* compara por UNIDADE, não pelo total — editar a quantidade da venda vinculada (fix
+       2026-08-10) reescala custoOrigem mas nunca mexe no pedaço físico (alvo), então os
+       totais divergem por design quando a qtd mudou; a taxa por unidade é o que realmente
+       prova se o custo está certo (se qtd bateu = totais batiam antes, comparação idêntica). */
+    const vQ=Math.max(+v.qtd||1,0.0001),alvoQ=Math.max(+alvo.qtd||1,0.0001);
+    const custoUnitV=(+v.custoOrigem||0)/vQ,custoUnitAlvo=(+alvo.valor||0)/alvoQ;
+    if(sitDe(alvo)==='Vendido'&&!alvoTemFilhos&&custoUnitV>custoUnitAlvo+0.02)add('vermelho','Custo do vínculo maior que o custo do material: venda de '+fmt(+v.valor||0),'Custo por unidade '+fmt(custoUnitV)+' > custo por unidade do pedaço '+fmt(custoUnitAlvo)+' — o lucro dessa venda está subestimado.','abrir a venda',`verMov('${v.id}')`);
     if((v.custoOrigem==null||+v.custoOrigem===0)&&(+alvo.valor||0)>0.02&&!alvoTemFilhos)add('amarelo','Venda vinculada sem custo registrado: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O vínculo existe mas o custo está vazio — o lucro aparece maior do que é. (Brinde de custo zero de verdade não gera este aviso.)','abrir a venda',`verMov('${v.id}')`);});
   /* 5. Material vendido órfão (saiu do estoque, nenhuma venda aponta) */
   movs.filter(x=>fragOrfao(x)).forEach(f=>{
@@ -1820,6 +1826,17 @@ function salvar(){
       const delta=Math.round(((+obj.valor||0)-(+e.valor||0))*100)/100;
       const rzE=movs[i].loteOrigem?(raizDe(movs[i])||movs[i]):movs[i];
       if(rzE&&rzE.valorOrig!=null)rzE.valorOrig=Math.round((rzE.valorOrig+delta)*100)/100;}
+    /* venda VINCULADA: custoOrigem é o custo TOTAL congelado no momento do vínculo (unit ×
+       qtd de então) — editar a quantidade sem reajustar isso deixa o lucro mentindo em
+       silêncio (achado do Felype 2026-08-10). "Valor" (o que o cliente pagou) não precisa
+       de ajuste aqui — o lucro já lê m.valor direto, então uma correção nele já se reflete
+       sozinha. Mesma filosofia do bloco de COMPRA acima: corrigir registro é diferente de
+       reabrir a operação física do lote — não mexe em baixarLote/loteOrigem. */
+    if(e&&e.tipo===obj.tipo&&obj.tipo==='VENDA'&&e.origemId&&e.custoOrigem!=null){
+      const qAntiga=+e.qtd||1,qNova=+obj.qtd||1;
+      if(Math.abs(qNova-qAntiga)>0.0001){
+        const custoUnit=(+e.custoOrigem||0)/qAntiga;
+        movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}
     save();editId=null;toast('Alteração salva');go('consultar');return;}
   movs.push(obj);aplicarFotosPend(obj.id);save();toast('Salvo ✓ — lance o próximo');render();
 }
@@ -2391,7 +2408,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 10h41';
+const BUILD_TAG='10/08 10h55';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
