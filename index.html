@@ -806,21 +806,34 @@ function vPainel(){
     const caixa=Math.round((r.vendasLiq-r.investido-r.despTotal)*100)/100;
     const bruto=Math.round((caixa+r.estoque+r.colCusto+r.pedido)*100)/100;
     const lin=(rot,v,click,sinal)=>`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;${click?'cursor:pointer':''}" ${click?`onclick="${click}"`:''}><span style="color:var(--mut)">${rot}${click?' →':''}</span><b style="color:${sinal==='+'?'var(--green)':sinal==='-'?'var(--red)':'var(--ink)'}">${sinal}${fmt(v)}</b></div>`;
+    /* Cada número mostra a PRÓPRIA conta embaixo dele — nunca uma lista solta que serve
+       os dois ao mesmo tempo (Felype apontou 2026-08-10: isso obrigava reconstruir de
+       cabeça qual linha alimentava qual resultado). comprei/despesas/vendi aparecem
+       DUAS vezes de propósito — uma vez fechando o bruto (+estoque/+coleção juntos, é
+       a conta completa dele), outra vez fechando o líquido sozinho (só essas 3, é a
+       conta completa dele) — repetição intencional, não bug. Espelha a montagem que
+       o Felype mandou pronta. */
     return `<div class="card"><div class="head">Resultado</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:700">📊 Resultado bruto</span><span style="font-size:24px;font-weight:700;color:${bruto>=0?'var(--green)':'var(--red)'}">${fmt(bruto)}</span></div>
+    <div class="ctx" style="margin-top:2px">Tudo que é seu hoje: o dinheiro que já entrou/saiu mais o que ainda está com você a custo (estoque, coleção, a caminho) — vira dinheiro conforme vende.${per?' <b>Atenção:</b> estoque/coleção/a caminho são o total de HOJE (não do período filtrado).':''}${margem?' Margem do que já saiu: <b>'+margem+'</b>.':''}</div>
+    <div style="margin-top:6px">
     ${lin('comprei (mercadoria)',r.investido,`consF='COMPRA';go('consultar')`,'-')}
     ${r.despTotal!==0?lin('despesas',r.despTotal,`consF='DESPESA';go('consultar')`,'-'):''}
     ${lin('vendi (líquido)',r.vendasLiq,`consF='VENDA';go('consultar')`,'+')}
-    <div style="border-top:2px solid var(--line);margin:6px 0 2px"></div>
-    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:700">📊 Resultado bruto</span><span style="font-size:24px;font-weight:700;color:${bruto>=0?'var(--green)':'var(--red)'}">${fmt(bruto)}</span></div>
-    <div class="ctx" style="margin-top:2px">Tudo que é seu hoje: o dinheiro que já entrou/saiu mais o que ainda está com você a custo (estoque, coleção, a caminho) — vira dinheiro conforme vende.${per?' <b>Atenção:</b> estoque/coleção/a caminho são o total de HOJE (não do período filtrado).':''}${margem?' Margem do que já saiu: <b>'+margem+'</b>.':''}</div>
+    ${lin('+ no estoque (a custo)',r.estoque,`consF='ESTOQUE';go('consultar')`,'+')}
+    ${lin('+ na coleção (a custo)',r.colCusto,`consF='COLECAO';go('consultar')`,'+')}
+    ${r.pedido>0?lin('+ a caminho (a custo)',r.pedido,`consF='PEDIDO';go('consultar')`,'+'):''}
+    </div>
+    <div style="border-top:2px solid var(--line);margin:8px 0 2px"></div>
     <div style="margin:10px 0 2px;padding:9px 10px;background:var(--card2);border-radius:10px">
       <div style="font-size:11px;color:var(--mut);margin-bottom:4px">desse bruto, o que já é dinheiro de verdade:</div>
       <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:700">💰 Resultado líquido <span style="font-weight:400;color:var(--mut);font-size:11px">(caixa)</span></span><span style="font-size:22px;font-weight:700;color:${caixa>=0?'var(--green)':'var(--red)'}">${fmt(caixa)}</span></div>
       <div class="ctx" style="margin-top:2px">Só o que entrou de venda menos o que saiu em compra e despesa. Parcelas futuras e repasses do app já contam aqui; o que ainda vai cair/vencer está em Contas, mais acima.</div>
-      <div style="font-size:11px;color:var(--mut);margin:8px 0 4px">e o que ainda está parado — só vira dinheiro quando vender:</div>
-      ${lin('+ no estoque (a custo)',r.estoque,`consF='ESTOQUE';go('consultar')`,'+')}
-      ${lin('+ na coleção (a custo)',r.colCusto,`consF='COLECAO';go('consultar')`,'+')}
-      ${r.pedido>0?lin('+ a caminho (a custo)',r.pedido,`consF='PEDIDO';go('consultar')`,'+'):''}
+      <div style="margin-top:6px">
+      ${lin('comprei (mercadoria)',r.investido,`consF='COMPRA';go('consultar')`,'-')}
+      ${r.despTotal!==0?lin('despesas',r.despTotal,`consF='DESPESA';go('consultar')`,'-'):''}
+      ${lin('vendi (líquido)',r.vendasLiq,`consF='VENDA';go('consultar')`,'+')}
+      </div>
     </div></div>`;})();
   return `<div class="mini click" style="position:sticky;top:var(--hh,0px);z-index:4;margin-bottom:10px;padding:9px 12px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35);${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render();${relFOpen?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtro ${relFOpen?'▾':'▸'}</div><div class="s">${filtroResumoTxt()}</div></div>
     ${relFOpen?filtrosRelCard():''}
@@ -2456,7 +2469,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 16h49';
+const BUILD_TAG='10/08 17h19';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
