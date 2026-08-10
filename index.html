@@ -102,15 +102,17 @@ const firebaseConfig = {
   messagingSenderId: "1055834697410",
   appId: "1:1055834697410:web:8360e6fae238a2de37155b"
 };
-const EMAILS_OK = ['felypexykawa@gmail.com','pokecentertcgoficial@gmail.com']; /* Felype + operação (Laura). Adicionar mais e-mails aqui quando quiser. */
-/* Perfis de acesso (Felype pediu, 2026-08-10): e-mail não listado aqui = acesso total
-   ('admin', padrão seguro — nunca trava alguém novo por esquecimento). Só quem está
-   listado com 'lancamento' fica restrito a lançar. GATING DE INTERFACE, não é segurança
+const EMAILS_OK = ['felypexykawa@gmail.com','pokecentertcgoficial@gmail.com','projetofelype@gmail.com']; /* Felype + Laura (acesso total) + e-mail de teste do Felype (restrito, de propósito). Adicionar mais e-mails aqui quando quiser. */
+/* Perfis de acesso (Felype pediu, 2026-08-10; default invertido 2026-08-10 a pedido dele —
+   "restrito é pra e-mail NOVO"): e-mail SEM entrada aqui cai em 'lancamento' (restrito) por
+   padrão — o oposto de antes. Só quem está listado abaixo com 'admin' tem acesso total.
+   Isso é mais seguro por padrão: um e-mail novo adicionado no futuro nunca herda acesso
+   total sem alguém decidir isso explicitamente aqui. GATING DE INTERFACE, não é segurança
    de verdade — quem souber abrir o console do navegador contorna (não tem regra de
    Firestore por papel, só por e-mail estar em EMAILS_OK); serve pra não confundir/expor
-   sem querer, não pra blindar contra alguém mal-intencionado. */
-const PAPEL_POR_EMAIL = {'pokecentertcgoficial@gmail.com':'lancamento'};
-function papelAtual(){return PAPEL_POR_EMAIL[(_userEmail||'').toLowerCase()]||'admin';}
+   sem querer, não pra blindar contra alguém mal-intencionado — ver backlog sobre isso. */
+const PAPEL_POR_EMAIL = {'felypexykawa@gmail.com':'admin','pokecentertcgoficial@gmail.com':'admin'};
+function papelAtual(){if(!_userEmail)return 'admin';return PAPEL_POR_EMAIL[_userEmail.toLowerCase()]||'lancamento';}
 const USAR_NUVEM = !!(firebaseConfig && firebaseConfig.apiKey);
 let _db=null,_auth=null,_syncReady=false,_userEmail='';
 const MK='tcg_movs_v2';
@@ -137,7 +139,10 @@ let consOrd='emissao',consGrupoFech={},_gKeys=[],ctAgrupo='mes',ctPess='',ctExp=
 let _preSel=null,vendaJogoF='',vvOrig='avulso',selMode=false,selIds={},ctJogo='',relChart=false;
 let relDimAll='colecao',extConta='',extOrdem='desc',cadTab='',ctFOpen=false,consFOpen=false,consCol='',consPess='',consConta='',consCat='',ctCat='',relCompView='lista',relTLView='lista';
 function perRotTxt(){return perSel==='custom'?((perDe?perDe.split('-').reverse().join('/'):'…')+' → '+(perAte?perAte.split('-').reverse().join('/'):'hoje')):((PERS.find(p=>p[0]===perSel)||['','Tudo'])[1]);}
-function fBtnMini(aberto,resumo,click){return `<div class="mini click" style="margin-bottom:8px;padding:9px 12px;${aberto?'outline:1.5px solid var(--blue)':''}" onclick="${click}"><div class="k">🔎 Filtros ${aberto?'▾':'▸'}</div><div class="s">${resumo||'tudo'}</div></div>`;}
+/* Sticky + rola pro topo ao abrir: sem isso, quem tá rolado lá embaixo aperta o filtro
+   e o painel dele abre lá em cima (onde o card mora no fluxo normal do documento), longe
+   da vista — precisa voltar a mão pra achar. Felype pediu 2026-08-10. */
+function fBtnMini(aberto,resumo,click){return `<div class="mini click" style="position:sticky;top:var(--hh,0px);z-index:4;margin-bottom:8px;padding:9px 12px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35);${aberto?'outline:1.5px solid var(--blue)':''}" onclick="${click}${aberto?'':";window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtros ${aberto?'▾':'▸'}</div><div class="s">${resumo||'tudo'}</div></div>`;}
 function togSel(id){if(selIds[id])delete selIds[id];else selIds[id]=1;render();}
 let fxSelMode=false,fxSel={},ctConta='';
 function togFxSel(id){if(fxSel[id])delete fxSel[id];else fxSel[id]=1;render();}
@@ -667,10 +672,21 @@ function motor(filtrar){
   for(const m of todasC){const v=+m.valor||0;const s=sitDe(m);if(s==='Em estoque')estoque+=v;else if(s==='Coleção')colCusto+=v;else if(s==='Pedido')pedido+=v;}
   const vendasLiq=vendas.reduce((s,x)=>s+x.receita,0);
   const disp=todasC.filter(m=>sitDe(m)==='Em estoque');
+  const colItens=todasC.filter(m=>sitDe(m)==='Coleção');
   let despOrd=0,despMat=0;const hojeISO2=new Date().toISOString().slice(0,10);for(const m of movs){if(m.tipo!=='DESPESA'||!noPer(m.data))continue;if(filtrar&&!mRelX(m))continue;if(m.status==='apagar'&&!perAte&&m.data>hojeISO2)continue;const v=+m.valor||0;if(m.natureza==='material')despMat+=v;else despOrd+=v;}
   const despTotal=despOrd+despMat;
-  return {compras,vendas,investido,cmv,estoque,colCusto,pedido,vendasLiq,lucro:vendasLiq-cmv,disp,despOrd,despMat,despTotal,liquido:vendasLiq-cmv-despTotal};
+  return {compras,vendas,investido,cmv,estoque,colCusto,pedido,vendasLiq,lucro:vendasLiq-cmv,disp,colItens,despOrd,despMat,despTotal,liquido:vendasLiq-cmv-despTotal};
 }
+/* Quanto vale (Liga) o que está parado — Felype notou que só mostrávamos custo, nunca o
+   valor de mercado. Só conta item com preço já coletado; nunca inventa preço pro resto —
+   por isso devolve quantos entraram (comN) e quantos ficaram de fora (semN), honesto sobre
+   cobertura parcial. */
+function valorMercadoDe(lista){let val=0,comN=0,semN=0;
+  lista.forEach(m=>{const pl=precoLigaDe(m.codigo);if(!pl||pl.status==='AMBIGUO'){semN++;return;}
+    const vs=ligaVersoes(pl);if(!vs.length){semN++;return;}
+    const preco=vs[0].md!=null?vs[0].md:vs[0].mn;if(preco==null){semN++;return;}
+    val+=preco*(+m.qtd||1);comN++;});
+  return {val:Math.round(val*100)/100,comN,semN};}
 function aPagar(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   const parc=movs.filter(m=>m.tipo==='COMPRA'&&m.pgTipo==='Parcelado'&&+m.nParc>0);
   const notas={},solo=[];
@@ -806,14 +822,14 @@ function vPainel(){
       ${lin('+ na coleção (a custo)',r.colCusto,`consF='COLECAO';go('consultar')`,'+')}
       ${r.pedido>0?lin('+ a caminho (a custo)',r.pedido,`consF='PEDIDO';go('consultar')`,'+'):''}
     </div></div>`;})();
-  return `<div class="mini click" style="position:sticky;top:var(--hh,0px);z-index:4;margin-bottom:10px;padding:9px 12px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35);${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render()"><div class="k">🔎 Filtro ${relFOpen?'▾':'▸'}</div><div class="s">${filtroResumoTxt()}</div></div>
+  return `<div class="mini click" style="position:sticky;top:var(--hh,0px);z-index:4;margin-bottom:10px;padding:9px 12px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35);${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render();${relFOpen?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtro ${relFOpen?'▾':'▸'}</div><div class="s">${filtroResumoTxt()}</div></div>
     ${relFOpen?filtrosRelCard():''}
     <div class="sec">Onde está o dinheiro</div>
     <div class="grid2">
       <div class="mini click" onclick="consF='COMPRA';go('consultar')"><div class="k">Investido total ${per?'(período)':''}</div><div class="v">${fmt(r.investido+r.despTotal)}</div>${r.despTotal>0?`<div style="font-size:11px;color:var(--mut);margin-top:4px;line-height:1.7">📦 ${fmt(r.investido)} <span style="opacity:.7">mercadoria</span><br>🧾 ${fmt(r.despTotal)} <span style="opacity:.7">infraestrutura</span></div>`:`<div class="s">o que comprou →</div>`}</div>
       <div class="mini click" onclick="consF='VENDA';go('consultar')"><div class="k">Vendido ${per?'(período)':'(tudo)'}</div><div class="v" style="color:var(--green)">${fmt(r.vendasLiq)}</div><div class="s">líquido →</div></div>
       <div class="mini click" onclick="consF='ESTOQUE';go('consultar')"><div class="k">Estoque pra vender</div><div class="v" style="color:var(--blue)">${fmt(r.estoque)}</div><div class="s">a custo · hoje →</div></div>
-      <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div></div>
+      <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div>${(function(){const cv=valorMercadoDe(r.colItens);return cv.comN>0?`<div style="font-size:11px;color:var(--green);margin-top:3px">vale ~${fmt(cv.val)}${cv.semN>0?' · '+cv.comN+'/'+(cv.comN+cv.semN)+' com preço':''}</div>`:'';})()}</div>
       ${r.pedido>0?`<div class="mini click" onclick="consF='PEDIDO';go('consultar')"><div class="k">🚚 A caminho</div><div class="v" style="color:var(--amber)">${fmt(r.pedido)}</div><div class="s">pedido feito, ainda não chegou →</div></div>`:''}
       ${contasBanc.length?`<div class="mini click" onclick="go('contas')"><div class="k">💼 Saldo em contas</div><div class="v" style="color:${contasBanc.reduce((s,cb)=>s+saldoConta(cb),0)>=0?'var(--green)':'var(--red)'}">${fmt(contasBanc.reduce((s,cb)=>s+saldoConta(cb),0))}</div><div class="s">${contasBanc.length} conta${contasBanc.length===1?'':'s'} · detalhe no Fluxo →</div></div>`:''}</div>
     <div class="sec">Contas <span style="text-transform:none;font-weight:400">(o que falta pagar e receber)</span></div>
@@ -1702,10 +1718,10 @@ function vRelatorios(){
   const compPer=comp.filter(m=>noPer(m.data)),vendPer=vend.filter(m=>noPer(m.data));
   const filtros=filtrosRelCard();
   const fResumo=filtroResumoTxt();
-  const barra=`<div style="display:flex;gap:7px;margin-bottom:10px">
-    <div class="mini click" style="flex:1.2;padding:9px 10px;${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render()"><div class="k">🔎 Filtros ${relFOpen?'▾':'▸'}</div><div class="s">${fResumo}</div></div>
-    <div class="mini click" style="flex:1;padding:9px 10px;${relExtrato?'outline:1.5px solid var(--blue)':''}" onclick="relExtrato=!relExtrato;render()"><div class="k">🧾 Extrato ${relExtrato?'▾':'▸'}</div><div class="s">caixa, tipo banco</div></div>
-    <div class="mini click" style="flex:1;padding:9px 10px;${relDet?'outline:1.5px solid var(--blue)':''}" onclick="relDet=!relDet;render()"><div class="k">📊 ${relDet?'Detalhado':'Resumido'}</div><div class="s">${relDet?'lançamento a lançamento':'só os totais'}</div></div>
+  const barra=`<div style="position:sticky;top:var(--hh,0px);z-index:4;display:flex;gap:7px;margin-bottom:10px;background:var(--bg);padding-top:2px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35)">
+    <div class="mini click" style="flex:1.2;padding:9px 10px;${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render();${relFOpen?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtros ${relFOpen?'▾':'▸'}</div><div class="s">${fResumo}</div></div>
+    <div class="mini click" style="flex:1;padding:9px 10px;${relExtrato?'outline:1.5px solid var(--blue)':''}" onclick="relExtrato=!relExtrato;render();${relExtrato?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🧾 Extrato ${relExtrato?'▾':'▸'}</div><div class="s">caixa, tipo banco</div></div>
+    <div class="mini click" style="flex:1;padding:9px 10px;${relDet?'outline:1.5px solid var(--blue)':''}" onclick="relDet=!relDet;render();${relDet?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">📊 ${relDet?'Detalhado':'Resumido'}</div><div class="s">${relDet?'lançamento a lançamento':'só os totais'}</div></div>
   </div>`;
   const dimK=(m,d)=>d==='pessoa'?(m.contraparte||'—'):d==='jogo'?(m.jogo||'Pokémon'):d==='cat'?(m.cat||'(sem tipo)'):(m.colecao||'(sem coleção)');
   const agg=(lista,d,liq)=>{const o={},M={};lista.forEach(m=>{const k=dimK(m,d);o[k]=(o[k]||0)+(liq?(+m.valor||0)*(1-(+m.taxa||0)/100):(+m.valor||0));(M[k]=M[k]||[]).push(m);});return[o,M];};
@@ -2424,7 +2440,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 11h22';
+const BUILD_TAG='10/08 12h09';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
