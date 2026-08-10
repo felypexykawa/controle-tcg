@@ -103,6 +103,14 @@ const firebaseConfig = {
   appId: "1:1055834697410:web:8360e6fae238a2de37155b"
 };
 const EMAILS_OK = ['felypexykawa@gmail.com','pokecentertcgoficial@gmail.com']; /* Felype + operação (Laura). Adicionar mais e-mails aqui quando quiser. */
+/* Perfis de acesso (Felype pediu, 2026-08-10): e-mail não listado aqui = acesso total
+   ('admin', padrão seguro — nunca trava alguém novo por esquecimento). Só quem está
+   listado com 'lancamento' fica restrito a lançar. GATING DE INTERFACE, não é segurança
+   de verdade — quem souber abrir o console do navegador contorna (não tem regra de
+   Firestore por papel, só por e-mail estar em EMAILS_OK); serve pra não confundir/expor
+   sem querer, não pra blindar contra alguém mal-intencionado. */
+const PAPEL_POR_EMAIL = {'pokecentertcgoficial@gmail.com':'lancamento'};
+function papelAtual(){return PAPEL_POR_EMAIL[(_userEmail||'').toLowerCase()]||'admin';}
 const USAR_NUVEM = !!(firebaseConfig && firebaseConfig.apiKey);
 let _db=null,_auth=null,_syncReady=false,_userEmail='';
 const MK='tcg_movs_v2';
@@ -755,7 +763,8 @@ function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t===
 function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
 function verFiltro(f){consF=f;consMenu=false;consQ='';expandId=null;render();}
 function voltar(){const s=navHist.pop();if(!s)return;tela=s.tela;consF=s.consF;consQ=s.consQ;consMenu=s.consMenu;perDe=s.perDe;perAte=s.perAte;perSel=s.perSel;editId=s.editId;tipoSel=s.tipoSel;render();}
-function render(){const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
+function render(){if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
+  const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
 function vPainel(){
   if(movs.length===0)return `<div class="card"><div class="empty">Sem lançamentos ainda.<br>Comece lançando — ou <b>traga seus dados de um backup</b>:</div><div class="btn" style="margin-top:8px" onclick="importarBackup()">⬆ Importar backup (.json)</div>${USAR_NUVEM?'':`<div class="btn g" style="margin-top:6px" onclick="carregarAcervo()">📥 Carregar histórico da planilha</div>`}</div>`;
@@ -926,7 +935,8 @@ function vLancar(){
     ${ehNota||ehVV||t==='ABRIR'?'':`<label>Data de emissão</label><input id="f_data" type="date" value="${e?.data||hoje}">`}${campos}
     ${(pode||ehNota||ehVV)?`<button class="btn g" id="btnFotosLanc" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">📷 fotos do lançamento<span id="fotosLancTxt">${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')}</span> <span style="color:var(--mut);font-size:10px">nota, boleto, a carta…</span></button>`:''}
     ${ehNota?`<button class="btn" onclick="salvarNota()">Salvar nota · ${notaItens.length} ${notaItens.length===1?'item':'itens'}</button>`:ehVV?`<button class="btn" onclick="salvarVendaVarios()">Salvar venda · ${vendaItens.length} ${vendaItens.length===1?'item':'itens'}</button>`:t==='TROCA'?`<button class="btn" onclick="salvarTroca()">Registrar troca</button>`:(pode?`<button class="btn" onclick="salvar()">${e?'Salvar alteração':'Salvar e lançar outro'}</button>`:'')}
-    ${e?`<button class="btn g" onclick="editId=null;go('consultar')">Cancelar</button>`:''}</div>`;
+    ${e?`<button class="btn g" onclick="editId=null;go('consultar')">Cancelar</button>`:''}
+    ${USAR_NUVEM&&_userEmail&&papelAtual()==='lancamento'?`<div class="lnk" style="margin-top:10px" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}</div>`;
 }
 function bdef(){const c=document.getElementById('f_cat')?.value,b=document.getElementById('f_boo');if(b&&CATB[c]!=null)b.value=CATB[c];bcalc();}
 function bcalc(){const c=document.getElementById('calc');if(!c||tipoSel!=='COMPRA')return;const v=+document.getElementById('f_val')?.value||0,q=+document.getElementById('f_qtd')?.value||1,b=+document.getElementById('f_boo')?.value||0;
@@ -2400,7 +2410,9 @@ function telaLogin(msg){const v=document.getElementById('view');if(v)v.innerHTML
 function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth=firebase.auth();_db=firebase.firestore();telaLogin('');
   _auth.onAuthStateChanged(u=>{
     if(u&&EMAILS_OK.map(x=>(x||'').toLowerCase()).includes((u.email||'').toLowerCase())){_userEmail=u.email;
-      _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');setSync('ok');go('painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
+      _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');
+          if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach(b=>{if(b.dataset.t!=='lancar')b.style.display='none';});
+          setSync('ok');go(papelAtual()==='lancamento'?'lancar':'painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Altura real do header vira variável CSS — o título fixo da consulta ancora logo abaixo dele
@@ -2408,7 +2420,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 10h55';
+const BUILD_TAG='10/08 11h09';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
