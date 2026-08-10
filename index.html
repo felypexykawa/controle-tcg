@@ -967,7 +967,7 @@ function vcalc(){const c=document.getElementById('calc');if(!c||tipoSel!=='VENDA
   c.innerHTML=`Você recebe <b>${fmt(liq)}</b>${tax>0?` (−${tax}%)`:''}${canal==='App'?', daqui '+(+document.getElementById('f_recdias')?.value||0)+' dias':' na hora'}. Entra como receita — o lucro aparece no painel.`;}
 function tcalc(){const c=document.getElementById('calc');if(!c||tipoSel!=='TROCA')return;const custo=(+document.getElementById('f_custou')?.value||0)+(+document.getElementById('f_din')?.value||0);c.innerHTML=custo>0?`A carta entra no acervo a custo de <b>${fmt(custo)}</b> — o que o material + dinheiro te custaram.`:'Informe quanto o material te custou.';}
 function notaForm(){
-  const itens=notaItens.length?notaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.cat}</b>${it.colecao?' · '+it.colecao:''}${it.condicao?' ['+it.condicao+']':''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span><div class="meta">${it.qtd>1?it.qtd+' × '+fmt(it.vUnit||(it.valor/it.qtd))+' = ':''}${fmt(it.valor)}${it.codigo?' · cód '+it.codigo:''}</div></div><button class="x" onclick="removeItemNota(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
+  const itens=notaItens.length?notaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.cat}</b>${it.colecao?' · '+it.colecao:''}${it.condicao?' ['+it.condicao+']':''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span><div class="meta">${it.qtd>1?it.qtd+' × '+fmt(it.vUnit||(it.valor/it.qtd))+' = ':''}${fmt(it.valor)}${it.codigo?' · cód '+it.codigo:''}</div></div><div style="flex:none;display:flex;gap:10px"><button class="x" style="color:var(--blue)" onclick="editItemNota(${i})">✎ corrigir</button><button class="x" onclick="removeItemNota(${i})">remover</button></div></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
   return `<div class="ctx">Adicione os itens (pode misturar jogos). Informe o frete e a taxa <b>uma vez</b> — o app divide proporcional ao valor de cada um.</div>
     <div class="sec">Itens da nota (${notaItens.length})</div>${itens}
     <div class="card" style="background:var(--card2);margin:8px 0">
@@ -1009,6 +1009,19 @@ function addItemNota(){const g=id=>document.getElementById(id);const cat=g('n_ca
   if(val<=0){alert('Informe o valor de cada item (ou o total).');return;}
   const col=g('n_col')?.value,cod=(g('n_cod')?.value||'').trim(),cond=g('n_cond')?.value;notaItens.push({jogo:g('n_jogo').value,cat,colecao:(col&&col!=='__add__')?col:'',idioma:g('n_idi').value,qtd,valor:val,vUnit:unit,codigo:cod,boosters:+g('n_boo')?.value||0,condicao:(cond&&cond!=='—')?cond:''});render();}
 function removeItemNota(i){notaItens.splice(i,1);render();}
+function editItemNota(i){const it=notaItens.splice(i,1)[0];render();
+  const s=id=>document.getElementById(id);
+  if(s('n_jogo')){s('n_jogo').value=it.jogo||'Pokémon';reColN(it.jogo||'Pokémon');}
+  if(s('n_cat'))s('n_cat').value=it.cat||'';
+  if(s('n_col'))s('n_col').value=it.colecao||'';
+  if(s('n_cod'))s('n_cod').value=it.codigo||'';
+  if(s('n_idi'))s('n_idi').value=it.idioma||'—';
+  if(s('n_qtd'))s('n_qtd').value=it.qtd||1;
+  if(s('n_unit'))s('n_unit').value=it.vUnit||'';
+  if(s('n_val'))s('n_val').value=it.valor||'';
+  if(s('n_boo'))s('n_boo').value=it.boosters||0;
+  if(s('n_cond'))s('n_cond').value=it.condicao||'—';
+  toast('De volta nos campos — corrija e toque em "+ adicionar à nota" de novo');}
 function rateioPreview(){const el=document.getElementById('ratPrev');if(el)el.innerHTML=ratTexto();}
 /* Rateio de um valor extra (frete OU taxa) proporcional ao produto de cada item, com o
    RESÍDUO de arredondamento absorvido no último — Σ rateios = extra EXATO (classe do
@@ -2443,7 +2456,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 14h38';
+const BUILD_TAG='10/08 16h49';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
