@@ -2495,40 +2495,97 @@ function setSync(st,msg){const el=document.getElementById('syncDot');if(!el)retu
   else if(st==='saving'){el.textContent='☁️…';el.title='salvando…';el.style.opacity='.8';el.style.color='';}
   else if(st==='erro'){el.textContent='☁️⚠ não salvou';el.title=msg||'erro ao salvar na nuvem';el.style.opacity='1';el.style.color='var(--red)';}
   else{el.textContent='';el.title='';}}
-/* União de 2 arrays de movs por id (mapeado 2026-08-11 — caso 2 da corrida de saves, distinto
+/* União de 2 arrays de objetos por id (mapeado 2026-08-11 — caso 2 da corrida de saves, distinto
    do rascunho em tela tratado em lancarTemRascunho/aplicarNuvem acima). Local tem prioridade
-   no empate (mesma id dos dois lados — edição concorrente do MESMO lançamento; caso raro,
-   quem salva por último nessa id específica vence, mas só ESSA id, não o array inteiro). Sem
-   isso, ids que só existem de um lado (o caso comum: cada aparelho lançou algo diferente na
-   mesma janela) desapareciam de vez quando o outro lado fazia um .set() puro por cima. */
-function mergeMovsPorId(local,remoto){
+   no empate (mesma id dos dois lados — edição concorrente do MESMO registro; caso raro, quem
+   salva por último nessa id específica vence, mas só ESSA id, não o array inteiro). Sem isso,
+   ids que só existem de um lado (o caso comum: cada aparelho lançou/cadastrou algo diferente
+   na mesma janela) desapareciam de vez quando o outro lado fazia um .set() puro por cima.
+   Genérico (não é só movs): serve pra qualquer array de objeto-com-id (movs, cadastros,
+   contasBanc). */
+function mergePorId(local,remoto){
   const byId={};
   (remoto||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
   (local||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
   return Object.values(byId);
 }
+/* União de 2 arrays de string (jogos/cats/cols/pess/pgs/despCats) — mesma filosofia do
+   mergePorId, sem id: o valor É a chave. Preserva a 1ª ordem de aparição. */
+function mergeArrUniao(local,remoto){
+  const vistos=new Set(),out=[];
+  (local||[]).concat(remoto||[]).forEach(v=>{if(v!=null&&v!==''&&!vistos.has(v)){vistos.add(v);out.push(v);}});
+  return out;
+}
+/* União rasa de 2 dicionários chave->valor (codigosResolvidos) — local vence empate de chave,
+   mesma convenção do mergePorId. */
+function mergeDictRaso(local,remoto){return {...(remoto||{}),...(local||{})};}
+/* colsJ = {jogo:[colecao,...]} — merge por jogo, e dentro de cada jogo une o array de coleções. */
+function mergeColsJ(local,remoto){
+  const out={};
+  new Set([...Object.keys(local||{}),...Object.keys(remoto||{})]).forEach(j=>{out[j]=mergeArrUniao((local||{})[j],(remoto||{})[j]);});
+  return out;
+}
+/* colsG = {jogo:{colecao:grupo}} — merge por jogo, e dentro de cada jogo merge raso colecao->grupo. */
+function mergeColsG(local,remoto){
+  const out={};
+  new Set([...Object.keys(local||{}),...Object.keys(remoto||{})]).forEach(j=>{out[j]=mergeDictRaso((local||{})[j],(remoto||{})[j]);});
+  return out;
+}
 function salvarNuvem(){if(!_db||!_syncReady)return;
   setSync('saving');
   const ref=_db.collection('controle').doc('dados');
-  let movsFinal=movs,fundiu=false;
+  let final=null,fundiu=false;
   _db.runTransaction(tx=>tx.get(ref).then(snap=>{
     const remoto=snap.exists?snap.data():null;
-    movsFinal=movs;fundiu=false;
+    fundiu=false;
+    final={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos};
     /* outro aparelho já salvou uma versão que este cliente ainda não tinha aplicado (_upd
        diferente do último que ele viu) — em vez de sobrescrever o documento inteiro (o bug:
-       .set() apagava em silêncio os lançamentos que só existiam do outro lado), funde os
-       dois arrays de movs por id antes de gravar. */
-    if(remoto&&Array.isArray(remoto.movs)&&remoto._upd&&remoto._upd!==_ultimoUpdAplicado){
-      movsFinal=mergeMovsPorId(movs,remoto.movs);fundiu=true;
+       .set() apagava em silêncio tudo que só existia do outro lado), funde CADA campo do
+       payload com a estratégia certa pro seu formato (mapeado 2026-08-11, pedido do Felype:
+       antes só movs tinha proteção — cadastro/conta/categoria criados quase juntos em 2
+       aparelhos podiam se perder em silêncio do mesmo jeito que os lançamentos perdiam). */
+    if(remoto&&remoto._upd&&remoto._upd!==_ultimoUpdAplicado){
+      fundiu=true;
+      final={
+        movs:mergePorId(movs,remoto.movs),
+        jogos:mergeArrUniao(jogos,remoto.jogos),
+        cats:mergeArrUniao(cats,remoto.cats),
+        cols:mergeArrUniao(cols,remoto.cols),
+        pess:mergeArrUniao(pess,remoto.pess),
+        pgs:mergeArrUniao(pgs,remoto.pgs),
+        despCats:mergeArrUniao(despCats,remoto.despCats),
+        cadastros:mergePorId(cadastros,remoto.cadastros),
+        contasBanc:mergePorId(contasBanc,remoto.contasBanc),
+        codigosResolvidos:mergeDictRaso(codigosResolvidos,remoto.codigosResolvidos),
+        colsJ:mergeColsJ(colsJ,remoto.colsJ),
+        colsG:mergeColsG(colsG,remoto.colsG),
+      };
     }
-    const payload={movs:movsFinal,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,_upd:Date.now(),_by:_userEmail};
+    const payload={...final,_upd:Date.now(),_by:_userEmail};
     try{const kb=Math.round(JSON.stringify(payload).length/1024);
       if(kb>700&&!window._doc1mbAviso){window._doc1mbAviso=true;toast('⚠ Seus dados estão em '+kb+'KB — perto do limite de 1MB da gaveta da nuvem. Avise o Felype pra planejar a divisão.');}}catch(e){}
     tx.set(ref,payload);
     return payload;
   })).then(payload=>{
     _ultimoUpdAplicado=payload._upd;
-    if(fundiu){movs=movsFinal;localStorage.setItem(MK,JSON.stringify(movs));if(!lancarTemRascunho())render();toast('☁️ mesclado com o que o outro aparelho salvou ✓');}
+    if(fundiu){
+      movs=final.movs;jogos=final.jogos;cats=final.cats;cols=final.cols;pess=final.pess;pgs=final.pgs;despCats=final.despCats;cadastros=final.cadastros;contasBanc=final.contasBanc;codigosResolvidos=final.codigosResolvidos;colsJ=final.colsJ;colsG=final.colsG;
+      localStorage.setItem(MK,JSON.stringify(movs));
+      localStorage.setItem('tcg_cats',JSON.stringify(cats));
+      localStorage.setItem('tcg_cols',JSON.stringify(cols));
+      localStorage.setItem('tcg_pess',JSON.stringify(pess));
+      localStorage.setItem('tcg_pgs',JSON.stringify(pgs));
+      localStorage.setItem('tcg_jogos',JSON.stringify(jogos));
+      localStorage.setItem('tcg_despcats',JSON.stringify(despCats));
+      localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));
+      localStorage.setItem('tcg_colsg',JSON.stringify(colsG));
+      localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
+      localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
+      localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));
+      if(!lancarTemRascunho())render();
+      toast('☁️ mesclado com o que o outro aparelho salvou ✓');
+    }
     setSync('ok');})
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
@@ -2567,7 +2624,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='11/08 02h51';
+const BUILD_TAG='11/08 10h25';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
