@@ -114,7 +114,11 @@ const EMAILS_OK = ['felypexykawa@gmail.com','pokecentertcgoficial@gmail.com','pr
 const PAPEL_POR_EMAIL = {'felypexykawa@gmail.com':'admin','pokecentertcgoficial@gmail.com':'admin'};
 function papelAtual(){if(!_userEmail)return 'admin';return PAPEL_POR_EMAIL[_userEmail.toLowerCase()]||'lancamento';}
 const USAR_NUVEM = !!(firebaseConfig && firebaseConfig.apiKey);
-let _db=null,_auth=null,_syncReady=false,_userEmail='';
+let _db=null,_auth=null,_syncReady=false,_userEmail='',_restaurando=false;
+/* _upd do último snapshot remoto que ESTE aparelho realmente aplicou — usado por salvarNuvem()
+   pra saber se alguém salvou por cima entre a última leitura e agora (corrida de 2 saves,
+   mapeado 2026-08-11: ver comentário completo em salvarNuvem). */
+let _ultimoUpdAplicado=0;
 const MK='tcg_movs_v2';
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
 const SEED=[];
@@ -474,6 +478,41 @@ function provaReal(){
     add('vermelho','Transferência sem origem E sem destino ('+fmt(+t.valor||0)+')','Não diz de onde saiu nem pra onde foi — corrija ou exclua.','abrir',`verMov('${t.id}')`);});
   movs.filter(m=>m.tipo==='COMPRA'&&m.origem==='TROCA'&&+m.din>0&&!(m.dinConta||'').trim()).forEach(t=>{
     add('amarelo','Dinheiro de troca sem conta: '+fmt(+t.din)+' em '+rotDe(t),'O dinheiro dado nessa troca não saiu de conta nenhuma — edite a troca ou ignore se foi antes das contas.','ver o item',`verMov('${t.id}')`);});
+  /* 2b. Tipo fora do vocabulário — lançamento fica invisível em compra/venda/despesa/transf */
+  const TIPOS_OK=new Set(['COMPRA','VENDA','DESPESA','TRANSF']);
+  movs.forEach(m=>{if(!TIPOS_OK.has(m.tipo))
+    add('vermelho','Tipo de lançamento desconhecido: "'+m.tipo+'"','Não é COMPRA, VENDA, DESPESA nem TRANSF — some de todos os relatórios e saldos.','abrir',`verMov('${m.id}')`);});
+  /* 2c. Condição fora do vocabulário conhecido (a UI só grava via <select>; import/backup não valida) */
+  const CONDS_OK=new Set(['—','NM','LP','MP','HP','']);
+  movs.forEach(m=>{if(m.condicao&&!CONDS_OK.has(m.condicao))
+    add('amarelo','Condição da carta com valor desconhecido em '+rotDe(m),'condicao = "'+m.condicao+'" não é NM/LP/MP/HP — veio de edição direta ou backup de outra origem.','abrir o lançamento',`verMov('${m.id}')`);});
+  /* 9c. Conta referenciada não existe mais no cadastro (dinheiro real existe, mas some do saldo mostrado).
+     Só os campos que de fato usam o <select> de contasBanc (dinConta, contaDe/contaPara, pgParcelas[i].conta)
+     — o campo comum `conta` de COMPRA/VENDA/DESPESA é texto livre do catálogo `pgs` (Dinheiro/Pix/Cartão),
+     NUNCA vem de contasBanc, então checar contaSumiu(m.conta) dava falso positivo em massa (achado real,
+     revisão adversarial 2026-08-11: cadastro de contas bancárias é opcional e recente, maioria dos
+     lançamentos legitimamente nunca teve conta bancária formal por trás do "Dinheiro/Pix/Cartão"). */
+  const nomesContas=new Set(contasBanc.map(c=>c.nome));
+  const contaSumiu=nome=>nome&&!nomesContas.has(nome);
+  movs.forEach(m=>{
+    if(contaSumiu(m.contaDe)||contaSumiu(m.contaPara))add('amarelo','Transferência com conta excluída: '+fmt(+m.valor||0),'"'+(m.contaDe||'—')+'" → "'+(m.contaPara||'—')+'" — uma delas não existe mais no cadastro.','abrir',`verMov('${m.id}')`);
+    if(contaSumiu(m.dinConta))add('amarelo','Dinheiro de troca com conta excluída: '+fmt(+m.din||0)+' em '+rotDe(m),'A conta de onde saiu o dinheiro dessa troca não existe mais.','ver o item',`verMov('${m.id}')`);
+    if(m.pgParcelas)Object.values(m.pgParcelas).forEach(p=>{if(p&&typeof p==='object'&&contaSumiu(p.conta))
+      add('amarelo','Parcela paga com conta excluída em '+rotDe(m),'Uma parcela já quitada aponta pra uma conta que não existe mais no cadastro.','abrir o lançamento',`verMov('${m.id}')`);});});
+  /* 9d. Vencimento inválido em compra parcelada — quebra a projeção "a pagar" em silêncio */
+  movs.filter(m=>m.tipo==='COMPRA'&&m.pgTipo==='Parcelado'&&+m.nParc>0).forEach(m=>{
+    const v=m.venc1||m.data;
+    if(!v||isNaN(new Date(v+'T00:00:00').getTime()))
+      add('amarelo','Vencimento inválido em compra parcelada: '+rotDe(m),'Sem 1º vencimento válido, a parcela pode sumir ou aparecer errada em "a pagar".','abrir o lançamento',`verMov('${m.id}')`);});
+  /* 11b. Coerência dentro de venda/troca multi-item — mesma lógica da nota (check já existe), aplicada a vendaId/trocaId */
+  const porVendaId={};movs.forEach(m=>{if(m.tipo==='VENDA'&&m.vendaId)(porVendaId[m.vendaId]=porVendaId[m.vendaId]||[]).push(m);});
+  Object.entries(porVendaId).forEach(([vid,its])=>{const h=its[0];
+    if(its.some(x=>(x.data||'')!==(h.data||'')||(x.contraparte||'')!==(h.contraparte||'')||(x.canal||'')!==(h.canal||'')||(x.conta||'')!==(h.conta||'')))
+      add('amarelo','Venda multi-item com dados divergentes entre itens','Data, cliente, canal ou conta destoam entre os itens da mesma venda — um foi editado sozinho.','ver as vendas',`consF='VENDA';consVer='itens';go('consultar')`);});
+  const porTrocaId={};movs.forEach(m=>{if(m.trocaId)(porTrocaId[m.trocaId]=porTrocaId[m.trocaId]||[]).push(m);});
+  Object.entries(porTrocaId).forEach(([tid,its])=>{const h=its[0];
+    if(its.some(x=>(x.data||'')!==(h.data||'')||(x.contraparte||'')!==(h.contraparte||'')))
+      add('amarelo','Troca multi-item com dados divergentes entre itens','Data ou pessoa destoam entre os itens da mesma troca.','ver os itens',`consF='COMPRA';consVer='itens';go('consultar')`);});
   /* 9. Parcela paga além do parcelamento */
   movs.filter(m=>m.pgParcelas).forEach(m=>{const nP=+m.nParc||0;
     Object.keys(m.pgParcelas).forEach(k=>{if(+k>nP)add('amarelo','Parcela paga além do parcelamento em '+rotDe(m),'Está marcada a parcela '+k+' mas a compra tem só '+nP+'× — sobra de uma edição.','abrir o lançamento',`verMov('${m.id}')`);});});
@@ -2155,7 +2194,20 @@ function excluirPess(nome){const n=movs.filter(m=>(m.contraparte||'')===nome).le
   pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
   salvarCad();save();saveL();toast('"'+nome+'" excluído ✓');render();}
 const pessOrd=()=>pess.slice().sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base'}));
-function restaurarBackup(ts){const x=get('tcg_backups',[]).find(y=>y.ts===ts);if(!x)return;if(confirm('Voltar ao ponto de '+new Date(ts).toLocaleString('pt-BR')+'? O estado atual será substituído.')){movs=x.dados.map(m=>({...m}));localStorage.setItem(MK,JSON.stringify(movs));fecharModal();go('painel');toast('Restaurado ✓');}}
+function restaurarBackup(ts){
+  const x=get('tcg_backups',[]).find(y=>y.ts===ts);
+  if(!x)return;
+  if(!confirm('Voltar ao ponto de '+new Date(ts).toLocaleString('pt-BR')+'? O estado atual será substituído.'))return;
+  /* trava: enquanto _restaurando=true, aplicarNuvem() ignora o que chegar — evita o onSnapshot
+     reaplicar por cima um estado antigo enquanto a restauração ainda está subindo pra nuvem
+     (mapeado 2026-08-11: restaurarBackup gravava só localStorage, nunca chamava salvarNuvem —
+     a nuvem ficava com o estado velho e o próximo snapshot desfazia a restauração em silêncio) */
+  _restaurando=true;
+  movs=x.dados.map(m=>({...m}));
+  save();
+  setTimeout(()=>{_restaurando=false;if(USAR_NUVEM&&_syncReady)salvarNuvem();},3000);
+  fecharModal();go('painel');toast('Restaurado ✓');
+}
 function todasFotos(cb){
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb([]));}
   else idbOpen(db=>{if(!db){cb([]);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else cb(L);};cur.onerror=()=>cb(L);});}
@@ -2443,16 +2495,62 @@ function setSync(st,msg){const el=document.getElementById('syncDot');if(!el)retu
   else if(st==='saving'){el.textContent='☁️…';el.title='salvando…';el.style.opacity='.8';el.style.color='';}
   else if(st==='erro'){el.textContent='☁️⚠ não salvou';el.title=msg||'erro ao salvar na nuvem';el.style.opacity='1';el.style.color='var(--red)';}
   else{el.textContent='';el.title='';}}
+/* União de 2 arrays de movs por id (mapeado 2026-08-11 — caso 2 da corrida de saves, distinto
+   do rascunho em tela tratado em lancarTemRascunho/aplicarNuvem acima). Local tem prioridade
+   no empate (mesma id dos dois lados — edição concorrente do MESMO lançamento; caso raro,
+   quem salva por último nessa id específica vence, mas só ESSA id, não o array inteiro). Sem
+   isso, ids que só existem de um lado (o caso comum: cada aparelho lançou algo diferente na
+   mesma janela) desapareciam de vez quando o outro lado fazia um .set() puro por cima. */
+function mergeMovsPorId(local,remoto){
+  const byId={};
+  (remoto||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
+  (local||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
+  return Object.values(byId);
+}
 function salvarNuvem(){if(!_db||!_syncReady)return;
-  const payload={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,_upd:Date.now(),_by:_userEmail};
-  try{const kb=Math.round(JSON.stringify(payload).length/1024);
-    if(kb>700&&!window._doc1mbAviso){window._doc1mbAviso=true;toast('⚠ Seus dados estão em '+kb+'KB — perto do limite de 1MB da gaveta da nuvem. Avise o Felype pra planejar a divisão.');}}catch(e){}
   setSync('saving');
-  _db.collection('controle').doc('dados').set(payload)
-    .then(()=>setSync('ok'))
+  const ref=_db.collection('controle').doc('dados');
+  let movsFinal=movs,fundiu=false;
+  _db.runTransaction(tx=>tx.get(ref).then(snap=>{
+    const remoto=snap.exists?snap.data():null;
+    movsFinal=movs;fundiu=false;
+    /* outro aparelho já salvou uma versão que este cliente ainda não tinha aplicado (_upd
+       diferente do último que ele viu) — em vez de sobrescrever o documento inteiro (o bug:
+       .set() apagava em silêncio os lançamentos que só existiam do outro lado), funde os
+       dois arrays de movs por id antes de gravar. */
+    if(remoto&&Array.isArray(remoto.movs)&&remoto._upd&&remoto._upd!==_ultimoUpdAplicado){
+      movsFinal=mergeMovsPorId(movs,remoto.movs);fundiu=true;
+    }
+    const payload={movs:movsFinal,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,_upd:Date.now(),_by:_userEmail};
+    try{const kb=Math.round(JSON.stringify(payload).length/1024);
+      if(kb>700&&!window._doc1mbAviso){window._doc1mbAviso=true;toast('⚠ Seus dados estão em '+kb+'KB — perto do limite de 1MB da gaveta da nuvem. Avise o Felype pra planejar a divisão.');}}catch(e){}
+    tx.set(ref,payload);
+    return payload;
+  })).then(payload=>{
+    _ultimoUpdAplicado=payload._upd;
+    if(fundiu){movs=movsFinal;localStorage.setItem(MK,JSON.stringify(movs));if(!lancarTemRascunho())render();toast('☁️ mesclado com o que o outro aparelho salvou ✓');}
+    setSync('ok');})
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
-function aplicarNuvem(d){if(!d)return;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));render();}
+/* Rascunho aberto no Lançar (editando um existente OU digitando um novo, ainda sem salvar)
+   não pode ser apagado por um snapshot que chega de OUTRO aparelho — mapeado 2026-08-11:
+   render() troca o innerHTML inteiro do #view, então os <input> em edição (que só guardam
+   o valor no próprio DOM até o clique em "Salvar") voltam pro valor antigo (ou ficam em
+   branco) na frente da pessoa, sem aviso nenhum. Os dados (movs etc.) são sempre atualizados
+   por baixo — só a REPINTURA da tela é que espera o rascunho fechar (salvar/cancelar já
+   chamam render() sozinhos com os dados já frescos). */
+function lancarTemRascunho(){
+  if(tela!=='lancar')return false;
+  if(editId)return true;
+  if(tipoSel==='TROCA'&&(trocaDei.length||trocaRecebi.length))return true;
+  if(compraModo==='nota'&&notaItens.length)return true;
+  if(vendaModo==='varios'&&vendaItens.length)return true;
+  const ids=['f_val','f_cod','f_obs','f_desc','d_desc','d_custo','r_desc','r_val','r_cod'];
+  return ids.some(id=>{const el=document.getElementById(id);return el&&(''+el.value).trim()!=='';});
+}
+function aplicarNuvem(d){if(!d||_restaurando)return;if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));
+  if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
+  render();}
 function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
 function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
 function telaLogin(msg){const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Controle TCG</div><div class="ctx">Entre pra acessar seu controle sincronizado em qualquer aparelho.</div>${msg?`<div class="soon" style="color:var(--red);justify-content:center">${msg}</div>`:''}<button class="btn" style="margin-top:16px" onclick="loginGoogle()">Entrar com Google</button></div>`;document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');const bv=document.getElementById('btnVoltar');if(bv)bv.style.display='none';}
@@ -2469,7 +2567,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='10/08 17h19';
+const BUILD_TAG='11/08 02h51';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova — cura o cache teimoso do iPhone/Safari sem truque de navegador.
    O build grava versao.json ao lado do app; se ele diz um carimbo diferente do embutido
