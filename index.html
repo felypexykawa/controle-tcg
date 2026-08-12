@@ -2624,7 +2624,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='11/08 19h25';
+const BUILD_TAG='12/08 12h05';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -2704,7 +2704,12 @@ function setCodigoUrl(id){const m=movs.find(x=>x.id===id);if(!m)return;
    ainda não populou `opcoes` (código descoberto ambíguo mas coleta ainda não rodou de
    novo), cai no fallback manual de sempre (link colado à mão). */
 function abrirEscolhaAmbigua(codigo){
-  const codC=codLimpo(codigo);const pl=precoLigaDe(codC);
+  /* BUG CORRIGIDO 2026-08-12 (Felype mandou o print: clicava em "escolher carta" e vinha o
+     pedido de colar link à mão). Causa: buscava SÓ pelo código limpo ("211/172"), mas a coleta
+     grava a entrada sob o código como está no cadastro ("Charizard (211/172)"). Não achava as
+     opções e caía no fallback manual. precoLigaDe() já tenta chave exata E depois a limpa —
+     então basta passar o código ORIGINAL primeiro. Vale pros dois formatos de cadastro. */
+  const codC=codLimpo(codigo);const pl=precoLigaDe(codigo)||precoLigaDe(codC);
   const ops=(pl&&Array.isArray(pl.opcoes))?pl.opcoes:[];
   if(!ops.length){setCodigoUrlGlobal(codC);return;}
   const esc=s=>(''+(s||'')).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
