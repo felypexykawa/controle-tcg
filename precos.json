@@ -1,5 +1,5 @@
 {
- "atualizadoEm": "2026-08-11T13:09:48Z",
+ "atualizadoEm": "2026-08-12T14:19:33Z",
  "fonte": "Chrome local — extrator v2 (bloco 'Preço Médio de Venda no Marketplace', por versão)",
  "cartas": {
   "135/108": {
@@ -305,6 +305,240 @@
    "menor": 119.0,
    "medio": 129.5,
    "maior": 140.0
+  },
+  "Mega zygarde ex (120/088)": {
+   "codigo": "Mega zygarde ex (120/088)",
+   "status": "OK",
+   "titulo": "Mega Zygarde ex (120/088)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 249.9,
+     "md": 279.9,
+     "mx": 459.9
+    },
+    {
+     "v": "Foil",
+     "mn": 161.41,
+     "md": 316.55,
+     "mx": 800.0
+    }
+   ],
+   "menor": 249.9,
+   "medio": 279.9,
+   "maior": 459.9,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Mega%20zygarde%20ex%20%28120%2F088%29"
+  },
+  "Pikachu (160/159)": {
+   "codigo": "Pikachu (160/159)",
+   "status": "OK",
+   "titulo": "Pikachu (160/159)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 355.9,
+     "md": 467.95,
+     "mx": 580.0
+    },
+    {
+     "v": "Foil",
+     "mn": 299.0,
+     "md": 615.5,
+     "mx": 2999.99
+    }
+   ],
+   "menor": 355.9,
+   "medio": 467.95,
+   "maior": 580.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Pikachu%20%28160%2F159%29"
+  },
+  "Sylveon-gx (140/145)": {
+   "codigo": "Sylveon-gx (140/145)",
+   "status": "OK",
+   "titulo": "Sylveon-GX (140/145)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 99.9,
+     "md": 213.92,
+     "mx": 350.0
+    }
+   ],
+   "menor": 99.9,
+   "medio": 213.92,
+   "maior": 350.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Sylveon-gx%20%28140%2F145%29"
+  },
+  "Noibat (111/100)": {
+   "codigo": "Noibat (111/100)",
+   "status": "OK",
+   "titulo": "Noibat (111/100)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 18.9,
+     "md": 25.16,
+     "mx": 26.89
+    }
+   ],
+   "menor": 18.9,
+   "medio": 25.16,
+   "maior": 26.89,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Noibat%20%28111%2F100%29"
+  },
+  "Charmander (168/165)": {
+   "codigo": "Charmander (168/165)",
+   "status": "OK",
+   "titulo": "Charmander (168/165)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 620.0,
+     "md": 620.0,
+     "mx": 620.0
+    },
+    {
+     "v": "Foil",
+     "mn": 319.9,
+     "md": 599.14,
+     "mx": 1499.0
+    }
+   ],
+   "menor": 620.0,
+   "medio": 620.0,
+   "maior": 620.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Charmander%20%28168%2F165%29"
+  },
+  "Psyduck (199/193)": {
+   "codigo": "Psyduck (199/193)",
+   "status": "OK",
+   "titulo": "Psyduck (199/193)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 183.9,
+     "md": 209.45,
+     "mx": 235.0
+    },
+    {
+     "v": "Foil",
+     "mn": 150.0,
+     "md": 246.33,
+     "mx": 799.9
+    }
+   ],
+   "menor": 183.9,
+   "medio": 209.45,
+   "maior": 235.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Psyduck%20%28199%2F193%29"
+  },
+  "Zorua do N (108/100)": {
+   "codigo": "Zorua do N (108/100)",
+   "status": "OK",
+   "titulo": "Zorua do N / N's Zorua (108/100)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 229.5,
+     "md": 270.0,
+     "mx": 270.0
+    }
+   ],
+   "menor": 229.5,
+   "medio": 270.0,
+   "maior": 270.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Zorua%20do%20N%20%28108%2F100%29"
+  },
+  "Dawn (118/094)": {
+   "codigo": "Dawn (118/094)",
+   "status": "OK",
+   "titulo": "Dawn (118/094)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 60.0,
+     "md": 94.5,
+     "mx": 150.0
+    },
+    {
+     "v": "Foil",
+     "mn": 32.25,
+     "md": 74.03,
+     "mx": 350.0
+    }
+   ],
+   "menor": 60.0,
+   "medio": 94.5,
+   "maior": 150.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Dawn%20%28118%2F094%29"
+  },
+  "Psyduck (175jp/165)": {
+   "codigo": "Psyduck (175jp/165)",
+   "status": "OK",
+   "titulo": "Psyduck (175JP/165)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 326.99,
+     "md": 332.08,
+     "mx": 350.0
+    }
+   ],
+   "menor": 326.99,
+   "medio": 332.08,
+   "maior": 350.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Psyduck%20%28175jp%2F165%29"
+  },
+  "Charizard (211/172)": {
+   "codigo": "Charizard (211/172)",
+   "status": "AMBIGUO",
+   "titulo": "Charizard (211/172) — múltiplas cartas com esse número (abrir a busca e escolher)",
+   "versoes": [],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Charizard%20%28211%2F172%29",
+   "opcoes": [
+    {
+     "titulo": "Charizard-V (211/172)",
+     "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Charizard-V%20(211%2F172)&ed=s12a&num=211",
+     "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/316/5129_211.jpg"
+    }
+   ]
+  },
+  "Ninetales (110jp/108)": {
+   "codigo": "Ninetales (110jp/108)",
+   "status": "AMBIGUO",
+   "titulo": "Ninetales (110jp/108) — busca sem carta encontrada nesse formato (abrir a busca e escolher)",
+   "versoes": [],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Ninetales%20%28110jp%2F108%29"
+  },
+  "Articuno (102jp/100)": {
+   "codigo": "Articuno (102jp/100)",
+   "status": "AMBIGUO",
+   "titulo": "Articuno (102jp/100) — busca sem carta encontrada nesse formato (abrir a busca e escolher)",
+   "versoes": [],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Articuno%20%28102jp%2F100%29"
+  },
+  "Squirtle (170jp/165)": {
+   "codigo": "Squirtle (170jp/165)",
+   "status": "OK",
+   "titulo": "Squirtle (170JP/165)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 300.0,
+     "md": 300.0,
+     "mx": 300.0
+    },
+    {
+     "v": "Foil",
+     "mn": 260.0,
+     "md": 360.1,
+     "mx": 1199.9
+    }
+   ],
+   "menor": 300.0,
+   "medio": 300.0,
+   "maior": 300.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Squirtle%20%28170jp%2F165%29"
   }
  },
  "historico": {
@@ -463,6 +697,154 @@
      "mn": 109.0,
      "md": 248.04,
      "mx": 3499.9
+    }
+   ]
+  },
+  "Mega zygarde ex (120/088)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 249.9,
+     "md": 279.9,
+     "mx": 459.9
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-12",
+     "mn": 161.41,
+     "md": 316.55,
+     "mx": 800.0
+    }
+   ]
+  },
+  "Pikachu (160/159)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 355.9,
+     "md": 467.95,
+     "mx": 580.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-12",
+     "mn": 299.0,
+     "md": 615.5,
+     "mx": 2999.99
+    }
+   ]
+  },
+  "Sylveon-gx (140/145)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 99.9,
+     "md": 213.92,
+     "mx": 350.0
+    }
+   ]
+  },
+  "Noibat (111/100)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 18.9,
+     "md": 25.16,
+     "mx": 26.89
+    }
+   ]
+  },
+  "Charmander (168/165)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 620.0,
+     "md": 620.0,
+     "mx": 620.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-12",
+     "mn": 319.9,
+     "md": 599.14,
+     "mx": 1499.0
+    }
+   ]
+  },
+  "Psyduck (199/193)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 183.9,
+     "md": 209.45,
+     "mx": 235.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-12",
+     "mn": 150.0,
+     "md": 246.33,
+     "mx": 799.9
+    }
+   ]
+  },
+  "Zorua do N (108/100)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 229.5,
+     "md": 270.0,
+     "mx": 270.0
+    }
+   ]
+  },
+  "Dawn (118/094)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 60.0,
+     "md": 94.5,
+     "mx": 150.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-12",
+     "mn": 32.25,
+     "md": 74.03,
+     "mx": 350.0
+    }
+   ]
+  },
+  "Psyduck (175jp/165)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 326.99,
+     "md": 332.08,
+     "mx": 350.0
+    }
+   ]
+  },
+  "Squirtle (170jp/165)": {
+   "Normal": [
+    {
+     "d": "2026-08-12",
+     "mn": 300.0,
+     "md": 300.0,
+     "mx": 300.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-12",
+     "mn": 260.0,
+     "md": 360.1,
+     "mx": 1199.9
     }
    ]
   }
