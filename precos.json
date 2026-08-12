@@ -49,29 +49,6 @@
    "versoes": [],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=188%2F172"
   },
-  "244/217": {
-   "codigo": "244/217",
-   "status": "OK",
-   "titulo": "Spiritomb da Cíntia / Cynthia's Spiritomb (244/217)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 80.0,
-     "md": 102.45,
-     "mx": 124.9
-    },
-    {
-     "v": "Foil",
-     "mn": 48.89,
-     "md": 84.98,
-     "mx": 149.9
-    }
-   ],
-   "menor": 80.0,
-   "medio": 102.45,
-   "maior": 124.9,
-   "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Cynthia%27s+Spiritomb%20(244/217)&ed=ASC&num=244"
-  },
   "122/086": {
    "codigo": "122/086",
    "status": "AMBIGUO",
@@ -112,29 +89,6 @@
    "menor": 17.5,
    "medio": 71.77,
    "maior": 129.9
-  },
-  "Cynthia's spiritomb (244/217)": {
-   "codigo": "Cynthia's spiritomb (244/217)",
-   "status": "OK",
-   "titulo": "Spiritomb da Cíntia / Cynthia's Spiritomb (244/217)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 40.0,
-     "md": 65.97,
-     "mx": 80.0
-    },
-    {
-     "v": "Foil",
-     "mn": 35.0,
-     "md": 80.75,
-     "mx": 134.9
-    }
-   ],
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Cynthia%27s%20spiritomb%20%28244%2F217%29",
-   "menor": 40.0,
-   "medio": 65.97,
-   "maior": 80.0
   },
   "Psyduck (226/217)": {
    "codigo": "Psyduck (226/217)",
@@ -539,6 +493,29 @@
    "medio": 300.0,
    "maior": 300.0,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Squirtle%20%28170jp%2F165%29"
+  },
+  "244/217": {
+   "codigo": "244/217",
+   "status": "OK",
+   "titulo": "Spiritomb da Cíntia / Cynthia's Spiritomb (244/217)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 40.0,
+     "md": 65.97,
+     "mx": 80.0
+    },
+    {
+     "v": "Foil",
+     "mn": 35.0,
+     "md": 80.75,
+     "mx": 134.9
+    }
+   ],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Cynthia%27s%20spiritomb%20%28244%2F217%29",
+   "menor": 40.0,
+   "medio": 65.97,
+   "maior": 80.0
   }
  },
  "historico": {
@@ -570,24 +547,6 @@
     }
    ]
   },
-  "244/217": {
-   "Normal": [
-    {
-     "d": "2026-07-06",
-     "mn": 80.0,
-     "md": 102.45,
-     "mx": 124.9
-    }
-   ],
-   "Foil": [
-    {
-     "d": "2026-07-06",
-     "mn": 48.89,
-     "md": 84.98,
-     "mx": 149.9
-    }
-   ]
-  },
   "Kingdra (tg03/tg30)": {
    "Normal": [
     {
@@ -595,24 +554,6 @@
      "mn": 17.5,
      "md": 71.77,
      "mx": 129.9
-    }
-   ]
-  },
-  "Cynthia's spiritomb (244/217)": {
-   "Normal": [
-    {
-     "d": "2026-08-11",
-     "mn": 40.0,
-     "md": 65.97,
-     "mx": 80.0
-    }
-   ],
-   "Foil": [
-    {
-     "d": "2026-08-11",
-     "mn": 35.0,
-     "md": 80.75,
-     "mx": 134.9
     }
    ]
   },
@@ -845,6 +786,36 @@
      "mn": 260.0,
      "md": 360.1,
      "mx": 1199.9
+    }
+   ]
+  },
+  "244/217": {
+   "Normal": [
+    {
+     "d": "2026-07-06",
+     "mn": 80.0,
+     "md": 102.45,
+     "mx": 124.9
+    },
+    {
+     "d": "2026-08-11",
+     "mn": 40.0,
+     "md": 65.97,
+     "mx": 80.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-07-06",
+     "mn": 48.89,
+     "md": 84.98,
+     "mx": 149.9
+    },
+    {
+     "d": "2026-08-11",
+     "mn": 35.0,
+     "md": 80.75,
+     "mx": 134.9
     }
    ]
   }
