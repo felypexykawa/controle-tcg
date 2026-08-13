@@ -410,6 +410,15 @@ function diagLote(raizId){
     && !movs.some(y=>y.loteOrigem===x.id));                       // sem pedaços próprios
   return {raiz,fam,ref,soma,dif:Math.round((soma-ref)*100)/100,intrusa:suspeitas.length===1?suspeitas[0]:null,ambiguo:suspeitas.length>1};
 }
+/* HISTÓRICO 2026-08-12, mesmo dia: nasceu simples (só solta a intrusa). Ganhou depois um recurso
+   pra "levar os pedaços que saíram dela" — pareceu resolver o caso real do Felype (12+18 boosters
+   presos na nota errada), mas o TESTE ISOLADO (fixture sintético, sem tocar dado real — depois do
+   susto de mais cedo, testar contra o app aberto está proibido) revelou que a correção era falsa:
+   mover os pedaços sem REDISTRIBUIR o valor deles cria uma conta que fecha no papel mas continua
+   com números errados dentro — maquiagem, não conserto. Redistribuir valor de verdade precisa do
+   preço por unidade da nota CERTA, que é um trabalho à parte, com mais cuidado, não escondido
+   dentro de um botão de "soltar". Revertido pra versão simples e PROVADA: 985,99+197,20+295,80=
+   1.478,99 exato, sem tocar valorOrig de ninguém. */
 function soltarIntrusa(raizId){
   const d=diagLote(raizId); if(!d||!d.intrusa) return;
   const x=d.intrusa;
@@ -419,28 +428,12 @@ function soltarIntrusa(raizId){
     (sitDe(x)==='Trocado'?' (hoje está marcada como TROCADA sem troca registrada)':'')+'.\n\n'+
     'Depois disso a conta do lote fecha: '+fmt(d.soma-(+x.valor||0))+' = '+fmt(d.ref)+'.\n\n'+
     'Nada é apagado. Dá pra desfazer refazendo o vínculo.'))return;
-  /* A caixa intrusa pode ter sido ABERTA — e nesse caso os pedaços que ela gerou (boosters/cartas)
-     estão pendurados na raiz ERRADA. Foi o caso real do Felype: os 12 boosters no estoque e os 18
-     vendidos vieram da caixa da nota 2, não da nota 1. Soltar só a caixa deixaria os filhos órfãos
-     na nota errada — conta fecharia e o rastreio continuaria mentindo. */
-  const irmaos=d.fam.filter(y=>y.id!==x.id&&y.id!==raizId&&y.loteOrigem===raizId);
-  const bpu=Math.max(1,+x.boosters||0);
-  let levar=[];
-  if(irmaos.length&&bpu>1){
-    const nomes=irmaos.map(y=>`  • ${(+y.qtd||1)} un · ${y.cat||'item'} · ${fmt(+y.valor||0)} (${sitDe(y).toLowerCase()})`).join('\n');
-    if(confirm('Essa caixa foi ABERTA e os pedaços abaixo saíram DELA?\n\n'+nomes+
-      '\n\nSe SIM, eles vão junto e passam a pertencer à nota certa — o rastreio fica verdadeiro.\n'+
-      'Se NÃO (eles vieram de outra caixa), toque cancelar: só a caixa sai.')) levar=irmaos;
-  }
   delete x.loteOrigem;
-  if(sitDe(x)==='Trocado'){x.situacao=levar.length?'Aberto':'Em estoque';x.destino=levar.length?'Aberto':'Vender';delete x.dataTroca;delete x.trocaId;}
-  const valorFamiliaNova=Math.round(((+x.valor||0)+levar.reduce((s,y)=>s+(+y.valor||0),0))*100)/100;
-  x.valorOrig=valorFamiliaNova;
-  levar.forEach(y=>{y.loteOrigem=x.id;});
-  x.obs=((x.obs||'')+' [solta do lote em '+new Date().toISOString().slice(0,10)+
-    (levar.length?' levando '+levar.length+' pedaço(s) que saíram dela':'')+' — estava somando na conta de outra nota]').trim();
+  if(sitDe(x)==='Trocado'){x.situacao='Em estoque';x.destino='Vender';delete x.dataTroca;delete x.trocaId;}
+  if(x.valorOrig==null)x.valorOrig=+x.valor||0;
+  x.obs=((x.obs||'')+' [solta do lote em '+new Date().toISOString().slice(0,10)+' — estava somando na conta de outra nota]').trim();
   save();fecharModal();
-  toast(levar.length?('🧩 Solta com '+levar.length+' pedaço(s) — rastreio corrigido ✓'):'🧩 Solta — a conta do lote fechou ✓');
+  toast('🧩 Solta — a conta do lote fechou ✓');
   render();
 }
 function verLote(id){const m=movs.find(x=>x.id===id);if(!m)return;
@@ -2753,7 +2746,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='12/08 22h47';
+const BUILD_TAG='12/08 23h06';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
