@@ -192,9 +192,22 @@ function renderVinculo(){const m=movs.find(x=>x.id===_vincId);if(!m)return;
     ctx=`Escolha de onde saiu <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'item')}</b> (vendida por ${fmt(+m.valor||0)}). O item escolhido some do estoque/coleção — nada é apagado. Itens 🚚 (pedido a caminho) também aparecem: vender antes de chegar é normal — vinculando, ele sai do pedido como vendido.`;
   }
   cands.sort((a,b)=>(b.data||'')<(a.data||'')?-1:1);
+  /* PENDÊNCIA 7 (2026-08-13): quando 2+ candidatos são o MESMO produto (coleção/cat/código/
+     idioma/condição iguais) mas têm CUSTO diferente, a escolha errada muda o lucro registrado
+     em silêncio. O custo por linha já existia (fmt(+c.valor)); isto só adiciona idioma/condição
+     (que faltavam aqui, mas já existem no seletor de venda nova) e um aviso visual SÓ quando a
+     ambiguidade é real (mesmo produto, custo diverge) — nunca dispara em duplicatas genuínas de
+     mesmo custo, onde a ordem de fato não importa. */
+  const chaveDup=c=>[c.colecao||'',c.cat||'',c.codigo||'',c.idioma||'',c.condicao||''].join('|');
+  const gruposDup={};
+  cands.forEach(c=>{const k=chaveDup(c);(gruposDup[k]=gruposDup[k]||[]).push(Math.round((+c.valor||0)*100));});
   const lin=cands.length?cands.slice(0,60).map(c=>{const rot=_vincModo==='deCompra'?'vendida por':'custou';
     const badgePed=(_vincModo!=='deCompra'&&sitDe(c)==='Pedido')?' <span class="tag c">🚚 a caminho</span>':'';
-    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="confirmVinculo('${c.id}')"><div><b>${(c.colecao?c.colecao+' · ':'')+(c.cat||'item')}</b>${c.codigo?' <span style="color:var(--mut);font-size:10px">#'+c.codigo+'</span>':''}${badgePed}<div class="meta">${c.data?dBR(new Date(c.data+'T00:00:00')):'—'} · ${c.contraparte||'—'} · ${(+c.qtd||1)} un · ${rot} ${fmt(+c.valor||0)}</div></div><span class="lnk">vincular</span></div>`;}).join('')
+    const valoresGrupo=gruposDup[chaveDup(c)]||[];
+    const custoDivergente=_vincModo!=='deCompra'&&valoresGrupo.length>1&&new Set(valoresGrupo).size>1;
+    const avisoGemeos=custoDivergente?' <span class="tag c" style="font-size:9px" title="Mesma coleção/tipo/código/idioma/condição que outro candidato desta lista, mas custo diferente — confira qual é a peça física antes de vincular">⚠ gêmeo com custo diferente</span>':'';
+    const infoExtra=_vincModo!=='deCompra'?`${c.idioma&&c.idioma!=='—'?' · '+c.idioma:''}${c.condicao&&c.condicao!=='—'?' · '+c.condicao:''}`:'';
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="confirmVinculo('${c.id}')"><div><b>${(c.colecao?c.colecao+' · ':'')+(c.cat||'item')}</b>${c.codigo?' <span style="color:var(--mut);font-size:10px">#'+c.codigo+'</span>':''}${badgePed}${avisoGemeos}<div class="meta">${c.data?dBR(new Date(c.data+'T00:00:00')):'—'} · ${c.contraparte||'—'} · ${(+c.qtd||1)} un${infoExtra} · ${rot} <b>${fmt(+c.valor||0)}</b></div></div><span class="lnk">vincular</span></div>`;}).join('')
     :'<div class="empty">Nenhum candidato com esse filtro (mesmo jogo).</div>';
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModalVinculo()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="sec" style="margin-top:0">${titulo}</div>
@@ -458,8 +471,51 @@ function verLote(id){const m=movs.find(x=>x.id===id);if(!m)return;
     <div class="ctx">Compra original ${raiz.data?dBR(new Date(raiz.data+'T00:00:00')):'—'}${raiz.contraparte?' de <b>'+raiz.contraparte+'</b>':''}${raiz.notaId?' · <span class="lnk" onclick="fecharModal();abrirNota(\''+raiz.notaId+'\')">🧾 ver nota</span>':''} — cada pedaço abaixo e pra onde foi. A soma dos pedaços é o custo original: nada se perde.</div>
     ${lin}
     <div class="calc" style="margin-top:10px">Custo total do lote: <b>${fmt(totLote)}</b></div>
+    <div class="lnk" style="margin-top:10px;font-weight:700" onclick="abrirJuntarLote('${raiz.id}')">→ 🔗 juntar outra compra a este lote (ela é a mesma operação real)</div>
+    <div class="meta" style="margin-top:2px">Pra quando falta peça aqui dentro — o oposto de "soltar". Nunca decide sozinho: mostra a conta, você confirma.</div>
     <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
   document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+/* JUNTAR — par simétrico de soltarIntrusa (Felype 2026-08-13: "ele só me dá a opção de
+   desvincular, cadê a opção de vincular de novo? o programa tem que ser regrado, se dá opção
+   pra um lado tem que dar pro outro"). soltarIntrusa serve quando SOBRA peça na conta do lote;
+   juntar serve quando FALTA — uma compra separada que na verdade é a MESMA operação real
+   (nota errada na entrada, edição que ficou pela metade, etc). NUNCA decide sozinho qual
+   direção é a certa — só mostra a lista de candidatos e a conta exata antes de confirmar;
+   quem decide se é caso de soltar ou de juntar é sempre o dono, olhando o histórico real. */
+function abrirJuntarLote(raizId){
+  const raiz=movs.find(x=>x.id===raizId);if(!raiz)return;
+  const jaNaFamilia=new Set(movs.filter(x=>x.tipo==='COMPRA'&&(raizDe(x)||x).id===raizId).map(x=>x.id));
+  /* [CORRIGIDO 2026-08-13, revisão adversarial] faltava excluir compra já vendida/com venda
+     vinculada — mesma guarda que diagLote já usa pro caso simétrico (soltar). Sem isso, uma
+     peça vendida podia ser "juntada" a um lote errado sem aviso nenhum, poluindo o rastreio
+     do lote de destino mesmo sem corromper o lucro já registrado (custoOrigem da venda fica
+     congelado, intocado pelo merge — mas o pedaço vendido não deveria virar peça de outro
+     lote de qualquer jeito). */
+  const cands=movs.filter(c=>c.tipo==='COMPRA'&&!jaNaFamilia.has(c.id)&&!c.loteOrigem&&!movs.some(y=>y.loteOrigem===c.id)&&!movs.some(v=>v.tipo==='VENDA'&&v.origemId===c.id)&&['Em estoque','Pedido','Coleção'].includes(sitDe(c))&&(c.jogo||'Pokémon')===(raiz.jogo||'Pokémon'));
+  cands.sort((a,b)=>(b.data||'')<(a.data||'')?-1:1);
+  const lin=cands.length?cands.slice(0,60).map(c=>
+    `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="confirmJuntar('${raizId}','${c.id}')"><div><b>${(c.colecao?c.colecao+' · ':'')+(c.cat||'item')}</b>${c.codigo?' <span style="color:var(--mut);font-size:10px">#'+c.codigo+'</span>':''}<div class="meta">${c.data?dBR(new Date(c.data+'T00:00:00')):'—'} · ${c.contraparte||'—'} · ${(+c.qtd||1)} un · ${fmt(+c.valor||0)}${sitDe(c)==='Trocado'?' · saiu em troca':''}</div></div><span class="lnk">juntar</span></div>`
+  ).join('') : '<div class="empty">Nenhuma compra solta (sem lote, sem filhos próprios) do mesmo jogo pra juntar.</div>';
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:31;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🔗 Juntar outra compra a este lote</div>
+    <div class="ctx">Escolha a compra que na verdade é a MESMA operação real que <b>${(raiz.colecao?raiz.colecao+' · ':'')+(raiz.cat||'item')}</b> (referência hoje ${fmt(raiz.valorOrig!=null?+raiz.valorOrig:+raiz.valor||0)}). Ela passa a fazer parte deste lote — o valor dela soma na referência.</div>
+    ${lin}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModal();verLote('${raizId}')">cancelar</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+function confirmJuntar(raizId,yId){
+  const raiz=movs.find(x=>x.id===raizId),y=movs.find(x=>x.id===yId);if(!raiz||!y)return;
+  const refAtual=raiz.valorOrig!=null?+raiz.valorOrig:+raiz.valor||0;
+  const refNova=Math.round((refAtual+(+y.valor||0))*100)/100;
+  const rot=(y.colecao?y.colecao+' · ':'')+(y.cat||'item');
+  if(!confirm('Juntar "'+rot+'" ('+(+y.qtd||1)+' un · '+fmt(+y.valor||0)+') neste lote?\n\n'+
+    'A referência de conta (valor original da compra) passa de '+fmt(refAtual)+' pra '+fmt(refNova)+'.\n\n'+
+    'Nada é apagado. Dá pra desfazer soltando ela de novo.'))return;
+  y.loteOrigem=raizId;
+  delete y.valorOrig;
+  raiz.valorOrig=refNova;
+  save();fecharModal();
+  toast('🔗 Juntado — referência agora é '+fmt(refNova)+' ✓');
+  verLote(raizId);}
 /* ===== PROVA REAL — o app confere as próprias contas e aponta onde não fecham. Nada se
    corrige sozinho: cada achado tem o botão que leva ao gesto certo (você decide). Roda no
    boot (aviso no Painel quando há achado) e sob demanda pelo botão 🩺. ===== */
@@ -986,6 +1042,7 @@ function vPainel(){
       <div class="mini click" onclick="go('contas')"><div class="k">A receber (app)</div><div class="v" style="color:var(--amber)">${fmt(arT)}</div><div class="s">${arMes>0?fmt(arMes)+' cai este mês':'nada cai este mês'} →</div></div></div>
     ${contasBanc.length?(function(){const tf=contasBanc.reduce((s,cb)=>s+saldoFisicoConta(cb),0);return `<div class="grid2" style="margin-top:8px"><div class="mini click" onclick="go('contas')"><div class="k">💼 Nas contas (físico hoje)</div><div class="v" style="color:${tf>=0?'var(--green)':'var(--red)'}">${fmt(tf)}</div><div class="s">${contasBanc.length} conta${contasBanc.length>1?'s':''} · toque p/ ver por conta →</div></div><div class="mini click" onclick="abrirTransferencia()"><div class="k">↔ Transferir / aportar</div><div class="v" style="font-size:15px;padding-top:4px">entre contas · dinheiro pessoal</div><div class="s">registrar movimento →</div></div></div>`;})():''}
     <div class="lnk" onclick="abrirProvaReal()">🩺 prova real — o app confere as próprias contas${_provaCache&&_provaCache.A.length?` <b style="color:${_provaCache.n.vermelho?'var(--red)':_provaCache.n.amarelo?'var(--amber)':'var(--mut)'}">· ${_provaCache.A.length} achado${_provaCache.A.length>1?'s':''}</b>`:_provaCache?' <span style="color:var(--green)">· tudo fechou ✓</span>':''}</div>
+    <div class="lnk" onclick="abrirPendenciasCodigo()">🏷️ pendências de cadastro (código)${(function(){const n=pendenciasCodigo().length;return n?` <b style="color:var(--amber)">· ${n} achado${n>1?'s':''}</b>`:' <span style="color:var(--green)">· tudo certo ✓</span>';})()}</div>
     <div class="lnk" onclick="imprimir()">🖨 imprimir este resumo</div>
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
     ${USAR_NUVEM&&_userEmail?`<div class="lnk" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}
@@ -2005,8 +2062,21 @@ function salvar(){
       save();toast('Despesa fixa criada — 12 previsões ✓');editId=null;go('consultar');return;}
     const dId=novoId();movs.push({...base,id:dId,data:g('f_data'),status:despStat});aplicarFotosPend(dId);
     save();toast(despStat==='apagar'?'Despesa registrada · a pagar ✓':'Despesa registrada ✓');editId=null;go('consultar');return;}
-  const val=+g('f_val')||0;
+  let val=+g('f_val')||0;
   if(val===0&&!confirm('O valor está R$ 0. Foi de graça / brinde? Toque OK pra salvar mesmo assim.'))return;
+  /* PENDÊNCIA 4 (Felype): mudar a QUANTIDADE de uma compra sem mudar o valor total é ambíguo —
+     o app não sabia se o total da nota é fixo (custo por unidade recalcula sozinho) ou se o
+     custo por unidade é que devia ficar fixo (o total muda). Só pergunta quando a quantidade
+     MUDOU e o valor ficou exatamente como estava — se o dono também editou o valor, a intenção
+     já está explícita nos dois campos e perguntar de novo seria ruído. */
+  if(tipoSel==='COMPRA'&&editId&&e&&e.tipo==='COMPRA'){
+    const qtdNova=+g('f_qtd')||1,qtdAntiga=+e.qtd||1;
+    if(qtdNova!==qtdAntiga&&qtdAntiga>0&&Math.abs(val-(+e.valor||0))<0.005){
+      const vuAntigo=(+e.valor||0)/qtdAntiga;
+      const manterTotal=confirm('Quantidade mudou de '+qtdAntiga+' para '+qtdNova+' un, mas o valor total ficou igual ('+fmt(+e.valor||0)+').\n\nOK = manter o TOTAL em '+fmt(+e.valor||0)+' — custo por unidade passa a '+fmt((+e.valor||0)/qtdNova)+'\nCancelar = manter o custo por unidade em '+fmt(vuAntigo)+' — total passa a '+fmt(vuAntigo*qtdNova));
+      if(!manterTotal)val=Math.round(vuAntigo*qtdNova*100)/100;
+    }
+  }
   let obj={id:editId||novoId(),tipo:tipoSel,data:g('f_data'),qtd:+g('f_qtd')||1,valor:val};
   if(tipoSel==='COMPRA'){const cat=g('f_cat');if(!cat||cat==='__add__'){alert('Escolha o tipo de produto.');return;}
     const sit=g('f_sit')||'Em estoque';
@@ -2746,7 +2816,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='12/08 23h06';
+const BUILD_TAG='13/08 00h41';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -2793,6 +2863,43 @@ function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return
   if(pl&&pl.status==='AMBIGUO'){const codC=codLimpo(cod),resolv=codigosResolvidos[codC];
     el.innerHTML='🔍 Liga: '+(resolv?'código resolvido ✓':'mais de uma carta com esse código')+' <span class="lnk" style="font-size:11px;padding:1px 4px" onclick="abrirEscolhaAmbigua(\''+codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">'+(resolv?'trocar':((pl.opcoes&&pl.opcoes.length)?'escolher qual →':'colar link →'))+'</span>';return;}
   el.innerHTML=pl?(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':''):'';}
+/* PENDÊNCIA 5 — painel de cadastro incompleto: carta avulsa que você ainda tem (estoque,
+   pedido ou coleção) e não tem NENHUM jeito de puxar preço da Liga — nem código, nem link
+   direto, nem resolução salva pra um código ambíguo. Só entra Single/Carta: produto
+   selado (booster/ETB/box) não tem código na Liga, não é pendência real pra ele. Item já
+   vendido/trocado/aberto também não entra — não é mais seu. O campo código aceita 3
+   formatos ao mesmo tempo (padrão Liga núm/total, SV3-125 e SKU da loja — ver placeholders
+   dos campos f_cod/v_cod/n_cod) — por isso só acusamos "formato estranho" quando o texto
+   TEM "/" (ou seja, claramente tentou o padrão Liga) e não fecha nesse padrão; SKU ou
+   SV3-125 sem barra nunca é sinalizado como errado. */
+const RE_COD_LIGA=/^\d{1,4}\s*(JP|C)?\s*\/\s*(\d{1,4}|∞)$/i;
+function pendenciasCodigo(){
+  return movs.filter(m=>m.tipo==='COMPRA'&&m.cat==='Single/Carta'&&(+m.qtd||1)>0&&['Em estoque','Pedido','Coleção'].includes(sitDe(m)))
+    .map(m=>{
+      if(m.codigoUrl)return null;
+      const cod=(m.codigo||'').trim(),codC=cod?codLimpo(cod):'';
+      if(codC&&codigosResolvidos[codC])return null;
+      let motivo=null;
+      if(!cod)motivo='sem_codigo';
+      else if(codC.includes('/')&&!RE_COD_LIGA.test(codC))motivo='cortado';
+      return motivo?{m,motivo,cod}:null;
+    }).filter(Boolean);
+}
+function abrirCorrigirCodigo(id){consVer='itens';verMov(id);}
+function abrirPendenciasCodigo(){const P=pendenciasCodigo();
+  const MOT={cortado:['🟡','formato estranho — confira, pode estar cortado ou digitado errado'],sem_codigo:['ℹ️','sem código (nem link direto)']};
+  const ST2={'Em estoque':['c','📦 estoque'],'Pedido':['c','🚚 pedido'],'Coleção':['k','⭐ coleção']};
+  const bloco=mot=>{const its=P.filter(x=>x.motivo===mot);if(!its.length)return '';
+    return `<div class="sec">${MOT[mot][0]} ${MOT[mot][1]} (${its.length})</div>`+its.map(x=>{
+      const m=x.m,rot=m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'Single/Carta')),st=ST2[sitDe(m)]||['c',sitDe(m)];
+      return `<div class="item" style="display:block;padding:10px 12px"><b>${rot}</b> <span class="tag ${st[0]}">${st[1]}</span>${x.cod?` <span class="meta">código atual: <b>${x.cod}</b></span>`:''}<div class="meta" style="margin-top:3px">${fmt(+m.valor||0)}${m.contraparte?' · '+m.contraparte:''}${m.data?' · '+dBR(new Date(m.data+'T00:00:00')):''}</div><div style="margin-top:5px;display:flex;gap:14px"><span class="lnk" onclick="abrirCorrigirCodigo('${m.id}')">→ ver na lista</span><span class="lnk" onclick="fecharModal();abrir('${m.id}')">✏️ editar direto</span></div></div>`;
+    }).join('');};
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🏷️ Pendências de cadastro — código da carta</div>
+    <div class="ctx">${P.length?`<b>${P.length} carta${P.length>1?'s':''}</b> em estoque, pedido ou coleção sem jeito de puxar preço da Liga ainda. Produto selado nunca entra aqui — só carta avulsa (Single/Carta).`:'<b>Tudo certo ✓</b> — toda carta avulsa que você ainda tem já tem código, link direto ou está resolvida.'}</div>
+    ${bloco('cortado')}${bloco('sem_codigo')}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 /* Assist de preço p/ campos "vale (mercado)" — nunca mexe em "valor" de compra/venda
    (isso é o que você pagou/recebeu, não o preço da Liga). Preenche NOME e VALE só se
    estiverem vazios (não sobrescreve o que você já digitou); dispara junto de digitar
