@@ -1621,7 +1621,15 @@ function abrirNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.len
     <div class="ctx">Emitida em <b>${dBR(new Date(h.data+'T00:00:00'))}</b> · ${h.contraparte||'—'} · custou <b>${fmt(tot)}</b>${prodT>0?` <span style="color:var(--mut)">(produto ${fmt(prodT)}${rotFT(freteT,taxaT)?' + '+rotFT(freteT,taxaT):''})</span>`:''}${nP>1?` · paga em <b>${nP}×</b> de <b>${fmt(tot/nP)}</b> (1ª em ${dBR(new Date((h.venc1||h.data)+'T00:00:00'))})`:' · à vista'} — confira com a nota do fornecedor: produto e frete/taxa separados são a prova real.</div>
     <button class="btn g" style="margin-bottom:8px" onclick="editarNota('${nid}')">✏️ editar a nota — quantidades, valores, frete e taxa</button>
     ${lin}
-    ${pedacos.length?`<div class="meta" style="padding:4px 12px">🧩 +${pedacos.length} pedaço(s) de saída (venda/abertura/troca) contando no total — toque num produto e use "ver o lote completo" pra rastrear.</div>`:''}
+    ${/* Felype 2026-08-12: quando a nota nao tem NENHUM produto visivel (todos viraram pedaco de
+          saida), a frase "toque num produto" mandava tocar em coisa que nao existe na tela — ele
+          clicou e nao foi a lugar nenhum. Caso real: nota de 21/06 HOLDING/VIANA, "0 produto",
+          R$739,50. Agora os proprios pedacos viram linhas clicaveis que levam ao lote. */
+      !pedacos.length?'':(itens.length?
+      `<div class="meta" style="padding:4px 12px">🧩 +${pedacos.length} pedaço(s) de saída (venda/abertura/troca) contando no total — toque num produto e use "ver o lote completo" pra rastrear.</div>`
+      :`<div class="meta" style="padding:4px 12px">🧩 Nenhum produto desta nota está inteiro hoje — os ${pedacos.length} pedaço(s) abaixo saíram por venda, abertura ou troca e são o que forma o total. Toque pra rastrear:</div>`
+       +pedacos.map(pz=>{const s=sitDe(pz);const EMOP={'Em estoque':'📦','Vendido':'💰','Coleção':'⭐','Pedido':'🚚','Aberto':'🔓','Trocado':'🔄'};
+         return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();verLote('${pz.id}')"><div><b>${EMOP[s]||''} ${(+pz.qtd||1)} un · ${pz.cat||'item'}</b>${pz.colecao?`<div class="meta">${pz.colecao} · ${s.toLowerCase()}</div>`:`<div class="meta">${s.toLowerCase()}</div>`}</div><div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+pz.valor||0)}<div class="meta" style="color:var(--blue)">ver o lote →</div></div></div>`;}).join(''))}
     <div style="display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:8px;padding-top:8px;font-weight:700"><span>Total (${itens.length} ${itens.length===1?'produto':'produtos'})</span><span>${fmt(tot)}</span></div>
     <div class="ctx" style="margin-top:8px">Entrou junto mas era separado? Toque num produto pra editar, use "✂ tirar da nota" na Consultar (um a um) ou desfaça a nota inteira:</div>
     <button class="btn g" style="margin-top:4px" onclick="desfazerNota('${nid}')">✂ desfazer nota — cada produto vira compra solta</button>
@@ -2727,7 +2735,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='12/08 22h38';
+const BUILD_TAG='12/08 22h40';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
