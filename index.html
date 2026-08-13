@@ -415,7 +415,13 @@ function diagLote(raizId){
   const fam=movs.filter(x=>x.tipo==='COMPRA'&&(raizDe(x)||x).id===raizId);
   const ref=raiz.valorOrig!=null?Math.round((+raiz.valorOrig)*100)/100:null;
   if(ref==null||fam.length<2) return null;
-  const soma=Math.round(fam.reduce((s,x)=>s+(+x.valor||0),0)*100)/100;
+  /* [CORRIGIDO 2026-08-13] a soma daqui divergia da regra que a prova real e o "aceitar
+     referência" já usavam: caixa ABERTA cujo valor foi redistribuído nos pedaços (filhos de
+     abertura) não pode contar de novo — contar os dois é dupla contagem e gerava alarme
+     falso neste diagnóstico depois de uma correção de "mesma compra". Mesma exclusão das
+     linhas irmãs (provaReal/aceitarConservacao). */
+  const filhosD=new Map();movs.forEach(m=>{if(m.tipo==='COMPRA'&&m.loteOrigem){if(!filhosD.has(m.loteOrigem))filhosD.set(m.loteOrigem,[]);filhosD.get(m.loteOrigem).push(m);}});
+  const soma=Math.round(fam.reduce((s,x)=>{const rd=sitDe(x)==='Aberto'&&(filhosD.get(x.id)||[]).some(f=>f.origem==='ABERTURA');return rd?s:s+(+x.valor||0);},0)*100)/100;
   if(Math.abs(soma-ref)<=0.02) return null;                       // conta fecha, nada a diagnosticar
   const suspeitas=fam.filter(x=>x.id!==raizId).filter(x=>
     Math.abs(Math.round((soma-(+x.valor||0))*100)/100-ref)<=0.02  // tirando ela, fecha
@@ -449,6 +455,78 @@ function soltarIntrusa(raizId){
   toast('🧩 Solta — a conta do lote fechou ✓');
   render();
 }
+/* MESMA COMPRA — a segunda saída do diagnóstico (Felype 2026-08-13, caso real ABBYs eyes:
+   a peça "intrusa" NÃO era de outra compra — a compra verdadeira era de 3 caixas e foi
+   lançada errada como 2+1; a 3ª ainda apareceu como "saiu em troca" sem troca existir).
+   O app só oferecia "soltar" (separar); faltava o caminho oposto. Regra dele, literal:
+   "se dá opção pra um lado, tem que dar pro outro — o programa nunca pode induzir".
+   IMPORTANTE (checagem dele, mesma data): marcar a caixa como "Aberta" NÃO manda nada pra
+   coleção — "Aberta" é só o rótulo da caixa que virou pedaços; o destino de cada pedaço
+   fica exatamente como está (estoque continua estoque pra vender, vendido continua vendido).
+   A conta: o valor dos pedaços volta pra raiz (tinha sido cavado do lugar errado), a caixa
+   redistribui o próprio valor nos pedaços por unidade (resíduo no último, nunca perde
+   centavo), a referência da compra vira a soma verdadeira, e o custo gravado DENTRO da
+   venda de pedaço vendido é atualizado junto — senão o lucro continuaria contado errado. */
+function _calcMesmaCompra(raizId){
+  const d=diagLote(raizId); if(!d||!d.intrusa) return null;
+  const raiz=d.raiz,x=d.intrusa;
+  /* [CORRIGIDO 2026-08-13, revisão adversarial com prova executada] pedaço que tem FILHOS
+     próprios (ex.: porção 'Aberto' de uma caixa da própria raiz, fluxo normal do app) entrava
+     na redistribuição — o valor dele era reescrito enquanto os filhos mantinham o antigo,
+     quebrando a conservação (soma 2.236,14 vs ref 2.218,49 no cenário de teste) SEM culpado
+     achável depois. Mesma guarda que o diagnóstico já usa pras suspeitas. */
+  const pecas=d.fam.filter(p=>p.id!==raiz.id&&p.id!==x.id&&p.loteOrigem===raiz.id&&(p.cat||'')!==(raiz.cat||'')&&!movs.some(y=>y.loteOrigem===p.id));
+  if(!pecas.length) return null;
+  const unTot=pecas.reduce((s,p)=>s+(+p.qtd||1),0);
+  if(unTot<1) return null;
+  const vUn=Math.round((+x.valor||0)/unTot*100)/100;
+  let acum=0;
+  const linhas=pecas.map((p,i)=>{
+    const nv=i===pecas.length-1?Math.round(((+x.valor||0)-acum)*100)/100:Math.round(vUn*(+p.qtd||1)*100)/100;
+    if(i<pecas.length-1)acum=Math.round((acum+nv)*100)/100;
+    return {p,novo:nv};
+  });
+  const devolvido=Math.round(pecas.reduce((s,p)=>s+(+p.valor||0),0)*100)/100;
+  return {raiz,x,linhas,vUn,unTot,
+    raizNovo:Math.round(((+raiz.valor||0)+devolvido)*100)/100,
+    refNova:Math.round((d.ref+(+x.valor||0))*100)/100,
+    refAtual:d.ref};
+}
+function abrirMesmaCompra(raizId){
+  const c=_calcMesmaCompra(raizId);
+  if(!c){alert('Não achei pedaços (boosters/itens) pendurados nesta compra pra redistribuir — nesse formato, o caminho é soltar ou editar à mão.');return;}
+  const rotX=(c.x.colecao?c.x.colecao+' · ':'')+(c.x.cat||'item');
+  const linPecas=c.linhas.map(({p,novo})=>{const s=sitDe(p);
+    return `<div class="item" style="justify-content:space-between;padding:8px 12px"><div><b>${(+p.qtd||1)} un · ${p.cat||'item'}</b><div class="meta">continua: ${s.toLowerCase()}</div></div><div style="text-align:right"><span style="color:var(--mut);text-decoration:line-through">${fmt(+p.valor||0)}</span> → <b>${fmt(novo)}</b></div></div>`;}).join('');
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:31;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🔗 É da mesma compra — conferir e aplicar</div>
+    <div class="ctx">A compra verdadeira passa a ser UMA só, de <b>${fmt(c.refNova)}</b>. A caixa "${rotX}" (${fmt(+c.x.valor||0)}) deixa de aparecer como ${sitDe(c.x)==='Trocado'?'"saiu em troca" (troca que nunca existiu)':'"'+sitDe(c.x).toLowerCase()+'"'} e vira <b>ABERTA</b> — aberta pra venda: <b>nada vai pra coleção</b>, cada pedaço continua exatamente onde está. O valor dela (${fmt(c.vUn)} por unidade) passa a morar dentro dos ${c.unTot} pedaços:</div>
+    <div class="item" style="justify-content:space-between;padding:8px 12px"><div><b>${(+c.raiz.qtd||1)} un · ${c.raiz.cat||'item'} (origem)</b><div class="meta">continua: ${sitDe(c.raiz).toLowerCase()}</div></div><div style="text-align:right"><span style="color:var(--mut);text-decoration:line-through">${fmt(+c.raiz.valor||0)}</span> → <b>${fmt(c.raizNovo)}</b></div></div>
+    ${linPecas}
+    <div class="calc" style="margin-top:8px">Referência da compra: <span style="color:var(--mut);text-decoration:line-through">${fmt(c.refAtual)}</span> → <b>${fmt(c.refNova)}</b> · conta fecha exata</div>
+    <div class="meta" style="margin-top:4px">Confira antes de aplicar: TODOS os pedaços listados acima saíram de DENTRO dessa caixa? Se algum veio de outra caixa, cancele — o app não tem como distinguir sozinho.</div>
+    ${c.linhas.some(({p})=>sitDe(p)==='Vendido')?`<div class="soon" style="display:block;margin-top:6px">⚠ Pedaço vendido ganha custo novo — o lucro daquela venda muda no relatório (fica o número honesto, que pode ser menor que o de hoje).</div>`:''}
+    <button class="btn" style="margin-top:12px" onclick="aplicarMesmaCompra('${raizId}')">aplicar a correção</button>
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal();verLote('${raizId}')">cancelar</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+function aplicarMesmaCompra(raizId){
+  const c=_calcMesmaCompra(raizId); if(!c) return;
+  if(!confirm('Aplicar? A compra vira UMA só de '+fmt(c.refNova)+' e a caixa de '+fmt(+c.x.valor||0)+' passa a ABERTA (nada vai pra coleção). Nada é apagado.'))return;
+  const hoje=new Date().toISOString().slice(0,10);
+  c.linhas.forEach(({p,novo})=>{
+    /* achar a venda ANTES de mexer no loteOrigem — o formato antigo de vínculo aponta pro pai */
+    const vd=movs.find(v=>v.tipo==='VENDA'&&v.origemId===p.id)||movs.find(v=>v.tipo==='VENDA'&&p.loteOrigem&&v.origemId===p.loteOrigem&&v.data===p.dataVenda&&(+v.qtd||1)===(+p.qtd||1)&&Math.abs((+v.custoOrigem||0)-(+p.valor||0))<0.02);
+    p.loteOrigem=c.x.id;p.origem='ABERTURA';
+    p.valor=novo;p.vUnit=Math.round(novo/(+p.qtd||1)*100)/100;
+    if(vd){vd.custoOrigem=novo;if(vd.origemId!==p.id&&vd.origemId===c.raiz.id)vd.origemId=c.x.id;}
+  });
+  c.raiz.valor=c.raizNovo;
+  c.raiz.valorOrig=c.refNova;
+  c.x.situacao='Aberto';c.x.destino='Aberto';delete c.x.dataTroca;delete c.x.trocaId;delete c.x.dataSaida;
+  c.x.obs=((c.x.obs||'')+' [corrigido '+hoje+': era parte da MESMA compra, lançada errada — aberta nos pedaços, sem troca]').trim();
+  save();fecharModal();
+  toast('🔗 Corrigido — a compra agora é uma só: '+fmt(c.refNova)+' ✓');
+  verLote(c.raiz.id);}
 function verLote(id){const m=movs.find(x=>x.id===id);if(!m)return;
   const raiz=raizDe(m)||m;
   const familia=movs.filter(x=>x.tipo==='COMPRA'&&(raizDe(x)||x).id===raiz.id);
@@ -466,7 +544,12 @@ function verLote(id){const m=movs.find(x=>x.id===id);if(!m)return;
     ${(function(){const d=diagLote(raiz.id);if(!d)return '';
       const cab=`<div class="soon" style="background:var(--nobg);color:var(--red);display:block"><b>🔴 A conta deste lote não fecha.</b><div style="margin-top:4px">Somando os pedaços dá <b>${fmt(d.soma)}</b>, mas a nota original foi <b>${fmt(d.ref)}</b> — <b>${fmt(Math.abs(d.dif))}</b> ${d.dif>0?'sobrando':'faltando'}.</div>`;
       if(d.intrusa){const x=d.intrusa,rot=(x.colecao?x.colecao+' · ':'')+(x.cat||'item');
-        return cab+`<div style="margin-top:6px">Achei o motivo: <b>${(+x.qtd||1)} un · ${rot} · ${fmt(+x.valor||0)}</b> está somando aqui, mas é de <b>outra compra</b>${x.notaId?' (tem nota própria)':''}${sitDe(x)==='Trocado'?' e aparece como <b>saiu em troca</b> sem troca registrada':''}. Sem ela a conta fecha exata.</div><div class="lnk" style="margin-top:6px;font-weight:700" onclick="soltarIntrusa('${raiz.id}')">→ 🧩 soltar do lote (vira compra própria, valor intacto)</div><div class="meta" style="margin-top:4px">Depois de soltar, confira a <b>quantidade</b> da linha de origem — quantidade errada é dado digitado, o app não tem como adivinhar.</div></div>`;}
+        /* [CORRIGIDO 2026-08-13, apontamento do Felype] o texto antigo AFIRMAVA "é de outra
+           compra" e só oferecia soltar — induzia pra um lado quando só o dono sabe a verdade.
+           Agora: apresenta o achado como fato (a peça explica a diferença) e as DUAS leituras
+           possíveis, cada uma com seu gesto. Quem decide é ele, nunca o app. */
+        const temMesma=!!_calcMesmaCompra(raiz.id);
+        return cab+`<div style="margin-top:6px">O que explica a diferença: <b>${(+x.qtd||1)} un · ${rot} · ${fmt(+x.valor||0)}</b>${x.notaId?' (tem nota própria)':''}${sitDe(x)==='Trocado'?', que aparece como <b>saiu em troca</b> sem nenhuma troca registrada':''}. Duas leituras possíveis — só você sabe qual é a verdadeira:</div><div class="lnk" style="margin-top:6px;font-weight:700" onclick="soltarIntrusa('${raiz.id}')">→ 🧩 ela é de OUTRA compra — soltar do lote (vira compra própria, valor intacto)</div>${temMesma?`<div class="lnk" style="margin-top:4px;font-weight:700" onclick="abrirMesmaCompra('${raiz.id}')">→ 🔗 ela é da MESMA compra (lançada errada) — juntar de vez e redistribuir a conta</div>`:''}<div class="meta" style="margin-top:4px">Os dois mostram a conta completa antes de aplicar. Nada é apagado em nenhum dos dois.</div></div>`;}
       return cab+`<div style="margin-top:6px">${d.ambiguo?'Mais de um pedaço poderia explicar sozinho — não vou escolher no chute.':'Nenhum pedaço isolado explica a diferença.'} Confira as linhas abaixo: valor de peça editado à mão, ou peça de outra nota somando aqui.</div></div>`;})()}
     <div class="ctx">Compra original ${raiz.data?dBR(new Date(raiz.data+'T00:00:00')):'—'}${raiz.contraparte?' de <b>'+raiz.contraparte+'</b>':''}${raiz.notaId?' · <span class="lnk" onclick="fecharModal();abrirNota(\''+raiz.notaId+'\')">🧾 ver nota</span>':''} — cada pedaço abaixo e pra onde foi. A soma dos pedaços é o custo original: nada se perde.</div>
     ${lin}
@@ -2816,7 +2899,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/08 00h41';
+const BUILD_TAG='13/08 20h31';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
