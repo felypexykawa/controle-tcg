@@ -720,12 +720,36 @@ function motor(filtrar){
    valor de mercado. Só conta item com preço já coletado; nunca inventa preço pro resto —
    por isso devolve quantos entraram (comN) e quantos ficaram de fora (semN), honesto sobre
    cobertura parcial. */
-function valorMercadoDe(lista){let val=0,comN=0,semN=0;
-  lista.forEach(m=>{const pl=precoLigaDe(m.codigo);if(!pl||pl.status==='AMBIGUO'){semN++;return;}
-    const vs=ligaVersoes(pl);if(!vs.length){semN++;return;}
-    const preco=vs[0].md!=null?vs[0].md:vs[0].mn;if(preco==null){semN++;return;}
-    val+=preco*(+m.qtd||1);comN++;});
-  return {val:Math.round(val*100)/100,comN,semN};}
+/* VALOR DE MERCADO — REGRA DO FELYPE 2026-08-12: NUNCA considerar zero.
+   Cascata, nesta ordem:
+     1) preço ATUAL da Liga (mesmo que esteja ABAIXO do custo — ele foi explícito: "se o valor
+        atual for menor do que o custo, tudo bem, entra o valor atual");
+     2) ÚLTIMO preço já visto na Liga (caso da carta que saiu do site: "ele não pode marcar como
+        zero; o valor que vai ficar é o último valor achado na Liga");
+     3) o CUSTO de aquisição ("se não tem informação do valor atual, considera no mínimo o custo").
+   Antes desta correção a função simplesmente IGNORAVA o item sem preço, o que fazia o card
+   mostrar um total que parecia o valor da coleção mas era o de um punhado de cartas. */
+function ultimoPrecoLigaDe(cod){
+  const h=(_precosLiga&&_precosLiga.historico)?(_precosLiga.historico[(''+cod).trim()]||_precosLiga.historico[codLimpo(cod)]):null;
+  if(!h)return null;
+  let melhorD='',preco=null;
+  Object.values(h).forEach(serie=>{if(!Array.isArray(serie))return;
+    serie.forEach(p=>{if(p&&p.d&&p.d>=melhorD&&(p.md!=null||p.mn!=null)){melhorD=p.d;preco=(p.md!=null?p.md:p.mn);}});});
+  return preco;
+}
+function valorMercadoDe(lista){
+  let val=0,comN=0,semN=0,porUltimo=0,porCusto=0;
+  lista.forEach(m=>{
+    const qtd=(+m.qtd||1);
+    const pl=precoLigaDe(m.codigo);
+    const vs=(pl&&pl.status!=='AMBIGUO')?ligaVersoes(pl):[];
+    const atual=vs.length?(vs[0].md!=null?vs[0].md:vs[0].mn):null;
+    if(atual!=null){val+=atual*qtd;comN++;return;}
+    const ult=m.codigo?ultimoPrecoLigaDe(m.codigo):null;
+    if(ult!=null){val+=ult*qtd;porUltimo++;semN++;return;}
+    val+=(+m.valor||0);porCusto++;semN++;
+  });
+  return {val:Math.round(val*100)/100,comN,semN,porUltimo,porCusto};}
 function aPagar(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   const parc=movs.filter(m=>m.tipo==='COMPRA'&&m.pgTipo==='Parcelado'&&+m.nParc>0);
   const notas={},solo=[];
@@ -819,6 +843,23 @@ function selPeriodo(){return `<div class="perbox"><div class="seg" style="margin
 function snap(){return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel};}
 function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];}selMode=false;selIds={};tela=t;editId=null;render();}
 function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
+/* Busca por digitação da Consulta (Felype 2026-08-12). Dois cuidados que fazem a diferença
+   entre funcionar e ser inutilizável no celular:
+   1) render() recria a tela inteira — sem devolver o foco e a posição do cursor, o teclado
+      fecharia a cada letra digitada;
+   2) espera de 200ms antes de refiltrar, pra não recalcular a lista a cada tecla em quem tem
+      centenas de lançamentos. */
+let _buscaT=null;
+function buscaCons(el){
+  const v=el.value,pos=el.selectionStart;
+  consQ=v;expandId=null;
+  clearTimeout(_buscaT);
+  _buscaT=setTimeout(()=>{
+    render();
+    const n=document.getElementById('consBusca');
+    if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(e){}}
+  },200);
+}
 function verFiltro(f){consF=f;consMenu=false;consQ='';expandId=null;render();}
 function voltar(){const s=navHist.pop();if(!s)return;tela=s.tela;consF=s.consF;consQ=s.consQ;consMenu=s.consMenu;perDe=s.perDe;perAte=s.perAte;perSel=s.perSel;editId=s.editId;tipoSel=s.tipoSel;render();}
 function render(){if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
@@ -880,8 +921,8 @@ function vPainel(){
     <div class="grid2">
       <div class="mini click" onclick="consF='COMPRA';go('consultar')"><div class="k">Investido total ${per?'(período)':''}</div><div class="v">${fmt(r.investido+r.despTotal)}</div>${r.despTotal>0?`<div style="font-size:11px;color:var(--mut);margin-top:4px;line-height:1.7">📦 ${fmt(r.investido)} <span style="opacity:.7">mercadoria</span><br>🧾 ${fmt(r.despTotal)} <span style="opacity:.7">infraestrutura</span></div>`:`<div class="s">o que comprou →</div>`}</div>
       <div class="mini click" onclick="consF='VENDA';go('consultar')"><div class="k">Vendido ${per?'(período)':'(tudo)'}</div><div class="v" style="color:var(--green)">${fmt(r.vendasLiq)}</div><div class="s">líquido →</div></div>
-      <div class="mini click" onclick="consF='ESTOQUE';go('consultar')"><div class="k">Estoque pra vender</div><div class="v" style="color:var(--blue)">${fmt(r.estoque)}</div><div class="s">a custo · hoje →</div>${(function(){const ev=valorMercadoDe(r.disp);return ev.comN>0?`<div style="font-size:11px;color:var(--green);margin-top:3px">vale ~${fmt(ev.val)}${ev.semN>0?' · '+ev.comN+'/'+(ev.comN+ev.semN)+' com preço':''}</div>`:'';})()}</div>
-      <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div>${(function(){const cv=valorMercadoDe(r.colItens);return cv.comN>0?`<div style="font-size:11px;color:var(--green);margin-top:3px">vale ~${fmt(cv.val)}${cv.semN>0?' · '+cv.comN+'/'+(cv.comN+cv.semN)+' com preço':''}</div>`:'';})()}</div>
+      <div class="mini click" onclick="consF='ESTOQUE';go('consultar')"><div class="k">Estoque pra vender</div><div class="v" style="color:var(--blue)">${fmt(r.estoque)}</div><div class="s">a custo · hoje →</div>${(function(){const ev=valorMercadoDe(r.disp);if(!ev.comN&&!ev.semN)return '';const tot=ev.comN+ev.semN;const detalhe=ev.semN>0?` · ${ev.comN}/${tot} com preço da Liga${ev.porCusto?', '+ev.porCusto+' pelo custo':''}${ev.porUltimo?', '+ev.porUltimo+' pelo último visto':''}`:'';return `<div style="font-size:11px;color:var(--green);margin-top:3px">vale ~${fmt(ev.val)}${detalhe}</div><div style="font-size:10px;color:var(--mut)">preços da Liga ${precosLigaQuando()||'ainda não coletados'}</div>`;})()}</div>
+      <div class="mini click" onclick="consF='COLECAO';go('consultar')"><div class="k">Coleção</div><div class="v" style="color:var(--purple)">${fmt(r.colCusto)}</div><div class="s">a custo · hoje →</div>${(function(){const cv=valorMercadoDe(r.colItens);if(!cv.comN&&!cv.semN)return '';const tot=cv.comN+cv.semN;const detalhe=cv.semN>0?` · ${cv.comN}/${tot} com preço da Liga${cv.porCusto?', '+cv.porCusto+' pelo custo':''}${cv.porUltimo?', '+cv.porUltimo+' pelo último visto':''}`:'';return `<div style="font-size:11px;color:var(--green);margin-top:3px">vale ~${fmt(cv.val)}${detalhe}</div><div style="font-size:10px;color:var(--mut)">preços da Liga ${precosLigaQuando()||'ainda não coletados'}</div>`;})()}</div>
       ${r.pedido>0?`<div class="mini click" onclick="consF='PEDIDO';go('consultar')"><div class="k">🚚 A caminho</div><div class="v" style="color:var(--amber)">${fmt(r.pedido)}</div><div class="s">pedido feito, ainda não chegou →</div></div>`:''}
       ${contasBanc.length?`<div class="mini click" onclick="go('contas')"><div class="k">💼 Saldo em contas</div><div class="v" style="color:${contasBanc.reduce((s,cb)=>s+saldoConta(cb),0)>=0?'var(--green)':'var(--red)'}">${fmt(contasBanc.reduce((s,cb)=>s+saldoConta(cb),0))}</div><div class="s">${contasBanc.length} conta${contasBanc.length===1?'':'s'} · detalhe no Fluxo →</div></div>`:''}</div>
     <div class="sec">Contas <span style="text-transform:none;font-weight:400">(o que falta pagar e receber)</span></div>
@@ -1274,6 +1315,20 @@ function vConsultar(){
   const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='PEDIDO'?(m.tipo==='COMPRA'&&sitDe(m)==='Pedido'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='TROCA'?(m.tipo==='COMPRA'&&(m.origem==='TROCA'||m.trocaId||m.deu||sitDe(m)==='Trocado')):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consCat||(m.cat||'')===consCat)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta||m.contaDe===consConta||m.contaPara===consConta||m.dinConta===consConta)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
   const doTipo=movs.filter(porTipo);
   let ord=doTipo.filter(m=>noPer(m.data));
+  /* BUSCA POR DIGITAÇÃO (Felype 2026-08-12: "ainda estou sem campo de busca por digitação;
+     no computador uso Ctrl+F, no celular é impraticável"). O motor de busca já existia — consQ
+     filtrava e havia até o aviso "filtrando: X" — mas NUNCA existiu campo pra digitar: consQ só
+     era preenchido clicando em gráfico/tabela. Aqui o filtro é explícito e cobre o que ele usa
+     pra achar uma carta: descrição/nome, código, coleção, categoria, jogo, pessoa e observação.
+     Sem acento e sem caixa, e cada palavra digitada precisa bater (busca "charizard 211" acha). */
+  if(q){
+    const termos=q.split(/\s+/).filter(Boolean);
+    const semAcento=s=>(''+(s||'')).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    ord=ord.filter(m=>{
+      const alvo=semAcento([m.desc,m.codigo,m.colecao,m.cat,m.jogo,m.contraparte,m.obs,m.conta,m.situacao,m.idioma].join(' '));
+      return termos.every(t=>alvo.includes(semAcento(t)));
+    });
+  }
   const cmpData=(a,b)=>(a.data||'')<(b.data||'')?1:-1;
   if(consOrd==='jogo')ord.sort((a,b)=>((a.jogo||'Pokémon').localeCompare(b.jogo||'Pokémon'))||cmpData(a,b));
   else if(consOrd==='pessoa')ord.sort((a,b)=>((a.contraparte||'—').localeCompare(b.contraparte||'—'))||cmpData(a,b));
@@ -1442,7 +1497,11 @@ function vConsultar(){
     vistaNotas=`<div class="ctx">💰 <b>${vidsVis.length} venda${vidsVis.length!==1?'s':''} com vários itens</b>${soltosV.length?' + '+soltosV.length+' venda(s) de item único':''} — toque pra dissecar. "☰ detalhado" mostra item por item.</div>${cardsV}${cardsSV}`;
   }
   const modoAgrupado=modoNotas||modoVendaG;
-  return `${voltar}${fCons}${chip}${aviso}${ctxTroca}${segVer}${modoAgrupado?'':ordBar}${modoAgrupado?'':selBar}${semVincBar}${totBar}${modoAgrupado?vistaNotas:lista}${ord.length?`<div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button></div>`:''}`;
+  const buscaBar=`<div style="display:flex;gap:6px;align-items:center;margin:6px 0">
+    <input id="consBusca" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 buscar carta, código, coleção…" value="${(consQ||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" oninput="buscaCons(this)" style="flex:1">
+    ${consQ?`<span class="lnk" style="flex:none" onclick="consQ='';render()">limpar ✕</span>`:''}
+  </div>`;
+  return `${voltar}${fCons}${buscaBar}${chip}${aviso}${ctxTroca}${segVer}${modoAgrupado?'':ordBar}${modoAgrupado?'':selBar}${semVincBar}${totBar}${modoAgrupado?vistaNotas:lista}${ord.length?`<div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarCSV()">⬇ Excel</button></div>`:''}`;
 }
 /* filtro das linhas do Fluxo (compartilhado com a tabela de impressão) */
 function okCtG(x){return (!ctPess||(x.m.contraparte||'—')===ctPess)&&(!ctJogo||(x.m.jogo||'')===ctJogo)&&(!ctConta||(x.m.conta||'')===ctConta)&&(!ctCat||(x.nota?movs.some(mm=>mm.notaId===x.nota.id&&(mm.cat||'')===ctCat):(x.m.cat||'')===ctCat))&&noPer((x.venc||x.data).toISOString().slice(0,10));}
@@ -2624,7 +2683,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='12/08 12h05';
+const BUILD_TAG='12/08 14h20';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
