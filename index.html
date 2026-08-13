@@ -1312,7 +1312,7 @@ function vConsultar(){
   if(consF==='CADASTRO')return voltar+vCadastros();
   if(movs.length===0)return `<div class="card"><div class="empty">Nada lançado ainda.</div></div>`;
   const q=consQ.toLowerCase();
-  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='PEDIDO'?(m.tipo==='COMPRA'&&sitDe(m)==='Pedido'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='TROCA'?(m.tipo==='COMPRA'&&(m.origem==='TROCA'||m.trocaId||m.deu||sitDe(m)==='Trocado')):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consCat||(m.cat||'')===consCat)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta||m.contaDe===consConta||m.contaPara===consConta||m.dinConta===consConta)&&(!q||((m.colecao||'')+' '+(m.contraparte||'')+' '+(m.jogo||'')+' '+(m.cat||'')+' '+(m.obs||'')+' '+(m.conta||'')+' '+(m.codigo||'')).toLowerCase().includes(q));
+  const porTipo=m=>(consF==='COMPRA'?m.tipo==='COMPRA':consF==='VENDA'?m.tipo==='VENDA':consF==='ESTOQUE'?(m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'):consF==='PEDIDO'?(m.tipo==='COMPRA'&&sitDe(m)==='Pedido'):consF==='COLECAO'?(m.tipo==='COMPRA'&&sitDe(m)==='Coleção'):consF==='TROCA'?(m.tipo==='COMPRA'&&(m.origem==='TROCA'||m.trocaId||m.deu||sitDe(m)==='Trocado')):consF==='DESPESA'?m.tipo==='DESPESA':true)&&(!consJogo||consJogo==='todos'||(m.jogo||'Pokémon')===consJogo)&&(!consCol||(m.colecao||'')===consCol)&&(!consCat||(m.cat||'')===consCat)&&(!consPess||(m.contraparte||'')===consPess)&&(!consConta||(m.conta||'')===consConta||m.contaDe===consConta||m.contaPara===consConta||m.dinConta===consConta);
   const doTipo=movs.filter(porTipo);
   let ord=doTipo.filter(m=>noPer(m.data));
   /* BUSCA POR DIGITAÇÃO (Felype 2026-08-12: "ainda estou sem campo de busca por digitação;
@@ -2683,7 +2683,7 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='12/08 21h20';
+const BUILD_TAG='12/08 21h27';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
