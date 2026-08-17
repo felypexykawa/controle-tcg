@@ -1035,7 +1035,7 @@ function selPeriodo(){return `<div class="perbox"><div class="seg" style="margin
   <div class="row2"><div><label style="margin:0 0 3px">De</label><input type="date" value="${perDe}" onchange="perDe=this.value;perSel='custom';render()"></div>
     <div><label style="margin:0 0 3px">Até</label><input type="date" value="${perAte}" onchange="perAte=this.value;perSel='custom';render()"></div></div></div>`;}
 function snap(){return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel};}
-function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];}selMode=false;selIds={};tela=t;editId=null;render();}
+function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];_lancarDirty=false;}selMode=false;selIds={};tela=t;editId=null;render();}
 function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
 /* Busca por digitação da Consulta (Felype 2026-08-12). Dois cuidados que fazem a diferença
    entre funcionar e ser inutilizável no celular:
@@ -1055,7 +1055,12 @@ function buscaCons(el){
   },200);
 }
 function verFiltro(f){consF=f;consMenu=false;consQ='';expandId=null;render();}
-function voltar(){const s=navHist.pop();if(!s)return;tela=s.tela;consF=s.consF;consQ=s.consQ;consMenu=s.consMenu;perDe=s.perDe;perAte=s.perAte;perSel=s.perSel;editId=s.editId;tipoSel=s.tipoSel;render();}
+function voltar(){const s=navHist.pop();if(!s)return;
+  /* [R1 2026-08-17, achado da revisão] sair do Lançar pelo "‹ voltar" não passa por go(), então
+     não limpava o rascunho — e, PIOR (bug pré-existente que o R1 revelou), não limpava as
+     FOTOS pendentes: fotos escolhidas num lançamento abandonado grudavam no próximo salvo. */
+  if(tela==='lancar'&&s.tela!=='lancar'){_lancarDirty=false;_fotosPend=[];}
+  tela=s.tela;consF=s.consF;consQ=s.consQ;consMenu=s.consMenu;perDe=s.perDe;perAte=s.perAte;perSel=s.perSel;editId=s.editId;tipoSel=s.tipoSel;render();}
 function render(){if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
   const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
@@ -2128,7 +2133,7 @@ function salvar(){
     let o={id:editId||novoId(),tipo:'COMPRA',origem:'TROCA',data:g('f_data')||e?.data,qtd:1,valor:custou+din,cat:e?.cat||'Single/Carta',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):(e?.colecao||''),idioma:e?.idioma||'—',situacao:g('f_sit')||sitDe(e||{})||'Em estoque',destino:(g('f_sit')==='Coleção')?'Coleção':'Vender',destIni:e?.destIni||((g('f_sit')==='Coleção')?'Coleção':'Em estoque'),contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):(e?.contraparte||''),deu:deuTx,custou,din,recebi,taxa:0,pgTipo:'À vista',obs:recebi+' (🔄 troca: dei '+(deuTx||'?')+(din>0?' + '+fmt(din):'')+')'};
     if(editId){const i=movs.findIndex(m=>m.id===editId);const old=movs[i];
       movs[i]=(old&&old.tipo===o.tipo)?{...old,...o}:o;}else movs.push(o);
-    if(!editId)aplicarFotosPend(o.id);save();toast('Troca registrada ✓');editId=null;render();return;}
+    if(!editId)aplicarFotosPend(o.id);save();_lancarDirty=false;toast('Troca registrada ✓');editId=null;render();return;}
   if(tipoSel==='DESPESA'){const val=+g('f_val')||0;const cat=g('f_dcat');if(!cat||cat==='__add__'){alert('Escolha a categoria da despesa.');return;}
     const cp=(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',ob=g('f_obs')||'';
     const base={tipo:'DESPESA',natureza:despNat,cat,valor:val,contraparte:cp,obs:ob,conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):''};
@@ -2211,7 +2216,7 @@ function salvar(){
         const custoUnit=(+e.custoOrigem||0)/qAntiga;
         movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}
     save();editId=null;toast('Alteração salva');go('consultar');return;}
-  movs.push(obj);aplicarFotosPend(obj.id);save();toast('Salvo ✓ — lance o próximo');render();
+  movs.push(obj);aplicarFotosPend(obj.id);save();_lancarDirty=false;toast('Salvo ✓ — lance o próximo');render();
 }
 function carregarAcervo(){if(confirm('Carregar o histórico da planilha (24 compras + 34 vendas)? Substitui o que está no app agora.')){movs=SEED.map(m=>({...m}));save();fecharModal();go('painel');toast('Histórico original restaurado ✓');}}
 function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();const snap={ts:now,n:movs.length,dados:movs.map(m=>({...m}))};if(b.length&&now-b[b.length-1].ts<90000)b[b.length-1]=snap;else b.push(snap);if(b.length>20)b=b.slice(-20);localStorage.setItem('tcg_backups',JSON.stringify(b));}catch(e){}}
@@ -2840,10 +2845,16 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     const payload={...final,_upd:Date.now(),_by:_userEmail};
     try{const kb=Math.round(JSON.stringify(payload).length/1024);
       if(kb>700&&!window._doc1mbAviso){window._doc1mbAviso=true;toast('⚠ Seus dados estão em '+kb+'KB — perto do limite de 1MB da gaveta da nuvem. Avise o Felype pra planejar a divisão.');}}catch(e){}
+    /* [R1 2026-08-17, caso do form que zera] registrar o _upd AQUI, dentro da transação, e
+       não no .then: o eco da própria escrita (onSnapshot) pode chegar ANTES do .then rodar —
+       se o registro fosse depois, aplicarNuvem não reconheceria o eco como próprio e
+       repintaria a tela em cima do formulário em digitação. Se a transação falhar depois
+       desta linha, o valor "pendente" só força um merge extra no próximo save (direção
+       segura: nunca perde dado, no pior caso funde de novo). */
+    _ultimoUpdAplicado=payload._upd;
     tx.set(ref,payload);
     return payload;
   })).then(payload=>{
-    _ultimoUpdAplicado=payload._upd;
     if(fundiu){
       movs=final.movs;jogos=final.jogos;cats=final.cats;cols=final.cols;pess=final.pess;pgs=final.pgs;despCats=final.despCats;cadastros=final.cadastros;contasBanc=final.contasBanc;codigosResolvidos=final.codigosResolvidos;colsJ=final.colsJ;colsG=final.colsG;
       localStorage.setItem(MK,JSON.stringify(movs));
@@ -2871,8 +2882,17 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
    branco) na frente da pessoa, sem aviso nenhum. Os dados (movs etc.) são sempre atualizados
    por baixo — só a REPINTURA da tela é que espera o rascunho fechar (salvar/cancelar já
    chamam render() sozinhos com os dados já frescos). */
+/* [R1 2026-08-17] _lancarDirty: o caso real do Felype — preencheu data/produto/qualidade,
+   criou um fornecedor novo pelo seletor, e o ECO da própria gravação na nuvem repintou o
+   formulário, apagando tudo. A whitelist de 9 campos abaixo não segurava (data, qtd,
+   condição, selects, bloco da nota — todos de fora). Whitelist "genérica por valor" daria
+   falso-positivo permanente (selects/data vêm pré-preenchidos e nunca ficam vazios) — por
+   isso a solução é uma FLAG DE INTERAÇÃO: qualquer digitação/mudança real do usuário no
+   Lançar marca sujo; navegar pra fora ou salvar limpa. */
+let _lancarDirty=false;
 function lancarTemRascunho(){
   if(tela!=='lancar')return false;
+  if(_lancarDirty)return true;
   if(editId)return true;
   if(tipoSel==='TROCA'&&(trocaDei.length||trocaRecebi.length))return true;
   if(compraModo==='nota'&&notaItens.length)return true;
@@ -2880,7 +2900,13 @@ function lancarTemRascunho(){
   const ids=['f_val','f_cod','f_obs','f_desc','d_desc','d_custo','r_desc','r_val','r_cod'];
   return ids.some(id=>{const el=document.getElementById(id);return el&&(''+el.value).trim()!=='';});
 }
-function aplicarNuvem(d){if(!d||_restaurando)return;if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));
+function aplicarNuvem(d){if(!d||_restaurando)return;
+  /* [R1 2026-08-17] eco da própria escrita: o estado local JÁ É este payload (registrado
+     dentro da transação em salvarNuvem) — reprocessar e repintar era o que apagava o
+     formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
+     fluxo normal abaixo. */
+  if(d._upd&&d._upd===_ultimoUpdAplicado)return;
+  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));
   if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
   render();}
 function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
@@ -2898,8 +2924,15 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
    (altura muda entre celular e PC; medir ao vivo em vez de chutar px) */
 function fixAlturaHeader(){const h=document.querySelector('header');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');}
 window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
+/* [R1 2026-08-17] marca o formulário do Lançar como "em uso" a partir de QUALQUER digitação
+   ou mudança real do usuário (input e change borbulham do campo até o #view). Um listener
+   só, delegado — cobre todos os campos de todos os sub-formulários (compra, nota, venda,
+   troca, despesa) sem depender de whitelist de ids. Limpa ao salvar e ao navegar (go). */
+(function(){const v=document.getElementById('view');if(!v)return;
+  const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
+  v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/08 20h31';
+const BUILD_TAG='17/08 20h04';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
