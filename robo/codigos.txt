@@ -1,9 +1,9 @@
 # Codigos de carta para o robo precificar (um por linha).
 # Alimentado pela leitura do estoque real (tcg_movs_v2, COMPRA ativa) + fallback manual.
 # Uniao ADITIVA: o estoque ADICIONA codigos, nunca remove (anti-regressao, CLAUDE.md Regra 13).
-# Formato aceito: "NUM/TOTAL" puro OU "Nome (NUM/TOTAL)" (padrao validado que cai direto na carta).
-# Atualizado 2026-08-10 pela leitura do estoque (55 itens ativos no estoque + 4 mantidos por
-# anti-regressao que nao aparecem mais no estoque atual: 135/108, 015/081, 188/172, 245/198).
+# Formato aceito: "NUM/TOTAL" puro OU "Nome (NUM/TOTAL)" OU "Nome NUM/TOTAL".
+# Atualizado 2026-08-17 pela leitura do estoque (92 itens ativos + 4 mantidos por anti-regressao
+# que nao aparecem mais no estoque atual: 135/108, 015/081, 188/172, 245/198).
 135/108
 122/086
 Kingdra (tg03/tg30)
@@ -63,6 +63,43 @@ Squirtle (170jp/165)
 Ninetales (110jp/108)
 Articuno (102jp/100)
 Dawn (118/094)
+Charmander (168jp/165)
+213/191
+068/191
+232/191
+133/191
+Magneton (159/∞)
+Treecko (055/∞)
+Torchic (056/∞)
+Mudkip (057/∞)
+Froakie (060/∞)
+Fennekin (059/∞)
+Chespin (058/∞)
+Quaxly (063/∞)
+Fuecoco (062/∞)
+Sprigatito (061/∞)
+Frosmoth 192/184
+Milotic 070/068
+Morpeko da marine 206/∞
+Flaaffy 194/184
+Spiritomb 076/071
+Staraptor do lauro 249/217
+Hoothoot 073/067
+Passimian 125/122
+Dusknoir 198/184
+Mimikyu da Equipe Rocket 238/217
+Arcanine de hisui 075/071
+Spiritomb da cintia 244/217
+Falinks 204/184
+Torkoal 237/236
+Clefairy ex da Lílian (195/∞)
+Stoutland 248/236
+Kleavor 071/067
+Roserade 068/067
+Wyrdeer 070/067
+Kingdra 190/184
+ST 14
+ST 22
 # --- Nao coletaveis automaticamente (nao inventar busca sem identificador) ---
 # Jolteon            -> cadastrado SEM codigo; so coletavel via link direto (codigoUrl no app)
 # Mew (052           -> codigo truncado no cadastro (falta /TOTAL e o fecha-parenteses); corrigir no app
