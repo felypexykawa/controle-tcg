@@ -2712,12 +2712,27 @@ function insSimbolo(inputId,ch){const el=document.getElementById(inputId);if(!el
   el.dispatchEvent(new Event('input',{bubbles:true}));}
 /* Colinha dos padrões de código (definidos por Felype e Laura) — consulta rápida no cadastro.
    Tem id próprio (modalPad) pra poder abrir POR CIMA do modal Abrir sem destruí-lo. */
+/* [2026-08-17, pedido do Felype] os padrões abaixo são do POKÉMON — One Piece e Yu-Gi-Oh têm
+   os seus próprios e ainda não foram estudados. Em vez de mostrar regra de um jogo como se
+   valesse pra todos (que é o tipo de coisa que faz o dono cadastrar errado confiando na tela),
+   a colinha declara de quem é a regra e admite o que ainda não sabemos. */
+function jogoAtualCod(){const ids=['f_jogo','n_jogo','v_jogo','r_jogo'];
+  for(const id of ids){const el=document.getElementById(id);if(el&&el.value)return el.value;}
+  return 'Pokémon';}
 function abrirPadroesCod(){document.getElementById('modalPad')?.remove();
+  const jg=jogoAtualCod();
+  if(jg!=='Pokémon'){document.body.insertAdjacentHTML('beforeend',`<div id="modalPad" onclick="if(event.target.id==='modalPad')document.getElementById('modalPad').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:45;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">❔ Padrões de código — ${jg}</div>
+    <div class="ctx">Os padrões que a gente mapeou até hoje são do <b>Pokémon</b> (número/total, JP/C, promocional com ∞). <b>${jg} ainda não foi estudado</b> — não vou inventar regra que pode te fazer cadastrar errado.</div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Enquanto isso, o caminho seguro</b><div class="meta">ache a carta na Liga pelo nome e use <b>🔗 colar link</b> — o app preenche nome e código sozinho, do jeito que a Liga escreve. Funciona em qualquer jogo.</div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Quer mapear ${jg}?</b><div class="meta">me manda 3-4 exemplos de código como aparecem na Liga (print serve) que eu monto a colinha específica, igual à do Pokémon.</div></div>
+    <button class="btn g" style="margin-top:10px" onclick="document.getElementById('modalPad').remove()">fechar</button></div></div>`);return;}
   document.body.insertAdjacentHTML('beforeend',`<div id="modalPad" onclick="if(event.target.id==='modalPad')document.getElementById('modalPad').remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:45;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
-    <div class="sec" style="margin-top:0">❔ Padrões de código</div>
+    <div class="sec" style="margin-top:0">❔ Padrões de código — Pokémon</div>
     <div class="item" style="display:block;padding:10px 12px"><b>Carta normal (EN/PT)</b><div class="meta">número/total da coleção — ex: <b>245/198</b></div></div>
-    <div class="item" style="display:block;padding:10px 12px"><b>Japonesa OU coreana</b><div class="meta"><b>JP</b> colado no número — ex: <b>167JP/165</b><br>coreana usa o MESMO código JP (mesmo valor de mercado)</div></div>
-    <div class="item" style="display:block;padding:10px 12px"><b>Chinesa</b><div class="meta"><b>C</b> colado no número — ex: <b>173C/151</b></div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Japonesa OU coreana <span style="color:var(--mut);font-weight:400">— só quando a carta TAMBÉM existe em EN/PT</span></b><div class="meta"><b>JP</b> colado no número — ex: <b>167JP/165</b><br>coreana usa o MESMO código JP (mesmo valor de mercado)</div></div>
+    <div class="item" style="display:block;padding:10px 12px"><b>Chinesa <span style="color:var(--mut);font-weight:400">— mesma regra</span></b><div class="meta"><b>C</b> colado no número — ex: <b>173C/151</b></div></div>
+    <div class="item" style="display:block;padding:10px 12px;border-left:3px solid var(--blue)"><b>⚠ Exclusiva daquele país = SEM letra</b><div class="meta">A letra (JP/C) serve só pra DIFERENCIAR a mesma carta que existe em vários idiomas. Se a carta é <b>exclusiva</b> da coleção japonesa (ou chinesa) — não tem versão EN/PT — o código vai <b>puro, sem letra nenhuma</b>: ex. <b>167/165</b>, não 167JP/165. Colocar a letra numa exclusiva faz a Liga não achar.</div></div>
     <div class="item" style="display:block;padding:10px 12px"><b>Achar a carta na Liga sem erro</b><div class="meta">buscar <b>Nome (código)</b> — ex: <b>Pikachu (173/165)</b> — cai direto na carta certa</div></div>
     <div class="item" style="display:block;padding:10px 12px"><b>Promocional com infinito</b><div class="meta">ex: <b>032/∞</b> — o teclado não tem o símbolo: use o botão <b>∞</b> ao lado do campo Código (insere onde o cursor estiver)</div></div>
     <div class="item" style="display:block;padding:10px 12px"><b>Carta antiga sem código</b><div class="meta">deixe o código vazio, ache a carta na Liga pelo nome e use <b>🔗 colar link</b> — o app preenche pelo link</div></div>
@@ -2932,7 +2947,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='17/08 20h04';
+const BUILD_TAG='17/08 20h47';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -2967,7 +2982,15 @@ let _precosLiga=null,_glVer='';
 fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.cartas){_precosLiga=j;if(document.getElementById('view'))render();}}).catch(()=>{});
 /* Aceita código "sujo" (nome junto, ex. "Cynthia's spiritomb (244/217)") — extrai o código
    dos parênteses do FIM. Robustez de leitura: os dados do usuário ficam como estão. */
-function codLimpo(cod){cod=(''+(cod||'')).trim();const m=cod.match(/\(([^()]+)\)\s*$/);return m?m[1].trim():cod;}
+/* [2026-08-17, achado do Felype] O TECLADO DO CELULAR entrega o infinito como EMOJI (♾️,
+   U+267E às vezes seguido do seletor de variação U+FE0F), mas a Liga — e o botão ∞ do próprio
+   app — usam o infinito MATEMÁTICO (∞, U+221E). Resultado real: "Mega Gardevoir ex (032/♾️)"
+   cadastrado pelo celular nunca casava com "032/∞" da Liga; o preço dava "não encontrado" e a
+   carta ainda aparecia como pendência de cadastro. Normalizar aqui conserta TODOS os caminhos
+   de uma vez (preço, picker de ambíguo, robô de coleta, checagens), porque codLimpo é o funil
+   por onde todo código passa antes de virar chave de busca. */
+function normCod(cod){return (''+(cod||'')).replace(/♾️?/g,'∞').replace(/\s+/g,' ').trim();}
+function codLimpo(cod){cod=normCod(cod);const m=cod.match(/\(([^()]+)\)\s*$/);return m?normCod(m[1]):cod;}
 function precoLigaDe(cod){if(!_precosLiga||!cod)return null;
   return _precosLiga.cartas[(''+cod).trim()]||_precosLiga.cartas[codLimpo(cod)]||null;}
 function ligaVersoes(pl){if(!pl)return[];if(Array.isArray(pl.versoes)&&pl.versoes.length)return pl.versoes;if(pl.menor!=null)return[{v:'',mn:pl.menor,md:pl.medio||null,mx:pl.maior||null}];return[];}
@@ -2979,31 +3002,36 @@ function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return
   if(pl&&pl.status==='AMBIGUO'){const codC=codLimpo(cod),resolv=codigosResolvidos[codC];
     el.innerHTML='🔍 Liga: '+(resolv?'código resolvido ✓':'mais de uma carta com esse código')+' <span class="lnk" style="font-size:11px;padding:1px 4px" onclick="abrirEscolhaAmbigua(\''+codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">'+(resolv?'trocar':((pl.opcoes&&pl.opcoes.length)?'escolher qual →':'colar link →'))+'</span>';return;}
   el.innerHTML=pl?(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':''):'';}
-/* PENDÊNCIA 5 — painel de cadastro incompleto: carta avulsa que você ainda tem (estoque,
-   pedido ou coleção) e não tem NENHUM jeito de puxar preço da Liga — nem código, nem link
-   direto, nem resolução salva pra um código ambíguo. Só entra Single/Carta: produto
-   selado (booster/ETB/box) não tem código na Liga, não é pendência real pra ele. Item já
-   vendido/trocado/aberto também não entra — não é mais seu. O campo código aceita 3
-   formatos ao mesmo tempo (padrão Liga núm/total, SV3-125 e SKU da loja — ver placeholders
-   dos campos f_cod/v_cod/n_cod) — por isso só acusamos "formato estranho" quando o texto
-   TEM "/" (ou seja, claramente tentou o padrão Liga) e não fecha nesse padrão; SKU ou
-   SV3-125 sem barra nunca é sinalizado como errado. */
-const RE_COD_LIGA=/^\d{1,4}\s*(JP|C)?\s*\/\s*(\d{1,4}|∞)$/i;
+/* PENDÊNCIA 5 — carta avulsa que você ainda tem (estoque, pedido ou coleção) e da qual o app
+   não consegue puxar preço.
+   [CORRIGIDO 2026-08-17 — 28 falsos alarmes na cara do Felype, achado dele]
+   A 1ª versão tentava ADIVINHAR se o código estava "cortado", comparando com um formato que
+   eu inventei (número/número). Errado na raiz: o Pokémon tem dezenas de formatos legítimos
+   com letra — Trainer Gallery (TG12/TG30), Galarian Gallery (GG01/GG70), Shiny Vault
+   (SV49/SV94), sets antigos (H1/H32) — e One Piece/Yu-Gi-Oh têm os seus próprios, que nem
+   estudamos ainda. Qualquer régua de formato que eu escreva vai reprovar carta certa. Além
+   disso o ♾️ do teclado do celular também caía aqui (agora normalizado em normCod).
+   REGRA NOVA, sem adivinhação: só aponto o que é FATO verificável —
+     (a) não tem código nenhum, nem link, nem resolução salva → não há como buscar preço;
+     (b) tem código, mas a Liga não devolve preço pra ele → ou o código está errado, ou a
+         coleta ainda não passou nessa carta. Os dois casos são acionáveis e honestos.
+   Nunca mais julgo "formato estranho". */
 function pendenciasCodigo(){
   return movs.filter(m=>m.tipo==='COMPRA'&&m.cat==='Single/Carta'&&(+m.qtd||1)>0&&['Em estoque','Pedido','Coleção'].includes(sitDe(m)))
     .map(m=>{
       if(m.codigoUrl)return null;
-      const cod=(m.codigo||'').trim(),codC=cod?codLimpo(cod):'';
+      const cod=normCod(m.codigo),codC=cod?codLimpo(cod):'';
       if(codC&&codigosResolvidos[codC])return null;
-      let motivo=null;
-      if(!cod)motivo='sem_codigo';
-      else if(codC.includes('/')&&!RE_COD_LIGA.test(codC))motivo='cortado';
-      return motivo?{m,motivo,cod}:null;
+      if(!cod)return {m,motivo:'sem_codigo',cod};
+      const pl=precoLigaDe(cod);
+      if(pl&&pl.status!=='AMBIGUO'&&ligaVersoes(pl).length)return null;   // tem preço: nada a fazer
+      if(pl&&pl.status==='AMBIGUO')return null;                            // ambíguo tem picker próprio
+      return {m,motivo:'sem_preco',cod};
     }).filter(Boolean);
 }
 function abrirCorrigirCodigo(id){consVer='itens';verMov(id);}
 function abrirPendenciasCodigo(){const P=pendenciasCodigo();
-  const MOT={cortado:['🟡','formato estranho — confira, pode estar cortado ou digitado errado'],sem_codigo:['ℹ️','sem código (nem link direto)']};
+  const MOT={sem_preco:['🟡','tem código, mas a Liga não devolveu preço — ou o código está diferente do dela, ou a coleta ainda não passou nessa carta'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar preço']};
   const ST2={'Em estoque':['c','📦 estoque'],'Pedido':['c','🚚 pedido'],'Coleção':['k','⭐ coleção']};
   const bloco=mot=>{const its=P.filter(x=>x.motivo===mot);if(!its.length)return '';
     return `<div class="sec">${MOT[mot][0]} ${MOT[mot][1]} (${its.length})</div>`+its.map(x=>{
@@ -3012,8 +3040,8 @@ function abrirPendenciasCodigo(){const P=pendenciasCodigo();
     }).join('');};
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="sec" style="margin-top:0">🏷️ Pendências de cadastro — código da carta</div>
-    <div class="ctx">${P.length?`<b>${P.length} carta${P.length>1?'s':''}</b> em estoque, pedido ou coleção sem jeito de puxar preço da Liga ainda. Produto selado nunca entra aqui — só carta avulsa (Single/Carta).`:'<b>Tudo certo ✓</b> — toda carta avulsa que você ainda tem já tem código, link direto ou está resolvida.'}</div>
-    ${bloco('cortado')}${bloco('sem_codigo')}
+    <div class="ctx">${P.length?`<b>${P.length} carta${P.length>1?'s':''}</b> em estoque, pedido ou coleção sem preço da Liga hoje. <b>Não estou julgando o formato do seu código</b> — só listo o que de fato não trouxe preço. Produto selado nunca entra aqui: só carta avulsa (Single/Carta). Se a coleta ainda não rodou depois do cadastro, é normal aparecer aqui e sumir na próxima rodada do robô${precosLigaQuando()?' (última coleta '+precosLigaQuando()+')':''}.`:'<b>Tudo certo ✓</b> — toda carta avulsa que você ainda tem já tem preço da Liga, link direto ou está resolvida.'}</div>
+    ${bloco('sem_preco')}${bloco('sem_codigo')}
     <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
   document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 /* Assist de preço p/ campos "vale (mercado)" — nunca mexe em "valor" de compra/venda
