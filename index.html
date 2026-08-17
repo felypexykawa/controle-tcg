@@ -2947,7 +2947,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='17/08 20h47';
+const BUILD_TAG='17/08 20h59';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -2989,10 +2989,26 @@ fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(
    carta ainda aparecia como pendência de cadastro. Normalizar aqui conserta TODOS os caminhos
    de uma vez (preço, picker de ambíguo, robô de coleta, checagens), porque codLimpo é o funil
    por onde todo código passa antes de virar chave de busca. */
-function normCod(cod){return (''+(cod||'')).replace(/♾️?/g,'∞').replace(/\s+/g,' ').trim();}
+function normCod(cod){return (''+(cod||'')).replace(/♾️?/g,'∞').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim();}
 function codLimpo(cod){cod=normCod(cod);const m=cod.match(/\(([^()]+)\)\s*$/);return m?normCod(m[1]):cod;}
+/* [CORRIGIDO 2026-08-17, revisão adversarial + conferência no arquivo real] normalizar só o
+   LADO DO APP quebrou os casos que funcionavam: o precos.json de produção tem os DOIS
+   símbolos misturados — 2 chaves gravadas com o emoji do celular (032/♾️, Xy116/♾️, que o
+   robô copiou do cadastro) e 11 com o matemático (159/∞ etc). Buscar só por ∞ passava a
+   errar as 2 do emoji; buscar só pelo cru errava as 11. A saída é comparar NORMALIZADO DOS
+   DOIS LADOS: um índice das chaves do arquivo, normalizadas uma vez, consultado quando a
+   busca literal não acha. Assim os dois formatos convivem sem migração de dado. */
+let _idxLigaNorm=null,_idxLigaFonte=null;
+function idxLigaNorm(){
+  if(!_precosLiga||!_precosLiga.cartas)return null;
+  if(_idxLigaNorm&&_idxLigaFonte===_precosLiga)return _idxLigaNorm;
+  const ix={};Object.keys(_precosLiga.cartas).forEach(k=>{ix[normCod(k)]=_precosLiga.cartas[k];ix[codLimpo(k)]=_precosLiga.cartas[k];});
+  _idxLigaNorm=ix;_idxLigaFonte=_precosLiga;return ix;}
 function precoLigaDe(cod){if(!_precosLiga||!cod)return null;
-  return _precosLiga.cartas[(''+cod).trim()]||_precosLiga.cartas[codLimpo(cod)]||null;}
+  const direto=_precosLiga.cartas[(''+cod).trim()]||_precosLiga.cartas[codLimpo(cod)];
+  if(direto)return direto;
+  const ix=idxLigaNorm();if(!ix)return null;
+  return ix[normCod(cod)]||ix[codLimpo(cod)]||null;}
 function ligaVersoes(pl){if(!pl)return[];if(Array.isArray(pl.versoes)&&pl.versoes.length)return pl.versoes;if(pl.menor!=null)return[{v:'',mn:pl.menor,md:pl.medio||null,mx:pl.maior||null}];return[];}
 function ligaHistDe(cod){if(!_precosLiga||!_precosLiga.historico)return null;
   const h=_precosLiga.historico[(''+cod).trim()]||_precosLiga.historico[codLimpo(cod)];if(!h)return null;
@@ -3017,12 +3033,20 @@ function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return
          coleta ainda não passou nessa carta. Os dois casos são acionáveis e honestos.
    Nunca mais julgo "formato estranho". */
 function pendenciasCodigo(){
+  /* [CORRIGIDO 2026-08-17, revisão adversarial] sem esta guarda o painel virava um alarme
+     de 100%: `_precosLiga` nasce null e só chega por fetch — no boot, offline, ou se o
+     precos.json der 404, TODA carta avulsa (40 no teste do revisor) seria acusada de "sem
+     preço", que é falso: o app é que ainda não sabe. Sem preço carregado, a checagem de
+     preço simplesmente não opina — a de "sem código nenhum" continua valendo porque
+     independe da Liga. */
+  const temPrecos=!!(_precosLiga&&_precosLiga.cartas);
   return movs.filter(m=>m.tipo==='COMPRA'&&m.cat==='Single/Carta'&&(+m.qtd||1)>0&&['Em estoque','Pedido','Coleção'].includes(sitDe(m)))
     .map(m=>{
       if(m.codigoUrl)return null;
       const cod=normCod(m.codigo),codC=cod?codLimpo(cod):'';
       if(codC&&codigosResolvidos[codC])return null;
       if(!cod)return {m,motivo:'sem_codigo',cod};
+      if(!temPrecos)return null;                                           // preços não carregaram: não opinar
       const pl=precoLigaDe(cod);
       if(pl&&pl.status!=='AMBIGUO'&&ligaVersoes(pl).length)return null;   // tem preço: nada a fazer
       if(pl&&pl.status==='AMBIGUO')return null;                            // ambíguo tem picker próprio
