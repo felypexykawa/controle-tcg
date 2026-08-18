@@ -3130,14 +3130,16 @@ function pendenciasResumo(){
     grave:pr?pr.n.vermelho:0};}
 function abrirPendencias(){
   const R=pendenciasResumo(),p=R.pr||provaReal();
+  window._pendAmb=R.amb;
+  const jsEsc=i=>`fecharModal();abrirEscolhaAmbigua(_pendAmb[${i}].codC)`;
   const linha=(tit,det,acoes)=>`<div class="item" style="display:block;padding:10px 12px"><b>${tit}</b>${det?`<div class="meta" style="margin-top:3px">${det}</div>`:''}${acoes||''}</div>`;
   const btn=(rot,js)=>` <span class="lnk" style="font-size:12px;padding:2px 6px;display:inline-block;margin-top:6px" onclick="${js}">${rot}</span>`;
   let h='';
   const com1=R.amb.filter(x=>x.nOpc>0),semOpc=R.amb.filter(x=>!x.nOpc);
   if(com1.length)h+=`<div class="sec">🎯 escolher qual carta é a sua (${com1.length}) <span style="text-transform:none;font-weight:400;color:var(--mut)">— 1 toque cada, destrava o preço</span></div>`+
-    com1.map(x=>linha('#'+x.codC+' — '+x.nOpc+' cartas com esse número',x.rots.slice(0,3).join(' · ')+(x.rots.length>3?' · +'+(x.rots.length-3)+' item(ns)':''),btn('escolher qual →',`fecharModal();abrirEscolhaAmbigua('${x.codC.replace(/\/g,'\\').replace(/'/g,"\'")}')`))).join('');
+    com1.map(x=>linha('#'+x.codC+' — '+x.nOpc+' cartas com esse número',x.rots.slice(0,3).join(' · ')+(x.rots.length>3?' · +'+(x.rots.length-3)+' item(ns)':''),btn('escolher qual →',jsEsc(R.amb.indexOf(x))))).join('');
   if(semOpc.length)h+=`<div class="sec">🔗 sem opções na tela (${semOpc.length}) <span style="text-transform:none;font-weight:400;color:var(--mut)">— precisa colar o link da carta</span></div>`+
-    semOpc.map(x=>linha('#'+x.codC,x.rots.slice(0,3).join(' · '),btn('colar link →',`fecharModal();abrirEscolhaAmbigua('${x.codC.replace(/\/g,'\\').replace(/'/g,"\'")}')`))).join('');
+    semOpc.map(x=>linha('#'+x.codC,x.rots.slice(0,3).join(' · '),btn('colar link →',jsEsc(R.amb.indexOf(x))))).join('');
   if(R.cad.length){
     const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
     ['sem_preco','sem_codigo'].forEach(mot=>{const its=R.cad.filter(x=>x.motivo===mot);if(!its.length)return;
