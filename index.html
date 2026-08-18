@@ -2670,31 +2670,71 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
       const cv=document.createElement('canvas');cv.width=W;cv.height=H;cv.getContext('2d').drawImage(img,0,0,W,H);
       const baixo=document.createElement('canvas');const bh=Math.round(H*0.30);
       baixo.width=W;baixo.height=bh;baixo.getContext('2d').drawImage(cv,0,H-bh,W,bh,0,0,W,bh);
-      const meio=document.createElement('canvas');const mh=Math.round(H*0.40);
-      meio.width=W;meio.height=mh;meio.getContext('2d').drawImage(cv,0,Math.round(H*0.42),W,mh,0,0,W,mh);
+      /* [2026-08-17] o recorte do MEIO da carta existia só pra alimentar o w.detect (escrita),
+         que se provou morto — removido junto, pra não gastar processamento do celular
+         montando uma imagem que ninguém lê. */
       ocrWorker(async w=>{if(!w){if(hint)hint.innerHTML='';return;}
         try{
-          await w.setParameters({tessedit_char_whitelist:'0123456789/JPC∞ '});
+          /* [MEDIDO 2026-08-17] a lista de caracteres permitidos era '0123456789/JPC∞' — só
+             JP e C. Resultado: Trainer Gallery (TG12/TG30) era lido como "C12/C30" e virava
+             sugestão ERRADA. Abrindo pra A-Z, o mesmo caso passou a ler certo com 90% de
+             confiança. Códigos com prefixo de letra são comuns no Pokémon (TG, GG, SV, H) —
+             o leitor precisa PODER lê-los; quem decide se está certo continua sendo você. */
+          await w.setParameters({tessedit_char_whitelist:'0123456789/ABCDEFGHIJKLMNOPQRSTUVWXYZ∞ '});
           const r=await w.recognize(baixo);
           await w.setParameters({tessedit_char_whitelist:''});
           const bruto=((r&&r.data&&r.data.text)||'').replace(/\s+/g,' ');
-          const m=bruto.match(/(\d{1,3})\s*(JP|C)?\s*\/\s*(\d{1,3}|∞)/i);
-          let escrita='latina';
-          try{const d=await w.detect(meio);const sc=((d&&d.data&&d.data.script)||'')+'';
-            if(/jap/i.test(sc))escrita='japonesa';else if(/hangul|kor/i.test(sc))escrita='coreana';else if(/^han|chin/i.test(sc))escrita='chinesa';}catch(e2){}
-          if(!m){if(hint)hint.innerHTML='📷 Não achei o código — tente de novo com a BASE da carta bem visível e iluminada (ou digite à mão).';return;}
+          const conf=Math.round((r&&r.data&&r.data.confidence)||0);
+          /* [2026-08-17, medido no teste] o modelo de leitura não conhece o glifo ∞: numa
+             carta promocional "032/∞" ele lê a barra e para, ou devolve algo no lugar do
+             símbolo (8, o, oo, co são os palpites típicos de um infinito deitado). Sem este
+             segundo padrão, TODA carta promocional caía em "não achei o código". Aqui: se
+             saiu número/barra e o que veio depois não é número, tratamos como promocional e
+             sugerimos ∞ — sempre como sugestão de 1 toque, nunca aplicado às cegas. */
+          /* padrão permissivo de propósito: aceita prefixo de letra dos dois lados (TG12/TG30,
+             GG01/GG70, SV49/SV94) além do formato mais comum. NÃO é régua de aprovação — é só
+             pra CAPTURAR o que a câmera leu; julgar se está certo é com você. */
+          let m=bruto.match(/([A-Z]{0,3}\s*\d{1,4})\s*(JP|C)?\s*\/\s*([A-Z]{0,3}\s*\d{1,4}|∞)/i);
+          if(!m){const mp=bruto.match(/([A-Z]{0,3}\s*\d{1,4})\s*(JP|C)?\s*\/\s*(?:[o0c8∞\s]{0,3})(?![\dA-Z])/i);
+            if(mp)m=[mp[0],mp[1],mp[2],'∞'];}
+          if(m){m[1]=(m[1]||'').replace(/\s+/g,'');m[3]=(m[3]||'').replace(/\s+/g,'');}
+          /* [CORRIGIDO 2026-08-17] a detecção automática de ESCRITA (w.detect) NUNCA funcionou:
+             testada ao vivo em 2 configurações (worker 'eng' OEM 2, e worker 'osd' OEM 0 com
+             legacyCore) devolve TODOS os campos nulos — script, confiança e orientação. O
+             osd.traineddata está no disco, mas o OSD não opera nesta build do Tesseract.js.
+             Efeito prático: `escrita` era SEMPRE 'latina', então o ramo "sugere direto" só
+             disparava quando o sufixo vinha impresso na carta — a promessa de "detecta o
+             idioma sozinho" nunca aconteceu uma vez. Em vez de manter chamada morta que faz
+             a tela prometer o que não entrega, assumimos o que é verdade e foi MEDIDO: a
+             máquina lê o CÓDIGO (92% de confiança em texto limpo); o IDIOMA quem diz é você,
+             num toque. */
+          if(!m){if(hint)hint.innerHTML='📷 Não achei o código'+(bruto.trim()?' (li: <b>'+bruto.trim().slice(0,24)+'</b>)':'')+' — tente de novo com a BASE da carta bem visível e iluminada, ou digite à mão.';return;}
+          const escrita='latina';
           const sufLido=(m[2]||'').toUpperCase(),num=m[1],tot=m[3];
           /* se a escrita foi cravada (ou o sufixo veio impresso), sugere direto; senão, 3 chips de 1 toque */
           const chip=(suf,rot,idi)=>{const c=num+suf+'/'+tot;
             return '<span class="lnk" style="font-weight:800;border:1px solid var(--blue);border-radius:8px;padding:2px 9px;display:inline-block;margin:2px 3px 0 0" onclick="aplicarScan(\''+codId+'\',\''+c+'\',\''+idiSelId+'\',\''+idi+'\',\''+hintId+'\')">'+rot+'</span>';};
+          /* [2026-08-17, insight do Felype] o PADRÃO de código volta aqui — mas como GUIA da
+             MÁQUINA, não como régua que reprova o humano. É a distinção que ele fez: reprovar
+             cadastro dele é errado (ele sabe mais que a régua); usar o padrão pra medir se a
+             LEITURA DA CÂMERA saiu plausível é exatamente pra isso que serve. Sinais somados:
+             confiança do próprio OCR + o número lido bater com o formato mais comum. Baixa
+             plausibilidade não bloqueia nada — só avisa pra conferir com mais cuidado. */
+          /* [CORRIGIDO no próprio teste, antes de publicar] a 1ª versão desta checagem exigia
+             num <= total — e reprovou 167JP/165 e 245/198, que o leitor tinha ACERTADO. Erro
+             meu, mesmo padrão dos 28 falsos alarmes: supus regra de domínio sem conferir.
+             Secret rare tem número MAIOR que o total da coleção (é justamente a carta cara);
+             os próprios exemplos do app (245/198) são secret rare. Plausível = os dois lados
+             existem e cabem em 4 dígitos. Nada além disso. */
+          const plausivel=(/\d/.test(num)&&num.length<=7&&(tot==='∞'||(/\d/.test(tot)&&tot.length<=7)));
+          const seguro=conf>=75&&plausivel;
+          const selo=seguro?'':' <span class="tag c" style="font-size:9px">⚠ leitura duvidosa'+(conf?' ('+conf+'%)':'')+' — confira na carta</span>';
           if(hint){
-            if(sufLido||escrita!=='latina'){
-              const suf=sufLido||((escrita==='japonesa'||escrita==='coreana')?'JP':'C');
-              const cod=num+suf+'/'+tot;
-              const idiSug=escrita==='japonesa'?'Japonês':escrita==='coreana'?'Coreano':escrita==='chinesa'?'Chinês':'';
-              hint.innerHTML='📷 Li: <b>'+cod+'</b>'+(idiSug?' · escrita '+escrita:'')+' '+chip(suf,'✔ usar '+cod,idiSug)+' <span style="color:var(--mut)">· confira com a carta na mão</span>';
+            if(sufLido){
+              const cod=num+sufLido+'/'+tot;
+              hint.innerHTML='📷 Li: <b>'+cod+'</b> (sufixo impresso na carta)'+selo+' '+chip(sufLido,'✔ usar '+cod,'')+' <span style="color:var(--mut)">· confira com a carta na mão</span>';
             }else{
-              hint.innerHTML='📷 Li: <b>'+num+'/'+tot+'</b> — a carta é: '+chip('','normal','')+chip('JP','🇯🇵 japonesa','Japonês')+chip('JP','🇰🇷 coreana','Coreano')+chip('C','🇨🇳 chinesa','Chinês')+' <span style="color:var(--mut)">· 1 toque monta o código certo</span>';
+              hint.innerHTML='📷 Li: <b>'+num+'/'+tot+'</b>'+selo+'<div style="margin-top:3px">a carta é: '+chip('','normal','')+chip('JP','🇯🇵 japonesa','Japonês')+chip('JP','🇰🇷 coreana','Coreano')+chip('C','🇨🇳 chinesa','Chinês')+'</div><div class="meta" style="margin-top:2px">1 toque monta o código certo. <b>Exclusiva</b> de japonês/chinês (sem versão EN/PT) = use <b>normal</b>, sem letra.</div>';
             }}
         }catch(e3){if(hint)hint.innerHTML='📷 A leitura falhou ('+(((e3&&e3.message)||'')+'').slice(0,50)+') — tenta outra foto ou digita.';}
       });};img.src=e.target.result;};rd.readAsDataURL(f);};
@@ -2947,7 +2987,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='17/08 20h59';
+const BUILD_TAG='17/08 22h04';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
