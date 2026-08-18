@@ -872,378 +872,6 @@
     "pt": 93
    }
   },
-  "Frosmoth 192/184": {
-   "codigo": "Frosmoth 192/184",
-   "status": "OK",
-   "titulo": "Frosmoth (192/184)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 46.0,
-     "md": 46.5,
-     "mx": 46.99
-    }
-   ],
-   "menor": 46.0,
-   "medio": 46.5,
-   "maior": 46.99,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=192%2F184",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 6
-   }
-  },
-  "Milotic 070/068": {
-   "codigo": "Milotic 070/068",
-   "status": "OK",
-   "titulo": "Milotic (070/068)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 60.0,
-     "md": 72.97,
-     "mx": 139.9
-    }
-   ],
-   "menor": 60.0,
-   "medio": 72.97,
-   "maior": 139.9,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=070%2F068",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 36
-   }
-  },
-  "Flaaffy 194/184": {
-   "codigo": "Flaaffy 194/184",
-   "status": "OK",
-   "titulo": "Flaaffy (194/184)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 54.9,
-     "md": 54.9,
-     "mx": 54.9
-    }
-   ],
-   "menor": 54.9,
-   "medio": 54.9,
-   "maior": 54.9,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=194%2F184",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 3
-   }
-  },
-  "Staraptor do lauro 249/217": {
-   "codigo": "Staraptor do lauro 249/217",
-   "status": "OK",
-   "titulo": "Staraptor do Lauro / Larry's Staraptor (249/217)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 18.0,
-     "md": 28.25,
-     "mx": 45.0
-    },
-    {
-     "v": "Foil",
-     "mn": 17.45,
-     "md": 32.79,
-     "mx": 69.99
-    }
-   ],
-   "menor": 18.0,
-   "medio": 28.25,
-   "maior": 45.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=249%2F217",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "pt": 105,
-    "en": 21
-   }
-  },
-  "Spiritomb 076/071": {
-   "codigo": "Spiritomb 076/071",
-   "status": "OK",
-   "titulo": "Spiritomb (076/071)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 40.0,
-     "md": 40.0,
-     "mx": 40.0
-    },
-    {
-     "v": "Foil",
-     "mn": 24.0,
-     "md": 29.55,
-     "mx": 49.98
-    }
-   ],
-   "menor": 40.0,
-   "medio": 40.0,
-   "maior": 40.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Spiritomb%20%28076%2F071%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 27,
-    "tw": 3
-   }
-  },
-  "Hoothoot 073/067": {
-   "codigo": "Hoothoot 073/067",
-   "status": "OK",
-   "titulo": "Hoothoot (073/067)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 88.9,
-     "md": 102.15,
-     "mx": 109.9
-    }
-   ],
-   "menor": 88.9,
-   "medio": 102.15,
-   "maior": 109.9,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Hoothoot%20%28073%2F067%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 9
-   }
-  },
-  "Dusknoir 198/184": {
-   "codigo": "Dusknoir 198/184",
-   "status": "OK",
-   "titulo": "Dusknoir (198/184)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 25.0,
-     "md": 28.45,
-     "mx": 32.0
-    }
-   ],
-   "menor": 25.0,
-   "medio": 28.45,
-   "maior": 32.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=198%2F184",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 9
-   }
-  },
-  "Mimikyu da Equipe Rocket 238/217": {
-   "codigo": "Mimikyu da Equipe Rocket 238/217",
-   "status": "OK",
-   "titulo": "Mimikyu da Equipe Rocket / Team Rocket's Mimikyu (238/217)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 64.0,
-     "md": 100.0,
-     "mx": 249.99
-    }
-   ],
-   "menor": 64.0,
-   "medio": 100.0,
-   "maior": 249.99,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=238%2F217",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 4,
-    "jp": 3,
-    "pt": 120,
-    "en": 45
-   }
-  },
-  "Falinks 204/184": {
-   "codigo": "Falinks 204/184",
-   "status": "OK",
-   "titulo": "Falinks (204/184)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 44.99,
-     "md": 44.99,
-     "mx": 44.99
-    }
-   ],
-   "menor": 44.99,
-   "medio": 44.99,
-   "maior": 44.99,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=204%2F184",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 3
-   }
-  },
-  "Arcanine de hisui 075/071": {
-   "codigo": "Arcanine de hisui 075/071",
-   "status": "OK",
-   "titulo": "Arcanine de Hisui / Hisuian Arcanine (075/071)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 40.0,
-     "md": 42.85,
-     "mx": 45.0
-    }
-   ],
-   "menor": 40.0,
-   "medio": 42.85,
-   "maior": 45.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Arcanine%20de%20Hisui%20%28075%2F071%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 21
-   }
-  },
-  "Torkoal 237/236": {
-   "codigo": "Torkoal 237/236",
-   "status": "OK",
-   "titulo": "Torkoal (237/236)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 29.9,
-     "md": 47.19,
-     "mx": 161.41
-    }
-   ],
-   "menor": 29.9,
-   "medio": 47.19,
-   "maior": 161.41,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Torkoal%20%28237%2F236%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "pt": 66,
-    "en": 6
-   }
-  },
-  "Stoutland 248/236": {
-   "codigo": "Stoutland 248/236",
-   "status": "OK",
-   "titulo": "Stoutland (248/236)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 19.43,
-     "md": 36.49,
-     "mx": 123.41
-    }
-   ],
-   "menor": 19.43,
-   "medio": 36.49,
-   "maior": 123.41,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Stoutland%20%28248%2F236%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "pt": 33,
-    "en": 6
-   }
-  },
-  "Kleavor 071/067": {
-   "codigo": "Kleavor 071/067",
-   "status": "OK",
-   "titulo": "Kleavor (071/067)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 21.99,
-     "md": 26.68,
-     "mx": 65.0
-    }
-   ],
-   "menor": 21.99,
-   "medio": 26.68,
-   "maior": 65.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Kleavor%20%28071%2F067%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 30
-   }
-  },
-  "Roserade 068/067": {
-   "codigo": "Roserade 068/067",
-   "status": "OK",
-   "titulo": "Roserade (068/067)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 50.0,
-     "md": 53.1,
-     "mx": 60.0
-    }
-   ],
-   "menor": 50.0,
-   "medio": 53.1,
-   "maior": 60.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Roserade%20%28068%2F067%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 15,
-    "tw": 3,
-    "tk": 3
-   }
-  },
-  "Wyrdeer 070/067": {
-   "codigo": "Wyrdeer 070/067",
-   "status": "OK",
-   "titulo": "Wyrdeer (070/067)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 29.0,
-     "md": 30.7,
-     "mx": 40.0
-    }
-   ],
-   "menor": 29.0,
-   "medio": 30.7,
-   "maior": 40.0,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Wyrdeer%20%28070%2F067%29",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 15
-   }
-  },
-  "Kingdra 190/184": {
-   "codigo": "Kingdra 190/184",
-   "status": "OK",
-   "titulo": "Kingdra (190/184)",
-   "versoes": [
-    {
-     "v": "Normal",
-     "mn": 79.9,
-     "md": 83.26,
-     "mx": 89.99
-    }
-   ],
-   "menor": 79.9,
-   "medio": 83.26,
-   "maior": 89.99,
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=190%2F184",
-   "verificadoEm": "2026-08-17",
-   "idiomaConferido": {
-    "pten": 1,
-    "jp": 6
-   }
-  },
   "tg02-tg30": {
    "codigo": "tg02-tg30",
    "status": "OK",
@@ -1605,14 +1233,6 @@
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Xy116%2F%E2%99%BE%EF%B8%8F",
    "verificadoEm": "2026-08-17"
   },
-  "Passimian 125/122": {
-   "codigo": "Passimian 125/122",
-   "status": "SEM_PRECO",
-   "titulo": "Passimian (125/122)",
-   "versoes": [],
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=125%2F122",
-   "verificadoEm": "2026-08-17"
-  },
   "Jolteon": {
    "codigo": "Jolteon",
    "status": "NAO_COLETAVEL",
@@ -1741,14 +1361,6 @@
    "versoes": [],
    "verificadoEm": "2026-08-17"
   },
-  "Morpeko da marine 206/∞": {
-   "codigo": "Morpeko da marine 206/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "Morpeko da marine 206/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-17"
-  },
   "195/∞": {
    "codigo": "195/∞",
    "status": "NAO_COLETAVEL",
@@ -1763,6 +1375,394 @@
    "titulo": "0106-07/196 — a Liga não devolveu nenhuma carta com esse código (o cadastro parece juntar duas cartas, 0106 e 0107 — corrigir no app)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=0106-07%2F196",
    "verificadoEm": "2026-08-18"
+  },
+  "192/184": {
+   "codigo": "192/184",
+   "status": "OK",
+   "titulo": "Frosmoth (192/184)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 46.0,
+     "md": 46.5,
+     "mx": 46.99
+    }
+   ],
+   "menor": 46.0,
+   "medio": 46.5,
+   "maior": 46.99,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=192%2F184",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 6
+   }
+  },
+  "070/068": {
+   "codigo": "070/068",
+   "status": "OK",
+   "titulo": "Milotic (070/068)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 60.0,
+     "md": 72.97,
+     "mx": 139.9
+    }
+   ],
+   "menor": 60.0,
+   "medio": 72.97,
+   "maior": 139.9,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=070%2F068",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 36
+   }
+  },
+  "194/184": {
+   "codigo": "194/184",
+   "status": "OK",
+   "titulo": "Flaaffy (194/184)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 54.9,
+     "md": 54.9,
+     "mx": 54.9
+    }
+   ],
+   "menor": 54.9,
+   "medio": 54.9,
+   "maior": 54.9,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=194%2F184",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 3
+   }
+  },
+  "249/217": {
+   "codigo": "249/217",
+   "status": "OK",
+   "titulo": "Staraptor do Lauro / Larry's Staraptor (249/217)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 18.0,
+     "md": 28.25,
+     "mx": 45.0
+    },
+    {
+     "v": "Foil",
+     "mn": 17.45,
+     "md": 32.79,
+     "mx": 69.99
+    }
+   ],
+   "menor": 18.0,
+   "medio": 28.25,
+   "maior": 45.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=249%2F217",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "pt": 105,
+    "en": 21
+   }
+  },
+  "076/071": {
+   "codigo": "076/071",
+   "status": "OK",
+   "titulo": "Spiritomb (076/071)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 40.0,
+     "md": 40.0,
+     "mx": 40.0
+    },
+    {
+     "v": "Foil",
+     "mn": 24.0,
+     "md": 29.55,
+     "mx": 49.98
+    }
+   ],
+   "menor": 40.0,
+   "medio": 40.0,
+   "maior": 40.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Spiritomb%20%28076%2F071%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 27,
+    "tw": 3
+   }
+  },
+  "073/067": {
+   "codigo": "073/067",
+   "status": "OK",
+   "titulo": "Hoothoot (073/067)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 88.9,
+     "md": 102.15,
+     "mx": 109.9
+    }
+   ],
+   "menor": 88.9,
+   "medio": 102.15,
+   "maior": 109.9,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Hoothoot%20%28073%2F067%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 9
+   }
+  },
+  "198/184": {
+   "codigo": "198/184",
+   "status": "OK",
+   "titulo": "Dusknoir (198/184)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 25.0,
+     "md": 28.45,
+     "mx": 32.0
+    }
+   ],
+   "menor": 25.0,
+   "medio": 28.45,
+   "maior": 32.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=198%2F184",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 9
+   }
+  },
+  "238/217": {
+   "codigo": "238/217",
+   "status": "OK",
+   "titulo": "Mimikyu da Equipe Rocket / Team Rocket's Mimikyu (238/217)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 64.0,
+     "md": 100.0,
+     "mx": 249.99
+    }
+   ],
+   "menor": 64.0,
+   "medio": 100.0,
+   "maior": 249.99,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=238%2F217",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 4,
+    "jp": 3,
+    "pt": 120,
+    "en": 45
+   }
+  },
+  "204/184": {
+   "codigo": "204/184",
+   "status": "OK",
+   "titulo": "Falinks (204/184)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 44.99,
+     "md": 44.99,
+     "mx": 44.99
+    }
+   ],
+   "menor": 44.99,
+   "medio": 44.99,
+   "maior": 44.99,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=204%2F184",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 3
+   }
+  },
+  "075/071": {
+   "codigo": "075/071",
+   "status": "OK",
+   "titulo": "Arcanine de Hisui / Hisuian Arcanine (075/071)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 40.0,
+     "md": 42.85,
+     "mx": 45.0
+    }
+   ],
+   "menor": 40.0,
+   "medio": 42.85,
+   "maior": 45.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Arcanine%20de%20Hisui%20%28075%2F071%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 21
+   }
+  },
+  "237/236": {
+   "codigo": "237/236",
+   "status": "OK",
+   "titulo": "Torkoal (237/236)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 29.9,
+     "md": 47.19,
+     "mx": 161.41
+    }
+   ],
+   "menor": 29.9,
+   "medio": 47.19,
+   "maior": 161.41,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Torkoal%20%28237%2F236%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "pt": 66,
+    "en": 6
+   }
+  },
+  "248/236": {
+   "codigo": "248/236",
+   "status": "OK",
+   "titulo": "Stoutland (248/236)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 19.43,
+     "md": 36.49,
+     "mx": 123.41
+    }
+   ],
+   "menor": 19.43,
+   "medio": 36.49,
+   "maior": 123.41,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Stoutland%20%28248%2F236%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "pt": 33,
+    "en": 6
+   }
+  },
+  "071/067": {
+   "codigo": "071/067",
+   "status": "OK",
+   "titulo": "Kleavor (071/067)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 21.99,
+     "md": 26.68,
+     "mx": 65.0
+    }
+   ],
+   "menor": 21.99,
+   "medio": 26.68,
+   "maior": 65.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Kleavor%20%28071%2F067%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 30
+   }
+  },
+  "068/067": {
+   "codigo": "068/067",
+   "status": "OK",
+   "titulo": "Roserade (068/067)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 50.0,
+     "md": 53.1,
+     "mx": 60.0
+    }
+   ],
+   "menor": 50.0,
+   "medio": 53.1,
+   "maior": 60.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Roserade%20%28068%2F067%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 15,
+    "tw": 3,
+    "tk": 3
+   }
+  },
+  "070/067": {
+   "codigo": "070/067",
+   "status": "OK",
+   "titulo": "Wyrdeer (070/067)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 29.0,
+     "md": 30.7,
+     "mx": 40.0
+    }
+   ],
+   "menor": 29.0,
+   "medio": 30.7,
+   "maior": 40.0,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Wyrdeer%20%28070%2F067%29",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 15
+   }
+  },
+  "190/184": {
+   "codigo": "190/184",
+   "status": "OK",
+   "titulo": "Kingdra (190/184)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 79.9,
+     "md": 83.26,
+     "mx": 89.99
+    }
+   ],
+   "menor": 79.9,
+   "medio": 83.26,
+   "maior": 89.99,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=190%2F184",
+   "verificadoEm": "2026-08-17",
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 6
+   }
+  },
+  "125/122": {
+   "codigo": "125/122",
+   "status": "SEM_PRECO",
+   "titulo": "Passimian (125/122)",
+   "versoes": [],
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=125%2F122",
+   "verificadoEm": "2026-08-17"
+  },
+  "206/∞": {
+   "codigo": "206/∞",
+   "status": "NAO_COLETAVEL",
+   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
+   "titulo": "Morpeko da marine 206/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
+   "versoes": [],
+   "verificadoEm": "2026-08-17"
   }
  },
  "historico": {
@@ -2396,182 +2396,6 @@
     }
    ]
   },
-  "Frosmoth 192/184": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 46.0,
-     "md": 46.5,
-     "mx": 46.99
-    }
-   ]
-  },
-  "Milotic 070/068": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 60.0,
-     "md": 72.97,
-     "mx": 139.9
-    }
-   ]
-  },
-  "Flaaffy 194/184": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 54.9,
-     "md": 54.9,
-     "mx": 54.9
-    }
-   ]
-  },
-  "Staraptor do lauro 249/217": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 18.0,
-     "md": 28.25,
-     "mx": 45.0
-    }
-   ],
-   "Foil": [
-    {
-     "d": "2026-08-17",
-     "mn": 17.45,
-     "md": 32.79,
-     "mx": 69.99
-    }
-   ]
-  },
-  "Spiritomb 076/071": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 40.0,
-     "md": 40.0,
-     "mx": 40.0
-    }
-   ],
-   "Foil": [
-    {
-     "d": "2026-08-17",
-     "mn": 24.0,
-     "md": 29.55,
-     "mx": 49.98
-    }
-   ]
-  },
-  "Hoothoot 073/067": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 88.9,
-     "md": 102.15,
-     "mx": 109.9
-    }
-   ]
-  },
-  "Dusknoir 198/184": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 25.0,
-     "md": 28.45,
-     "mx": 32.0
-    }
-   ]
-  },
-  "Mimikyu da Equipe Rocket 238/217": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 64.0,
-     "md": 100.0,
-     "mx": 249.99
-    }
-   ]
-  },
-  "Falinks 204/184": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 44.99,
-     "md": 44.99,
-     "mx": 44.99
-    }
-   ]
-  },
-  "Arcanine de hisui 075/071": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 40.0,
-     "md": 42.85,
-     "mx": 45.0
-    }
-   ]
-  },
-  "Torkoal 237/236": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 29.9,
-     "md": 47.19,
-     "mx": 161.41
-    }
-   ]
-  },
-  "Stoutland 248/236": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 19.43,
-     "md": 36.49,
-     "mx": 123.41
-    }
-   ]
-  },
-  "Kleavor 071/067": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 21.99,
-     "md": 26.68,
-     "mx": 65.0
-    }
-   ]
-  },
-  "Roserade 068/067": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 50.0,
-     "md": 53.1,
-     "mx": 60.0
-    }
-   ]
-  },
-  "Wyrdeer 070/067": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 29.0,
-     "md": 30.7,
-     "mx": 40.0
-    }
-   ]
-  },
-  "Kingdra 190/184": {
-   "Normal": [
-    {
-     "d": "2026-08-17",
-     "mn": 79.9,
-     "md": 83.26,
-     "mx": 89.99
-    }
-   ]
-  },
   "tg02-tg30": {
    "Normal": [
     {
@@ -2627,6 +2451,182 @@
      "mn": 149.0,
      "md": 167.94,
      "mx": 200.0
+    }
+   ]
+  },
+  "192/184": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 46.0,
+     "md": 46.5,
+     "mx": 46.99
+    }
+   ]
+  },
+  "070/068": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 60.0,
+     "md": 72.97,
+     "mx": 139.9
+    }
+   ]
+  },
+  "194/184": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 54.9,
+     "md": 54.9,
+     "mx": 54.9
+    }
+   ]
+  },
+  "249/217": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 18.0,
+     "md": 28.25,
+     "mx": 45.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-17",
+     "mn": 17.45,
+     "md": 32.79,
+     "mx": 69.99
+    }
+   ]
+  },
+  "076/071": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 40.0,
+     "md": 40.0,
+     "mx": 40.0
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-08-17",
+     "mn": 24.0,
+     "md": 29.55,
+     "mx": 49.98
+    }
+   ]
+  },
+  "073/067": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 88.9,
+     "md": 102.15,
+     "mx": 109.9
+    }
+   ]
+  },
+  "198/184": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 25.0,
+     "md": 28.45,
+     "mx": 32.0
+    }
+   ]
+  },
+  "238/217": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 64.0,
+     "md": 100.0,
+     "mx": 249.99
+    }
+   ]
+  },
+  "204/184": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 44.99,
+     "md": 44.99,
+     "mx": 44.99
+    }
+   ]
+  },
+  "075/071": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 40.0,
+     "md": 42.85,
+     "mx": 45.0
+    }
+   ]
+  },
+  "237/236": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 29.9,
+     "md": 47.19,
+     "mx": 161.41
+    }
+   ]
+  },
+  "248/236": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 19.43,
+     "md": 36.49,
+     "mx": 123.41
+    }
+   ]
+  },
+  "071/067": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 21.99,
+     "md": 26.68,
+     "mx": 65.0
+    }
+   ]
+  },
+  "068/067": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 50.0,
+     "md": 53.1,
+     "mx": 60.0
+    }
+   ]
+  },
+  "070/067": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 29.0,
+     "md": 30.7,
+     "mx": 40.0
+    }
+   ]
+  },
+  "190/184": {
+   "Normal": [
+    {
+     "d": "2026-08-17",
+     "mn": 79.9,
+     "md": 83.26,
+     "mx": 89.99
     }
    ]
   }

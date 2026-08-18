@@ -1129,8 +1129,7 @@ function vPainel(){
       <div class="mini click" onclick="go('contas')"><div class="k">A pagar (parcelas e despesas)</div><div class="v" style="color:var(--red)">${fmt(apT)}</div><div class="s">${apMes>0?fmt(apMes)+' vence este mês':'nada vence este mês'} →</div></div>
       <div class="mini click" onclick="go('contas')"><div class="k">A receber (app)</div><div class="v" style="color:var(--amber)">${fmt(arT)}</div><div class="s">${arMes>0?fmt(arMes)+' cai este mês':'nada cai este mês'} →</div></div></div>
     ${contasBanc.length?(function(){const tf=contasBanc.reduce((s,cb)=>s+saldoFisicoConta(cb),0);return `<div class="grid2" style="margin-top:8px"><div class="mini click" onclick="go('contas')"><div class="k">💼 Nas contas (físico hoje)</div><div class="v" style="color:${tf>=0?'var(--green)':'var(--red)'}">${fmt(tf)}</div><div class="s">${contasBanc.length} conta${contasBanc.length>1?'s':''} · toque p/ ver por conta →</div></div><div class="mini click" onclick="abrirTransferencia()"><div class="k">↔ Transferir / aportar</div><div class="v" style="font-size:15px;padding-top:4px">entre contas · dinheiro pessoal</div><div class="s">registrar movimento →</div></div></div>`;})():''}
-    <div class="lnk" onclick="abrirProvaReal()">🩺 prova real — o app confere as próprias contas${_provaCache&&_provaCache.A.length?` <b style="color:${_provaCache.n.vermelho?'var(--red)':_provaCache.n.amarelo?'var(--amber)':'var(--mut)'}">· ${_provaCache.A.length} achado${_provaCache.A.length>1?'s':''}</b>`:_provaCache?' <span style="color:var(--green)">· tudo fechou ✓</span>':''}</div>
-    <div class="lnk" onclick="abrirPendenciasCodigo()">🏷️ pendências de cadastro (código)${(function(){const n=pendenciasCodigo().length;return n?` <b style="color:var(--amber)">· ${n} achado${n>1?'s':''}</b>`:' <span style="color:var(--green)">· tudo certo ✓</span>';})()}</div>
+    <div class="lnk" onclick="abrirPendencias()">⚠️ pendências — o que precisa da sua mão${(function(){const R=pendenciasResumo();if(!R.pronto)return R.total?` <b style="color:var(--amber)">· ${R.total}+ achado${R.total>1?'s':''}</b> <span style="color:var(--mut)">(ainda conferindo as contas…)</span>`:' <span style="color:var(--mut)">· conferindo…</span>';if(!R.total)return ' <span style="color:var(--green)">· tudo certo ✓</span>';return ` <b style="color:${R.grave?'var(--red)':'var(--amber)'}">· ${R.total} achado${R.total>1?'s':''}</b>${R.n1toque?` <span style="color:var(--mut)">· ${R.n1toque} resolve em 1 toque</span>`:''}`;})()}</div>
     <div class="lnk" onclick="imprimir()">🖨 imprimir este resumo</div>
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
     ${USAR_NUVEM&&_userEmail?`<div class="lnk" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}
@@ -1173,7 +1172,7 @@ function vLancar(){
     if(compraModo==='nota'&&!editId){campos+=notaForm();}
     else{campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo selecionado)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <div class="row2"><div><label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${e?.idioma===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}" oninput="bcalc()"></div></div>
       <label>Condição <span style="color:var(--mut);font-size:10px">(afeta o preço na Liga — opcional)</span></label><select id="f_cond">${CONDS.map(([v,l])=>`<option value="${v}" ${(e?.condicao||'—')===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -1194,7 +1193,7 @@ function vLancar(){
       campos+= !editId?`<label style="margin-top:0">De onde sai a carta?</label><div class="toggle" id="vdetog"><div class="o ${vendaDe==='estoque'?'on':''}" onclick="setVendaDe('estoque')">📦 Estoque</div><div class="o ${vendaDe==='colecao'?'on':''}" onclick="setVendaDe('colecao')">⭐ Coleção</div><div class="o ${vendaDe==='avulsa'?'on':''}" onclick="setVendaDe('avulsa')">✍ Avulsa</div></div>`:'';
       if(avulso){campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>`;}
       else{let itens=vendaDe==='estoque'?movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Pedido')):movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
         const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
@@ -1267,7 +1266,7 @@ function notaForm(){
       <div class="row2"><div><label style="margin-top:0">Jogo</label><select id="n_jogo" onchange="reColN(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label style="margin-top:0">Tipo de produto</label><select id="n_cat" onchange="novo(this,'cat');nbooDef()">${selOpts(cats)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('n_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="n_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('n_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('n_cod','∞')">∞</span></label><input id="n_cod" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCodN')"><div class="meta" id="ligaHintCodN"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('n_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('n_cod','∞')">∞</span></label><input id="n_cod" placeholder="ex: SV3-125 / SKU da loja" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCodN')" oninput="ligaHint(this.value,'ligaHintCodN')"><div class="meta" id="ligaHintCodN"></div>
       <div class="row2"><div><label>Idioma</label><select id="n_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Qtd</label><input id="n_qtd" type="number" inputmode="numeric" value="1" oninput="ncalc('q')"></div></div>
       <div class="row2"><div><label>Valor de cada (R$)</label><input id="n_unit" type="number" inputmode="decimal" placeholder="0,00" oninput="ncalc('u')"></div>
@@ -3030,7 +3029,19 @@ fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(
    de uma vez (preço, picker de ambíguo, robô de coleta, checagens), porque codLimpo é o funil
    por onde todo código passa antes de virar chave de busca. */
 function normCod(cod){return (''+(cod||'')).replace(/♾️?/g,'∞').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim();}
-function codLimpo(cod){cod=normCod(cod);const m=cod.match(/\(([^()]+)\)\s*$/);return m?normCod(m[1]):cod;}
+function codLimpo(cod){cod=normCod(cod);const m=cod.match(/\(([^()]+)\)\s*$/);if(m)return normCod(m[1]);
+  /* [2026-08-18, direção do Felype] terceiro formato de cadastro, que faltava: "Nome NUM/TOTAL"
+     SEM parênteses (ex. "Spiritomb da cintia 244/217"). Era a causa de 18 fichas de preço
+     duplicadas no precos.json: o robô guardava sob o texto inteiro e a série de histórico
+     rachava em duas. O cabeçalho do robo/codigos.txt SEMPRE declarou aceitar os três formatos —
+     só o codLimpo sabia dois. Exige espaço antes do código pra não confundir com código puro. */
+  const t=cod.match(/\s([0-9A-Za-z]{1,6}\/[0-9A-Za-z∞]{1,6})\s*$/);return t?normCod(t[1]):cod;}
+/* Só para o CAMPO de cadastro: devolve o texto com o código entre parênteses ("Spiritomb da
+   cintia 244/217" -> "Spiritomb da cintia (244/217)"). Ideia do Felype: em vez de só ensinar
+   o robô a adivinhar, fixar o parêntese na entrada pra o formato torto não nascer mais.
+   Roda ao SAIR do campo, nunca a cada tecla (senão fecharia parêntese no meio da digitação). */
+function fixaParenteses(v){const c=normCod(v);if(!c||/\)\s*$/.test(c))return c;
+  const m=c.match(/^(.*\S)\s([0-9A-Za-z]{1,6}\/[0-9A-Za-z∞]{1,6})$/);return m?m[1]+' ('+m[2]+')':c;}
 /* [CORRIGIDO 2026-08-17, revisão adversarial + conferência no arquivo real] normalizar só o
    LADO DO APP quebrou os casos que funcionavam: o precos.json de produção tem os DOIS
    símbolos misturados — 2 chaves gravadas com o emoji do celular (032/♾️, Xy116/♾️, que o
@@ -3094,6 +3105,56 @@ function pendenciasCodigo(){
     }).filter(Boolean);
 }
 function abrirCorrigirCodigo(id){consVer='itens';verMov(id);}
+/* ===== PENDÊNCIAS UNIFICADAS (Felype 2026-08-18: "juntar esses itens de achados num item só").
+   Antes: 2 links soltos no Painel (prova real / pendências de cadastro) com critérios e escalas
+   de severidade diferentes — e um TERCEIRO grupo, as cartas ambíguas da Liga, que não tinha
+   lugar nenhum: só aparecia DENTRO de cada carta aberta, uma por uma, sem lista. Com 25
+   ambíguas, achar cada uma era adivinhação. Ordem dos grupos = do mais barato de resolver
+   pro mais caro, não por gravidade: escolher carta é 1 toque, conta quebrada é investigação. */
+function ambiguasPendentes(){
+  if(!(_precosLiga&&_precosLiga.cartas))return [];
+  const M={};
+  movs.filter(m=>m.tipo==='COMPRA'&&m.cat==='Single/Carta'&&(+m.qtd||1)>0&&['Em estoque','Pedido','Coleção'].includes(sitDe(m))&&m.codigo&&!m.codigoUrl)
+    .forEach(m=>{
+      const pl=precoLigaDe(m.codigo);if(!pl||pl.status!=='AMBIGUO')return;
+      const codC=codLimpo(m.codigo);if(codigosResolvidos[codC])return;
+      if(!M[codC])M[codC]={codC,cod:m.codigo,nOpc:(pl.opcoes||[]).length,rots:[],ids:[]};
+      M[codC].rots.push(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'carta')));M[codC].ids.push(m.id);});
+  return Object.values(M).sort((a,b)=>(b.nOpc>0)-(a.nOpc>0)||a.codC.localeCompare(b.codC));}
+function pendenciasResumo(){
+  const amb=ambiguasPendentes(),cad=pendenciasCodigo(),pr=_provaCache;
+  const n1toque=amb.filter(x=>x.nOpc>0).length;
+  return {amb,cad,pr,n1toque,
+    total:amb.length+cad.length+(pr?pr.A.length:0),
+    pronto:!!pr,
+    grave:pr?pr.n.vermelho:0};}
+function abrirPendencias(){
+  const R=pendenciasResumo(),p=R.pr||provaReal();
+  const linha=(tit,det,acoes)=>`<div class="item" style="display:block;padding:10px 12px"><b>${tit}</b>${det?`<div class="meta" style="margin-top:3px">${det}</div>`:''}${acoes||''}</div>`;
+  const btn=(rot,js)=>` <span class="lnk" style="font-size:12px;padding:2px 6px;display:inline-block;margin-top:6px" onclick="${js}">${rot}</span>`;
+  let h='';
+  const com1=R.amb.filter(x=>x.nOpc>0),semOpc=R.amb.filter(x=>!x.nOpc);
+  if(com1.length)h+=`<div class="sec">🎯 escolher qual carta é a sua (${com1.length}) <span style="text-transform:none;font-weight:400;color:var(--mut)">— 1 toque cada, destrava o preço</span></div>`+
+    com1.map(x=>linha('#'+x.codC+' — '+x.nOpc+' cartas com esse número',x.rots.slice(0,3).join(' · ')+(x.rots.length>3?' · +'+(x.rots.length-3)+' item(ns)':''),btn('escolher qual →',`fecharModal();abrirEscolhaAmbigua('${x.codC.replace(/\/g,'\\').replace(/'/g,"\'")}')`))).join('');
+  if(semOpc.length)h+=`<div class="sec">🔗 sem opções na tela (${semOpc.length}) <span style="text-transform:none;font-weight:400;color:var(--mut)">— precisa colar o link da carta</span></div>`+
+    semOpc.map(x=>linha('#'+x.codC,x.rots.slice(0,3).join(' · '),btn('colar link →',`fecharModal();abrirEscolhaAmbigua('${x.codC.replace(/\/g,'\\').replace(/'/g,"\'")}')`))).join('');
+  if(R.cad.length){
+    const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
+    ['sem_preco','sem_codigo'].forEach(mot=>{const its=R.cad.filter(x=>x.motivo===mot);if(!its.length)return;
+      h+=`<div class="sec">${MOT[mot][0]} ${MOT[mot][1]} (${its.length})</div>`+
+        its.map(x=>linha((x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),'',btn('abrir o lançamento →',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`))).join('');});}
+  const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência de conta'],info:['ℹ️','informativo']};
+  ['vermelho','amarelo','info'].forEach(sev=>{const its=p.A.filter(x=>x.sev===sev);if(!its.length)return;
+    h+=`<div class="sec">${SEV[sev][0]} ${SEV[sev][1]} (${its.length})</div>`+
+      its.map(x=>linha(x.titulo,x.detalhe,(x.acaoJs?btn(x.acaoRot+' →',`fecharModal();${x.acaoJs}`):'')+(x.acao2Js?btn(x.acao2Rot+' →',`fecharModal();${x.acao2Js}`):''))).join('');});
+  if(!h)h='<div class="ctx" style="color:var(--green)">Nada pendente — cadastro, preços e contas fecharam ✓</div>';
+  const tot=R.amb.length+R.cad.length+p.A.length;
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px 14px 22px">
+    <div class="sec" style="margin-top:0">⚠️ pendências — o que precisa da sua mão</div>
+    <div class="ctx">${tot?`<b>${tot} no total</b>: ${R.n1toque} 🎯 escolha de carta (1 toque) · ${R.cad.length} 🏷️ cadastro · ${p.n.vermelho} 🔴 conta quebrada · ${p.n.amarelo} 🟡 pendência de conta. Nada é corrigido sozinho — cada item leva ao lugar certo e você decide.`:'Tudo conferido.'}</div>
+    ${h}
+    <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 function abrirPendenciasCodigo(){const P=pendenciasCodigo();
   const MOT={sem_preco:['🟡','tem código, mas a Liga não devolveu preço — ou o código está diferente do dela, ou a coleta ainda não passou nessa carta'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar preço']};
   const ST2={'Em estoque':['c','📦 estoque'],'Pedido':['c','🚚 pedido'],'Coleção':['k','⭐ coleção']};
