@@ -2,9 +2,8 @@
 # Alimentado pela leitura do estoque real (tcg_movs_v2, COMPRA ativa) + fallback manual.
 # Uniao ADITIVA: o estoque ADICIONA codigos, nunca remove (anti-regressao, CLAUDE.md Regra 13).
 # Formato aceito: "NUM/TOTAL" puro OU "Nome (NUM/TOTAL)" OU "Nome NUM/TOTAL".
-# Atualizado 2026-08-17 pela leitura do estoque (92 itens ativos + 4 mantidos por anti-regressao
-# que nao aparecem mais no estoque atual: 135/108, 015/081, 188/172, 245/198).
-135/108
+# Atualizado 2026-08-20 pela leitura do estoque (92 itens ativos + 4 mantidos por
+# anti-regressao que nao aparecem mais no estoque atual).
 122/086
 Kingdra (tg03/tg30)
 Cynthia's spiritomb (244/217)
@@ -16,7 +15,7 @@ Gyarados (040/098)
 Flareon (tg01/tg30)
 Jolteon
 Eevee (tg11/tg30)
-Mega gardevoir ex (032/♾️)
+Mega gardevoir ex (032/∞)
 Mega charizard x ex (109/094)
 Meowth (106/094)
 Mega zygarde ex (120/088)
@@ -39,7 +38,6 @@ Mega greninja ex
 097/081
 096/081
 093/081
-015/081
 094/081
 104/081
 103/081
@@ -49,13 +47,12 @@ Mega greninja ex
 094/084
 Bulk
 217/217
-188/172
-245/198
 Xy116/♾️
 Sylveon-gx (140/145)
 Noibat (111/100)
 183/172
 Psyduck (175jp/165)
+Charmander (168jp/165)
 Charmander (168/165)
 Psyduck (199/193)
 Zorua do N (108/100)
@@ -63,7 +60,6 @@ Squirtle (170jp/165)
 Ninetales (110jp/108)
 Articuno (102jp/100)
 Dawn (118/094)
-Charmander (168jp/165)
 213/191
 068/191
 232/191
@@ -100,7 +96,16 @@ Wyrdeer 070/067
 Kingdra 190/184
 ST 14
 ST 22
+135/108
+015/081
+188/172
+245/198
 # --- Nao coletaveis automaticamente (nao inventar busca sem identificador) ---
 # Jolteon            -> cadastrado SEM codigo; so coletavel via link direto (codigoUrl no app)
 # Mew (052           -> codigo truncado no cadastro (falta /TOTAL e o fecha-parenteses); corrigir no app
 # Bulk / Mega greninja ex -> sem codigo; nao coletaveis sem identificador
+# ST 14 / ST 22      -> Starter Deck 14 e 22 de ONE PIECE (cadastro: colecao "ST Deck"); a Liga
+#                       Pokemon nao cobre esse TCG, entao nao ha preco a coletar la
+# XXX/(infinito)     -> total do codigo e placeholder do cadastro; sem o total real a busca nao
+#                       identifica a carta (familia 055, 056, 057, 058, 059, 060, 061, 062, 063,
+#                       159, 195, 206 e 032)
