@@ -14,6 +14,11 @@
 set -e
 cd "$(dirname "$0")"
 
+# instala a trava de sintaxe deste repo se ainda nao estiver instalada nesta maquina.
+# .git/hooks nao viaja com o clone; .githooks/ viaja, e esta linha liga os dois — assim
+# uma copia nova do app ganha a protecao na primeira vez que alguem publica por aqui.
+[ "$(git config core.hooksPath)" = ".githooks" ] || { git config core.hooksPath .githooks; echo "trava de sintaxe instalada (.githooks)"; }
+
 TAG=$(date '+%d/%m %Hh%M')
 MSG=${1:-"app: atualizacao"}
 
@@ -29,17 +34,16 @@ io.open('index.html','w',encoding='utf-8',newline='').write(novo)
 io.open('versao.json','w',encoding='utf-8',newline='').write('{"tag": "%s"}'%tag)
 PY
 
-# 2) trava: os dois TÊM que bater, e o JS tem que ser válido — senão não publica
+# 2) trava: os dois carimbos TEM que bater, e o app nao pode ter perdido capacidade
 node -e "
 const fs=require('fs');
-const h=fs.readFileSync('index.html','utf8');
-const tag=(h.match(/const BUILD_TAG='([^']*)'/)||[])[1];
+const tag=(fs.readFileSync('index.html','utf8').match(/const BUILD_TAG='([^']*)'/)||[])[1];
 const vj=JSON.parse(fs.readFileSync('versao.json','utf8')).tag;
 if(tag!==vj){console.error('ABORTADO: carimbo divergente',tag,vj);process.exit(1);}
-const m=[...h.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(x=>x[1]).join('\n;\n');
-try{new Function(m);}catch(e){console.error('ABORTADO: erro de sintaxe no app —',e.message);process.exit(1);}
-console.log('carimbo:',tag,'| sintaxe OK');
+console.log('carimbo:',tag);
 "
+# sintaxe + capacidades (fonte canonica das regras: checks-app.js)
+node checks-app.js index.html
 
 # 3) publica
 git add index.html versao.json

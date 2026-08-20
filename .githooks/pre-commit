@@ -1,0 +1,39 @@
+#!/bin/sh
+# TRAVA DE SINTAXE — barra commit de index.html cujo JS nao parseia.
+#
+# POR QUE EXISTE (2026-08-18): publiquei o app com uma aspa mal escapada; o script inteiro
+# morreu e o app ficou no ar sem funcionar. A checagem que pegaria isso JA existia dentro do
+# publicar.sh — eu commitei na mao e passei por fora dela.
+# MEDIDO no proprio historico: desde que o publicar.sh nasceu (12/08), 10 de 12 commits que
+# tocaram index.html nao passaram por ele. Ou seja, o desvio e o caminho PADRAO, nao a excecao.
+#
+# DESENHO (skill 25): detector de ESTADO determinado (o JS parseia ou nao), nunca padrao de
+# texto — precisao 100% por construcao, zero transito legitimo bloqueado.
+# FAIL-OPEN: se node nao existir ou algo quebrar aqui, o commit PASSA (a trava nunca vira
+# o motivo de voce nao conseguir salvar trabalho).
+# ESCAPE: git commit --no-verify  (ou apague este arquivo).
+set -e
+git diff --cached --name-only | grep -qx 'index.html' || exit 0
+command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem conferir sintaxe (passando)"; exit 0; }
+# Confere o arquivo COMO ELE VAI PRO COMMIT (o do indice, nao o do disco).
+TMP=$(mktemp 2>/dev/null || echo "/tmp/precommit-index.html")
+git show :index.html > "$TMP" 2>/dev/null || exit 0
+# checks-app.js confere sintaxe E capacidade (blocos que ja estavam entregues e podem sumir
+# numa edicao feita sobre copia antiga — foi o que aconteceu em 19/08). Fonte canonica das
+# regras: checks-app.js na raiz do repo.
+if [ -f checks-app.js ]; then
+  node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
+else
+  echo "[pre-commit] checks-app.js ausente — conferindo so a sintaxe"
+  node -e "
+const fs=require('fs');
+let h;try{h=fs.readFileSync(process.argv[1],'utf8')}catch(e){process.exit(0)}
+const m=[...h.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(x=>x[1]).join('
+;
+');
+if(!m.trim())process.exit(0);
+try{new Function(m);}catch(e){console.error('  COMMIT BARRADO — o JavaScript do index.html nao parseia: '+e.message);process.exit(1);}
+console.log('[pre-commit] sintaxe do app OK');
+" "$TMP" || { rm -f "$TMP"; exit 1; }
+fi
+rm -f "$TMP"

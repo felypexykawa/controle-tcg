@@ -1,0 +1,45 @@
+name: app-sintaxe
+# TRAVA QUE VIAJA COM O REPOSITORIO (2026-08-18).
+#
+# POR QUE EXISTE: em 18/08 o app foi publicado com uma aspa mal escapada — o script inteiro
+# morreu e o app ficou no ar sem funcionar. A checagem que pegaria isso ja existia dentro do
+# publicar.sh, mas foi contornada por um commit feito na mao.
+#
+# A trava local (.git/hooks/pre-commit) resolve na maquina do Felype, mas NAO viaja: .git/hooks
+# nao e versionado. Esta aqui viaja: roda no servidor do GitHub a cada push, em qualquer
+# maquina, sem ninguem instalar nada — e pega inclusive quem usou `git commit --no-verify`.
+#
+# O QUE ELA NAO FAZ (limite honesto): ela nao IMPEDE a publicacao. O GitHub Pages serve o
+# arquivo assim que o push chega, entao ela avisa em ~1 minuto, nao previne o minuto ruim.
+# Prevenir e papel do hook local; esta e a rede que pega o que passou por fora dele.
+
+on:
+  push:
+    paths:
+      - 'index.html'
+  workflow_dispatch:
+
+jobs:
+  sintaxe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: o app parseia E nao perdeu capacidade?
+        run: node checks-app.js index.html
+
+      - name: carimbo de versao bate nos dois lugares?
+        run: |
+          node -e "
+          const fs=require('fs');
+          const h=fs.readFileSync('index.html','utf8');
+          const tag=(h.match(/const BUILD_TAG='([^']*)'/)||[])[1];
+          if(!tag){console.log('sem BUILD_TAG — pulando');process.exit(0);}
+          let vj=null;try{vj=JSON.parse(fs.readFileSync('versao.json','utf8')).tag}catch(e){}
+          if(vj&&tag!==vj){
+            console.error('CARIMBO DIVERGENTE: index.html diz \"'+tag+'\" e versao.json diz \"'+vj+'\"');
+            console.error('O aviso de \"versao nova\" do app compara exatamente esses dois — divergente, ele fica preso na tela pra sempre.');
+            process.exit(1);}
+          console.log('carimbo conferido: '+tag);
+          "
