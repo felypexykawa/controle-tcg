@@ -2993,6 +2993,19 @@ function voltouDeRedirect(){try{const t=+sessionStorage.getItem('tcg_redir')||0;
 function limpouRedirect(){try{sessionStorage.removeItem('tcg_redir');}catch(e){}}
 /* tela intermediária: login JÁ aprovado, dados a caminho. Antes este estado era invisível —
    o app continuava mostrando o formulário de login, o que fazia parecer que nada aconteceu. */
+/* Tela morta nunca: se o app quebrou DEPOIS de receber os dados, ele diz o que quebrou e
+   oferece saídas que não dependem da parte quebrada (recarregar, baixar backup, sair). */
+function telaFalhaApp(msg){const v=document.getElementById('view');if(!v)return;
+  v.innerHTML=`<div class="card" style="margin:20px auto 0;max-width:420px">
+    <div class="head" style="color:var(--red)">⚠ Seus dados chegaram, mas o app tropeçou</div>
+    <div class="ctx">Falhou <b>${(msg||'').slice(0,160)}</b></div>
+    <div class="ctx" style="margin-top:6px">Nada foi perdido — isto é só a tela. Manda esta mensagem pro Felype que ele conserta.</div>
+    <div class="acoes" style="margin-top:12px">
+      <button class="btn g" onclick="location.reload()">recarregar</button>
+      <button class="btn g" onclick="try{baixarBackupCompleto()}catch(e){alert('não consegui gerar o backup: '+e.message)}">baixar backup</button>
+      <button class="btn g" onclick="sairConta()">sair da conta</button>
+    </div></div>`;
+  document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');}
 function telaCarregando(){const v=document.getElementById('view');if(!v)return;
   v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Entrou ✓</div><div class="ctx">Carregando seus lançamentos…</div><div class="ctx" id="cargaLenta" style="display:none;color:var(--amber);margin-top:10px">Está demorando mais que o normal — pode ser a internet. <span class="lnk" onclick="location.reload()">tentar de novo</span> · <span class="lnk" onclick="sairConta()">sair da conta</span></div></div>`;
   document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');
@@ -3046,9 +3059,27 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
          login é aprovado a tela de login SAI e vira "carregando seus dados", que é um estado
          diferente e visível; o dado chegando depois só troca pelo Painel. */
       limpouRedirect();_telaLoginNoAr=false;telaCarregando();
-      _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;_telaLoginNoAr=false;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');
-          if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach(b=>{if(b.dataset.t!=='lancar')b.style.display='none';});
-          setSync('ok');go(papelAtual()==='lancamento'?'lancar':'painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
+      /* [BLINDAGEM 2026-08-20 — o Felype ficou preso em "Entrou ✓ carregando"]
+         Este callback fazia tudo numa linha só, sem rede de proteção: se aplicarNuvem OU o
+         desenho da tela lançasse uma exceção com o dado REAL (que nenhum teste meu tem), o
+         bloco que mostra o menu e vai pro Painel nunca rodava — e o app ficava eternamente
+         na tela de "carregando", com os dados JÁ na mão. Pior: como _syncReady já era true,
+         o aviso de "está demorando" também não aparecia; o app ficava mudo.
+         Agora cada etapa é protegida: os dados chegando SEMPRE liberam o menu, e qualquer
+         erro vira mensagem na tela com saídas (recarregar / backup / sair), nunca tela morta. */
+      _db.collection('controle').doc('dados').onSnapshot(s=>{
+        const primeiro=!_syncReady;_syncReady=true;_telaLoginNoAr=false;
+        let falha='';
+        try{if(s.exists)aplicarNuvem(s.data());else salvarNuvem();}
+        catch(e){falha='ao aplicar seus dados: '+((e&&e.message)||e);try{console.error('aplicarNuvem',e);}catch(_){}}
+        if(primeiro){
+          try{document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');
+            if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach(b=>{if(b.dataset.t!=='lancar')b.style.display='none';});
+            setSync('ok');}catch(e){}
+          try{go(papelAtual()==='lancamento'?'lancar':'painel');}
+          catch(e){falha=falha||('ao desenhar a tela: '+((e&&e.message)||e));try{console.error('render',e);}catch(_){}}
+          if(falha)telaFalhaApp(falha);
+        }},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
     }else if(u){_syncReady=false;telaLogin('Sem acesso: '+(u.email||'')+' não está autorizado. Peça pro Felype liberar.');}
     else{_syncReady=false;telaLogin('');}});}
 /* Altura real do header vira variável CSS — o título fixo da consulta ancora logo abaixo dele
@@ -3063,7 +3094,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='20/08 00h10';
+const BUILD_TAG='20/08 08h26';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
