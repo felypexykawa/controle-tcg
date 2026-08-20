@@ -44,6 +44,12 @@ console.log('carimbo:',tag);
 "
 # sintaxe + capacidades (fonte canonica das regras: checks-app.js)
 node checks-app.js index.html
+# a vacina so vale se ela propria estiver provada: a suite roda as 18 mutacoes conhecidas e as
+# 6 refatoracoes legitimas. Sem python na maquina, segue sem ela (fail-open do ambiente).
+if command -v python >/dev/null 2>&1 && [ -f checks-suite.py ]; then
+  python checks-suite.py > /dev/null 2>&1 || { echo "ABORTADO: a suite da vacina falhou — rode: python checks-suite.py"; exit 1; }
+  echo "suite da vacina: verde"
+fi
 
 # 3) publica
 git add index.html versao.json

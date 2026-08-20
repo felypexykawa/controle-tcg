@@ -18,6 +18,7 @@ on:
     paths:
       - 'index.html'
       - 'checks-app.js'
+      - 'checks-suite.py'
   workflow_dispatch:
 
 jobs:
@@ -29,6 +30,9 @@ jobs:
 
       - name: o app parseia E nao perdeu capacidade?
         run: node checks-app.js index.html
+
+      - name: a propria vacina esta provada? (18 mutacoes + 6 refatoracoes)
+        run: python checks-suite.py
 
       - name: carimbo de versao bate nos dois lugares?
         run: |

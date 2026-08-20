@@ -21,7 +21,7 @@
 # FAIL-CLOSED quanto ao CONTEUDO: se o checks-app.js rodar e reprovar, o commit para.
 # ESCAPE: git commit --no-verify  (ou apague este arquivo).
 set -e
-MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js' || true)
+MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js|checks-suite.py' || true)
 [ -n "$MUDOU" ] || exit 0
 command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem conferir o app (passando)"; exit 0; }
 [ -f checks-app.js ] || { echo "[pre-commit] checks-app.js ausente — sem conferir o app (passando)"; exit 0; }
@@ -35,5 +35,15 @@ command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem con
 # quem for mexer depois.]
 TMP=$(mktemp 2>/dev/null || echo "/tmp/precommit-index.html")
 git show :index.html > "$TMP" 2>/dev/null || { echo "[pre-commit] index.html fora do indice — nada a conferir"; exit 0; }
-node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
+# REDE GROSSA: compara com a versao ANTERIOR (HEAD) e barra se alguma funcao sumiu sem
+# declaracao. E o unico check que nao depende de alguem ter lembrado de enumerar a capacidade,
+# e por isso e o que de fato cobre "commit escrito sobre copia antiga do arquivo".
+# Remocao proposital:  PODE_REMOVER="nomeA,nomeB" git commit ...   (ou PODE_REMOVER=tudo)
+BASE=$(mktemp 2>/dev/null || echo "/tmp/precommit-base.html")
+if git show HEAD:index.html > "$BASE" 2>/dev/null; then
+  node checks-app.js "$TMP" --contra "$BASE" || { rm -f "$TMP" "$BASE"; exit 1; }
+else
+  node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
+fi
+rm -f "$BASE"
 rm -f "$TMP"
