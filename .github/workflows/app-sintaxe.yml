@@ -17,6 +17,7 @@ on:
   push:
     paths:
       - 'index.html'
+      - 'checks-app.js'
   workflow_dispatch:
 
 jobs:
