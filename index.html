@@ -2975,10 +2975,36 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
   if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));
   if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
   render();}
-function loginGoogle(){_auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('Erro no login: '+(e&&e.message)));}
+/* [CORRIGIDO 2026-08-19 — loop de login no iPhone, reportado pelo Felype: "clica pra logar,
+   parece que vai carregar, volta pra tela de login, loop infinito"]
+   Causa: o login era por JANELA POP-UP (signInWithPopup). No Safari do iPhone a janela abre,
+   autentica no Google, fecha — e o retorno pro app é barrado pela proteção anti-rastreamento
+   (o popup precisa conversar com a página de origem por armazenamento cross-site, que o
+   Safari corta por padrão). Fica no laço: clica, some, volta pro login, sem erro nenhum.
+   Correção: no celular usa REDIRECIONAMENTO (sai do app, vai pro Google, volta) — que é o
+   caminho recomendado pra mobile e não depende de popup; no computador mantém o popup, que
+   funciona bem e é mais rápido. Se o popup falhar por qualquer motivo, cai automaticamente
+   pro redirecionamento em vez de morrer calado. */
+function ehCelular(){return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));}
+function loginGoogle(){
+  if(!_auth){telaLogin('O login ainda não carregou — feche e abra o app de novo.');return;}
+  const prov=new firebase.auth.GoogleAuthProvider();
+  const btn=document.querySelector('#view .btn');if(btn){btn.textContent='entrando…';btn.disabled=true;}
+  if(ehCelular()){_auth.signInWithRedirect(prov).catch(e=>telaLogin('Não consegui abrir o login: '+((e&&(e.code||e.message))||'erro desconhecido')));return;}
+  _auth.signInWithPopup(prov).catch(e=>{
+    const cod=(e&&e.code)||'';
+    /* popup bloqueado/fechado/não suportado: tenta pelo redirecionamento antes de desistir */
+    if(/popup|operation-not-supported|cancelled/i.test(cod)){_auth.signInWithRedirect(prov).catch(e2=>telaLogin('Não consegui abrir o login: '+((e2&&(e2.code||e2.message))||'erro')));return;}
+    telaLogin('Erro no login: '+(cod||(e&&e.message)||'desconhecido'));});}
 function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
 function telaLogin(msg){_telaLoginNoAr=true;const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Controle TCG</div><div class="ctx">Entre pra acessar seu controle sincronizado em qualquer aparelho.</div>${msg?`<div class="soon" style="color:var(--red);justify-content:center">${msg}</div>`:''}<button class="btn" style="margin-top:16px" onclick="loginGoogle()">Entrar com Google</button></div>`;document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');const bv=document.getElementById('btnVoltar');if(bv)bv.style.display='none';}
 function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth=firebase.auth();_db=firebase.firestore();telaLogin('');
+  /* volta do redirecionamento do Google: se deu errado, o motivo TEM que aparecer na tela —
+     senão o usuário só vê a tela de login de novo e parece laço infinito (foi exatamente o
+     que aconteceu com o Felype). Sucesso não precisa de nada aqui: o onAuthStateChanged
+     abaixo assume. */
+  try{_auth.getRedirectResult().catch(e=>{const cod=(e&&(e.code||e.message))||'';
+    if(cod)telaLogin('O Google recusou o login: '+cod+' — me manda esta mensagem.');});}catch(e){}
   _auth.onAuthStateChanged(u=>{
     if(u&&EMAILS_OK.map(x=>(x||'').toLowerCase()).includes((u.email||'').toLowerCase())){_userEmail=u.email;
       /* login resolveu e o dado chegou: libera a trava ANTES do aplicarNuvem, senão o
@@ -3000,7 +3026,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='19/08 23h19';
+const BUILD_TAG='19/08 23h56';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
