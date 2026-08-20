@@ -26,13 +26,14 @@ MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js' || t
 command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem conferir o app (passando)"; exit 0; }
 [ -f checks-app.js ] || { echo "[pre-commit] checks-app.js ausente — sem conferir o app (passando)"; exit 0; }
 
-# confere o arquivo COMO ELE VAI PRO COMMIT (o do indice, nao o do disco)
+# Confere o index.html COMO ELE VAI FICAR APOS O COMMIT — que e sempre a versao do INDICE:
+# se o commit toca o index.html, o indice tem a versao nova; se toca so o checks-app.js, o
+# indice tem a versao do HEAD, que continua sendo a que o app serve. Nos dois casos e o
+# arquivo certo pra conferir. [Corrigido em 2026-08-20: a versao anterior tinha um ramo
+# "senao confere o do disco" que NUNCA rodava — `git show :index.html` sempre tem sucesso
+# pra arquivo rastreado, esteja ou nao staged. Comentario que descreve caminho morto engana
+# quem for mexer depois.]
 TMP=$(mktemp 2>/dev/null || echo "/tmp/precommit-index.html")
-if git show :index.html > "$TMP" 2>/dev/null; then
-  node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
-else
-  # index.html nao esta no indice (commit que so mexe no proprio checks-app.js):
-  # confere contra o arquivo do disco, que e o que o app serve hoje
-  node checks-app.js index.html || exit 1
-fi
+git show :index.html > "$TMP" 2>/dev/null || { echo "[pre-commit] index.html fora do indice — nada a conferir"; exit 0; }
+node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
 rm -f "$TMP"

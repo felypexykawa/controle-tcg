@@ -18,10 +18,20 @@
  *    do arquivo, executadas com dublês (dados de mentira no lugar do banco e da tela) e o
  *    RESULTADO e conferido. Presenca de nome nunca basta, e comentario nao conta: as buscas
  *    de nome rodam sobre uma copia do arquivo COM OS COMENTARIOS REMOVIDOS.
- *    [Isto foi corrigido em 2026-08-20 depois que a revisao adversarial furou a 1a versao:
- *     3 das 5 capacidades so eram conferidas por texto, e um comentario mencionando o nome
- *     da funcao apagada fazia o check passar verde. Verde que nao exerceu nada e o defeito
- *     que esta pagina existe pra impedir.]
+ *    [DUAS rodadas adversariais moldaram isto, ambas em 2026-08-20. A 1a furou a versao
+ *     inicial: 3 das 5 capacidades so eram conferidas por texto, e um comentario mencionando
+ *     o nome da funcao apagada fazia o check passar VERDE. A 2a furou a correcao: as funcoes
+ *     passaram a ser exercitadas, mas em TUBO DE ENSAIO — quebrar `precoLigaDe` (o funil real
+ *     cadastro->preco) reproduzia o dano exato do incidente, 17 cartas -> 0, e passava verde,
+ *     porque o dublê substituia justamente a peca quebrada. Dai nasceu a 1a capacidade da
+ *     lista: caminho INTEIRO contra o precos.json e o codigos.txt REAIS, sem dublê.]
+ *  - RESIDUAL DECLARADO (o que esta pagina NAO cobre, para ninguem confundir com garantia):
+ *    (a) "esta ligado na tela" e conferido por ATRIBUTO no HTML (`onclick="abrirPendencias()"`),
+ *        que ainda e texto — mais dificil de forjar sem querer que uma mencao ao nome, porem
+ *        nao e execucao. Provar de verdade exigiria renderizar as telas, que e outra ordem de
+ *        trabalho. (b) Onde ha dublê, o que o dublê fornece nao esta sendo testado — as
+ *        fixtures tem caso NEGATIVO justamente pra reduzir isso, mas nao elimina.
+ *        (c) Capacidades fora das 6 listadas nao sao cobertas por ninguem.
  *  - Fail-CLOSED de proposito, ao contrario de um hook de trabalho: se este script NAO
  *    conseguir exercitar as funcoes, ele FALHA em vez de passar.
  *    (O pre-commit continua fail-open quanto ao AMBIENTE: sem node, ele nao barra nada.)
@@ -39,6 +49,7 @@
  */
 'use strict';
 const fs = require('fs');
+const path = require('path');
 const alvo = process.argv[2] || 'index.html';
 
 /* ---------- leitura do arquivo ---------- */
@@ -75,8 +86,28 @@ function fimLiteral(src, i, aspa) {
   for (let j = i + 1; j < src.length; j++) {
     if (src[j] === '\\') { j++; continue; }
     if (src[j] === aspa) return j;
-    if (aspa === '`' && src[j] === '$' && src[j + 1] === '{') { let n = 1; j += 2;
-      for (; j < src.length && n > 0; j++) { if (src[j] === '{') n++; else if (src[j] === '}') n--; } j--; }
+    /* dentro de `${ ... }` de template: contar chaves PULANDO strings — senao um '}' escrito
+       dentro de aspas fecha a expressao cedo, o fim do template se perde e o scanner copia
+       verbatim ate a proxima crase, arrastando comentarios junto (furo achado na revisao
+       adversarial de 2026-08-20: 8 sobras de comentario no arquivo de producao) */
+    if (aspa === '`' && src[j] === '$' && src[j + 1] === '{') {
+      let n = 1; j += 2; let ant = '(';
+      for (; j < src.length && n > 0; j++) {
+        const c = src[j];
+        if (c === '\\') { j++; continue; }
+        if (c === '"' || c === "'" || c === '`') { j = fimLiteral(src, j, c); ant = 'x'; continue; }
+        /* regex DENTRO da expressao: `${s.replace(/'/g,"x")}` tem uma aspa dentro da regex —
+           sem tratar isso, o scanner a le como abertura de string e sai de sincronia pro resto
+           do arquivo. MEDIDO no index.html real: pular strings sem pular regex levou as sobras
+           de comentario de 8 para 148, ou seja, "corrigir" pela metade e pior que nao mexer. */
+        if (c === '/' && src[j + 1] === '/') { const f = src.indexOf('\n', j); j = f < 0 ? src.length : f; continue; }
+        if (c === '/' && src[j + 1] === '*') { const f = src.indexOf('*/', j + 2); j = f < 0 ? src.length : f + 1; continue; }
+        if (c === '/' && podeIniciarRegex(ant)) { j = fimRegex(src, j); ant = 'x'; continue; }
+        if (c === '{') n++; else if (c === '}') n--;
+        if (!/\s/.test(c)) ant = c;
+      }
+      j--;
+    }
   }
   return src.length;
 }
@@ -111,6 +142,55 @@ function telaFalsa() {
 /* ---------- o que o app NAO pode perder ---------- */
 const CAPACIDADES = [
   {
+    /* A capacidade MAIS IMPORTANTE: o caminho INTEIRO cadastro -> preco na tela, contra os
+       arquivos REAIS do repo (precos.json + robo/codigos.txt), sem dublê nenhum no meio.
+       Nasceu do 2o reataque adversarial (2026-08-20): quebrar `precoLigaDe` reproduzia o dano
+       exato do incidente fundador (17 cartas -> 0) e a vacina passava VERDE, porque as outras
+       capacidades testavam `codLimpo` em tubo de ensaio e substituiam `precoLigaDe` por dublê.
+       Testar o ingrediente nao prova a receita. */
+    nome: 'cadastro chega no preco (caminho inteiro, arquivos reais)',
+    perde: 'o funil que liga o codigo do cadastro a ficha de preco — e o dano e invisivel: o preco existe no arquivo, coletado, e simplesmente nao aparece na tela. Foi assim em 19/08 com 17 cartas',
+    precisa: ['normCod', 'codLimpo', 'idxLigaNorm', 'precoLigaDe'],
+    contexto: () => {
+      /* procura os arquivos de dados ao lado do alvo E na pasta atual. O pre-commit confere
+         uma COPIA do index.html numa pasta temporaria (pra ver a versao do indice, nao a do
+         disco) — ali nao ha precos.json nenhum, e sem esta segunda tentativa o fail-closed
+         barraria TODO commit. Pego ao testar o transporte real, antes de publicar. */
+      const perto = f => {
+        for (const base of [path.dirname(alvo) || '.', '.']) {
+          const p = path.join(base, ...f);
+          try { return fs.readFileSync(p, 'utf8'); } catch (e) {}
+        }
+        return null;
+      };
+      let precos = null, cadastros = [];
+      try { precos = JSON.parse(perto(['precos.json'])); } catch (e) {}
+      const txt = perto(['robo', 'codigos.txt']);
+      if (txt) cadastros = txt.split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#'));
+      return { _precosLiga: precos, _idxLigaNorm: null, _idxLigaFonte: null, _cadastros: cadastros };
+    },
+    exercicio: (F, ctx) => {
+      if (!ctx._precosLiga || !ctx._precosLiga.cartas || !ctx._cadastros.length)
+        throw new Error('sem precos.json/codigos.txt ao lado do index.html para exercitar o caminho real');
+      const cartas = ctx._precosLiga.cartas;
+      let soltos = 0, soltosResolvidos = 0, orfaos = [];
+      for (const linha of ctx._cadastros) {
+        const ehSolto = !/\([^()]+\)\s*$/.test(linha) && /\s[^\s]+\/[^\s]+$/.test(linha);
+        const ficha = cartas[F.codLimpo(linha)];
+        if (!ficha) continue;                       // cadastro sem ficha coletada: nao e defeito do app
+        const achou = F.precoLigaDe(linha);
+        if (ehSolto) { soltos++; if (achou === ficha) soltosResolvidos++; }
+        if (achou !== ficha) orfaos.push(linha);
+      }
+      return [
+        ['exercitou cadastros em formato solto suficientes pra valer', soltos >= 5, true],
+        ['TODO cadastro com ficha no precos.json e alcancado por precoLigaDe', orfaos.length, 0],
+        ['nenhum cadastro de codigo solto fica orfao (' + soltosResolvidos + ' de ' + soltos + ')', soltosResolvidos, soltos],
+        ['e o formato com parenteses continua funcionando', !!F.precoLigaDe("Cynthia's spiritomb (244/217)"), !!cartas['244/217']]
+      ];
+    }
+  },
+  {
     nome: 'codigo solto no cadastro',
     perde: 'cadastro escrito "Frosmoth 192/184" (sem parenteses) para de casar com o preco coletado — a carta fica sem preco na tela, e o grafico de historico dela some junto',
     precisa: ['normCod', 'codLimpo'],
@@ -128,6 +208,7 @@ const CAPACIDADES = [
     perde: 'o formato torto volta a nascer no cadastro em vez de ser corrigido na entrada — foi o que gerou 18 fichas de preco duplicadas',
     precisa: ['normCod', 'fixaParenteses'],
     chamadas: [['fixaParenteses', 3, 'os 3 formularios com campo de codigo (compra, venda avulsa, nota)']],
+    atributos: [['onchange="this.value=fixaParenteses(this.value);ligaHint(', 3, 'o handler real nos 3 campos de codigo']],
     exercicio: F => [
       ['fixaParenteses("Frosmoth 192/184")', F.fixaParenteses('Frosmoth 192/184'), 'Frosmoth (192/184)'],
       ['fixaParenteses("Spiritomb da cintia 244/217")', F.fixaParenteses('Spiritomb da cintia 244/217'), 'Spiritomb da cintia (244/217)'],
@@ -142,6 +223,7 @@ const CAPACIDADES = [
     precisa: ['ambiguasPendentes', 'pendenciasResumo', 'abrirPendencias'],
     recorta: ['normCod', 'codLimpo', 'ambiguasPendentes', 'pendenciasResumo', 'abrirPendencias'],
     chamadas: [['abrirPendencias', 1, 'o link do Painel que abre a lista']],
+    atributos: [['onclick="abrirPendencias()"', 1, 'o link do Painel']],
     contexto: () => {
       const tela = telaFalsa();
       const FICHAS = {
@@ -152,14 +234,20 @@ const CAPACIDADES = [
       };
       return {
         _tela: tela,
+        /* a fixture PRECISA ter caso negativo: com so casos positivos, apagar os filtros de
+           dentro da funcao passa verde (furo achado no reataque adversarial de 2026-08-20) */
         movs: [
           { id: 'a', tipo: 'COMPRA', cat: 'Single/Carta', qtd: 1, codigo: 'Frosmoth 192/184', obs: 'Frosmoth' },
           { id: 'b', tipo: 'COMPRA', cat: 'Single/Carta', qtd: 1, codigo: '188/172', obs: 'Sem opcoes' },
-          { id: 'c', tipo: 'COMPRA', cat: 'Single/Carta', qtd: 1, codigo: '211/172', obs: 'Com preco' }
+          { id: 'c', tipo: 'COMPRA', cat: 'Single/Carta', qtd: 1, codigo: '211/172', obs: 'Com preco' },
+          { id: 'd', tipo: 'COMPRA', cat: 'Single/Carta', qtd: 1, codigo: '188/172', obs: 'JA VENDIDA', _vendida: true },
+          { id: 'e', tipo: 'VENDA', cat: 'Single/Carta', qtd: 1, codigo: '188/172', obs: 'movimento de VENDA' },
+          { id: 'f', tipo: 'COMPRA', cat: 'Booster Box', qtd: 1, codigo: '188/172', obs: 'CAIXA, nao e carta' },
+          { id: 'h', tipo: 'COMPRA', cat: 'Single/Carta', qtd: 1, codigo: '188/172', obs: 'ja tem link proprio', codigoUrl: 'https://x' }
         ],
         _precosLiga: { cartas: FICHAS },
         codigosResolvidos: {},
-        sitDe: () => 'Em estoque',
+        sitDe: m => (m && m._vendida ? 'Vendido' : 'Em estoque'),
         precoLigaDe: c => FICHAS[('' + c).trim()] || null,
         pendenciasCodigo: () => [{ motivo: 'sem_preco', cod: '999/999', m: { id: 'z', obs: 'carta sem preco' } }],
         provaReal: () => ({ A: [], n: { vermelho: 0, amarelo: 0 } }),
@@ -178,6 +266,11 @@ const CAPACIDADES = [
       const html = ctx._tela.escrito.join('');
       return [
         ['ambiguasPendentes() acha as 2 ambiguas', amb.length, 2],
+        /* qtd 0 NAO entra nesta lista de propósito: `(+m.qtd||1)` faz zero valer 1 no app,
+           que e comportamento real (tolera cadastro antigo sem qtd), nao defeito. A 1a versao
+           desta fixture esperava exclusao e acusou o app — a regua e que estava errada. */
+        ['e IGNORA vendida, movimento de VENDA, caixa e item com link proprio',
+          amb.map(x => x.rots.join('|')).join(' ').match(/VENDIDA|VENDA|CAIXA|link proprio/) || 'nenhum', 'nenhum'],
         ['e agrupa pelo codigo LIMPO (nao pelo texto do cadastro)', amb[0] && amb[0].codC, '192/184'],
         ['contando as opcoes que o robo capturou', amb[0] && amb[0].nOpc, 2],
         ['poe quem resolve em 1 toque na frente', amb[1] && amb[1].codC, '188/172'],
@@ -219,6 +312,35 @@ const CAPACIDADES = [
     }
   },
   {
+    /* achado do reataque: `escolherOpcaoAmbigua` e quem de fato GRAVA a escolha do Felype.
+       Apagar a funcao inteira deixava o picker abrindo e o botao apontando pro vazio — e a
+       vacina passava, porque ela nao estava no inventario. */
+    nome: 'gravar a escolha da carta',
+    perde: 'o picker abre, o Felype escolhe e nada acontece — o codigo continua ambiguo e o preco travado, que e exatamente o que a escolha existe pra destravar',
+    precisa: ['escolherOpcaoAmbigua'],
+    recorta: ['escolherOpcaoAmbigua'],
+    atributos: [['escolherOpcaoAmbigua(', 2, 'os botoes de cada opcao no picker']],
+    contexto: () => {
+      const ch = { salvou: 0, save: 0, fechou: 0, render: 0, toasts: [] };
+      return { _ch: ch, codigosResolvidos: {},
+               salvarCodRes: () => ch.salvou++, save: () => ch.save++,
+               fecharModal: () => ch.fechou++, render: () => ch.render++,
+               toast: t => ch.toasts.push(t) };
+    },
+    exercicio: (F, ctx) => {
+      F.escolherOpcaoAmbigua('192/184', 'https://ligapokemon/x');
+      const gravou = ctx.codigosResolvidos['192/184'];
+      const antes = ctx._ch.salvou;
+      F.escolherOpcaoAmbigua('999/999', '');
+      return [
+        ['a escolha e gravada no catalogo global do codigo', gravou, 'https://ligapokemon/x'],
+        ['e persistida (salvarCodRes + save)', ctx._ch.salvou >= 1 && ctx._ch.save >= 1, true],
+        ['a tela fecha e redesenha com o preco novo', ctx._ch.fechou >= 1 && ctx._ch.render >= 1, true],
+        ['opcao sem link avisa em vez de gravar lixo', ctx.codigosResolvidos['999/999'] === undefined && ctx._ch.salvou === antes, true]
+      ];
+    }
+  },
+  {
     nome: 'login que nao entra em laco',
     perde: 'as correcoes de login de 19-20/08: redirecionamento no celular, a tela "Entrou/carregando" e a tela de falha com saidas. Sem elas o app volta a prender o dono na tela de login',
     precisa: ['ehCelular', 'voltouDeRedirect', 'telaCarregando', 'telaFalhaApp'],
@@ -232,11 +354,21 @@ const CAPACIDADES = [
     },
     exercicio: (F, ctx) => {
       const celular = F.ehCelular();
+      ctx._nav.userAgent = 'Mozilla/5.0 (Linux; Android 14; SM-S911B)'; ctx._nav.maxTouchPoints = 5;
+      const android = F.ehCelular();
+      ctx._nav.userAgent = 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X)'; ctx._nav.maxTouchPoints = 5;
+      const ipad = F.ehCelular();
+      ctx._nav.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'; ctx._nav.maxTouchPoints = 5;
+      const ipadDesktopMode = F.ehCelular();
       ctx._nav.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'; ctx._nav.maxTouchPoints = 0;
       const desktop = F.ehCelular();
       const semMarca = F.voltouDeRedirect();
       ctx._ss.setItem('tcg_redir', String(Date.now()));
       const comMarca = F.voltouDeRedirect();
+      ctx._ss.setItem('tcg_redir', String(Date.now() - 9 * 60000));
+      const dentroDaJanela = F.voltouDeRedirect();
+      ctx._ss.setItem('tcg_redir', String(Date.now() - 11 * 60000));
+      const foraDaJanela = F.voltouDeRedirect();
       ctx._ss.setItem('tcg_redir', String(Date.now() - 3600000));
       const marcaVelha = F.voltouDeRedirect();
       F.telaCarregando();
@@ -246,9 +378,14 @@ const CAPACIDADES = [
       const falha = ctx._tela.escrito.join('');
       return [
         ['iPhone e tratado como celular (usa redirecionamento)', celular, true],
+        ['Android tambem', android, true],
+        ['iPad tambem', ipad, true],
+        ['iPad em "modo computador" (se diz Macintosh mas tem toque) tambem', ipadDesktopMode, true],
         ['computador nao (mantem o popup, que funciona)', desktop, false],
         ['sem ter saido pro Google, nao ha volta pendente', semMarca, false],
         ['tendo saido agora, a volta e detectada', comMarca, true],
+        ['9 min atras ainda conta (a janela e de 10 min)', dentroDaJanela, true],
+        ['11 min atras nao conta mais — a fronteira e testada, nao suposta', foraDaJanela, false],
         ['marca velha nao conta como volta de agora', marcaVelha, false],
         ['a tela "Entrou/carregando" existe de verdade', /Entrou/.test(carregando) && /Carregando/i.test(carregando), true],
         ['a tela de falha diz o que quebrou', falha.indexOf('ao aplicar seus dados: teste') >= 0, true],
@@ -284,6 +421,14 @@ for (const cap of CAPACIDADES) {
   for (const [fn, minimo, onde] of (cap.chamadas || [])) {
     const usos = (jsLimpo.match(new RegExp('\\b' + fn + '\\s*\\(', 'g')) || []).length - 1;
     if (usos < minimo) falhas.push([cap.nome, fn + ' existe mas e chamada ' + usos + 'x (esperado no minimo ' + minimo + ': ' + onde + ')', 'funcao definida e nao ligada nao faz nada — ' + cap.perde]);
+  }
+
+  /* LIGACAO por ATRIBUTO: exige o handler real (`onclick="abrirPendencias()"`), nao uma
+     chamada solta em qualquer lugar. Mata o truque de deixar funcao-lixo ou string de ajuda
+     chamando o nome enquanto o handler de verdade sumiu do campo (furos A/B/C do reataque). */
+  for (const [padrao, minimo, onde] of (cap.atributos || [])) {
+    const n = jsLimpo.split(padrao).length - 1;
+    if (n < minimo) falhas.push([cap.nome, 'o handler real aparece ' + n + 'x (esperado no minimo ' + minimo + ': ' + onde + ') — procurado: ' + padrao, 'a funcao pode ate existir, mas nao esta mais ligada na tela — ' + cap.perde]);
   }
 
   if (!cap.exercicio) continue;
