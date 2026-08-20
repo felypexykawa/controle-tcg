@@ -2986,16 +2986,37 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
    funciona bem e é mais rápido. Se o popup falhar por qualquer motivo, cai automaticamente
    pro redirecionamento em vez de morrer calado. */
 function ehCelular(){return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/i.test(navigator.userAgent));}
+/* marcador de "saí pro Google agora" — é o que permite saber, na volta, se o login foi
+   tentado e não completou (o SDK não avisa isso: resolve nulo, calado) */
+function marcaRedirect(){try{sessionStorage.setItem('tcg_redir',String(Date.now()));}catch(e){}}
+function voltouDeRedirect(){try{const t=+sessionStorage.getItem('tcg_redir')||0;return t>0&&Date.now()-t<600000;}catch(e){return false;}}
+function limpouRedirect(){try{sessionStorage.removeItem('tcg_redir');}catch(e){}}
+/* tela intermediária: login JÁ aprovado, dados a caminho. Antes este estado era invisível —
+   o app continuava mostrando o formulário de login, o que fazia parecer que nada aconteceu. */
+function telaCarregando(){const v=document.getElementById('view');if(!v)return;
+  v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Entrou ✓</div><div class="ctx">Carregando seus lançamentos…</div><div class="ctx" id="cargaLenta" style="display:none;color:var(--amber);margin-top:10px">Está demorando mais que o normal — pode ser a internet. <span class="lnk" onclick="location.reload()">tentar de novo</span> · <span class="lnk" onclick="sairConta()">sair da conta</span></div></div>`;
+  document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');
+  setTimeout(()=>{const el=document.getElementById('cargaLenta');if(el&&!_syncReady)el.style.display='block';},8000);}
 function loginGoogle(){
   if(!_auth){telaLogin('O login ainda não carregou — feche e abra o app de novo.');return;}
   const prov=new firebase.auth.GoogleAuthProvider();
   const btn=document.querySelector('#view .btn');if(btn){btn.textContent='entrando…';btn.disabled=true;}
-  if(ehCelular()){_auth.signInWithRedirect(prov).catch(e=>telaLogin('Não consegui abrir o login: '+((e&&(e.code||e.message))||'erro desconhecido')));return;}
+  if(ehCelular()){marcaRedirect();_auth.signInWithRedirect(prov).catch(e=>{limpouRedirect();telaLogin('Não consegui abrir o login: '+((e&&(e.code||e.message))||'erro desconhecido'));});return;}
   _auth.signInWithPopup(prov).catch(e=>{
     const cod=(e&&e.code)||'';
-    /* popup bloqueado/fechado/não suportado: tenta pelo redirecionamento antes de desistir */
-    if(/popup|operation-not-supported|cancelled/i.test(cod)){_auth.signInWithRedirect(prov).catch(e2=>telaLogin('Não consegui abrir o login: '+((e2&&(e2.code||e2.message))||'erro')));return;}
+    /* [CORRIGIDO 2026-08-20, achado da revisão] a lista de erros que caía pro redirecionamento
+       incluía "popup-closed-by-user" e "cancelled-popup-request" — ou seja, FECHAR o popup de
+       propósito, ou clicar duas vezes no botão, arrancava o usuário da página pro Google. Isso
+       é regressão num caminho que funcionava. Agora só o BLOQUEIO real (o navegador impediu de
+       abrir, ou não suporta popup) justifica trocar de método; desistência do usuário volta
+       pro formulário, como sempre foi. */
+    if(/popup-blocked|operation-not-supported/i.test(cod)){marcaRedirect();_auth.signInWithRedirect(prov).catch(e2=>{limpouRedirect();telaLogin('Não consegui abrir o login: '+((e2&&(e2.code||e2.message))||'erro'));});return;}
+    if(/popup-closed-by-user|cancelled-popup-request/i.test(cod)){telaLogin('');return;}
     telaLogin('Erro no login: '+(cod||(e&&e.message)||'desconhecido'));});}
+/* [CORRIGIDO 2026-08-20] voltar pelo "‹" do navegador restaura a página do cache sem rodar o
+   script de novo: o botão ficava preso em "entrando…" e desabilitado, sem como tentar outra
+   vez. Ao restaurar, se ninguém está logado, devolve o formulário funcionando. */
+window.addEventListener('pageshow',e=>{if(e.persisted&&!(_auth&&_auth.currentUser)&&_telaLoginNoAr)telaLogin('');});
 function sairConta(){if(_auth&&confirm('Sair da conta?')){_syncReady=false;_auth.signOut();}}
 function telaLogin(msg){_telaLoginNoAr=true;const v=document.getElementById('view');if(v)v.innerHTML=`<div class="card" style="text-align:center;margin:46px auto 0;max-width:360px"><div style="font-size:32px">🃏</div><div class="head" style="justify-content:center;margin-top:6px">Controle TCG</div><div class="ctx">Entre pra acessar seu controle sincronizado em qualquer aparelho.</div>${msg?`<div class="soon" style="color:var(--red);justify-content:center">${msg}</div>`:''}<button class="btn" style="margin-top:16px" onclick="loginGoogle()">Entrar com Google</button></div>`;document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='none');const bv=document.getElementById('btnVoltar');if(bv)bv.style.display='none';}
 function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth=firebase.auth();_db=firebase.firestore();telaLogin('');
@@ -3003,12 +3024,28 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
      senão o usuário só vê a tela de login de novo e parece laço infinito (foi exatamente o
      que aconteceu com o Felype). Sucesso não precisa de nada aqui: o onAuthStateChanged
      abaixo assume. */
-  try{_auth.getRedirectResult().catch(e=>{const cod=(e&&(e.code||e.message))||'';
-    if(cod)telaLogin('O Google recusou o login: '+cod+' — me manda esta mensagem.');});}catch(e){}
+  /* [CORRIGIDO 2026-08-20] getRedirectResult NÃO rejeita quando simplesmente não achou o
+     evento de volta (o SDK trata "auth/no-auth-event" como não-erro e resolve nulo) — então
+     o .catch abaixo é cego pro pior caso: voltar do Google sem logar, calado. Por isso
+     marcamos ANTES de sair (marcaRedirect) e conferimos na volta: se saiu pro Google e
+     voltou sem usuário, DIZEMOS isso na tela, com o próximo passo. */
+  try{_auth.getRedirectResult().then(r=>{
+      if(r&&r.user)return;                       // sucesso: onAuthStateChanged assume
+      if(!voltouDeRedirect())return;             // nem tentou logar agora: tela normal
+      setTimeout(()=>{if(!(_auth&&_auth.currentUser)){limpouRedirect();
+        telaLogin('Você voltou do Google mas o login não completou neste navegador. No iPhone: Ajustes → Safari → desligue "Impedir Rastreamento entre Sites" e tente de novo. Se continuar, me avise que eu mudo o endereço do app.');}},1500);
+    }).catch(e=>{const cod=(e&&(e.code||e.message))||'';limpouRedirect();
+      if(cod)telaLogin('O Google recusou o login: '+cod+' — me manda esta mensagem.');});}catch(e){}
   _auth.onAuthStateChanged(u=>{
     if(u&&EMAILS_OK.map(x=>(x||'').toLowerCase()).includes((u.email||'').toLowerCase())){_userEmail=u.email;
-      /* login resolveu e o dado chegou: libera a trava ANTES do aplicarNuvem, senão o
-         primeiro render legítimo seria engolido pela própria trava */
+      /* [CORRIGIDO 2026-08-20 — revisão adversarial derrubou a versão de ontem]
+         A trava saía do ar SÓ quando o banco respondia. Com o login já aprovado mas o dado
+         demorando (4G ruim, primeira abertura, regra negando), a tela de login CONTINUAVA no
+         ar — o dono tocava "entrar" de novo, o Google aprovava na hora, voltava, mesma tela.
+         Isso é o laço infinito, e nasce aqui dentro, sem culpa do Safari. Agora: assim que o
+         login é aprovado a tela de login SAI e vira "carregando seus dados", que é um estado
+         diferente e visível; o dado chegando depois só troca pelo Painel. */
+      limpouRedirect();_telaLoginNoAr=false;telaCarregando();
       _db.collection('controle').doc('dados').onSnapshot(s=>{const primeiro=!_syncReady;_syncReady=true;_telaLoginNoAr=false;if(s.exists)aplicarNuvem(s.data());else salvarNuvem();if(primeiro){document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');
           if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach(b=>{if(b.dataset.t!=='lancar')b.style.display='none';});
           setSync('ok');go(papelAtual()==='lancamento'?'lancar':'painel');}},e=>telaLogin('Erro de conexão: '+(e&&e.message)));
@@ -3026,7 +3063,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='19/08 23h56';
+const BUILD_TAG='20/08 00h10';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
