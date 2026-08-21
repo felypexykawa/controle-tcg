@@ -95,8 +95,21 @@ fi
 # ele NAO se commitava, entao a fiacao da trava so existia nesta maquina — um clone novo, um
 # `git checkout publicar.sh` ou um stash e a conferencia sumia sem aviso (achado da revisao
 # adversarial, 21/08: o antipadrao 37 dentro da peca que existe pra curar o antipadrao 37).
-git add -A index.html versao.json checks-app.js checks-suite.py testes-nucleo.js publicar.sh .githooks .github .gitignore checa-linha-paralela.js 2>/dev/null || git add -A index.html versao.json
-git commit -q -m "$MSG (v $TAG)"
+# `git add -A .` no repo INTEIRO, protegido pelo .gitignore — e NAO uma lista de nomes.
+# A lista era fragil por duas vias, as duas medidas hoje: (1) ela esqueceu o proprio
+# publicar.sh por meses, entao a fiacao das travas so existia nesta maquina; (2) bastava um
+# nome da lista nao existir mais (apaguei um arquivo hoje) pra o `git add` inteiro FALHAR e
+# cair no plano B, que so levava o app — as melhorias de trava ficavam pra tras em silencio,
+# publicacao apos publicacao. Lista explicita e uma cerca que so protege quem lembrou de citar.
+git add -A .
+# ESCAPE UNICO NAS TRES PORTAS: o pre-commit e este script leem PODE_REMOVER do ambiente; o
+# CI le do CORPO da mensagem (la nao existe ambiente). Sem carimbar aqui, uma remocao declarada
+# passava local e deixava o CI vermelho — vigia que grita a toa ensina a ignorar vigia.
+if [ -n "$PODE_REMOVER" ]; then
+  git commit -q -m "$MSG (v $TAG)" -m "PODE_REMOVER=$PODE_REMOVER"
+else
+  git commit -q -m "$MSG (v $TAG)"
+fi
 git push -q origin master
 echo "publicado: $(git rev-parse --short HEAD) as $(date '+%H:%M:%S')"
 

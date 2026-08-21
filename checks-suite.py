@@ -17,11 +17,18 @@ try:
 except Exception:
     pass
 
-SP = os.path.join(tempfile.gettempdir(), 'checks-suite-tcg')
+# pasta de trabalho POR PROCESSO. Antes era um nome fixo: duas execucoes ao mesmo tempo
+# (o publicar.sh e uma conferencia manual, ou um agente revisor em paralelo) disputavam a mesma
+# pasta — uma apagava a da outra e a suite devolvia "0/6 refatoracoes passam", que e VEREDITO
+# FALSO, nao falha real. Instrumento que mente sob concorrencia e pior que instrumento ausente:
+# manda consertar o que nao esta quebrado. (Achado ao vivo em 2026-08-21.)
+SP = os.path.join(tempfile.gettempdir(), 'checks-suite-tcg-%d' % os.getpid())
 REPO = os.path.dirname(os.path.abspath(__file__))
 if os.path.isdir(SP):
-    shutil.rmtree(SP)
+    shutil.rmtree(SP, ignore_errors=True)
 os.makedirs(os.path.join(SP, 'robo'))
+import atexit
+atexit.register(lambda: shutil.rmtree(SP, ignore_errors=True))
 shutil.copy(os.path.join(REPO, 'precos.json'), os.path.join(SP, 'precos.json'))
 shutil.copy(os.path.join(REPO, 'robo', 'codigos.txt'), os.path.join(SP, 'robo', 'codigos.txt'))
 S = io.open(os.path.join(REPO, 'index.html'), encoding='utf-8').read()
@@ -122,6 +129,17 @@ dano('X7', S.replace('onclick="limparTudo()"', 'onclick="if(confirm(\'Apagar TOD
 #     nao recarregou grava sem o campo e RESSUSCITA tudo (a cura valia so pela metade)
 dano('X8', S.replace('if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));',
                      'if(d.excluidos&&Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));', 1))
+
+# ---- guarda de toque repetido (21/08) ----
+# X9/X10: tirar da lista justamente os dois nomes da queixa do dono. Com a comparacao por
+#         substring (a 1a versao) os dois passavam VERDE, porque 'salvar' aparece dentro de
+#         'salvarNota' e 'excluir' dentro de 'excluirPess'.
+dano('X9',  S.replace('const RE_GRAVA=/\\b(salvar|', 'const RE_GRAVA=/\\b(', 1))
+dano('X10', S.replace('const RE_GRAVA=/\\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|', 'const RE_GRAVA=/\\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|', 1))
+# X11: a guarda para de engolir o segundo toque -> a venda volta a entrar 2x
+dano('X11', S.replace('ev.preventDefault();ev.stopImmediatePropagation();', '', 1))
+# X12: o retorno visual some -> a pessoa continua com motivo pra tocar de novo
+dano('X12', S.replace("el.classList.add('agindo');", '', 1))
 
 # ---- refatoracoes LEGITIMAS: nao podem barrar ----
 i, j = corta(S, 'codLimpo')

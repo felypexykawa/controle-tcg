@@ -187,7 +187,16 @@ const CAPACIDADES = [
       const protegidos = ['salvar', 'salvarNota', 'salvarVendaVarios', 'salvarTroca',
                           'salvarTransferencia', 'excluir', 'execExcl', 'execDev', 'devolver',
                           'limparTudo', 'marcarPago'];
-      const fora = protegidos.filter(n => lista.indexOf(n) < 0);
+      /* TOKEN EXATO, nunca substring. Com `indexOf`, tirar `salvar|` da lista continuava
+         "achando" salvar dentro de salvarNota — e a vacina passava VERDE justamente nos dois
+         nomes da queixa que originou a peca ("clica em salvar a venda... salvou 3 vendas").
+         Medido: remover salvar| e excluir| davam exit 0. Achado da 2a revisao adversarial. */
+      /* tirar a moldura da regex ANTES de separar: o primeiro nome vem grudado no `(`
+         e virava 'bsalvar' — falso positivo em massa que eu mesmo criei ao corrigir o furo
+         de substring. Trava que grita a toa e defeito igual ao furo. */
+      const nomes = new Set(lista.replace(/^\\b\(/, '').replace(/\)[\s\S]*$/, '')
+        .split('|').map(x => x.trim()).filter(Boolean));
+      const fora = protegidos.filter(n => !nomes.has(n));
       return [
         ['a guarda existe e roda na CAPTURA (antes do handler do botao)',
           /addEventListener\('click',[\s\S]{0,900}?\},\s*true\)/.test(src), true],

@@ -38,7 +38,9 @@ git show :index.html > "$TMP" 2>/dev/null || { echo "[pre-commit] index.html for
 # REDE GROSSA: compara com a versao ANTERIOR (HEAD) e barra se alguma funcao sumiu sem
 # declaracao. E o unico check que nao depende de alguem ter lembrado de enumerar a capacidade,
 # e por isso e o que de fato cobre "commit escrito sobre copia antiga do arquivo".
-# Remocao proposital:  PODE_REMOVER="nomeA,nomeB" git commit ...   (ou PODE_REMOVER=tudo)
+# Remocao proposital:  PODE_REMOVER="nomeA,nomeB" git commit -m "msg" -m "PODE_REMOVER=nomeA,nomeB"
+# (a variavel libera AQUI; a linha na MENSAGEM libera no CI, que nao ve ambiente. Publicando
+#  por `PODE_REMOVER=... sh publicar.sh`, o carimbo na mensagem sai sozinho.)
 BASE=$(mktemp 2>/dev/null || echo "/tmp/precommit-base.html")
 if git show HEAD:index.html > "$BASE" 2>/dev/null; then
   node checks-app.js "$TMP" --contra "$BASE" || { rm -f "$TMP" "$BASE"; exit 1; }
