@@ -1070,6 +1070,21 @@ let _idb=null,_fotosCache=[],_fotosPend=[];
    na lista, as fotos vao com ele — e ao salvar, cada lancamento recebe as SUAS. Antes tudo ia
    pro primeiro lancamento e os outros ficavam sem nada. */
 let _fotosItem=[];
+/* [21/08 — achado da revisao adversarial] O balde de foto do ITEM pertence ao FORMULARIO que
+   esta na tela. Eu tinha curado UMA porta (go/trocar de aba) e a revisao achou outras TRES
+   abertas: "< voltar", trocar o tipo de lancamento, alternar 1 item<->Nota. Em todas, a foto
+   da carta abandonada grudava na proxima carta salva — silencioso, e pior que o bug original.
+   Curar porta por porta e caca a rato. Regra unica: se a identidade do formulario mudou desde
+   a ultima pintura, o balde do item vai embora. Porta nova nasce coberta. */
+function _idForm(){return tela+'|'+tipoSel+'|'+compraModo+'|'+(editId||'');}
+let _fotosItemForm=null;
+function guardaBaldeItem(){const at=_idForm();
+  if(_fotosItemForm!==null&&at!==_fotosItemForm&&_fotosItem.length)_fotosItem=[];
+  _fotosItemForm=at;}
+/* [21/08] Corrigir OUTRO item enquanto voce tem foto tirada da carta em digitacao descartaria
+   essas fotos em silencio. Avisa antes: foto custa esforco, nao e texto que se redigita. */
+function baldeItemLivre(){if(!_fotosItem.length)return true;
+  return confirm('Você tem '+_fotosItem.length+' foto(s) tirada(s) da carta que está digitando agora.\n\nCorrigir outro item substitui o formulário por ele — e essas fotos são descartadas.\n\nDescartar e continuar?');}
 function abrirFotosItem(){const old=document.getElementById('modal');if(old)old.remove();
   const thumbs=_fotosItem.length?_fotosItem.map((b,i)=>`<div style="position:relative"><img src="${b}" style="width:100%;height:92px;object-fit:cover;border-radius:8px"><button class="x" style="position:absolute;top:2px;right:4px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 7px" onclick="_fotosItem.splice(${i},1);abrirFotosItem()">✕</button></div>`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto desta carta ainda.</div>';
   const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();atualizarBadgeFotoItem()}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
@@ -1382,7 +1397,7 @@ function voltar(){const s=navHist.pop();if(!s)return;
    do login resolver, não só o dos preços — por isso a trava mora aqui dentro, e não no
    fetch: enquanto a tela de login estiver no ar, render() não pinta por cima dela. */
 let _telaLoginNoAr=false;
-function render(){if(_telaLoginNoAr)return;
+function render(){guardaBaldeItem();if(_telaLoginNoAr)return;
   if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
   const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
@@ -1624,7 +1639,10 @@ function addItemNota(){const g=id=>document.getElementById(id);const cat=g('n_ca
   if(val<=0){alert('Informe o valor de cada item (ou o total).');return;}
   const col=g('n_col')?.value,cod=(g('n_cod')?.value||'').trim(),cond=g('n_cond')?.value;notaItens.push({jogo:g('n_jogo').value,cat,colecao:(col&&col!=='__add__')?col:'',idioma:g('n_idi').value,qtd,valor:val,vUnit:unit,codigo:cod,boosters:+g('n_boo')?.value||0,condicao:(cond&&cond!=='—')?cond:'',fotos:_fotosItem.slice()});_fotosItem=[];render();}
 function removeItemNota(i){notaItens.splice(i,1);render();}
-function editItemNota(i){const it=notaItens.splice(i,1)[0];render();
+function editItemNota(i){if(!baldeItemLivre())return;const it=notaItens.splice(i,1)[0];
+  /* [21/08 revisao] faltava esta linha: o editRecebi devolvia as fotos ao balde e este nao —
+     corrigir um item da nota perdia as fotos dele em silencio. */
+  _fotosItem=(it&&it.fotos)?it.fotos.slice():[];render();
   const s=id=>document.getElementById(id);
   if(s('n_jogo')){s('n_jogo').value=it.jogo||'Pokémon';reColN(it.jogo||'Pokémon');}
   if(s('n_cat'))s('n_cat').value=it.cat||'';
@@ -1728,13 +1746,13 @@ function trocaForm(){
      `baixarLote` ja resolve o destino de origem sozinho pelo `destIni`. */
   const _mt=motor();
   const dispc=(_mt.disp||[]).concat(_mt.colItens||[]);trocaUn='un';const dit0=dispc[0],dbpu0=dit0?Math.max(1,+dit0.boosters||1):1;
-  const dei=trocaDei.length?trocaDei.map((d,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${d.desc}</b>${d.estoqueId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">custou ${fmt(d.custo)}</div></div><div style="flex:none;display:flex;gap:10px"><button class="x" style="color:var(--blue)" onclick="editDei(${i})">✎ corrigir</button><button class="x" onclick="removeDei(${i})">remover</button></div></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
+  const dei=trocaDei.length?trocaDei.map((d,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${d.desc}</b>${d.estoqueId?(d.deiSit==='Coleção'?' <span style="color:var(--amber);font-size:10px">⭐ sai da sua coleção</span>':' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>'):''}<div class="meta">custou ${fmt(d.custo)}</div></div><div style="flex:none;display:flex;gap:10px"><button class="x" style="color:var(--blue)" onclick="editDei(${i})">✎ corrigir</button><button class="x" onclick="removeDei(${i})">remover</button></div></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
   const recebi=trocaRecebi.length?trocaRecebi.map((r,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${r.desc}</b>${r.colecao?' · '+r.colecao:''}${r.condicao?' ['+r.condicao+']':''}<div class="meta">vale ${fmt(r.valorMercado)} · ${r.sit}</div></div><div style="flex:none;display:flex;gap:10px"><button class="x" style="color:var(--blue)" onclick="editRecebi(${i})">✎ corrigir</button><button class="x" onclick="removeRecebi(${i})">remover</button></div></div>`).join(''):`<div class="empty" style="padding:10px">Nada ainda.</div>`;
   return `<div class="ctx">Troca de vários × vários. O custo do que você deu é rateado nas cartas que recebeu, proporcional ao valor de cada uma.</div>
     <div class="sec">📤 O que eu dei (${trocaDei.length})</div>${dei}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="toggle" style="margin-bottom:8px"><div class="o ${deiModo==='estoque'?'on':''}" onclick="deiModo='estoque';render()">do estoque</div><div class="o ${deiModo==='avulso'?'on':''}" onclick="deiModo='avulso';render()">avulso</div></div>
-      ${deiModo==='estoque'?(dispc.length?`<label style="margin-top:0">Material <span style="color:var(--mut);font-size:10px">(digite pra filtrar · baixa sozinho)</span></label>${selBusca('d_item',dispc.map(d=>({id:d.id,rot:`${sitDe(d)==='Coleção'?'⭐ ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}`})),null,'digite pra filtrar… (⭐ = da sua coleção)',()=>trocaUnHint())}<div class="row2" style="margin-top:6px"><div><label style="margin-top:0">Quantas?</label><input id="d_qtd" type="number" inputmode="numeric" value="1" min="1"></div><div></div></div><div id="dunrow" data-rot="Dar em" style="margin-top:6px;display:none"><label>Dar em</label></div>`:`<div class="meta">Nada em estoque — use "avulso".</div>`)
+      <div class="toggle" style="margin-bottom:8px"><div class="o ${deiModo==='estoque'?'on':''}" onclick="deiModo='estoque';render()">do estoque/coleção</div><div class="o ${deiModo==='avulso'?'on':''}" onclick="deiModo='avulso';render()">avulso</div></div>
+      ${deiModo==='estoque'?(dispc.length?`<label style="margin-top:0">Material <span style="color:var(--mut);font-size:10px">(digite pra filtrar · baixa sozinho)</span></label>${selBusca('d_item',dispc.map(d=>({id:d.id,rot:`${sitDe(d)==='Coleção'?'⭐ ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}`})),null,'digite pra filtrar… (⭐ = da sua coleção)',()=>trocaUnHint())}<div class="row2" style="margin-top:6px"><div><label style="margin-top:0">Quantas?</label><input id="d_qtd" type="number" inputmode="numeric" value="1" min="1"></div><div></div></div><div id="dunrow" data-rot="Dar em" style="margin-top:6px;display:none"><label>Dar em</label></div>`:`<div class="meta">Nada no estoque nem na coleção — use "avulso".</div>`)
       :`<div class="row2"><div><label style="margin-top:0">O que dei</label><input id="d_desc" placeholder="ex: 14 quads"></div><div><label style="margin-top:0">Me custou (R$)</label><input id="d_custo" type="number" inputmode="decimal"></div></div>`}
       <button class="btn g" style="margin-top:10px" onclick="addDei()">+ adicionar material</button></div>
     <div class="row2"><div><label>+ dinheiro que eu dei (R$)</label><input type="number" inputmode="decimal" value="${trocaDin||0}" oninput="trocaDin=+this.value||0;trocaRatPrev()"></div>
@@ -1760,7 +1778,7 @@ function addDei(){if(deiModo==='estoque'){const id=document.getElementById('d_it
   const bpu=Math.max(1,+m.boosters||1),boo=(trocaUn==='boo'&&bpu>1);
   const dispM=boo?(+m.qtd||1)*bpu:(+m.qtd||1),vU=(+m.valor||0)/dispM;let q=+document.getElementById('d_qtd')?.value||1;
   if(q>dispM){alert('Você só tem '+dispM+(boo?' boosters':' em estoque')+' desse item.');return;}
-  trocaDei.push({desc:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))).slice(0,40)+(boo?' ('+q+' boosters)':(dispM>1?' ('+q+' un)':'')),custo:Math.round(vU*q*100)/100,estoqueId:id,estoqueQtd:q,deiBoo:boo});}else{const desc=document.getElementById('d_desc')?.value||'material',custo=+document.getElementById('d_custo')?.value||0;trocaDei.push({desc,custo});}render();}
+  trocaDei.push({desc:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'item'))).slice(0,40)+(boo?' ('+q+' boosters)':(dispM>1?' ('+q+' un)':'')),custo:Math.round(vU*q*100)/100,estoqueId:id,estoqueQtd:q,deiBoo:boo,deiSit:sitDe(m)});}else{const desc=document.getElementById('d_desc')?.value||'material',custo=+document.getElementById('d_custo')?.value||0;trocaDei.push({desc,custo});}render();}
 function removeDei(i){trocaDei.splice(i,1);render();}
 /* Corrigir item já adicionado nas listas da troca: volta pros campos (em vez de redigitar tudo) */
 function editDei(i){const d=trocaDei.splice(i,1)[0];
@@ -1772,7 +1790,7 @@ function editDei(i){const d=trocaDei.splice(i,1)[0];
     const dd=document.getElementById('d_desc'),dc=document.getElementById('d_custo');
     if(dd)dd.value=d.desc||'';if(dc)dc.value=d.custo||'';}
   toast('De volta nos campos — corrija e toque em "+ adicionar" de novo');}
-function editRecebi(i){const r=trocaRecebi.splice(i,1)[0];_fotosItem=(r&&r.fotos)?r.fotos.slice():[];render();
+function editRecebi(i){if(!baldeItemLivre())return;const r=trocaRecebi.splice(i,1)[0];_fotosItem=(r&&r.fotos)?r.fotos.slice():[];render();
   const s=id=>document.getElementById(id);
   if(s('r_jogo')){s('r_jogo').value=r.jogo||'Pokémon';reColR(r.jogo||'Pokémon');}
   if(s('r_desc'))s('r_desc').value=r.desc||'';
@@ -3077,7 +3095,7 @@ function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const 
       <div><label style="margin-top:0">Em</label><select id="ab_unA" onchange="abUnAChange(this,'${m.id}')">${Math.max(1,+m.boosters||1)>1?`<option value="un" ${_abUnA!=='boo'?'selected':''}>unidades (tem ${+m.qtd||1})</option><option value="boo" ${_abUnA==='boo'?'selected':''}>boosters (tem ${(+m.qtd||1)*Math.max(1,+m.boosters||1)})</option>`:`<option value="un">unidades (tem ${+m.qtd||1})</option><option value="boo">🃏 boosters avulsos…</option>`}</select></div></div>
     ${lin}
     <div class="card" style="background:var(--card2);margin:8px 0">
-      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('ab_cod','','ab_desc','ab_vm','abCodHint')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="abrirLigaDoCampo('${(m.jogo||'Pokémon').replace(/'/g,"\'")}','ab_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('ab_cod','ab_desc','abCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('ab_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="ab_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
+      <div class="row2"><div><label style="margin-top:0">Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('ab_cod','','ab_desc','ab_vm','abCodHint')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="abrirLigaDoCampo('${(m.jogo||'Pokémon').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','ab_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('ab_cod','ab_desc','abCodHint')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('ab_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="ab_cod" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="assistCod('ab_cod','ab_desc','ab_vm','abCodHint')"></div><div><label style="margin-top:0">Qtd</label><input id="ab_qtd" type="number" inputmode="numeric" value="1" min="1"></div></div>
       <div class="meta" id="abCodHint" style="margin-bottom:6px"></div>
       <div class="row2"><div><label>O que saiu</label><input id="ab_desc" placeholder="ex: SIR Marnie (ou deixe o código preencher)"></div><div><label>Tipo</label><select id="ab_cat">${selOpts(cats,'Single/Carta')}</select></div></div>
       <label>Vale (mercado, R$ — opcional, só pro rateio)</label><input id="ab_vm" type="number" inputmode="decimal" placeholder="0,00">
@@ -3103,14 +3121,22 @@ function abUnAChange(sel,movId){const m=movs.find(x=>x.id===movId);if(!m)return;
    ligaonepiece devolveu as duas Boa Hancock (normal e Alternate Art).
    liganaruto.com.br NAO RESOLVE — nao existe sob esse nome, entao nao entra na lista: o app
    avisa em vez de abrir link morto. Se aparecer o endereco certo, e uma linha aqui. */
-const LIGAS={'pokemon':'ligapokemon.com.br','onepiece':'ligaonepiece.com.br',
-  'yugioh':'ligayugioh.com.br','magic':'ligamagic.com.br',
-  'dragonball':'ligadragonball.com.br','digimon':'ligadigimon.com.br'};
+/* [CONFERIDO 21/08, achado da revisao] o host da BUSCA nem sempre e "www.": a ligadragonball
+   partiu em dois jogos e o www. so devolve a tela "qual card game deseja visualizar?". Os hosts
+   reais respondem a busca — title "Busca: BT1-001 ... Fusion World" / "... Masters". Fusion World
+   e o jogo em circulacao hoje; se aparecer carta de Masters, e trocar esta linha. */
+const LIGAS={'pokemon':'www.ligapokemon.com.br','onepiece':'www.ligaonepiece.com.br',
+  'yugioh':'www.ligayugioh.com.br','magic':'www.ligamagic.com.br',
+  'dragonball':'fusion.ligadragonball.com.br','digimon':'www.ligadigimon.com.br'};
+/* validar link COLADO usa o dominio-base: qualquer subdominio da Liga vale (www., fusion.,
+   masters.) — recusar o link que o proprio site do jogo entrega seria meia cura de novo. */
+const LIGAS_BASE=['ligapokemon.com.br','ligaonepiece.com.br','ligayugioh.com.br',
+  'ligamagic.com.br','ligadragonball.com.br','ligadigimon.com.br'];
 /* [21/08] aceitar link de QUALQUER Liga conhecida, nao so a do Pokemon — o dono cadastra
    One Piece, e recusar o link dele no passo seguinte a busca seria meia cura. */
-function ehLinkDeLiga(url){try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
-  return Object.values(LIGAS).indexOf(h)>=0;}catch(e){return false;}}
-function nomeDasLigas(){return Object.values(LIGAS).join(', ');}
+function ehLinkDeLiga(url){try{const h=new URL(url).hostname.toLowerCase();
+  return LIGAS_BASE.some(b=>h===b||h.endsWith('.'+b));}catch(e){return false;}}
+function nomeDasLigas(){return LIGAS_BASE.join(', ');}
 function ligaDoJogo(jogo){
   const k=(''+(jogo||'Pokémon')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   /* tira acento: Pokémon -> pokemon */
@@ -3121,17 +3147,14 @@ function ligaJogoAtual(jogoSelId){
   return (el&&el.value)||'Pokémon';}
 /* o card ja sabe de que jogo ele e — nao depende de seletor nenhum na tela */
 function abrirLigaDoItem(jogo,cod){const site=ligaDoJogo(jogo);
-  if(!site){alert('Ainda não sei o endereço da Liga de "'+jogo+'".\n\nTenho: '+Object.values(LIGAS).join(', ')+'.');return;}
-  window.open('https://www.'+site+'/?view=cards/search&card='+encodeURIComponent(cod),'_blank');}
+  if(!site){alert('Ainda não sei o endereço da Liga de "'+jogo+'".\n\nTenho: '+nomeDasLigas()+'.');return;}
+  window.open('https://'+site+'/?view=cards/search&card='+encodeURIComponent(cod),'_blank');}
 /* usada onde a tela NAO tem seletor de jogo (abrir caixa): o jogo vem do proprio lote. */
 function abrirLigaDoCampo(jogo,inputId){const v=(document.getElementById(inputId)?.value||'').trim();
   if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
   abrirLigaDoItem(jogo,v);}
-function buscarLigaCampo(inputId,jogoSelId){const v=(document.getElementById(inputId)?.value||'').trim();
-  if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
-  const jogo=ligaJogoAtual(jogoSelId),site=ligaDoJogo(jogo);
-  if(!site){alert('Ainda não sei o endereço da Liga de "'+jogo+'".\n\nTenho: '+Object.values(LIGAS).join(', ')+'.\n\nMe passe o endereço e eu ligo.');return;}
-  window.open('https://www.'+site+'/?view=cards/search&card='+encodeURIComponent(v),'_blank');}
+function buscarLigaCampo(inputId,jogoSelId){
+  abrirLigaDoCampo(ligaJogoAtual(jogoSelId),inputId);}
 /* ── Scanner de carta (fase 1): foto → leitor local (arquivos no PRÓPRIO site, pasta ocr/)
    → lê o CÓDIGO na base da carta + detecta a ESCRITA (latina/japonesa/coreana/chinesa)
    → monta o código no padrão da casa (JP colado p/ japonesa OU coreana; C p/ chinesa)
@@ -3655,11 +3678,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 04h05';
+const BUILD_TAG='21/08 04h41';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787295936873;
+const BUILD_TS=1787298070834;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

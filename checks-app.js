@@ -65,6 +65,24 @@ function semComentarios(src) {
   }
   return fora;
 }
+/* Irma de extrairFuncao, para DADO. A vacina precisa do mapa de Ligas para exercitar o
+   colar-link; retipar o mapa aqui dentro criava uma segunda verdade que envelhece sozinha
+   (foi o que aconteceu em 21/08). Le do arquivo, como as funcoes. */
+function extrairConst(src, nome) {
+  const m = new RegExp('\\b(?:const|let|var)\\s+' + nome + '\\s*=').exec(src);
+  if (!m) return null;
+  let i = src.indexOf('=', m.index) + 1, nivel = 0, dentro = null, ant = '';
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (dentro) { if (c === dentro && ant !== '\\') dentro = null; }
+    else if (c === '"' || c === "'" || c === '`') dentro = c;
+    else if (c === '{' || c === '[' || c === '(') nivel++;
+    else if (c === '}' || c === ']' || c === ')') nivel--;
+    else if (c === ';' && nivel <= 0) break;
+    ant = c;
+  }
+  return src.slice(m.index, i + 1);
+}
 function extrairFuncao(src, nome) {
   /* aceita as MESMAS formas que `definida()` aceita — declaracao, `const f = function`,
      `const f = (a)=>{...}`. A versao anterior so entendia `function nome(`, entao trocar uma
@@ -602,13 +620,19 @@ const CAPACIDADES = [
          o caminho "colar link manual" com a vacina verde (furo Q5 do 3o reataque). O que se
          dubla agora e o AMBIENTE (a caixa de texto do navegador, o armazenamento). */
       const store = {}; const alertas = [];
-      /* LIGAS e DADO (o mapa jogo->site), nao a logica sob teste — vai de contexto */
-      const LIGAS = { 'pokemon': 'ligapokemon.com.br', 'onepiece': 'ligaonepiece.com.br',
-        'yugioh': 'ligayugioh.com.br', 'magic': 'ligamagic.com.br',
-        'dragonball': 'ligadragonball.com.br', 'digimon': 'ligadigimon.com.br' };
+      /* LIGAS/LIGAS_BASE sao DADO (o mapa jogo->site), nao a logica sob teste — vao de
+         contexto. Mas LIDOS DO ARQUIVO, nunca retipados: a copia retipada que existia aqui
+         envelheceu no mesmo dia em que o app trocou de host, e a vacina abortou o build com
+         o sintoma certo pela causa errada. */
+      const _decl = ['LIGAS', 'LIGAS_BASE'].map(n => {
+        const d = extrairConst(js, n);
+        if (!d) throw new Error('nao achei a constante ' + n + ' no index.html');
+        return d;
+      }).join('\n');
+      const { LIGAS, LIGAS_BASE } = new Function(_decl + '\nreturn {LIGAS, LIGAS_BASE};')();
       let respostaDoPrompt = 'https://www.ligapokemon.com.br/?view=cards/card&card=x';
       const ch = { save: 0, fechou: 0, render: 0, toasts: [] };
-      return { _tela: tela, _store: store, _alertas: alertas, _ch: ch, LIGAS, URL,
+      return { _tela: tela, _store: store, _alertas: alertas, _ch: ch, LIGAS, LIGAS_BASE, URL,
                _prompt: v => { respostaDoPrompt = v; },
                document: tela.doc, codigosResolvidos: {},
                localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },

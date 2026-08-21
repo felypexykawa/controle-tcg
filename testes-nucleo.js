@@ -44,13 +44,24 @@ const ctx = {
   performance:{now:()=>0}, crypto:{getRandomValues:a=>a},
   /* o arquivo PUBLICADO tem firebaseConfig real e liga a nuvem; o de dev nao. Dublê pra que o
      mesmo teste rode nos dois sem mudar nada. */
+  /* dube RECURSIVO: as fotos moram em controle/dados/fotos/<id> — dois niveis de colecao. O
+     dube antigo so aguentava um, entao o teste da foto por item explodia contra o arquivo de
+     DEPLOY (onde USAR_NUVEM e true) e passava contra o de dev. Dube raso e instrumento que
+     mente por omissao: ele nao reprovava, ele nem chegava a testar. */
   firebase:{ initializeApp(){}, auth(){return {onAuthStateChanged(){}, signOut(){return Promise.resolve();}};},
-             firestore(){return {collection(){return {doc(){return {set(){return Promise.resolve();},
-               get(){return Promise.resolve({exists:false,data:()=>({})});}, collection(){return this;},
-               onSnapshot(){}, orderBy(){return this;}, limit(){return this;}};}};}, runTransaction(){return Promise.resolve();}};} },
+             firestore(){const no={set(){return Promise.resolve();}, update(){return Promise.resolve();},
+                 delete(){return Promise.resolve();},
+                 get(){return Promise.resolve({exists:false,data:()=>({}),docs:[],forEach(){}});},
+                 doc(){return no;}, collection(){return no;}, where(){return no;},
+                 onSnapshot(){return ()=>{};}, orderBy(){return no;}, limit(){return no;}};
+               return {collection(){return no;}, doc(){return no;}, runTransaction(){return Promise.resolve();},
+                       batch(){return {set(){}, update(){}, delete(){}, commit(){return Promise.resolve();}};}};} },
   addEventListener(){}, removeEventListener(){}, dispatchEvent(){return true;},
   open:()=>null, scrollTo(){}, scrollY:0, innerWidth:1200, innerHeight:800,
-  URL:{createObjectURL:()=>'blob:x', revokeObjectURL(){}},
+  /* URL PRECISA ser a classe real: ehLinkDeLiga faz `new URL(url)` e cai no catch se o dube
+     nao construir — o teste passaria por sempre-false, sem testar nada (o verde do
+     instrumento nao e o fato). Os dois estaticos ficam pendurados na subclasse. */
+  URL:(()=>{const C=class extends URL{};C.createObjectURL=()=>'blob:x';C.revokeObjectURL=()=>{};return C;})(),
 };
 ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx;
 vm.createContext(ctx);
@@ -202,6 +213,89 @@ A('execExcl')('d1','serie');
 t('apagou desta em diante (2 restantes: a paga e a anterior)', M().length === 2, 'sobrou '+M().map(m=>m.id).join(','));
 t('a despesa JA PAGA nao foi tocada', M().some(m=>m.id==='dp'));
 t('a previsao anterior nao foi tocada', M().some(m=>m.id==='d0'));
+
+console.log('\n=== 13. foto POR ITEM: o balde nao pode vazar de uma carta pra outra ===');
+/* [21/08] A revisao achou 3 portas abertas depois de eu curar UMA (go/trocar de aba): o
+   "< voltar", trocar o tipo de lancamento e alternar 1 item<->Nota. A cura virou regra unica
+   (a identidade do formulario), entao porta nova nasce coberta.
+   O teste dirige render() e voltar() DE VERDADE — chamar a guarda direto provaria que ela
+   funciona, nao que ela esta LIGADA (foi o furo do meu primeiro teste: mutei a fonte tirando
+   a guarda do render e este teste passou verde). */
+reset();
+setg('tela', 'lancar'); setg('tipoSel', 'COMPRA'); setg('compraModo', 'item'); setg('editId', null);
+A('render')();                                            /* fixa a linha de base */
+setg('_fotosItem', ['FOTO_A']);
+A('render')();
+t('mesmo formulario: a foto continua no balde', g('_fotosItem').length === 1);
+setg('tipoSel', 'TROCA'); A('render')();                  /* e o que o botao de tipo faz */
+t('trocou o TIPO de lancamento: o balde esvazia', g('_fotosItem').length === 0);
+setg('_fotosItem', ['FOTO_B']); setg('compraModo', 'nota'); A('render')();
+t('alternou 1 item <-> Nota: o balde esvazia', g('_fotosItem').length === 0);
+/* a porta que a revisao achou: o "< voltar" nao passa por go(), entao a cura de la nao valia */
+setg('tipoSel', 'COMPRA'); setg('compraModo', 'item'); A('render')();
+setg('_fotosItem', ['FOTO_C']);
+setg('navHist', [{tela:'consultar', consF:'tudo', consQ:'', consMenu:false, perDe:'', perAte:'',
+                  perSel:'d30', editId:null, tipoSel:'COMPRA'}]);
+A('voltar')();
+t('o "< voltar" (que nao passa por go) nao leva a foto pra frente', g('_fotosItem').length === 0);
+/* falso-positivo: repintar a MESMA tela (eco da nuvem, toast, qualquer render) nao pode comer
+   a foto. Entrar na tela PRIMEIRO e so entao fotografar — que e a ordem do mundo real. */
+setg('tela', 'lancar'); setg('tipoSel', 'COMPRA'); A('render')();
+setg('_fotosItem', ['FOTO_D']); A('render')(); A('render')();
+t('falso-positivo: repintar a MESMA tela nao come a foto', g('_fotosItem').length === 1);
+
+console.log('\n=== 14. corrigir item devolve as fotos dele (e avisa antes de descartar) ===');
+reset();
+setg('_fotosItem', []);
+setg('notaItens', [{jogo:'Pokemon', cat:'Single/Carta', qtd:1, valor:10, fotos:['F1','F2']}]);
+A('editItemNota')(0);
+t('editItemNota devolve as 2 fotos do item ao balde', g('_fotosItem').length === 2,
+  'balde ficou com ' + g('_fotosItem').length);
+reset();
+setg('_fotosItem', []);
+setg('trocaRecebi', [{desc:'x', valorMercado:1, fotos:['F9']}]);
+A('editRecebi')(0);
+t('editRecebi devolve a foto do item ao balde', g('_fotosItem').length === 1);
+/* o aviso: com foto em digitacao, corrigir OUTRO item pergunta antes — e "nao" cancela mesmo */
+setg('_fotosItem', ['EM_DIGITACAO']);
+setg('trocaRecebi', [{desc:'y', valorMercado:2, fotos:['F8']}]);
+let _perguntou = false;
+ctx.confirm = () => { _perguntou = true; return false; };
+A('editRecebi')(0);
+t('com foto em digitacao, corrigir outro item PERGUNTA antes', _perguntou);
+t('respondeu "nao": o item NAO foi tirado da lista', g('trocaRecebi').length === 1);
+t('respondeu "nao": a foto em digitacao continua no balde', g('_fotosItem')[0] === 'EM_DIGITACAO');
+ctx.confirm = () => true;
+A('editRecebi')(0);
+t('respondeu "sim": a foto do item corrigido substitui o balde', g('_fotosItem').length === 1 && g('_fotosItem')[0] === 'F8');
+
+console.log('\n=== 15. cada carta leva a SUA foto (nao todas pro primeiro item) ===');
+reset();
+M().push({id:'a1', tipo:'COMPRA', data:'2026-08-01', valor:10, qtd:1});
+M().push({id:'a2', tipo:'COMPRA', data:'2026-08-01', valor:20, qtd:1});
+setg('_fotosPend', []);
+A('aplicarFotosDoItem')(['P1','P2'], 'a1');
+A('aplicarFotosDoItem')(['P3'], 'a2');
+t('a carta 1 ficou com 2 fotos', (M().find(m=>m.id==='a1').nFotos|0) === 2);
+t('a carta 2 ficou com 1 foto', (M().find(m=>m.id==='a2').nFotos|0) === 1);
+t('o balde da NOTA nao foi consumido pelo item', g('_fotosPend').length === 0);
+setg('_fotosPend', ['NOTA']);
+A('aplicarFotosDoItem')(['P4'], 'a1');
+t('aplicar foto de item NAO rouba a foto da nota do balde', g('_fotosPend').length === 1 && g('_fotosPend')[0] === 'NOTA');
+
+console.log('\n=== 16. "ver na Liga" abre a Liga do JOGO, e o link colado aceita subdominio ===');
+t('Pokemon -> ligapokemon',   A('ligaDoJogo')('Pokemon') === 'www.ligapokemon.com.br');
+t('acento nao atrapalha (Pokemon com e agudo)', A('ligaDoJogo')('Pok\u00e9mon') === 'www.ligapokemon.com.br');
+t('One Piece -> ligaonepiece', A('ligaDoJogo')('One Piece') === 'www.ligaonepiece.com.br');
+t('Yu-Gi-Oh (hifen) -> ligayugioh', A('ligaDoJogo')('Yu-Gi-Oh') === 'www.ligayugioh.com.br');
+t('Dragon Ball vai pro host que RESPONDE a busca, nao pro www. que pergunta o jogo',
+  A('ligaDoJogo')('Dragon Ball') === 'fusion.ligadragonball.com.br');
+t('jogo desconhecido devolve null (avisa, nao manda pro site errado)', A('ligaDoJogo')('Lorcana') === null);
+t('link de One Piece e aceito',  A('ehLinkDeLiga')('https://www.ligaonepiece.com.br/?view=cards/card&card=x'));
+t('link com subdominio (fusion.) e aceito', A('ehLinkDeLiga')('https://fusion.ligadragonball.com.br/?view=cards/card&card=x'));
+t('link de outro site e recusado', !A('ehLinkDeLiga')('https://mercadolivre.com.br/x'));
+t('dominio que so TERMINA parecido e recusado', !A('ehLinkDeLiga')('https://naoligapokemon.com.br/x'));
+t('texto que nem e URL e recusado', !A('ehLinkDeLiga')('ligapokemon'));
 
 console.log('\n----------------------------------------');
 console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
