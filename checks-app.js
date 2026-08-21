@@ -192,7 +192,12 @@ const CAPACIDADES = [
         ['a guarda existe e roda na CAPTURA (antes do handler do botao)',
           /addEventListener\('click',[\s\S]{0,900}?\},\s*true\)/.test(src), true],
         ['o segundo toque no mesmo botao e ENGOLIDO',
-          src.indexOf('ev.stopImmediatePropagation();') >= 0 && /_ultToque\.el===el&&agora-_ultToque\.ts<900/.test(src), true],
+          src.indexOf('ev.stopImmediatePropagation();') >= 0 && /_ultToque\.chave===attr&&agora-_ultToque\.ts<900/.test(src), true],
+        /* a chave e o ATRIBUTO, nao o elemento: com a tela repintando entre um toque e outro,
+           o botao novo e outro elemento e pela identidade o segundo toque passaria (buraco
+           achado na propria revisao, 21/08) */
+        ['a guarda sobrevive ao repinte da tela (chave = o handler, nao o elemento)',
+          /let _ultToque=\{chave:null,ts:0\}/.test(src), true],
         ['todo gravador importante esta na lista' + (fora.length ? ' (fora: ' + fora.join(', ') + ')' : ''), fora.length, 0],
         ['o primeiro toque da retorno visual na hora',
           src.indexOf("el.classList.add('agindo')") >= 0 && /\.agindo\{[^}]*pointer-events:none/.test(src), true],

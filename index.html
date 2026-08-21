@@ -457,7 +457,11 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
    Fora da lista de proposito: os "+ adicionar" e a navegacao — la tocar duas vezes rapido e
    uso legitimo. */
 const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
-let _ultToque={el:null,ts:0};
+/* a chave e o ATRIBUTO inteiro (funcao + argumentos), nao o elemento. Se a tela repintar
+   entre um toque e outro, o botao novo e outro ELEMENTO mas tem o mesmo atributo — pela
+   identidade do elemento o segundo toque passaria e a venda entraria 2x assim mesmo. Usar os
+   argumentos na chave mantem legitimo apagar dois itens diferentes em seguida. */
+let _ultToque={chave:null,ts:0};
 (function(){try{
   document.addEventListener('click',function(ev){
     let el=null;
@@ -466,11 +470,11 @@ let _ultToque={el:null,ts:0};
     const attr=el.getAttribute('onclick')||'';
     if(!RE_GRAVA.test(attr))return;
     const agora=Date.now();
-    if(_ultToque.el===el&&agora-_ultToque.ts<900){
+    if(_ultToque.chave===attr&&agora-_ultToque.ts<900){
       ev.preventDefault();ev.stopImmediatePropagation();
       try{toast('já registrei esse toque — só um instante');}catch(e){}
       return;}
-    _ultToque={el:el,ts:agora};
+    _ultToque={chave:attr,ts:agora};
     try{el.classList.add('agindo');
       setTimeout(function(){try{el.classList.remove('agindo');}catch(e){}},900);}catch(e){}
   },true);
@@ -3519,11 +3523,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 00h55';
+const BUILD_TAG='21/08 01h02';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787284549204;
+const BUILD_TS=1787284979744;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
