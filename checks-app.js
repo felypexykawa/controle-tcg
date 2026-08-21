@@ -166,6 +166,43 @@ function telaFalsa() {
 /* ---------- o que o app NAO pode perder ---------- */
 const CAPACIDADES = [
   {
+    /* Felype, 21/08: "clica em salvar a venda e parece que nao foi, porque o aplicativo nao
+       reage... quando tu ve, salvou 3 vendas." Nao e incomodo visual, e DUPLICACAO DE DADO.
+       A guarda vive num listener de captura no document; aqui ela e conferida pelas DUAS
+       metades, porque so a primeira nao resolve: sem retorno visual imediato a pessoa continua
+       com motivo pra tocar de novo, e a guarda so esconderia o sintoma. */
+    nome: 'toque repetido nao grava duas vezes (e o botao responde na hora)',
+    perde: 'a venda lancada 3x porque o botao nao deu sinal de que pegou — dado duplicado que so aparece depois, na conferencia',
+    precisa: [],
+    recorta: [],
+    contexto: () => {
+      let fonte = '';
+      try { fonte = require('fs').readFileSync(alvo, 'utf8'); } catch (e) {}
+      return { _fonte: fonte };
+    },
+    exercicio: (F, ctx) => {
+      const src = ctx._fonte;
+      if (!src) throw new Error('DADOS: nao consegui ler o arquivo');
+      const lista = (src.match(/const RE_GRAVA=\/([^/]+)\//) || [])[1] || '';
+      const protegidos = ['salvar', 'salvarNota', 'salvarVendaVarios', 'salvarTroca',
+                          'salvarTransferencia', 'excluir', 'execExcl', 'execDev', 'devolver',
+                          'limparTudo', 'marcarPago'];
+      const fora = protegidos.filter(n => lista.indexOf(n) < 0);
+      return [
+        ['a guarda existe e roda na CAPTURA (antes do handler do botao)',
+          /addEventListener\('click',[\s\S]{0,900}?\},\s*true\)/.test(src), true],
+        ['o segundo toque no mesmo botao e ENGOLIDO',
+          src.indexOf('ev.stopImmediatePropagation();') >= 0 && /_ultToque\.el===el&&agora-_ultToque\.ts<900/.test(src), true],
+        ['todo gravador importante esta na lista' + (fora.length ? ' (fora: ' + fora.join(', ') + ')' : ''), fora.length, 0],
+        ['o primeiro toque da retorno visual na hora',
+          src.indexOf("el.classList.add('agindo')") >= 0 && /\.agindo\{[^}]*pointer-events:none/.test(src), true],
+        ['a marca se apaga sozinha (botao nao fica preso)', /classList\.remove\('agindo'\)/.test(src), true],
+        ['navegacao NAO entra na guarda (tocar duas vezes ali e uso legitimo)',
+          /go/.test(lista.replace(/salvar|excluir|aplicar/g, '')), false]
+      ];
+    }
+  },
+  {
     /* Handler inline que nao compila e MUDO: a tela desenha, o botao aparece, o clique nao faz
        nada e ninguem recebe erro. Foi assim que "limpar tudo" foi ao ar morto em 21/08 — o
        aviso levava \n dentro do atributo, o template literal emitiu a quebra de linha DE

@@ -59,6 +59,8 @@ nav button.on{color:var(--blue)}nav svg{width:23px;height:23px}
 nav button{font-size:10.5px}
 .x{color:var(--mut);font-size:13px;cursor:pointer;border:none;background:none}
 .note{font-size:12px;color:var(--mut);margin-top:8px;line-height:1.55}
+.agindo{opacity:.5;pointer-events:none;position:relative}
+.agindo::after{content:' ⏳';font-size:.9em}
 .lnk{font-size:12px;color:var(--mut);text-align:center;margin-top:18px;cursor:pointer;text-decoration:underline}
 #toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 18px;border-radius:22px;font-size:14px;font-weight:500;opacity:0;transition:opacity .25s;pointer-events:none;z-index:60}
 #toast.on{opacity:1}
@@ -440,6 +442,39 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
 /* fora do atributo de proposito: texto com quebra de linha DENTRO de onclick="" nao compila
    (o template literal emite a quebra de verdade). Regra da casa desde 21/08: acao com aviso
    de mais de uma linha vira FUNCAO, nunca fica no atributo. */
+/* CLIQUE QUE PARECE NAO TER PEGADO (Felype, 21/08): "clica em salvar a venda e parece que
+   nao foi porque o aplicativo nao reage... quando tu ve, salvou 3 vendas". Nao e incomodo
+   visual: e DUPLICACAO DE DADO. No celular a tela leva um instante pra repintar depois de
+   gravar, e nesse instante o botao antigo ainda esta la, clicavel.
+
+   Duas metades, as duas necessarias:
+     (1) o segundo toque no MESMO botao dentro de 900ms nao executa (e avisa por que);
+     (2) o primeiro toque marca o botao na hora (opacidade + ampulheta), pra a pessoa VER que
+         pegou — sem isso ela continua com motivo pra tocar de novo, e a guarda so esconderia
+         o sintoma.
+
+   Por captura no document: nenhum botao precisa ser alterado e botao NOVO ja nasce protegido.
+   Fora da lista de proposito: os "+ adicionar" e a navegacao — la tocar duas vezes rapido e
+   uso legitimo. */
+const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
+let _ultToque={el:null,ts:0};
+(function(){try{
+  document.addEventListener('click',function(ev){
+    let el=null;
+    try{el=ev.target&&ev.target.closest?ev.target.closest('[onclick]'):null;}catch(e){}
+    if(!el)return;
+    const attr=el.getAttribute('onclick')||'';
+    if(!RE_GRAVA.test(attr))return;
+    const agora=Date.now();
+    if(_ultToque.el===el&&agora-_ultToque.ts<900){
+      ev.preventDefault();ev.stopImmediatePropagation();
+      try{toast('já registrei esse toque — só um instante');}catch(e){}
+      return;}
+    _ultToque={el:el,ts:agora};
+    try{el.classList.add('agindo');
+      setTimeout(function(){try{el.classList.remove('agindo');}catch(e){}},900);}catch(e){}
+  },true);
+}catch(e){}})();
 function limparTudo(){
   if(!movs.length){toast('Não há lançamentos pra apagar');return;}
   if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura.\n\nNão dá pra desfazer depois. Tem certeza?'))return;
@@ -3484,11 +3519,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 00h39';
+const BUILD_TAG='21/08 00h55';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787283558500;
+const BUILD_TS=1787284549204;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
