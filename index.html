@@ -1942,7 +1942,7 @@ function vConsultar(){
             if(diverge)return `<span class="meta" style="flex-basis:100%;color:var(--red)">🔍 Liga: ⚠ este item tem um link PRÓPRIO diferente do link resolvido pro código ${codC} — confira qual carta é a certa (toque em 🔗 pra ver/trocar a deste item).</span>`;
             return `<span class="meta" style="flex-basis:100%;color:var(--amber)">🔍 Liga: código com mais de uma carta${resolv?' — 🔗 resolvido, a próxima coleta pega o preço da página certa':(pl.opcoes&&pl.opcoes.length?' — toque em 🔗 pra escolher qual das '+pl.opcoes.length+' cartas é a sua':' — ainda sem as opções pra escolher na tela; toque em 🔗 e cole o link manualmente (dica: buscar <b>Nome (código)</b> na Liga, ex. Pikachu (173/165), costuma cair direto na carta certa)')}</span>`;}
           return `<span class="meta" style="flex-basis:100%;color:var(--green)">🔍 Liga: <b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
-        ${(!m.codigo&&!m.codigoUrl)?`<span class="meta" style="flex-basis:100%">💡 Sem código — normal em cartas antigas. Busque à mão em ligapokemon.com.br pelo nome (formato <b>Nome (código-se-tiver)</b>) e cole o link em 🔗.</span>`:''}
+        ${(!m.codigo&&!m.codigoUrl)?`<span class="meta" style="flex-basis:100%">💡 Sem código — normal em cartas antigas. Busque à mão na Liga do jogo desta carta pelo nome (formato <b>Nome (código-se-tiver)</b>) e cole o link em 🔗.</span>`:''}
         ${(function(){const nP=+m.nFotos||0;
           if(nP>0||!venda||!m.origemId)return `<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${nP>0?' ('+nP+')':''}</button>`;
           const og=movs.find(z=>z.id===m.origemId),nO=og?(+og.nFotos||0):0;
@@ -3106,6 +3106,11 @@ function abUnAChange(sel,movId){const m=movs.find(x=>x.id===movId);if(!m)return;
 const LIGAS={'pokemon':'ligapokemon.com.br','onepiece':'ligaonepiece.com.br',
   'yugioh':'ligayugioh.com.br','magic':'ligamagic.com.br',
   'dragonball':'ligadragonball.com.br','digimon':'ligadigimon.com.br'};
+/* [21/08] aceitar link de QUALQUER Liga conhecida, nao so a do Pokemon — o dono cadastra
+   One Piece, e recusar o link dele no passo seguinte a busca seria meia cura. */
+function ehLinkDeLiga(url){try{const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
+  return Object.values(LIGAS).indexOf(h)>=0;}catch(e){return false;}}
+function nomeDasLigas(){return Object.values(LIGAS).join(', ');}
 function ligaDoJogo(jogo){
   const k=(''+(jogo||'Pokémon')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   /* tira acento: Pokémon -> pokemon */
@@ -3332,14 +3337,14 @@ function abrirPadroesCod(){document.getElementById('modalPad')?.remove();
    no item ao salvar (a coleta passa a acompanhar o valor por ele). O nome vem DENTRO da
    própria URL da Liga (parâmetro card=Nome (código)) — zero digitação. */
 let _linkPend={};
-function parseLinkLiga(url){try{const u=new URL(url);if(!/ligapokemon\.com\.br$/i.test(u.hostname.replace(/^www\./,'')))return null;
+function parseLinkLiga(url){try{const u=new URL(url);if(!ehLinkDeLiga(url))return null;
   const card=u.searchParams.get('card');if(!card)return null;
   const mm=card.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
   return mm?{nome:mm[1].trim(),cod:mm[2].trim(),url}:{nome:card.trim(),cod:'',url};}catch(e){return null;}}
 function colarLinkLiga(codId,descId,hintId){
   const u=prompt('Cole o LINK da página da carta na Liga (ache pelo 🔎, abra a carta certa, copie o endereço):','');
   if(u===null)return;const p=parseLinkLiga((u||'').trim());
-  if(!p){alert('Não reconheci esse link — precisa ser o endereço de uma carta na ligapokemon.com.br.');return;}
+  if(!p){alert('Não reconheci esse link.\n\nPrecisa ser o endereço de uma carta em uma das Ligas: '+nomeDasLigas()+'.');return;}
   const codEl=document.getElementById(codId),descEl=document.getElementById(descId),hintEl=document.getElementById(hintId);
   if(codEl&&p.cod&&!codEl.value.trim())codEl.value=p.cod;
   if(descEl&&p.nome&&!descEl.value.trim())descEl.value=p.nome;
@@ -3650,11 +3655,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 03h58';
+const BUILD_TAG='21/08 04h05';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787295529920;
+const BUILD_TS=1787295936873;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -3920,11 +3925,11 @@ function assistCod(codId,descId,valId,hintId){const cod=(document.getElementById
    você cola 1x o link da página certa; a rotina passa a coletar direto nela */
 function setCodigoUrl(id){const m=movs.find(x=>x.id===id);if(!m)return;
   const atual=m.codigoUrl||'';
-  const u=prompt('Cole o LINK da página certa na Liga: busque em ligapokemon.com.br por "Nome (código)" — ex. Pikachu (173/165) — ou só o nome se não tiver código; abra a carta certa e copie o endereço:',atual);
+  const u=prompt('Cole o LINK da página certa na Liga do jogo desta carta ('+nomeDasLigas()+'): busque por "Nome (código)" — ex. Pikachu (173/165) ou Boa Hancock (OP13-051) — ou só o nome se não tiver código; abra a carta certa e copie o endereço:',atual);
   if(u===null)return;
   const url=(u||'').trim();
   if(!url){if(atual&&confirm('Remover o link direto deste item?')){delete m.codigoUrl;save();toast('Link removido');render();}return;}
-  if(!/^https:\/\/(www\.)?ligapokemon\.com\.br\//i.test(url)){alert('Esse link não é da ligapokemon.com.br — cole o endereço da página da carta/produto na Liga.');return;}
+  if(!ehLinkDeLiga(url)){alert('Esse link não é de nenhuma Liga que eu conheço ('+nomeDasLigas()+') — cole o endereço da página da carta/produto na Liga.');return;}
   m.codigoUrl=url;save();toast('🔗 Link direto salvo — a próxima coleta busca nessa página');render();}
 /* FASE 3 do preço ambíguo ("padrão Janet", pedido 2026-07-04, executado 2026-08-10):
    quando a rotina já capturou as opções da página "Busca:" (precos.json ganha `opcoes`
@@ -3964,7 +3969,7 @@ function setCodigoUrlGlobal(codC){
   if(u===null)return;
   const url=(u||'').trim();
   if(!url){if(atual&&confirm('Remover o link resolvido deste código?')){delete codigosResolvidos[codC];salvarCodRes();save();toast('Link removido');render();}return;}
-  if(!/^https:\/\/(www\.)?ligapokemon\.com\.br\//i.test(url)){alert('Esse link não é da ligapokemon.com.br — cole o endereço da página da carta/produto na Liga.');return;}
+  if(!ehLinkDeLiga(url)){alert('Esse link não é de nenhuma Liga que eu conheço ('+nomeDasLigas()+') — cole o endereço da página da carta/produto na Liga.');return;}
   codigosResolvidos[codC]=url;salvarCodRes();save();toast('🔗 Link salvo pro código — a próxima coleta busca nessa página ✓');render();}
 /* Gráfico de evolução do preço (historico do precos.json) — menor/médio/maior no tempo */
 function graficoLiga(cod){const pl=precoLigaDe(cod),hist=ligaHistDe(cod);if(!hist){toast('Sem histórico ainda pra esse código');return;}

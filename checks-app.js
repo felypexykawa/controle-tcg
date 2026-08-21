@@ -587,7 +587,10 @@ const CAPACIDADES = [
     nome: 'escolha da carta ambigua (picker)',
     perde: 'nao ha como escolher qual carta e a sua quando o codigo bate em varias — o preco fica travado pra sempre',
     precisa: ['abrirEscolhaAmbigua', 'setCodigoUrlGlobal'],
-    recorta: ['normCod', 'codLimpo', 'abrirEscolhaAmbigua', 'setCodigoUrlGlobal', 'salvarCodRes'],
+    /* ehLinkDeLiga/nomeDasLigas entraram em 21/08, quando o colar-link passou a aceitar
+       qualquer Liga (One Piece, Yu-Gi-Oh...). Vao no RECORTA e nao em duble: dublar
+       justamente a validacao sob teste foi furo apontado em reataque anterior. */
+    recorta: ['normCod', 'codLimpo', 'ehLinkDeLiga', 'nomeDasLigas', 'abrirEscolhaAmbigua', 'setCodigoUrlGlobal', 'salvarCodRes'],
     chamadas: [['abrirEscolhaAmbigua', 1, 'a lista de pendencias e/ou a carta aberta']],
     contexto: () => {
       const tela = telaFalsa();
@@ -599,9 +602,13 @@ const CAPACIDADES = [
          o caminho "colar link manual" com a vacina verde (furo Q5 do 3o reataque). O que se
          dubla agora e o AMBIENTE (a caixa de texto do navegador, o armazenamento). */
       const store = {}; const alertas = [];
+      /* LIGAS e DADO (o mapa jogo->site), nao a logica sob teste — vai de contexto */
+      const LIGAS = { 'pokemon': 'ligapokemon.com.br', 'onepiece': 'ligaonepiece.com.br',
+        'yugioh': 'ligayugioh.com.br', 'magic': 'ligamagic.com.br',
+        'dragonball': 'ligadragonball.com.br', 'digimon': 'ligadigimon.com.br' };
       let respostaDoPrompt = 'https://www.ligapokemon.com.br/?view=cards/card&card=x';
       const ch = { save: 0, fechou: 0, render: 0, toasts: [] };
-      return { _tela: tela, _store: store, _alertas: alertas, _ch: ch,
+      return { _tela: tela, _store: store, _alertas: alertas, _ch: ch, LIGAS, URL,
                _prompt: v => { respostaDoPrompt = v; },
                document: tela.doc, codigosResolvidos: {},
                localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
