@@ -1,5 +1,5 @@
 {
- "atualizadoEm": "2026-08-21T12:58:08Z",
+ "atualizadoEm": "2026-08-21T13:35:00Z",
  "fonte": "Chrome local — extrator v2",
  "cartas": {
   "135/108": {
@@ -1281,19 +1281,59 @@
   },
   "swsh183/71": {
    "codigo": "swsh183/71",
-   "status": "AMBIGUO",
-   "titulo": "swsh183/71 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
-   "versoes": [],
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=swsh183%2F71",
-   "verificadoEm": "2026-08-20"
+   "status": "OK",
+   "titulo": "Jolteon-V (SWSH183/71)",
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Jolteon-V%20%28SWSH183%29",
+   "verificadoEm": "2026-08-21",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 100,
+     "md": 100,
+     "mx": 100
+    },
+    {
+     "v": "Foil",
+     "mn": 105,
+     "md": 250.63,
+     "mx": 759.91
+    }
+   ],
+   "menor": 100,
+   "medio": 100,
+   "maior": 100,
+   "idiomaConferido": {
+    "pten": 1,
+    "pt": 102,
+    "en": 9
+   },
+   "aliasDe": "swsh183",
+   "notaAlias": "mesmo card que swsh183 — o cadastro tem o codigo escrito de dois jeitos; preco espelhado da ficha canonica, historico fica so nela"
   },
   "swsh181-71": {
    "codigo": "swsh181-71",
-   "status": "AMBIGUO",
-   "titulo": "swsh181-71 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
-   "versoes": [],
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=swsh181-71",
-   "verificadoEm": "2026-08-20"
+   "status": "OK",
+   "titulo": "Vaporeon-V (SWSH181/71)",
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Vaporeon-V%20%28SWSH181%29",
+   "verificadoEm": "2026-08-21",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 119.9,
+     "md": 225.83,
+     "mx": 800
+    }
+   ],
+   "menor": 119.9,
+   "medio": 225.83,
+   "maior": 800,
+   "idiomaConferido": {
+    "pten": 1,
+    "pt": 84,
+    "en": 3
+   },
+   "aliasDe": "swsh181",
+   "notaAlias": "mesmo card que swsh181 — o cadastro tem o codigo escrito de dois jeitos; preco espelhado da ficha canonica, historico fica so nela"
   },
   "036/08": {
    "codigo": "036/08",
