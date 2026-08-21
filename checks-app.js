@@ -69,7 +69,15 @@ function semComentarios(src) {
    colar-link; retipar o mapa aqui dentro criava uma segunda verdade que envelhece sozinha
    (foi o que aconteceu em 21/08). Le do arquivo, como as funcoes. */
 function extrairConst(src, nome) {
-  const m = new RegExp('\\b(?:const|let|var)\\s+' + nome + '\\s*=').exec(src);
+  /* [21/08] aceita tambem a forma COMPOSTA (`const A={...}, B=[...];`). Sem isso, juntar duas
+     declaracoes — refatoracao que nao muda comportamento nenhum — deixava a vacina VERMELHA
+     sugerindo --no-verify. Mesma licao ja escrita no irmao extrairFuncao, logo abaixo. */
+  let m = new RegExp('\\b(?:const|let|var)\\s+' + nome + '\\s*=').exec(src);
+  let prefixo = '';
+  if (!m) {
+    m = new RegExp(',\\s*' + nome + '\\s*=').exec(src);
+    if (m) prefixo = 'const ';                 /* pedaco de declaracao composta vira declaracao propria */
+  }
   if (!m) return null;
   let i = src.indexOf('=', m.index) + 1, nivel = 0, dentro = null, ant = '';
   for (; i < src.length; i++) {
@@ -81,7 +89,8 @@ function extrairConst(src, nome) {
     else if (c === ';' && nivel <= 0) break;
     ant = c;
   }
-  return src.slice(m.index, i + 1);
+  const corpo = src.slice(m.index, i + 1);
+  return prefixo ? prefixo + corpo.replace(/^,\s*/, '') : corpo;
 }
 function extrairFuncao(src, nome) {
   /* aceita as MESMAS formas que `definida()` aceita — declaracao, `const f = function`,
@@ -625,7 +634,10 @@ const CAPACIDADES = [
          envelheceu no mesmo dia em que o app trocou de host, e a vacina abortou o build com
          o sintoma certo pela causa errada. */
       const _decl = ['LIGAS', 'LIGAS_BASE'].map(n => {
-        const d = extrairConst(js, n);
+        /* [21/08] fonte LIMPA, nunca a crua: um comentario "antes era: const LIGAS={...}"
+           acima da declaracao real fazia a vacina exercitar um mapa fantasma, e ficar verde.
+           Os irmaos (definida, nomesDeFuncao) ja liam daqui — este nascera lendo do cru. */
+        const d = extrairConst(jsLimpo, n);
         if (!d) throw new Error('nao achei a constante ' + n + ' no index.html');
         return d;
       }).join('\n');

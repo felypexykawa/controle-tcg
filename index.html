@@ -1079,10 +1079,19 @@ let _fotosItem=[];
 function _idForm(){return tela+'|'+tipoSel+'|'+compraModo+'|'+(editId||'');}
 let _fotosItemForm=null;
 function guardaBaldeItem(){const at=_idForm();
-  if(_fotosItemForm!==null&&at!==_fotosItemForm&&_fotosItem.length)_fotosItem=[];
+  if(_fotosItemForm!==null&&at!==_fotosItemForm&&_fotosItem.length){
+    /* [21/08] descartar calado e o que o Felype chama de "o app fez e nao disse". Aqui o aviso
+       cobre TODAS as portas de uma vez — inclusive as que ainda nao existem — porque mora na
+       mesma regra unica, e nao numa lista de portas que alguem tem de lembrar de manter. */
+    const n=_fotosItem.length;_fotosItem=[];
+    setTimeout(()=>toast(n+(n===1?' foto descartada':' fotos descartadas')+' — a carta não tinha sido adicionada à lista'),0);}
   _fotosItemForm=at;}
 /* [21/08] Corrigir OUTRO item enquanto voce tem foto tirada da carta em digitacao descartaria
    essas fotos em silencio. Avisa antes: foto custa esforco, nao e texto que se redigita. */
+/* [21/08] salvar com foto tirada de uma carta que nunca foi adicionada perdia as duas coisas
+   sem uma palavra. Aqui o aviso e ACIONAVEL: da pra cancelar, adicionar a carta e salvar de novo. */
+function baldeItemFechaBem(oque){if(!_fotosItem.length)return true;
+  return confirm('Você tirou '+_fotosItem.length+' foto(s) de uma carta que NÃO foi adicionada à '+oque+'.\n\nSe salvar agora, a carta e as fotos dela não entram — só o que está na lista.\n\nSalvar mesmo assim?');}
 function baldeItemLivre(){if(!_fotosItem.length)return true;
   return confirm('Você tem '+_fotosItem.length+' foto(s) tirada(s) da carta que está digitando agora.\n\nCorrigir outro item substitui o formulário por ele — e essas fotos são descartadas.\n\nDescartar e continuar?');}
 function abrirFotosItem(){const old=document.getElementById('modal');if(old)old.remove();
@@ -1666,6 +1675,7 @@ function ratearExato(extra,valores){const tot=valores.reduce((s,v)=>s+v,0);if(!(
     const r=Math.floor(extra*v/tot*100)/100;acum=Math.round((acum+r)*100)/100;return r;});}
 function salvarNota(){
   if(!notaItens.length){alert('Adicione pelo menos um item à nota.');return;}
+  if(!baldeItemFechaBem('nota'))return;
   if(!avisaSemConta((notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'','Nota'))return;
   const frete=Math.max(0,+notaHead.frete||0),taxa=Math.max(0,+notaHead.taxa||0);
   const sit=notaHead.sit||'Em estoque',cp=(notaHead.cp&&notaHead.cp!=='__add__')?notaHead.cp:'',data=notaHead.data||new Date().toISOString().slice(0,10);
@@ -1813,6 +1823,7 @@ function trocaRatTxt(){const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+
   return `Custo do que saiu: <b>${fmt(custoTot)}</b> → rateado nas cartas:<br>`+trocaRecebi.map(r=>{const c=vTot>0?custoTot*(r.valorMercado/vTot):custoTot/trocaRecebi.length;return `• ${r.desc}: entra a <b style="color:var(--green)">${fmt(c)}</b>${r.valorMercado>0?` <span style="color:var(--mut)">(vale ${fmt(r.valorMercado)})</span>`:''}`;}).join('<br>');}
 function salvarTroca(){
   if(!trocaDei.length&&!trocaDin){alert('Informe o que você deu (material ou dinheiro).');return;}
+  if(!baldeItemFechaBem('troca'))return;
   if(!trocaRecebi.length){alert('Informe o que você recebeu.');return;}
   if(+trocaDin>0&&!avisaSemConta(document.getElementById('t_dinconta')?.value||'','O dinheiro dado na troca'))return;
   const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+(+trocaDin||0),vTot=trocaRecebi.reduce((s,r)=>s+(+r.valorMercado||0),0);
@@ -3678,11 +3689,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 04h49';
+const BUILD_TAG='21/08 05h29';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787298543133;
+const BUILD_TS=1787300941491;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

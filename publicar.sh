@@ -19,8 +19,26 @@ cd "$(dirname "$0")"
 # uma copia nova do app ganha a protecao na primeira vez que alguem publica por aqui.
 [ "$(git config core.hooksPath)" = ".githooks" ] || { git config core.hooksPath .githooks; echo "trava de sintaxe instalada (.githooks)"; }
 
+SRC_DEV=${SRC_DEV:-"C:/Users/USER/app-tcg/index.html"}   # fonte de dev; so existe nesta maquina
 TAG=$(date '+%d/%m %Hh%M')
 MSG=${1:-"app: atualizacao"}
+
+# 0) CONSTROI o artefato a partir da fonte de dev e roda as 272 checagens de capacidade.
+#
+# [21/08, achado da revisao de fiacao] Ate hoje este passo NAO EXISTIA: o _build_deploy.py tinha
+# 272 checagens, rodava a vacina contra o app no ar e barrava publicacao por cima de trabalho
+# alheio — e nenhuma porta o chamava. So eu, a mao, quando lembrava. Pior: ele morava em
+# C:\Users\USER\, fora de repositorio, entao toda cura escrita nele existia nesta maquina so.
+# Sem este passo, `publicar.sh` so re-carimbava o que ja estava em tcg-web: dava pra publicar
+# sem que a fonte de dev tivesse passado por checagem nenhuma.
+#
+# Fail-OPEN de ambiente (clone sem a fonte de dev nao tem o que construir), fail-CLOSED de
+# achado (checagem reprovada aborta).
+if [ -f _build_deploy.py ] && [ -f "$SRC_DEV" ]; then
+  python _build_deploy.py || { echo "ABORTADO: o build reprovou (a mensagem dele esta acima). Nada foi publicado."; exit 1; }
+else
+  echo "[publicar] sem a fonte de dev nesta maquina ($SRC_DEV) — publicando o que ja esta em tcg-web, SEM as 272 checagens de capacidade"
+fi
 
 # 1) grava o carimbo nos dois lugares, a partir da MESMA variável
 python - "$TAG" <<'PY'

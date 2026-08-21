@@ -269,6 +269,24 @@ ctx.confirm = () => true;
 A('editRecebi')(0);
 t('respondeu "sim": a foto do item corrigido substitui o balde', g('_fotosItem').length === 1 && g('_fotosItem')[0] === 'F8');
 
+/* [21/08] as duas mutacoes que ainda escapavam depois da secao 17: sem `editId` na identidade,
+   a foto tirada num lancamento NOVO viajava pra dentro da EDICAO de outro; e sem o
+   `baldeItemLivre` no editItemNota, corrigir item da nota descartava calado. */
+setg('tela','lancar'); setg('tipoSel','COMPRA'); setg('compraModo','item'); setg('editId',null);
+A('render')();
+setg('_fotosItem',['FOTO_DO_NOVO']);
+setg('editId','m1'); A('render')();
+t('entrar na EDICAO de um lancamento nao leva a foto do novo junto', g('_fotosItem').length === 0);
+setg('editId',null); A('render')();
+setg('_fotosItem',['EM_DIGITACAO_2']);
+setg('notaItens',[{jogo:'Pokemon',cat:'Single/Carta',qtd:1,valor:9,fotos:['FX']}]);
+let _perg2 = false;
+ctx.confirm = () => { _perg2 = true; return false; };
+A('editItemNota')(0);
+t('corrigir item da NOTA com foto em digitacao tambem pergunta antes', _perg2);
+t('respondeu "nao": o item da nota continua na lista', g('notaItens').length === 1);
+ctx.confirm = () => true;
+
 console.log('\n=== 15. cada carta leva a SUA foto (nao todas pro primeiro item) ===');
 reset();
 M().push({id:'a1', tipo:'COMPRA', data:'2026-08-01', valor:10, qtd:1});
@@ -296,6 +314,121 @@ t('link com subdominio (fusion.) e aceito', A('ehLinkDeLiga')('https://fusion.li
 t('link de outro site e recusado', !A('ehLinkDeLiga')('https://mercadolivre.com.br/x'));
 t('dominio que so TERMINA parecido e recusado', !A('ehLinkDeLiga')('https://naoligapokemon.com.br/x'));
 t('texto que nem e URL e recusado', !A('ehLinkDeLiga')('ligapokemon'));
+
+console.log('\n=== 17. a fiacao da foto por item, dirigida pela PORTA do usuario ===');
+/* [21/08] A secao 15 chama `aplicarFotosDoItem` direto — funcao que botao nenhum chama. A
+   revisao adversarial provou que 6 mutacoes na fiacao passavam VERDE por causa disso, entre
+   elas cortar a chamada de dentro do `salvarNota` (o recurso inteiro morria calado). Aqui a
+   cadeia e dirigida inteira: preencher -> adicionar -> salvar -> conferir no lancamento. */
+const _campos = {};
+function _elCampo(id){
+  return { get value(){ return (id in _campos) ? _campos[id] : ''; },
+           set value(v){ _campos[id] = v; },
+           checked:false, textContent:'', innerHTML:'', style:{},
+           classList:{add(){},remove(){},toggle(){}}, dataset:{}, children:[],
+           appendChild(){}, remove(){}, addEventListener(){}, querySelector(){return null;},
+           querySelectorAll(){return [];}, scrollIntoView(){}, focus(){},
+           insertAdjacentHTML(){}, getAttribute(){return null;}, setAttribute(){},
+           removeAttribute(){}, closest(){return null;}, cloneNode(){return _elCampo(id);} };
+}
+ctx.document.getElementById = _elCampo;
+
+reset();
+setg('tela','lancar'); setg('tipoSel','COMPRA'); setg('compraModo','nota');
+setg('notaItens',[]); setg('_fotosItem',[]);
+Object.assign(_campos, {n_jogo:'Pokemon', n_cat:'Single/Carta', n_col:'', n_idi:'Ingles',
+                        n_qtd:'1', n_unit:'', n_val:'10', n_cod:'CARTA-A', n_boo:'0', n_cond:''});
+
+setg('_fotosItem',['FOTO_DA_CARTA_A']);
+A('addItemNota')();
+t('a foto entra na lista JUNTO com o item (nao fica pra tras)',
+  ((g('notaItens')[0]||{}).fotos||[]).length === 1);
+t('e o balde fica limpo pra proxima carta', g('_fotosItem').length === 0);
+
+_campos.n_cod = 'CARTA-B'; _campos.n_val = '20';
+setg('_fotosItem',['FOTO_DA_CARTA_B1','FOTO_DA_CARTA_B2']);
+A('addItemNota')();
+t('a segunda carta leva as SUAS duas fotos', ((g('notaItens')[1]||{}).fotos||[]).length === 2);
+
+/* [21/08] salvar com foto de uma carta que nunca foi adicionada perdia carta e fotos calado.
+   Agora pergunta — e "nao" tem de cancelar o salvamento de verdade. */
+setg('_fotosItem',['FOTO_DE_CARTA_NUNCA_ADICIONADA']);
+/* o teste tem de olhar a PERGUNTA, nao so o fato de perguntar: o `avisaSemConta` logo abaixo
+   tambem usa confirm e tambem cancela o salvamento, entao "perguntou + nao gravou" nao
+   distingue os dois. Sem isto, tirar o aviso da foto passava verde. */
+let _msgSalvar = '';
+ctx.confirm = (m) => { _msgSalvar = String(m||''); return false; };
+setg('notaHead', {frete:0, taxa:0, cp:'F', conta:'', sit:'Em estoque', data:'2026-08-21',
+                  num:'1', pg:'A vista', nParc:3, venc1:'', obs:''});
+A('salvarNota')();
+t('salvar com foto de carta nao adicionada PERGUNTA antes, falando de FOTO',
+  /foto/i.test(_msgSalvar), 'perguntou: ' + _msgSalvar.slice(0, 60));
+t('respondeu "nao": nada foi gravado', M().filter(m=>m.tipo==='COMPRA').length === 0);
+t('respondeu "nao": os itens continuam na lista', g('notaItens').length === 2);
+ctx.confirm = () => true;
+setg('_fotosItem',[]);
+setg('notaHead', {frete:0, taxa:0, cp:'Fornecedor', conta:'', sit:'Em estoque',
+                  data:'2026-08-21', num:'1', pg:'A vista', nParc:3, venc1:'', obs:''});
+setg('_fotosPend', []);
+A('salvarNota')();
+const _lan = M().filter(m => m.tipo === 'COMPRA');
+const _A = _lan.find(m => m.codigo === 'CARTA-A') || {};
+const _B = _lan.find(m => m.codigo === 'CARTA-B') || {};
+t('salvar a nota criou os 2 lancamentos', _lan.length === 2, 'criou ' + _lan.length);
+t('a carta A saiu do salvamento com 1 foto', (_A.nFotos|0) === 1, 'nFotos=' + _A.nFotos);
+t('a carta B saiu do salvamento com 2 fotos', (_B.nFotos|0) === 2, 'nFotos=' + _B.nFotos);
+t('nenhuma foto foi parar na carta errada', (_A.nFotos|0) + (_B.nFotos|0) === 3);
+
+/* a mesma cadeia do lado da TROCA: addRecebi -> trocaRecebi[].fotos -> salvarTroca */
+reset();
+setg('tela','lancar'); setg('tipoSel','TROCA');
+setg('trocaDei',[]); setg('trocaRecebi',[]); setg('trocaDin',0); setg('_fotosItem',[]); setg('_fotosPend',[]);
+Object.assign(_campos, {r_desc:'Recebida 1', r_val:'50', r_col:'', r_sit:'Em estoque',
+                        r_jogo:'One Piece', r_idi:'Ingles', r_cat:'Single/Carta',
+                        r_cod:'OP-1', r_boo:'0', r_cond:'', d_desc:'Dei isso', d_custo:'30'});
+setg('deiModo','avulso');
+A('addDei')();
+setg('_fotosItem',['FOTO_RECEBIDA_1']);
+A('addRecebi')();
+t('o item recebido entra com a foto dele', ((g('trocaRecebi')[0]||{}).fotos||[]).length === 1);
+_campos.r_desc = 'Recebida 2'; _campos.r_cod = 'OP-2';
+setg('_fotosItem',[]);
+A('addRecebi')();
+A('salvarTroca')();
+const _tr = M().filter(m => m.codigo === 'OP-1');
+t('salvar a troca levou a foto pro lancamento certo',
+  _tr.length === 1 && (_tr[0].nFotos|0) === 1, 'achei ' + _tr.length + ' com nFotos=' + (_tr[0]||{}).nFotos);
+const _tr2 = M().filter(m => m.codigo === 'OP-2');
+t('a carta recebida sem foto continua sem foto', _tr2.length === 1 && !(_tr2[0].nFotos|0));
+
+/* [21/08] as duas ultimas mutacoes que escapavam: tirar o aviso de foto orfa do salvarTroca,
+   e fazer a guarda descartar CALADA. As duas sao perda silenciosa — a classe que o Felype
+   nomeia como "o app fez e nao disse". */
+setg('trocaDei',[{desc:'x',custo:10}]); setg('trocaRecebi',[{desc:'y',valorMercado:20,fotos:[]}]);
+setg('_fotosItem',['FOTO_ORFA_NA_TROCA']);
+let _msgTroca = '';
+ctx.confirm = (m) => { _msgTroca = String(m||''); return false; };
+A('salvarTroca')();
+t('registrar troca com foto de carta nao adicionada avisa, falando de FOTO',
+  /foto/i.test(_msgTroca), 'perguntou: ' + _msgTroca.slice(0, 60));
+t('respondeu "nao": a troca NAO foi gravada', !M().some(m => m.tipo === 'TROCA'));
+ctx.confirm = () => true;
+
+/* o descarte tem de FALAR. O aviso sai por setTimeout pra nao brigar com a repintura, entao o
+   teste roda o timer na hora e escuta o toast. */
+const _toasts = [];
+const _toastOrig = g('toast'), _stOrig = ctx.setTimeout;
+setg('toast', (m) => { _toasts.push(String(m)); });
+ctx.setTimeout = (f) => { try { f(); } catch (e) {} return 0; };
+setg('tela','lancar'); setg('tipoSel','COMPRA'); setg('compraModo','item'); setg('editId',null);
+A('render')();
+setg('_fotosItem',['UMA','DUAS']);
+setg('tipoSel','TROCA'); A('render')();
+t('quando descarta, a guarda DIZ quantas fotos foram embora',
+  _toasts.some(m => /2 fotos descartadas/.test(m)), 'toasts: ' + JSON.stringify(_toasts));
+setg('toast', _toastOrig); ctx.setTimeout = _stOrig;
+
+ctx.document.getElementById = () => elStub();   /* devolve o dube padrao pras secoes seguintes */
 
 console.log('\n----------------------------------------');
 console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
