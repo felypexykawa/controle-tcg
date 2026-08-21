@@ -426,6 +426,20 @@ setg('_fotosItem',['UMA','DUAS']);
 setg('tipoSel','TROCA'); A('render')();
 t('quando descarta, a guarda DIZ quantas fotos foram embora',
   _toasts.some(m => /2 fotos descartadas/.test(m)), 'toasts: ' + JSON.stringify(_toasts));
+_toasts.length = 0;
+/* [21/08, 2a revisao] as portas do MENU (go) calavam: o proprio go() zerava o balde antes do
+   render, e a guarda encontrava tudo vazio. Sao as saidas mais usadas do Lancar. */
+setg('tela','lancar'); setg('tipoSel','COMPRA'); setg('compraModo','item'); setg('editId',null);
+A('render')();
+setg('_fotosItem',['UMA_SO']);
+A('go')('consultar');
+t('sair pelo MENU (Consultar) tambem avisa que descartou',
+  _toasts.some(m => /1 foto descartada/.test(m)), 'toasts: ' + JSON.stringify(_toasts));
+t('e a foto foi mesmo embora', g('_fotosItem').length === 0);
+_toasts.length = 0;
+setg('tela','lancar'); A('render')(); setg('_fotosItem',['X']);
+A('go')('painel');
+t('sair pelo MENU (Painel) tambem avisa', _toasts.some(m => /foto descartada/.test(m)));
 setg('toast', _toastOrig); ctx.setTimeout = _stOrig;
 
 ctx.document.getElementById = () => elStub();   /* devolve o dube padrao pras secoes seguintes */

@@ -633,14 +633,19 @@ const CAPACIDADES = [
          contexto. Mas LIDOS DO ARQUIVO, nunca retipados: a copia retipada que existia aqui
          envelheceu no mesmo dia em que o app trocou de host, e a vacina abortou o build com
          o sintoma certo pela causa errada. */
-      const _decl = ['LIGAS', 'LIGAS_BASE'].map(n => {
-        /* [21/08] fonte LIMPA, nunca a crua: um comentario "antes era: const LIGAS={...}"
-           acima da declaracao real fazia a vacina exercitar um mapa fantasma, e ficar verde.
-           Os irmaos (definida, nomesDeFuncao) ja liam daqui — este nascera lendo do cru. */
+      /* [21/08] fonte LIMPA, nunca a crua: um comentario "antes era: const LIGAS={...}" acima
+         da declaracao real fazia a vacina exercitar um mapa fantasma, e ficar verde. Os irmaos
+         (definida, nomesDeFuncao) ja liam daqui — este nascera lendo do cru.
+         E pula o nome que JA VEIO junto numa declaracao composta (`const A={...}, B=[...];`):
+         sem isso os dois recortes se sobrepunham e o eval morria com "B ja declarado", com a
+         vacina culpando "copia antiga do index.html" — causa errada, procura no lugar errado. */
+      let _decl = '';
+      for (const n of ['LIGAS', 'LIGAS_BASE']) {
+        if (new RegExp('(?:^|[,\\s])' + n + '\\s*=').test(_decl)) continue;   /* ja veio na composta */
         const d = extrairConst(jsLimpo, n);
         if (!d) throw new Error('nao achei a constante ' + n + ' no index.html');
-        return d;
-      }).join('\n');
+        _decl += d + '\n';
+      }
       const { LIGAS, LIGAS_BASE } = new Function(_decl + '\nreturn {LIGAS, LIGAS_BASE};')();
       let respostaDoPrompt = 'https://www.ligapokemon.com.br/?view=cards/card&card=x';
       const ch = { save: 0, fechou: 0, render: 0, toasts: [] };

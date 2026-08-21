@@ -19,11 +19,15 @@ cd "$(dirname "$0")"
 # uma copia nova do app ganha a protecao na primeira vez que alguem publica por aqui.
 [ "$(git config core.hooksPath)" = ".githooks" ] || { git config core.hooksPath .githooks; echo "trava de sintaxe instalada (.githooks)"; }
 
-SRC_DEV=${SRC_DEV:-"C:/Users/USER/app-tcg/index.html"}   # fonte de dev; so existe nesta maquina
+# fonte de dev (so existe na maquina de quem desenvolve). Apontar SRC_DEV pra um caminho que
+# nao existe DESLIGA as checagens de capacidade — e um kill-switch de fato, entao ele avisa na
+# tela E fica registrado na mensagem do commit (achado da 2a revisao de fiacao: rota que pula
+# trava tem de se auto-denunciar depois do fato, senao ninguem descobre olhando o historico).
+SRC_DEV=${SRC_DEV:-"$(cd "$(dirname "$0")/../app-tcg" 2>/dev/null && pwd)/index.html"}
 TAG=$(date '+%d/%m %Hh%M')
 MSG=${1:-"app: atualizacao"}
 
-# 0) CONSTROI o artefato a partir da fonte de dev e roda as 272 checagens de capacidade.
+# 0) CONSTROI o artefato a partir da fonte de dev e roda as checagens de capacidade (273 hoje; o numero sai do proprio build, nao daqui).
 #
 # [21/08, achado da revisao de fiacao] Ate hoje este passo NAO EXISTIA: o _build_deploy.py tinha
 # 272 checagens, rodava a vacina contra o app no ar e barrava publicacao por cima de trabalho
@@ -37,7 +41,8 @@ MSG=${1:-"app: atualizacao"}
 if [ -f _build_deploy.py ] && [ -f "$SRC_DEV" ]; then
   python _build_deploy.py || { echo "ABORTADO: o build reprovou (a mensagem dele esta acima). Nada foi publicado."; exit 1; }
 else
-  echo "[publicar] sem a fonte de dev nesta maquina ($SRC_DEV) — publicando o que ja esta em tcg-web, SEM as 272 checagens de capacidade"
+  echo "[publicar] sem a fonte de dev nesta maquina ($SRC_DEV) — publicando o que ja esta em tcg-web, SEM as checagens de capacidade do build"
+  PULOU_BUILD=1
 fi
 
 # 1) grava o carimbo nos dois lugares, a partir da MESMA variável
@@ -123,8 +128,13 @@ git add -A .
 # ESCAPE UNICO NAS TRES PORTAS: o pre-commit e este script leem PODE_REMOVER do ambiente; o
 # CI le do CORPO da mensagem (la nao existe ambiente). Sem carimbar aqui, uma remocao declarada
 # passava local e deixava o CI vermelho — vigia que grita a toa ensina a ignorar vigia.
-if [ -n "$PODE_REMOVER" ]; then
-  git commit -q -m "$MSG (v $TAG)" -m "PODE_REMOVER=$PODE_REMOVER"
+# [21/08, 2a revisao] rota que pula trava tem de se auto-denunciar DEPOIS do fato: sem esta
+# linha, nada no historico registrava que as checagens de capacidade nao rodaram naquele commit.
+NOTA=""
+[ -n "$PULOU_BUILD" ] && NOTA="SEM-BUILD: as checagens de capacidade nao rodaram (fonte de dev ausente ou SRC_DEV apontando pra fora)"
+if [ -n "$PODE_REMOVER" ] || [ -n "$NOTA" ]; then
+  git commit -q -m "$MSG (v $TAG)" -m "${PODE_REMOVER:+PODE_REMOVER=$PODE_REMOVER}${PODE_REMOVER:+
+}$NOTA"
 else
   git commit -q -m "$MSG (v $TAG)"
 fi

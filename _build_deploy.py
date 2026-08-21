@@ -2,8 +2,13 @@ import os
 # Build da versao de deploy: app-tcg (fonte, dev) -> tcg-web (nuvem, publico)
 # Difere em 2 pontos: firebaseConfig real (USAR_NUVEM auto-deriva) + SEED=[]
 import re
-SRC=r'C:\Users\USER\app-tcg\index.html'
-DEP=r'C:\Users\USER\tcg-web\index.html'
+# [21/08, 2a revisao de fiacao] os caminhos saem da posicao DESTE arquivo, nunca cravados em
+# C:\Users\USER. Cravados, um clone noutra pasta rodava o build e gravava no checkout ALHEIO
+# enquanto o publicar.sh commitava o daqui — silencioso dos dois lados. AQUI = a pasta do site;
+# a fonte de dev fica ao lado dela (../app-tcg), e da pra apontar outra por TCG_SRC.
+AQUI=os.path.dirname(os.path.abspath(__file__))
+SRC=os.environ.get('TCG_SRC') or os.path.join(os.path.dirname(AQUI),'app-tcg','index.html')
+DEP=os.path.join(AQUI,'index.html')
 src=open(SRC,encoding='utf-8').read()
 dep=open(DEP,encoding='utf-8').read()
 
@@ -30,7 +35,7 @@ assert nb==1, f'BUILD_TAG: {nb} substituicoes (esperado 1)'
 # publicar.sh: quem quer que rode, o invariante vale.
 _ms=int(time.time()*1000)
 try:
-    _ant=int(json.load(open(r'C:\Users\USER\tcg-web\versao.json',encoding='utf-8')).get('ts',0))
+    _ant=int(json.load(open(os.path.join(AQUI,'versao.json'),encoding='utf-8')).get('ts',0))
 except Exception:
     _ant=0
 if _ms<=_ant: _ms=_ant+1000
@@ -44,7 +49,7 @@ assert nts==1, f'BUILD_TS: {nts} substituicoes (esperado 1) — o app precisa de
 # "versao nova disponivel" aparece, o clique recarrega o MESMO arquivo e ela volta; (b) se a
 # pessoa rodasse o publicar.sh em seguida, ia ao ar conteudo VELHO sob carimbo NOVO, e a
 # conferencia de linha paralela (velho contra velho) ficava verde.
-_VERSAO_JSON = r'C:\Users\USER\tcg-web\versao.json'
+_VERSAO_JSON = os.path.join(AQUI,'versao.json')
 _CARIMBO = json.dumps({'tag':tag,'ts':_ms})
 
 # 3) SEED -> [] (linha unica que comeca com const SEED=)
@@ -63,7 +68,7 @@ out='\n'.join(lines)
 # se o arquivo que ja esta la tem funcao que este nao tem, PARA e nomeia.
 # Liberacao proposital: PODE_REMOVER="nomeA,nomeB" python _build_deploy.py
 import subprocess as _sp, tempfile as _tf
-_CHK = os.path.join('C:' + os.sep, 'Users', 'USER', 'tcg-web', 'checks-app.js')
+_CHK = os.path.join(AQUI, 'checks-app.js')
 if os.path.exists(DEP) and os.path.exists(_CHK):
     _t = _tf.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8')
     _t.write(out); _t.close()
@@ -86,6 +91,11 @@ if os.path.exists(DEP) and os.path.exists(_CHK):
 
 # 4) verificacao do artefato
 chk=out
+# [21/08, 2a revisao] o denominador era `count('buscarLigaCampo(')-1`, que conta TAMBEM as
+# chamadas com o id em variavel — passar os ids por variavel (refatoracao que nao muda
+# comportamento nenhum) reprovava o build. O denominador passou a contar so a forma LITERAL,
+# que e a unica sobre a qual esta checagem tem o que dizer.
+_litLiga=len(re.findall(r'''buscarLigaCampo\(\s*['"]''', chk))
 _chamLiga=re.findall(r'''buscarLigaCampo\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*\)''', chk)
 checks={
  'apiKey presente':'AIzaSy' in chk,
@@ -279,12 +289,12 @@ checks={
  # numero de chamadas ENTENDIDAS tem de bater com o numero de chamadas que existem no texto;
  # forma nova de escrever vira alarme, nao silencio.
  'todo seletor de jogo citado na busca da Liga existe na tela':(
-   len(_chamLiga)==chk.count('buscarLigaCampo(')-1        # -1 = a declaracao da propria funcao
+   len(_chamLiga)==_litLiga        # so as chamadas em forma LITERAL entram na conta
    and len(_chamLiga)>=3
    and all(('id="%s"' % sel) in chk for _campo, sel in _chamLiga)),
  'a URL da Liga e montada num lugar so':chk.count("'/?view=cards/search&card='")==1,
  # validar link COLADO pelo dominio-base: subdominio (fusion., masters.) tem de passar
- 'colar link aceita subdominio da Liga':'const LIGAS_BASE=' in chk and "h.endsWith('.'+b)" in chk,  # o comentario CITA liganaruto (pra dizer que nao existe); o que nao pode e ele estar no MAPA
+ 'colar link aceita subdominio da Liga':'LIGAS_BASE' in chk and "h.endsWith('.'+b)" in chk,  # [21/08] sem exigir a FORMA da declaracao: juntar duas constantes numa linha nao muda comportamento e nao pode reprovar  # o comentario CITA liganaruto (pra dizer que nao existe); o que nao pode e ele estar no MAPA
  # [21/08 revisao] a cura do vazamento de foto e de REGRA UNICA (a identidade do formulario),
  # nao porta a porta — eu tinha curado go() e sobraram 3 portas abertas ("< voltar", trocar o
  # tipo, alternar item<->Nota). Quem exercita isso de verdade e o testes-nucleo (secao 13);

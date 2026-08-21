@@ -1370,7 +1370,11 @@ function selPeriodo(){return `<div class="perbox"><div class="seg" style="margin
   <div class="row2"><div><label style="margin:0 0 3px">De</label><input type="date" value="${perDe}" onchange="perDe=this.value;perSel='custom';render()"></div>
     <div><label style="margin:0 0 3px">Até</label><input type="date" value="${perAte}" onchange="perAte=this.value;perSel='custom';render()"></div></div></div>`;}
 function snap(){return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel};}
-function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];_fotosItem=[];_lancarDirty=false;}selMode=false;selIds={};tela=t;editId=null;render();}
+/* [21/08] NAO zere `_fotosItem` aqui. Ele saiu desta linha de proposito: enquanto estava,
+   o balde chegava vazio no `guardaBaldeItem` e o aviso "N fotos descartadas" nao saia —
+   justamente nas duas saidas mais usadas (tocar Consultar ou Painel). Remendo antigo
+   convivendo com a regra nova nao e redundancia: o remendo executa primeiro e come o sinal. */
+function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];_lancarDirty=false;}selMode=false;selIds={};tela=t;editId=null;render();}
 function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
 /* Busca por digitação da Consulta (Felype 2026-08-12). Dois cuidados que fazem a diferença
    entre funcionar e ser inutilizável no celular:
@@ -3689,11 +3693,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 05h29';
+const BUILD_TAG='21/08 06h11';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787300941491;
+const BUILD_TS=1787303488238;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
