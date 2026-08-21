@@ -125,16 +125,31 @@ const SEED=[];
 let movs=get(MK,[]);
 let cats=get('tcg_cats',['ETB','Booster Box','Box da Coleção','Mini BB','Quad','Triple','Case','Sleeved','Blister','Single/Carta','Outro']);
 let cols=get('tcg_cols',[]),pess=get('tcg_pess',[]),pgs=get('tcg_pgs',['Dinheiro','Pix','Cartão']);
-let colsJ=get('tcg_colsj',null);const colsDe=j=>(colsJ&&colsJ[j])||[];const salvarColsJ=()=>localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));
-let colsG=get('tcg_colsg',{});const grupoDe=(j,c)=>(colsG[j]&&colsG[j][c])||'';const salvarColsG=()=>localStorage.setItem('tcg_colsg',JSON.stringify(colsG));
+let colsJ=get('tcg_colsj',null);const colsDe=j=>(colsJ&&colsJ[j])||[];const salvarColsJ=()=>gravaLocal('tcg_colsj',JSON.stringify(colsJ));
+let colsG=get('tcg_colsg',{});const grupoDe=(j,c)=>(colsG[j]&&colsG[j][c])||'';const salvarColsG=()=>gravaLocal('tcg_colsg',JSON.stringify(colsG));
 let jogos=get('tcg_jogos',['Pokémon','Yu-Gi-Oh','One Piece']);
 let despCats=get('tcg_despcats',['Luz','Aluguel','Advogado','Internet','Sleeves','Toploader','Sacolas','Fita','Caixas']);
-let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
-let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
+let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
+let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
 /* código ambíguo (2+ cartas na Liga p/ o mesmo código) resolvido 1x — vale pra TODOS os
    itens com esse código, atuais e futuros (a rotina de coleta lê isto pra navegar direto,
    sem passar pela página "Busca:" de novo). Chave = código LIMPO (codLimpo). */
-let codigosResolvidos=get('tcg_codres',{});const salvarCodRes=()=>localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));
+let codigosResolvidos=get('tcg_codres',{});const salvarCodRes=()=>gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));
+/* [CAUSA RAIZ 2026-08-20 — "a Laura exclui e volta tudo"; erro meu, de 11/08]
+   A proteção contra dois aparelhos salvando ao mesmo tempo funde as listas por id. Só que
+   exclusão era expressa por AUSÊNCIA — e unir "ausente aqui" com "presente lá" dá PRESENTE.
+   Resultado: quem exclui perde a exclusão sempre que alguém tiver mexido na nuvem no meio
+   (outra aba, o outro aparelho, o eco da própria escrita). Vira loteria: um item some, o
+   outro volta — exatamente o que eles viveram. O revisor me avisou disso na época e eu
+   registrei como "risco residual aceitável"; não era.
+   CURA: exclusão passa a ser um FATO GRAVADO, não uma ausência. Cada id excluído fica aqui
+   com a data, o registro sobe pra nuvem junto e o merge respeita: id que está aqui não
+   ressuscita, venha de onde vier. Limpeza automática depois de 120 dias (a essa altura o
+   outro aparelho já sincronizou muitas vezes; guardar pra sempre incharia o documento). */
+let excluidos=get('tcg_excluidos',{});
+function marcaExcluido(...ids){const t=Date.now();ids.flat().forEach(id=>{if(id)excluidos[id]=t;});podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+function podaExcluidos(){const lim=Date.now()-120*864e5;Object.keys(excluidos).forEach(k=>{if(!(excluidos[k]>lim))delete excluidos[k];});}
+function estaExcluido(id){return !!(id&&excluidos[id]);}
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
@@ -258,6 +273,168 @@ function vinculoInfoVenda(m){const alvo=movs.find(x=>x.id===m.origemId);
   const dataC=raiz.data?dBR(new Date(raiz.data+'T00:00:00')):'—';
   const forn=raiz.contraparte?' de <b>'+raiz.contraparte+'</b>':'';
   return `<span class="meta" style="flex-basis:100%">🔗 veio de: <b>${rot}</b> — compra ${dataC}${forn}${raiz.notaId?` · <span class="lnk" onclick="abrirNota('${raiz.notaId}')">🧾 ver nota</span>`:''} · <span class="lnk" onclick="verMov('${alvo.id}')">ver item</span></span>`;}
+/* ============ EXCLUSAO COM LASTRO (2026-08-20) ============
+   Regra do dono: "quando exclua, exclua mesmo" - e a unidade de exclusao e a COMPRA INTEIRA,
+   nao o pedaco clicado: excluir estoque leva o pedido do mesmo produto junto. Todo caminho
+   passa por um aviso em TELA dizendo o que vai acontecer, com as saidas nomeadas pela
+   consequencia - nunca por confirm() encadeado (aviso curto pra acao grave era o pior
+   defeito da versao anterior). */
+function praRot(v){return v==='Coleção'?'pra coleção':v==='Pedido'?'pro pedido (a caminho)':'pro estoque';}
+function doRot(v){return v==='Coleção'?'da coleção':v==='Pedido'?'do pedido':'do estoque';}
+function noRot(v){return v==='Coleção'?'na coleção':v==='Pedido'?'no pedido':'no estoque';}
+function rotDe(m){return (m&&m.colecao?m.colecao+' · ':'')+((m&&m.cat)||'item');}
+function dataBRde(m){try{return m&&m.data?dBR(new Date(m.data+'T00:00:00')):'—';}catch(e){return '—';}}
+/* acha o pedaco de estoque que saiu nesta venda. vendaRef e o vinculo gravado na criacao
+   (deterministico); a heuristica de data/qtd/custo so entra pro legado sem esse campo. */
+function pecaDaVenda(v){if(!v||!v.origemId)return null;
+  const direto=movs.find(x=>x.tipo==='COMPRA'&&x.vendaRef===v.id);
+  if(direto)return direto;
+  const alvo=movs.find(x=>x.id===v.origemId);if(!alvo)return null;
+  if(sitDe(alvo)==='Vendido')return alvo;
+  const cands=movs.filter(x=>x.loteOrigem===alvo.id&&sitDe(x)==='Vendido'&&x.dataVenda===v.data&&(+x.qtd||1)===(+v.qtd||1)&&Math.abs((+x.valor||0)-(+v.custoOrigem||0))<0.02&&!movs.some(o=>o.tipo==='VENDA'&&o.origemId===x.id));
+  return cands.length?cands[0]:null;}
+/* devolve o pedaco pro lugar de onde saiu (estoque, pedido ou colecao) */
+function voltarPeca(peca,v){
+  const volta=(v&&v.vendaTipo==='colecao')?'Coleção':((v&&v.vendaDe==='pedido')?'Pedido':'Em estoque');
+  peca.situacao=volta;peca.destino=volta==='Coleção'?'Coleção':'Vender';
+  delete peca.dataVenda;delete peca.dataSaida;delete peca.vendaRef;
+  return volta;}
+/* familia inteira a partir da RAIZ: o lote original, todos os pedacos que sairam dele
+   (e pedacos de pedacos) e as vendas penduradas em qualquer um deles. */
+function famDe(id){const m0=movs.find(x=>x.id===id);if(!m0)return null;
+  const raiz=raizDe(m0)||m0;const fam=[raiz];let mudou=true,g=0;
+  while(mudou&&g++<25){mudou=false;
+    movs.forEach(x=>{if(x.loteOrigem&&fam.indexOf(x)<0&&fam.some(f=>f.id===x.loteOrigem)){fam.push(x);mudou=true;}});}
+  const ids={};fam.forEach(x=>ids[x.id]=1);
+  const vendas=movs.filter(x=>x.tipo==='VENDA'&&ids[x.origemId]);
+  const por=st=>fam.filter(x=>sitDe(x)===st);
+  return {raiz:raiz,fam:fam,vendas:vendas,
+    saiu:fam.filter(x=>sitDe(x)==='Vendido'||sitDe(x)==='Trocado'),
+    estoque:por('Em estoque'),pedido:por('Pedido'),colecao:por('Coleção')};}
+const somaV=a=>a.reduce((s,x)=>s+(+x.valor||0),0);
+const somaQ=a=>a.reduce((s,x)=>s+(+x.qtd||1),0);
+/* aviso em tela: o que existe hoje + cada saida com a consequencia escrita por extenso */
+function modalAviso(titulo,corpo,botoes){
+  const bs=botoes.map(b=>'<div class="item" style="cursor:pointer;align-items:flex-start;gap:10px;border-left:4px solid '+(b.cor||'var(--mut)')+'" onclick="'+b.acao+'">'
+    +'<div style="flex:1"><b style="color:'+(b.cor||'var(--txt)')+'">'+b.rot+'</b>'
+    +'<div class="meta" style="margin-top:4px;line-height:1.45">'+b.exp+'</div></div></div>').join('');
+  const hh='<div id="modal" onclick="if(event.target.id===\'modal\')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:33;display:flex;align-items:flex-end">'
+    +'<div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:90vh;overflow:auto;border-top:4px solid var(--red)">'
+    +'<div style="font-weight:800;font-size:16px;margin-bottom:8px">'+titulo+'</div>'+corpo
+    +'<div style="margin:14px 0 6px;font-weight:700;font-size:12px;color:var(--mut);letter-spacing:.4px">ESCOLHA O QUE FAZER</div>'+bs
+    +'<div class="lnk" style="text-align:center;margin-top:14px;padding:8px" onclick="fecharModal()">cancelar — não mexer em nada</div>'
+    +'</div></div>';
+  document.getElementById('modal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',hh);}
+/* --------- roteador: cada tipo de lancamento merece um aviso diferente --------- */
+function excluir(id){const m=movs.find(x=>x.id===id);if(!m)return;
+  if(m.serieId&&m.status==='apagar')return exclSerie(m);
+  if(m.tipo==='VENDA')return exclVenda(m);
+  if(m.tipo==='COMPRA')return exclCompra(m);
+  return exclSimples(m);}
+function exclSerie(m){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar');
+  const corpo='<div class="meta" style="line-height:1.5">Isto é uma <b>despesa fixa</b> — '+rotDe(m)+', '+fmt(+m.valor||0)+' por mês.<br><br>'
+    +'<b>O que vai acontecer:</b> saem esta previsão e todas as próximas ainda não pagas — <b>'+alvos.length+' no total</b>, somando '+fmt(somaV(alvos))+'. As que você já pagou continuam no histórico.</div>';
+  modalAviso('🗑 Excluir esta despesa fixa?',corpo,[
+    {rot:'🗑 Apagar esta e as próximas ('+alvos.length+')',cor:'var(--red)',
+     exp:'As previsões somem do seu fluxo de caixa. Nada do que já foi pago é tocado.',
+     acao:"execExcl('"+m.id+"','serie')"}]);}
+function exclSimples(m){
+  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números. Nada mais é afetado.</div>';
+  modalAviso('🗑 Excluir este lançamento?',corpo,[
+    {rot:'🗑 Apagar',cor:'var(--red)',exp:'Some dos números. Não dá pra desfazer depois.',acao:"execExcl('"+m.id+"','so')"}]);}
+function exclVenda(v){const peca=pecaDaVenda(v),val=+v.valor||0;
+  const quem=v.contraparte?' pra <b>'+v.contraparte+'</b>':'';
+  let corpo='<div class="meta" style="line-height:1.5">Venda de <b>'+rotDe(v)+'</b> — '+fmt(val)+quem+' em '+dataBRde(v)+'.</div>';
+  if(!peca){
+    corpo+='<div class="meta" style="margin-top:10px;line-height:1.5">Esta venda <b>não tem produto do estoque vinculado</b>, então nada volta pro estoque e nada mais some junto.<br><br><b>O que vai acontecer:</b> os '+fmt(val)+' saem do seu faturamento e do seu lucro.</div>';
+    return modalAviso('🗑 Excluir esta venda?',corpo,[
+      {rot:'🗑 Apagar a venda',cor:'var(--red)',exp:'Ela some dos números. Nenhum estoque é afetado.',acao:"execExcl('"+v.id+"','vendaSo')"}]);}
+  const volta=(v.vendaTipo==='colecao')?'Coleção':(v.vendaDe==='pedido'?'Pedido':'Em estoque');
+  const nq=(+peca.qtd||1);
+  corpo+='<div class="meta" style="margin-top:10px;line-height:1.5">Nesta venda saíram <b>'+nq+' un.</b> de <b>'+rotDe(peca)+'</b> (custo '+fmt(+peca.valor||0)+') '+doRot(volta)+'.</div>';
+  modalAviso('🗑 Excluir esta venda?',corpo,[
+    {rot:'↩ Apagar a venda e devolver o produto '+praRot(volta),cor:'var(--green)',
+     exp:'A venda some dos números (−'+fmt(val)+' de faturamento) e as '+nq+' un. voltam a existir '+noRot(volta)+', como estavam antes. Use quando a venda foi lançada errada.',
+     acao:"execExcl('"+v.id+"','vendaVolta')"},
+    {rot:'🗑 Apagar tudo — a venda E o produto',cor:'var(--red)',
+     exp:'Some a venda (−'+fmt(val)+' de faturamento) E as '+nq+' un. que saíram nela (−'+fmt(+peca.valor||0)+' de custo). O produto não vai existir nem no estoque nem no pedido. Use quando o lançamento inteiro estava errado.',
+     acao:"execExcl('"+v.id+"','vendaTudo')"}]);}
+function exclCompra(m){const f=famDe(m.id);if(!f)return;
+  const raiz=f.raiz,eParte=(raiz.id!==m.id||f.fam.length>1);
+  const cTot=somaV(f.fam),recV=somaV(f.vendas);
+  const naoVend=f.estoque.concat(f.pedido,f.colecao);
+  let corpo='<div class="meta" style="line-height:1.5">Compra de <b>'+rotDe(raiz)+'</b> em '+dataBRde(raiz)
+    +(raiz.contraparte?' de <b>'+raiz.contraparte+'</b>':'')+' — custo total hoje '+fmt(cTot)+'.</div>';
+  if(eParte)corpo+='<div class="meta" style="margin-top:8px;line-height:1.5;color:var(--amber)">⚠ Este item é <b>parte</b> dessa compra. Excluir mexe na compra inteira — o estoque e o pedido do mesmo produto vão junto.</div>';
+  corpo+='<div class="meta" style="margin-top:10px;line-height:1.6"><b>Como ela está hoje:</b><br>';
+  if(f.estoque.length)corpo+='• '+somaQ(f.estoque)+' un. em <b>estoque</b> (custo '+fmt(somaV(f.estoque))+')<br>';
+  if(f.pedido.length)corpo+='• '+somaQ(f.pedido)+' un. no <b>pedido</b>, a caminho (custo '+fmt(somaV(f.pedido))+')<br>';
+  if(f.colecao.length)corpo+='• '+somaQ(f.colecao)+' un. na <b>coleção</b> (custo '+fmt(somaV(f.colecao))+')<br>';
+  if(f.saiu.length)corpo+='• '+somaQ(f.saiu)+' un. já <b>saíram</b> (vendidas ou trocadas — custo '+fmt(somaV(f.saiu))+')<br>';
+  if(f.vendas.length)corpo+='• <b>'+f.vendas.length+' venda(s)</b> registradas, somando '+fmt(recV)+' de faturamento<br>';
+  corpo+='</div>';
+  const bts=[{rot:'🗑 Apagar TUDO'+(f.vendas.length?' — inclusive as '+f.vendas.length+' venda(s)':''),cor:'var(--red)',
+    exp:'Some a compra inteira: estoque, pedido, coleção e o que já saiu. Seu custo cai '+fmt(cTot)
+       +(f.vendas.length?' e seu faturamento cai '+fmt(recV)+' (as '+f.vendas.length+' venda(s) somem junto)':'')
+       +'. Use quando a compra inteira foi lançada errada.',
+    acao:"execExcl('"+m.id+"','compraTudo')"}];
+  if(f.vendas.length&&naoVend.length)bts.push({rot:'📌 Apagar só o que NÃO vendeu — manter as '+f.vendas.length+' venda(s)',cor:'var(--amber)',
+    exp:'Some '+somaQ(naoVend)+' un. de estoque/pedido/coleção (−'+fmt(somaV(naoVend))+' de custo). As '+f.vendas.length+' venda(s) continuam valendo '+fmt(recV)+', e o custo do que foi vendido ('+fmt(somaV(f.saiu))+') fica guardado como histórico — senão a venda ficaria sem custo e seu lucro sairia falso.',
+    acao:"execExcl('"+m.id+"','compraSobra')"});
+  modalAviso('🗑 Excluir esta compra?',corpo,bts);}
+/* --------- executor unico: toda saida passa por aqui e REGISTRA a exclusao --------- */
+function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)return;
+  const some=lista=>{const st={};[].concat(lista).forEach(x=>{if(x)st[x]=1;});
+    marcaExcluido(Object.keys(st));movs=movs.filter(x=>!st[x.id]);};
+  if(modo==='serie'){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar');
+    some(alvos.map(x=>x.id));save();render();toast(alvos.length+' previsão(ões) apagada(s)');return;}
+  if(modo==='so'){some([m.id]);save();render();toast('Lançamento apagado');return;}
+  if(modo==='vendaSo'){some([m.id]);save();render();toast('Venda apagada');return;}
+  if(modo==='vendaVolta'){const pc=pecaDaVenda(m);const volta=pc?voltarPeca(pc,m):null;
+    some([m.id]);save();render();
+    toast(volta?'Venda apagada — produto voltou '+praRot(volta)+' ✓':'Venda apagada');return;}
+  if(modo==='vendaTudo'){const pc=pecaDaVenda(m);
+    some([m.id].concat(pc?[pc.id]:[]));save();render();toast('Venda e produto apagados');return;}
+  if(modo==='compraTudo'){const f=famDe(id);if(!f)return;
+    const n=f.fam.length+f.vendas.length;
+    some(f.fam.map(x=>x.id).concat(f.vendas.map(x=>x.id)));save();render();
+    toast('Apagados '+n+' registro(s) — a compra inteira');return;}
+  if(modo==='compraSobra'){const f=famDe(id);if(!f)return;
+    const fica={};f.saiu.forEach(x=>fica[x.id]=1);
+    /* religar cada venda no pedaco que fica: sem isto ela apontaria pro lote-pai apagado */
+    f.vendas.forEach(v=>{const pc=pecaDaVenda(v);if(pc&&fica[pc.id]){v.origemId=pc.id;pc.vendaRef=v.id;}});
+    /* pedaco que fica vira raiz propria: sem pai, a conservacao vale contra ele mesmo */
+    f.saiu.forEach(x=>{if(!fica[x.loteOrigem]){delete x.loteOrigem;x.valorOrig=+x.valor||0;}});
+    some(f.fam.filter(x=>!fica[x.id]).map(x=>x.id));save();render();
+    toast('Apagado o que não vendeu — '+f.vendas.length+' venda(s) mantida(s)');return;}}
+/* --------- DEVOLUCAO: o produto voltou de verdade (diferente de excluir) --------- */
+function devolver(id){const v=movs.find(x=>x.id===id);
+  if(!v||v.tipo!=='VENDA'){toast('Devolução só vale pra venda');return;}
+  const peca=pecaDaVenda(v),val=+v.valor||0,quem=v.contraparte?' de <b>'+v.contraparte+'</b>':'';
+  if(!peca){
+    const corpo='<div class="meta" style="line-height:1.5">Venda de <b>'+rotDe(v)+'</b> — '+fmt(val)+quem+'.<br><br>'
+      +'Esta venda <b>não tem produto do estoque vinculado</b>, então não tenho o que devolver pro estoque.<br><br>'
+      +'<b>O que dá pra fazer:</b> tirar a venda dos números (os '+fmt(val)+' saem do faturamento). Se o produto voltou pra sua mão, lance a entrada dele depois.</div>';
+    return modalAviso('↩ Devolução',corpo,[
+      {rot:'↩ Tirar a venda dos números',cor:'var(--amber)',exp:'A venda some. Nenhum estoque é afetado (não havia vínculo).',acao:"execDev('"+v.id+"')"}]);}
+  const volta=(v.vendaTipo==='colecao')?'Coleção':(v.vendaDe==='pedido'?'Pedido':'Em estoque');
+  const corpo='<div class="meta" style="line-height:1.5">Venda de <b>'+rotDe(v)+'</b> — '+fmt(val)+quem+' em '+dataBRde(v)+'.<br><br>'
+    +'<b>O que vai acontecer:</b><br>'
+    +'• as <b>'+(+peca.qtd||1)+' un.</b> voltam '+praRot(volta)+', como estavam antes da venda<br>'
+    +'• os <b>'+fmt(val)+'</b> desta venda saem do seu faturamento<br>'
+    +'• o motivo que você escrever fica gravado no item, como histórico</div>';
+  modalAviso('↩ Devolução',corpo,[
+    {rot:'↩ Confirmar devolução',cor:'var(--green)',exp:'Vou pedir o motivo (produto devolvido, pessoa errada, produto errado…) e devolver o produto '+praRot(volta)+'.',acao:"execDev('"+v.id+"')"}]);}
+function execDev(id){fecharModal();const v=movs.find(x=>x.id===id);if(!v)return;
+  const peca=pecaDaVenda(v);
+  if(!peca){marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);save();render();toast('Venda removida dos números');return;}
+  const motivo=(prompt('Motivo da devolução (fica gravado no item):','produto devolvido')||'').trim()||'produto devolvido';
+  const volta=voltarPeca(peca,v);
+  const hj=new Date().toISOString().slice(0,10);
+  peca.devObs='↩ devolvido em '+dBR(new Date(hj+'T00:00:00'))+' — '+motivo+(v.contraparte?' ('+v.contraparte+')':'')+' · a venda era '+fmt(+v.valor||0);
+  marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);
+  save();render();toast('↩ Devolvido — voltou '+praRot(volta)+' ✓');}
 function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)return;
   const alvo=movs.find(x=>x.id===v.origemId);
   const limpa=()=>{delete v.origemId;delete v.custoOrigem;delete v.vendaDe;delete v.semOrigem;if(alvo&&alvo.vendaRef===v.id)delete alvo.vendaRef;save();toast('✂ Vínculo desfeito ✓');render();};
@@ -744,8 +921,41 @@ if(!colsJ){colsJ={};jogos.forEach(j=>colsJ[j]=[]);movs.forEach(m=>{const j=m.jog
 const fmt=n=>'R$ '+(Math.round(n*100)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=n=>(n>=0?'+':'')+Math.round(n*100)+'%';
 const dBR=d=>d.toLocaleDateString('pt-BR');
-const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM&&_syncReady)salvarNuvem();};
-const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStorage.setItem('tcg_cols',JSON.stringify(cols));localStorage.setItem('tcg_pess',JSON.stringify(pess));localStorage.setItem('tcg_pgs',JSON.stringify(pgs));localStorage.setItem('tcg_jogos',JSON.stringify(jogos));localStorage.setItem('tcg_despcats',JSON.stringify(despCats));localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));localStorage.setItem('tcg_colsg',JSON.stringify(colsG));localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+/* [CAUSA RAIZ 2026-08-20 — "The quota has been exceeded" no iPhone do Felype]
+   A memória local do navegador encheu (o Safari dá ~5MB por site) e o app quebrava no
+   PRIMEIRO passo do salvamento. Como a gravação local vinha ANTES da nuvem, a exceção
+   derrubava a linha inteira: a nuvem NUNCA era salva. Efeitos que ele viveu, todos do
+   mesmo defeito: (a) excluía um item, saía e voltava, e o item estava lá — a exclusão
+   morria antes de subir; (b) o app travava na abertura ("carregando" eterno), porque
+   aplicarNuvem também grava local; (c) tudo isso sem uma palavra na tela.
+   Regra nova: a NUVEM é a fonte de verdade, a cópia local é só conveniência — falhar a
+   cópia NUNCA pode impedir de salvar de verdade. E quando faltar espaço, o app poda as
+   cópias de segurança antigas sozinho e avisa em linguagem clara. */
+let _localCheio=false,_avisouPoda=false;
+function avisaPoda(oQue){if(_avisouPoda)return;_avisouPoda=true;
+  try{toast('⚠ A memória deste aparelho encheu — '+oQue+'.');}catch(_){}}
+function gravaLocal(chave,valor){
+  try{localStorage.setItem(chave,valor);return true;}catch(e){}
+  /* Faltou espaço. Vamos podar as cópias de segurança locais pra conseguir salvar — mas com
+     uma ressalva que precisa ficar registrada: [CORRIGIDO 2026-08-20, conferido no código]
+     `tcg_backups` (os pontos de restauração do botão "restaurar") NÃO sobe pra nuvem nem
+     entra no arquivo de backup baixável — mora só neste aparelho. Ou seja, podar aqui é
+     DESTRUIR a única cópia daqueles pontos no tempo. Continua sendo a escolha certa (salvar
+     o lançamento de agora vale mais que um ponto de restauração antigo), mas NUNCA em
+     silêncio: a 1ª versão desta função só avisava se a gravação falhasse mesmo depois de
+     apagar tudo — se a poda desse certo, o dono perdia os pontos sem saber. Agora avisa
+     sempre que podar. */
+  try{const b=get('tcg_backups',[]);
+    if(b.length>3){localStorage.setItem('tcg_backups',JSON.stringify(b.slice(-3)));
+      try{localStorage.setItem(chave,valor);avisaPoda('mantive só os 3 pontos de restauração mais recentes deste aparelho');return true;}catch(e2){}}
+    localStorage.removeItem('tcg_backups');
+    try{localStorage.setItem(chave,valor);avisaPoda('precisei apagar os pontos de restauração DESTE APARELHO (seus lançamentos seguem na nuvem, intactos)');return true;}catch(e3){}}catch(e4){}
+  if(!_localCheio){_localCheio=true;
+    try{setSync('erro','memória deste aparelho cheia — seus dados seguem salvos na nuvem');}catch(_){}
+    try{toast('⚠ A memória deste aparelho encheu. Seus lançamentos continuam salvos na NUVEM — só a cópia local parou.');}catch(_){}}
+  return false;}
+const save=()=>{gravaLocal(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+const saveL=()=>{gravaLocal('tcg_cats',JSON.stringify(cats));gravaLocal('tcg_cols',JSON.stringify(cols));gravaLocal('tcg_pess',JSON.stringify(pess));gravaLocal('tcg_pgs',JSON.stringify(pgs));gravaLocal('tcg_jogos',JSON.stringify(jogos));gravaLocal('tcg_despcats',JSON.stringify(despCats));gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));gravaLocal('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 /* id único: base36 do relógio + 5 chars aleatórios — dois aparelhos lançando no mesmo milissegundo não colidem */
@@ -1145,7 +1355,7 @@ function vPainel(){
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
     ${USAR_NUVEM&&_userEmail?`<div class="lnk" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}
     ${resultadoHTML}
-    <div class="lnk" onclick="if(confirm('Apagar TODOS os lançamentos?')){movs=[];save();render()}">limpar tudo</div>`;
+    <div class="lnk" onclick="if(confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura.\n\nNão dá pra desfazer depois. Tem certeza?')){marcaExcluido(movs.map(x=>x.id));movs=[];save();render()}">limpar tudo</div>`;
 }
 
 function selOpts(lista,val){return `<option value="">— selecionar —</option>`+lista.map(x=>`<option ${x===val?'selected':''}>${x}</option>`).join('')+`<option value="__add__">➕ adicionar novo…</option>`;}
@@ -1607,6 +1817,7 @@ function vConsultar(){
           const tot=its.reduce((s,x)=>s+(+x.valor||0),0);const fora=its.filter(x=>sitDe(x)!==sitDe(m)).length;
           if(!fora)return '';
           return `<span class="meta" style="flex-basis:100%">🧾 A nota inteira tem <b>${its.length} itens · ${fmt(tot)}</b> — ${fora} item(ns) em outra situação NÃO aparecem nesta aba (por isso a soma daqui pode ser menor que o que você pagou) · <span class="lnk" onclick="abrirNota('${m.notaId}')">ver a nota completa</span></span>`;})():''}
+        ${m.devObs?`<span class="meta" style="flex-basis:100%;color:var(--amber)">${m.devObs}</span>`:''}
         ${m.codigo?`<button class="x" style="color:var(--green)" onclick="window.open('https://www.ligapokemon.com.br/?view=cards/search&card='+encodeURIComponent('${(m.codigo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}'),'_blank')">🔎 preço Liga</button>`:''}
         ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
         ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;const codC=m.codigo?codLimpo(m.codigo):'';
@@ -1628,6 +1839,7 @@ function vConsultar(){
           const og=movs.find(z=>z.id===m.origemId),nO=og?(+og.nFotos||0):0;
           return nO>0?`<button class="x" style="color:var(--purple)" onclick="abrirFotos('${og.id}')">📷 fotos do item (${nO})</button><button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 foto própria</button>`:`<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos</button>`;})()}
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
+        ${venda?`<button class="x" style="color:var(--green)" onclick="devolver('${m.id}')">↩ devolução</button>`:''}
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
     </div>`;}).join(''):`<div class="empty">Nada nesse filtro.</div>`;
   const aviso=(escondidos>0&&(perDe||perAte))?`<div class="soon" style="cursor:pointer" onclick="setPer('tudo')">+${escondidos} lançamento${escondidos>1?'s':''} fora deste período · toque pra ver tudo</div>`:'';
@@ -1861,7 +2073,7 @@ function salvarEdicaoNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!to
 function excluirNotaInteira(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   const tot=its.reduce((s,x)=>s+(+x.valor||0),0);
   if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números, como se nunca tivessem existido.\n\nUse pra relançar do zero. Excluir?'))return;
-  movs=movs.filter(m=>m.notaId!==nid);save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos apagados');render();}
+  marcaExcluido(its.map(x=>x.id));movs=movs.filter(m=>m.notaId!==nid);save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos apagados');render();}
 function desfazerNota(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   if(!confirm('Desfazer a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+'? Os '+its.length+' produtos viram compras SOLTAS (cada um mantém seu valor e pagamento) — os lançamentos não são apagados.'))return;
   its.forEach(m=>{delete m.notaId;delete m.notaNum;});
@@ -2229,7 +2441,17 @@ function salvar(){
   movs.push(obj);aplicarFotosPend(obj.id);save();_lancarDirty=false;toast('Salvo ✓ — lance o próximo');render();
 }
 function carregarAcervo(){if(confirm('Carregar o histórico da planilha (24 compras + 34 vendas)? Substitui o que está no app agora.')){movs=SEED.map(m=>({...m}));save();fecharModal();go('painel');toast('Histórico original restaurado ✓');}}
-function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();const snap={ts:now,n:movs.length,dados:movs.map(m=>({...m}))};if(b.length&&now-b[b.length-1].ts<90000)b[b.length-1]=snap;else b.push(snap);if(b.length>20)b=b.slice(-20);localStorage.setItem('tcg_backups',JSON.stringify(b));}catch(e){}}
+/* [CORRIGIDO 2026-08-20] eram 20 cópias INTEIRAS dos lançamentos guardadas no navegador,
+   cada uma carregando as miniaturas de foto (imagem embutida em texto) — foi isso que
+   encheu a memória do iPhone e derrubou o salvamento. Agora: 8 cópias, e sem as
+   miniaturas (elas são derivadas das fotos, que moram na nuvem; ao restaurar, voltam
+   sozinhas quando a foto é aberta). Mesmo efeito de segurança, uma fração do espaço. */
+function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();
+  const enxuto=movs.map(m=>{const c={...m};delete c.fotoThumb;return c;});
+  const snap={ts:now,n:movs.length,dados:enxuto};
+  if(b.length&&now-b[b.length-1].ts<90000)b[b.length-1]=snap;else b.push(snap);
+  if(b.length>8)b=b.slice(-8);
+  gravaLocal('tcg_backups',JSON.stringify(b));}catch(e){}}
 /* [Felype 2026-08-20] "O APP SALVA AUTOMATICO BACKUP NA NUVEM. MAS O ULTIMO BACKUP EH DE 12/08
    ... E EU NAO CONSIGO PEDIR PARA FAZER NOVO BACKUP NA NUVEM."
    O mal-entendido era real e a culpa e da tela, nao dele: a lista "Voltar a um ponto" so mostrava
@@ -2595,7 +2817,7 @@ function excluirPess(nome){const n=movs.filter(m=>(m.contraparte||'')===nome).le
     movs.forEach(m=>{if((m.contraparte||'')===nome)m.contraparte=dest;});
     if(!pess.includes(dest))pess.push(dest);}
   else if(!confirm('Excluir "'+nome+'" da lista de clientes/fornecedores?'))return;
-  pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
+  marcaExcluido('pess:'+nome);pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
   salvarCad();save();saveL();toast('"'+nome+'" excluído ✓');render();}
 const pessOrd=()=>pess.slice().sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base'}));
 function restaurarBackup(ts){
@@ -2713,17 +2935,14 @@ function imprimirFluxoGo(){['pagar','receber','saldo','pagas','extrato'].forEach
   imprimir();
   setTimeout(()=>{document.body.classList.remove('ptable');document.getElementById('printTable')?.remove();render();},400);}
 function abrir(id){const m=movs.find(x=>x.id===id);if(!m)return;navHist.push(snap());tipoSel=m.tipo;editId=id;tela='lancar';render();}
-function excluir(id){const m=movs.find(x=>x.id===id);
-  if(m&&m.serieId&&m.status==='apagar'){const n=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar').length;
-    if(!confirm(`É uma despesa fixa. Excluir esta e as próximas previsões a pagar (${n} no total)?`))return;
-    movs=movs.filter(x=>!(x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar'));save();render();return;}
-  if(m&&m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')){
-    if(!confirm('⚠️ Excluir apaga a COMPRA e o CUSTO dela dos números — como se você nunca tivesse comprado.\n\nUse só pra lançamento ERRADO. Se o item saiu de verdade (vendeu, foi pra coleção, trocou), use o botão certo — o custo fica registrado.\n\nExcluir mesmo assim?'))return;
-    movs=movs.filter(x=>x.id!==id);save();render();toast('Compra excluída (custo removido)');return;}
-  if(confirm('Excluir este lançamento?')){movs=movs.filter(x=>x.id!==id);save();render();}}
 function marcarPago(id){const m=movs.find(x=>x.id===id);if(m){m.status='pago';m.dataPagamento=new Date().toISOString().slice(0,10);save();render();}}
 function toggleExp(id){expandId=expandId===id?null:id;render();}
-function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;const ORD=['Em estoque','Pedido','Vendido','Coleção'];const px=ORD[(ORD.indexOf(sitDe(m))+1)%ORD.length];m.situacao=px;m.destino=px==='Coleção'?'Coleção':'Vender';save();toast('Agora: '+px);render();}
+function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;
+  const ORD=['Em estoque','Pedido','Vendido','Coleção'];const px=ORD[(ORD.indexOf(sitDe(m))+1)%ORD.length];
+  /* um toque levava direto a "Vendido" sem aviso nenhum - e sem venda, sem dinheiro, sem
+     vinculo: o item sumia do estoque e o faturamento nao subia. Agora avisa. */
+  if(px==='Vendido'&&!confirm('Marcar "'+rotDe(m)+'" como VENDIDO?\n\nEle sai do estoque, mas NENHUMA venda é criada: não entra dinheiro e não entra lucro.\n\nSe você vendeu de verdade, cancele e lance a venda — aí o app dá baixa sozinho e calcula o lucro.\n\nMarcar como vendido mesmo assim?'))return;
+  m.situacao=px;m.destino=px==='Coleção'?'Coleção':'Vender';save();toast('Agora: '+px);render();}
 function chegouPedido(id){const m=movs.find(x=>x.id===id);if(!m)return;
   if(!confirm('Confirmar que o pedido chegou? Ele entra no estoque disponível hoje.'))return;
   m.situacao='Em estoque';m.destino='Vender';m.dataChegada=new Date().toISOString().slice(0,10);
@@ -2966,13 +3185,21 @@ function mergePorId(local,remoto){
   const byId={};
   (remoto||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
   (local||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
-  return Object.values(byId);
+  /* [CURA 2026-08-20] o filtro que faltava. Exclusao se expressa por AUSENCIA; uniao de
+     ausencia com presenca dava PRESENCA - e o item ressuscitava no aparelho do outro.
+     Era so uma corrida: se o _upd batia, o .set limpo valia e a exclusao pegava; se nao
+     batia, o merge trazia tudo de volta. Por isso "uma venda voltou e a outra nao". */
+  return Object.values(byId).filter(m=>!estaExcluido(m&&m.id));
 }
 /* União de 2 arrays de string (jogos/cats/cols/pess/pgs/despCats) — mesma filosofia do
    mergePorId, sem id: o valor É a chave. Preserva a 1ª ordem de aparição. */
-function mergeArrUniao(local,remoto){
+function mergeArrUniao(local,remoto,pref){
   const vistos=new Set(),out=[];
-  (local||[]).concat(remoto||[]).forEach(v=>{if(v!=null&&v!==''&&!vistos.has(v)){vistos.add(v);out.push(v);}});
+  (local||[]).concat(remoto||[]).forEach(v=>{if(v!=null&&v!==''&&!vistos.has(v)){vistos.add(v);
+    /* mesma doenca do mergePorId: sem isto, apagar um fornecedor num aparelho e ele voltava
+       pelo outro. O prefixo separa o espaco de nomes do registro de exclusoes. */
+    if(pref&&estaExcluido(pref+v))return;
+    out.push(v);}});
   return out;
 }
 /* União rasa de 2 dicionários chave->valor (codigosResolvidos) — local vence empate de chave,
@@ -2997,7 +3224,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
   _db.runTransaction(tx=>tx.get(ref).then(snap=>{
     const remoto=snap.exists?snap.data():null;
     fundiu=false;
-    final={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos};
+    final={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,excluidos};
     /* outro aparelho já salvou uma versão que este cliente ainda não tinha aplicado (_upd
        diferente do último que ele viu) — em vez de sobrescrever o documento inteiro (o bug:
        .set() apagava em silêncio tudo que só existia do outro lado), funde CADA campo do
@@ -3011,12 +3238,13 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
         jogos:mergeArrUniao(jogos,remoto.jogos),
         cats:mergeArrUniao(cats,remoto.cats),
         cols:mergeArrUniao(cols,remoto.cols),
-        pess:mergeArrUniao(pess,remoto.pess),
+        pess:mergeArrUniao(pess,remoto.pess,'pess:'),
         pgs:mergeArrUniao(pgs,remoto.pgs),
         despCats:mergeArrUniao(despCats,remoto.despCats),
         cadastros:mergePorId(cadastros,remoto.cadastros),
         contasBanc:mergePorId(contasBanc,remoto.contasBanc),
         codigosResolvidos:mergeDictRaso(codigosResolvidos,remoto.codigosResolvidos),
+        excluidos:mergeDictRaso(excluidos,remoto.excluidos),
         colsJ:mergeColsJ(colsJ,remoto.colsJ),
         colsG:mergeColsG(colsG,remoto.colsG),
       };
@@ -3035,19 +3263,19 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     return payload;
   })).then(payload=>{
     if(fundiu){
-      movs=final.movs;jogos=final.jogos;cats=final.cats;cols=final.cols;pess=final.pess;pgs=final.pgs;despCats=final.despCats;cadastros=final.cadastros;contasBanc=final.contasBanc;codigosResolvidos=final.codigosResolvidos;colsJ=final.colsJ;colsG=final.colsG;
-      localStorage.setItem(MK,JSON.stringify(movs));
-      localStorage.setItem('tcg_cats',JSON.stringify(cats));
-      localStorage.setItem('tcg_cols',JSON.stringify(cols));
-      localStorage.setItem('tcg_pess',JSON.stringify(pess));
-      localStorage.setItem('tcg_pgs',JSON.stringify(pgs));
-      localStorage.setItem('tcg_jogos',JSON.stringify(jogos));
-      localStorage.setItem('tcg_despcats',JSON.stringify(despCats));
-      localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));
-      localStorage.setItem('tcg_colsg',JSON.stringify(colsG));
-      localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
-      localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
-      localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));
+      movs=final.movs;jogos=final.jogos;cats=final.cats;cols=final.cols;pess=final.pess;pgs=final.pgs;despCats=final.despCats;cadastros=final.cadastros;contasBanc=final.contasBanc;codigosResolvidos=final.codigosResolvidos;if(final.excluidos)excluidos=final.excluidos;colsJ=final.colsJ;colsG=final.colsG;
+      gravaLocal(MK,JSON.stringify(movs));
+      gravaLocal('tcg_cats',JSON.stringify(cats));
+      gravaLocal('tcg_cols',JSON.stringify(cols));
+      gravaLocal('tcg_pess',JSON.stringify(pess));
+      gravaLocal('tcg_pgs',JSON.stringify(pgs));
+      gravaLocal('tcg_jogos',JSON.stringify(jogos));
+      gravaLocal('tcg_despcats',JSON.stringify(despCats));
+      gravaLocal('tcg_colsj',JSON.stringify(colsJ));
+      gravaLocal('tcg_colsg',JSON.stringify(colsG));
+      gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
+      gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
+      gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));
       if(!lancarTemRascunho())render();
       toast('☁️ mesclado com o que o outro aparelho salvou ✓');
     }
@@ -3085,7 +3313,7 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
      formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
      fluxo normal abaixo. */
   if(d._upd&&d._upd===_ultimoUpdAplicado)return;
-  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));
+  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeDictRaso(excluidos,d.excluidos);podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));}gravaLocal(MK,JSON.stringify(movs));
   if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
   render();}
 /* [CORRIGIDO 2026-08-19 — loop de login no iPhone, reportado pelo Felype: "clica pra logar,
@@ -3209,11 +3437,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='20/08 22h21';
+const BUILD_TAG='21/08 00h22';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787275278366;
+const BUILD_TS=1787282545676;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

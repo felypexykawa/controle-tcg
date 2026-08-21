@@ -46,7 +46,14 @@ ONN = ' onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,\'li
 
 DANO, LEGIT = [], []
 
-def dano(n, t): DANO.append(sub(n, t))
+def dano(n, t):
+    if t == S:
+        raise SystemExit(
+            'MUTACAO MORTA: "' + n + '" nao alterou nada do index.html. '
+            'O texto que ela procura deixou de existir (uma refatoracao mudou o codigo). '
+            'Ela reportaria FURO da vacina sendo que o furo e dela — CORRIJA a mutacao, '
+            'nunca ignore: mutacao morta e trava desarmada sem ninguem ver.')
+    DANO.append(sub(n, t))
 def legit(n, t): LEGIT.append(sub(n, t))
 
 i, j = corta(S, 'precoLigaDe')
@@ -69,7 +76,7 @@ dano('M', S[:i] + '/* apagada: escolherOpcaoAmbigua( escolherOpcaoAmbigua( */' +
 dano('PERDA', S[:i] + S[j:])
 i, j = corta(S, 'pendenciasCodigo')
 dano('Q3', S[:i] + 'function pendenciasCodigo(){return [];}' + S[j:])
-dano('Q4', S.replace("const salvarCodRes=()=>localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));", "const salvarCodRes=()=>{};"))
+dano('Q4', S.replace("const salvarCodRes=()=>gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));", "const salvarCodRes=()=>{};"))
 i, j = corta(S, 'setCodigoUrlGlobal')
 dano('Q5', S[:i] + 'function setCodigoUrlGlobal(codC){}' + S[j:])
 i, j = corta(S, 'abrirPendencias')
@@ -89,6 +96,23 @@ troca('M4', 'salvarPontoNuvem(true,true).then(r=>{', 'Promise.resolve({ok:true})
 troca('M5', 'ids.slice(PONTOS_NUVEM_MAX).forEach', 'ids.slice(1).forEach')
 troca('M6', "const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência de conta'],info:['ℹ️','informativo']};",
             "const SEV={vermelho:['🔴','conta quebrada']};")
+
+# ---- rodada EXCLUSAO-LASTRO (21/08): as travas que impedem a exclusao de voltar ----
+# X1: o filtro do registro de exclusao some -> volta a uniao pura, o bug que a Laura sofreu
+dano('X1', S.replace("return Object.values(byId).filter(m=>!estaExcluido(m&&m.id));",
+                     "return Object.values(byId);"))
+# X2: o registro para de viajar pela nuvem -> apaga aqui e o outro aparelho nunca fica sabendo
+dano('X2', S.replace("codigosResolvidos,excluidos};", "codigosResolvidos};"))
+# X3: o filtro do catalogo some -> fornecedor apagado ressuscita pelo outro aparelho
+dano('X3', S.replace("if(pref&&estaExcluido(pref+v))return;", ""))
+# X4: excluir venda deixa de achar o produto -> item preso em "Vendido" sem dono
+i, j = corta(S, 'pecaDaVenda')
+dano('X4', S[:i] + 'function pecaDaVenda(v){return null;}' + S[j:])
+# X5: a familia deixa de subir ate a raiz -> excluir estoque nao leva mais o pedido junto
+dano('X5', S.replace("const raiz=raizDe(m0)||m0;", "const raiz=m0;"))
+# X6: devolver para de devolver -> o produto nao volta pro lugar de onde saiu
+i, j = corta(S, 'voltarPeca')
+dano('X6', S[:i] + "function voltarPeca(peca,v){return 'Em estoque';}" + S[j:])
 
 # ---- refatoracoes LEGITIMAS: nao podem barrar ----
 i, j = corta(S, 'codLimpo')

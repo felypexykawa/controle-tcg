@@ -153,6 +153,7 @@ function telaFalsa() {
   const view = { get innerHTML() { return this._h || ''; }, set innerHTML(v) { this._h = v; escrito.push(v); }, style: {} };
   return {
     escrito,
+    gravaLocal: () => true,   /* desde a cura da memoria cheia (20/08) o app grava por aqui */
     doc: {
       getElementById: id => (id === 'view' ? view : null),
       querySelectorAll: () => [],
@@ -164,6 +165,101 @@ function telaFalsa() {
 
 /* ---------- o que o app NAO pode perder ---------- */
 const CAPACIDADES = [
+  {
+    /* A CURA de 2026-08-21. `mergePorId` era uniao pura: exclusao se expressa por AUSENCIA, e
+       uniao de ausencia com presenca da PRESENCA — o lancamento apagado num aparelho voltava
+       pelo outro. A esposa do dono perdeu TODAS as exclusoes dela por causa disso, e o sintoma
+       enganava ("uma venda voltou e a outra nao") porque e uma CORRIDA, nao caminho diferente
+       de codigo: com o carimbo _upd batendo, a gravacao limpa valia; sem bater, o merge
+       ressuscitava. Aqui a regra e exercitada de verdade, com o caso de falso-positivo junto —
+       um filtro exagerado que barrasse lancamento legitimo seria pior que o bug original. */
+    nome: 'exclusao nao volta pela nuvem (a cura de 2026-08-21)',
+    perde: 'a garantia de que apagar apaga: sem isto o lancamento excluido num aparelho ressuscita pelo outro, e o dono descobre por acaso dias depois',
+    precisa: ['marcaExcluido', 'estaExcluido', 'podaExcluidos', 'mergePorId', 'mergeArrUniao'],
+    contexto: () => {
+      /* o registro precisa VIAJAR: sem os tres pontos abaixo o filtro funciona sozinho em
+         cada aparelho e o outro nunca fica sabendo da exclusao — exatamente o bug original,
+         com a vacina verde (furo X2 da suite, 2026-08-21). Isto e ligacao declarada, nao
+         execucao: exercitar salvarNuvem exigiria dublar o Firestore inteiro; o RESIDUAL fica
+         escrito aqui em vez de virar garantia falsa. */
+      let fonte = '';
+      try { fonte = require('fs').readFileSync(alvo, 'utf8'); } catch (e) {}
+      return { excluidos: {}, gravaLocal: () => true, _fonte: fonte };
+    },
+    exercicio: (F, ctx) => {
+      F.marcaExcluido('v1');
+      const fundido = F.mergePorId([{ id: 'a' }], [{ id: 'a' }, { id: 'v1' }]).map(m => m.id).sort();
+      const normal = F.mergePorId([{ id: 'a' }], [{ id: 'b' }]).map(m => m.id).sort();
+      F.marcaExcluido(['x1', 'x2']);                       /* forma em lista, usada na compra inteira */
+      F.marcaExcluido('pess:Fornecedor X');
+      const cat = F.mergeArrUniao(['Cliente Y'], ['Fornecedor X', 'Cliente Y'], 'pess:');
+      const catOutro = F.mergeArrUniao(['Booster'], ['Booster', 'Deck'], 'cats:');
+      const semPref = F.mergeArrUniao(['Fornecedor X'], ['Fornecedor X']);
+      ctx.excluidos['antigo'] = Date.now() - 200 * 864e5;   /* fora da janela de 120 dias */
+      F.podaExcluidos();
+      return [
+        ['o lancamento apagado NAO ressuscita no merge', fundido, ['a']],
+        ['falso-positivo: merge normal continua unindo os dois aparelhos', normal, ['a', 'b']],
+        ['a forma em lista tambem registra (compra inteira apaga varios de uma vez)', [F.estaExcluido('x1'), F.estaExcluido('x2')], [true, true]],
+        ['fornecedor/cliente apagado nao volta pelo catalogo', cat, ['Cliente Y']],
+        ['falso-positivo: outro catalogo nao e afetado pelo prefixo', catOutro, ['Booster', 'Deck']],
+        ['falso-positivo: sem prefixo o filtro nao morde (catalogos que nao usam registro)', semPref, ['Fornecedor X']],
+        ['registro velho e podado (o registro nao cresce pra sempre)', F.estaExcluido('antigo'), false],
+        ['registro recente sobrevive a poda', F.estaExcluido('v1'), true],
+        ['o registro SOBE pra nuvem junto com os dados', /codigosResolvidos,\s*excluidos\s*\}/.test(ctx._fonte), true],
+        ['o registro se funde quando os dois aparelhos gravam juntos', ctx._fonte.indexOf('excluidos:mergeDictRaso(excluidos,remoto.excluidos)') >= 0, true],
+        ['o registro VOLTA da nuvem e poda o que ja foi apagado', /if\(d\.excluidos&&typeof d\.excluidos===.object.\)/.test(ctx._fonte), true]
+      ];
+    }
+  },
+  {
+    /* LASTRO da exclusao (regras dadas pelo dono em 2026-08-21): excluir venda tem de devolver
+       o produto ao lugar de onde ele saiu, e excluir qualquer pedaco tem de mostrar a COMPRA
+       INTEIRA — "se eu excluir alguma coisa do estoque e pra excluir o pedido tambem". Sem
+       `pecaDaVenda` o app nao acha o que devolver e o item fica preso em 'Vendido' apontando
+       pra uma venda que nao existe mais: some do estoque sem ter sido vendido. */
+    nome: 'exclusao segue o lastro (venda devolve o produto, compra mostra a familia)',
+    perde: 'o item preso em "Vendido" sem dono depois de apagar a venda — e a exclusao de estoque que deixa o pedido do mesmo produto orfao para tras',
+    precisa: ['pecaDaVenda', 'voltarPeca', 'famDe', 'rotDe', 'sitDe', 'raizDe', 'excluir', 'execExcl', 'devolver', 'execDev', 'modalAviso'],
+    recorta: ['pecaDaVenda', 'voltarPeca', 'famDe', 'rotDe', 'sitDe', 'raizDe'],
+    chamadas: [['execExcl', 6, 'os botoes do aviso de exclusao (serie, so, vendaSo, vendaVolta, vendaTudo, compraTudo, compraSobra)'],
+               ['modalAviso', 5, 'todo caminho de exclusao/devolucao mostra o aviso completo em tela']],
+    atributos: [[/onclick="devolver\(/g, 1, 'o botao ↩ devolucao no card da venda']],
+    contexto: () => {
+      const movs = [
+        { id: 'L', tipo: 'COMPRA', data: '2026-08-01', cat: 'Booster', colecao: 'SS', qtd: 5, valor: 50, situacao: 'Em estoque', destino: 'Vender' },
+        { id: 'P', tipo: 'COMPRA', data: '2026-08-01', cat: 'Booster', colecao: 'SS', qtd: 3, valor: 30, situacao: 'Pedido', destino: 'Vender', loteOrigem: 'L' },
+        { id: 'V', tipo: 'COMPRA', data: '2026-08-01', cat: 'Booster', colecao: 'SS', qtd: 2, valor: 20, situacao: 'Vendido', destino: 'Vender', loteOrigem: 'L', dataVenda: '2026-08-10', vendaRef: 'S' },
+        { id: 'S', tipo: 'VENDA', data: '2026-08-10', cat: 'Booster', colecao: 'SS', qtd: 2, valor: 40, origemId: 'L', custoOrigem: 20, contraparte: 'Cliente Y' }
+      ];
+      return { movs };
+    },
+    exercicio: (F, ctx) => {
+      const venda = ctx.movs.find(m => m.id === 'S'), peca = ctx.movs.find(m => m.id === 'V');
+      const porRef = F.pecaDaVenda(venda);
+      delete peca.vendaRef;                                  /* legado: vinculo so por heuristica */
+      const porHeuristica = F.pecaDaVenda(venda);
+      const semOrigem = F.pecaDaVenda({ id: 'z', tipo: 'VENDA' });
+      const f = F.famDe('P');                                /* clicou no pedaco que esta no PEDIDO */
+      const volta = F.voltarPeca(peca, venda);
+      const voltaPedido = F.voltarPeca({ situacao: 'Vendido' }, { vendaDe: 'pedido' });
+      const voltaColecao = F.voltarPeca({ situacao: 'Vendido' }, { vendaTipo: 'colecao' });
+      return [
+        ['acha o produto da venda pelo vinculo gravado', porRef && porRef.id, 'V'],
+        ['acha o produto da venda tambem no legado (sem vinculo gravado)', porHeuristica && porHeuristica.id, 'V'],
+        ['falso-positivo: venda sem origem nao inventa produto', semOrigem, null],
+        ['excluir qualquer pedaco sobe ate a compra inteira', f.raiz.id, 'L'],
+        ['a compra inteira mostra o estoque', f.estoque.map(x => x.id), ['L']],
+        ['a compra inteira mostra o pedido (regra: excluir estoque leva o pedido junto)', f.pedido.map(x => x.id), ['P']],
+        ['a compra inteira mostra o que ja saiu', f.saiu.map(x => x.id), ['V']],
+        ['a compra inteira enxerga a venda pendurada', f.vendas.map(x => x.id), ['S']],
+        ['devolver poe o produto de volta no estoque', [volta, peca.situacao, peca.vendaRef], ['Em estoque', 'Em estoque', undefined]],
+        ['produto que saiu do PEDIDO volta pro pedido, nao pro estoque', voltaPedido, 'Pedido'],
+        ['produto que saiu da COLECAO volta pra colecao', voltaColecao, 'Coleção'],
+        ['o aviso sabe nomear o produto', F.rotDe({ colecao: 'SS', cat: 'Booster' }), 'SS · Booster']
+      ];
+    }
+  },
   {
     /* A capacidade MAIS IMPORTANTE: o caminho INTEIRO cadastro -> preco na tela, contra os
        arquivos REAIS do repo (precos.json + robo/codigos.txt), sem dublê nenhum no meio.
@@ -401,6 +497,7 @@ const CAPACIDADES = [
                _prompt: v => { respostaDoPrompt = v; },
                document: tela.doc, codigosResolvidos: {},
                localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
+               gravaLocal: (k, v) => { store[k] = v; return true; },   /* o app grava por aqui desde a cura da memoria cheia (20/08) */
                precoLigaDe: c => FICHAS[('' + c).trim()] || null,
                prompt: () => respostaDoPrompt, confirm: () => true,
                alert: m => alertas.push(m), toast: t => ch.toasts.push(t),
@@ -439,6 +536,7 @@ const CAPACIDADES = [
       const ch = { save: 0, fechou: 0, render: 0, toasts: [] };
       const store = {};
       return { _ch: ch, _store: store, codigosResolvidos: {},
+        gravaLocal: (k, v) => { store[k] = v; return true; },   /* idem: gravar passa por gravaLocal */
                localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
                save: () => ch.save++, fecharModal: () => ch.fechou++,
                render: () => ch.render++, toast: t => ch.toasts.push(t) };
