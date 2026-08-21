@@ -58,9 +58,29 @@ const vj=JSON.parse(fs.readFileSync('versao.json','utf8')).tag;
 if(tag!==vj){console.error('ABORTADO: carimbo divergente',tag,vj);process.exit(1);}
 console.log('carimbo:',tag);
 "
-# sintaxe + capacidades (fonte canonica das regras: checks-app.js)
-node checks-app.js index.html
-# a vacina so vale se ela propria estiver provada: a suite roda as 18 mutacoes conhecidas e as
+# sintaxe + capacidades + LINHA PARALELA, tudo pela MESMA regra (checks-app.js e a fonte
+# canonica). A regua da linha paralela aqui e o app NO AR: se ele tem peca que este arquivo nao
+# tem, alguem publicou por outra porta e publicar daqui apagaria o trabalho dele.
+# (Incidente fundador: 20/08 23h30 — 4 capacidades sumiram do ar por uma publicacao que passou
+# por fora daqui. O pre-commit e o CI usam a MESMA regra contra o commit anterior.)
+# Remocao proposital: PODE_REMOVER="nomeA,nomeB" sh publicar.sh "..."   (ou PODE_REMOVER=tudo)
+NOAR=$(mktemp 2>/dev/null || echo "/tmp/tcg-noar.html")
+if curl -fsS "https://felypexykawa.github.io/controle-tcg/index.html?cb=$$" -o "$NOAR" 2>/dev/null && [ -s "$NOAR" ]; then
+  node checks-app.js index.html --contra "$NOAR" || { rm -f "$NOAR"; exit 1; }
+else
+  echo "[publicar] nao consegui baixar o app do ar — seguindo sem a conferencia de linha paralela"
+  node checks-app.js index.html || exit 1
+fi
+rm -f "$NOAR" 
+# TESTES DO NUCLEO: executam as regras de negocio de ponta a ponta (exclusao com lastro,
+# devolucao, merge entre aparelhos) contra o arquivo que VAI ao ar — nao contra a copia de dev.
+# Vivia num scratchpad temporario ate 21/08, sendo a prova mais forte da entrega sem rodar em
+# porta nenhuma. Fail-OPEN de ambiente (sem node ja abortou la em cima), fail-CLOSED de achado.
+if [ -f testes-nucleo.js ]; then
+  node testes-nucleo.js index.html || { echo "ABORTADO: os testes do nucleo falharam"; exit 1; }
+fi
+
+# a vacina so vale se ela propria estiver provada: a suite roda as mutacoes conhecidas (29 hoje) e as
 # 6 refatoracoes legitimas. Sem python na maquina, segue sem ela (fail-open do ambiente).
 if command -v python >/dev/null 2>&1 && [ -f checks-suite.py ]; then
   python checks-suite.py > /dev/null 2>&1 || { echo "ABORTADO: a suite da vacina falhou — rode: python checks-suite.py"; exit 1; }
@@ -70,7 +90,12 @@ fi
 # 3) publica
 # a vacina vai junto: publicar o app com uma versao ANTIGA do checks-app.js deixaria a trava
 # atras do que ela protege, sem ninguem ver (achado da revisao adversarial de 2026-08-20)
-git add index.html versao.json checks-app.js checks-suite.py 2>/dev/null || git add index.html versao.json
+# -A pra registrar tambem DELECAO: com lista explicita, apagar um arquivo nunca chegava ao
+# repositorio e ele voltava a existir em qualquer clone. E o proprio publicar.sh entra na lista:
+# ele NAO se commitava, entao a fiacao da trava so existia nesta maquina — um clone novo, um
+# `git checkout publicar.sh` ou um stash e a conferencia sumia sem aviso (achado da revisao
+# adversarial, 21/08: o antipadrao 37 dentro da peca que existe pra curar o antipadrao 37).
+git add -A index.html versao.json checks-app.js checks-suite.py testes-nucleo.js publicar.sh .githooks .github .gitignore checa-linha-paralela.js 2>/dev/null || git add -A index.html versao.json
 git commit -q -m "$MSG (v $TAG)"
 git push -q origin master
 echo "publicado: $(git rev-parse --short HEAD) as $(date '+%H:%M:%S')"

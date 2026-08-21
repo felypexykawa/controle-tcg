@@ -19,6 +19,7 @@ on:
       - 'index.html'
       - 'checks-app.js'
       - 'checks-suite.py'
+      - 'testes-nucleo.js'
   workflow_dispatch:
 
 jobs:
@@ -27,11 +28,32 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # precisa do commit ANTERIOR pra conferir linha paralela
 
       - name: o app parseia E nao perdeu capacidade?
         run: node checks-app.js index.html
 
-      - name: a propria vacina esta provada? (18 mutacoes + 6 refatoracoes)
+      # MESMA regra do pre-commit e do publicar.sh, aqui contra o commit ANTERIOR. E a unica
+      # porta que pega quem escreveu DIRETO pela API do GitHub (sem commit local, sem hook) —
+      # exatamente a rota do incidente de 20/08 23h30, quando 4 capacidades sumiram do ar.
+      # Nao previne (o Pages ja serviu), mas grita em ~1 minuto em vez de dias.
+      # Remocao proposital: escreva PODE_REMOVER=nomeA,nomeB no corpo da mensagem do commit.
+      - name: alguma funcao sumiu em relacao ao commit anterior?
+        run: |
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            git show HEAD~1:index.html > /tmp/anterior.html 2>/dev/null || exit 0
+            LIB=$(git log -1 --pretty=%B | sed -n 's/.*PODE_REMOVER=\([^ ]*\).*/\1/p')
+            PODE_REMOVER="$LIB" node checks-app.js index.html --contra /tmp/anterior.html
+          else
+            echo "primeiro commit — sem versao anterior pra comparar"
+          fi
+
+      - name: as regras de negocio rodam de ponta a ponta?
+        run: |
+          if [ -f testes-nucleo.js ]; then node testes-nucleo.js index.html; else echo "sem testes-nucleo.js neste commit"; fi
+
+      - name: a propria vacina esta provada? (mutacoes conhecidas + refatoracoes legitimas)
         run: python checks-suite.py
 
       - name: carimbo de versao bate nos dois lugares?

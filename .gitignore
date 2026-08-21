@@ -1,0 +1,8 @@
+# criado 2026-08-21: um .pyc de um arquivo temporario meu foi parar dentro do repo
+# de publicacao (achado da revisao adversarial). Repo de publicacao nao guarda lixo
+# de execucao.
+__pycache__/
+*.pyc
+*.novo
+*.novo.*
+*.tmp

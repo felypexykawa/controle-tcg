@@ -21,7 +21,7 @@
 # FAIL-CLOSED quanto ao CONTEUDO: se o checks-app.js rodar e reprovar, o commit para.
 # ESCAPE: git commit --no-verify  (ou apague este arquivo).
 set -e
-MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js|checks-suite.py' || true)
+MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js|checks-suite.py|testes-nucleo.js' || true)
 [ -n "$MUDOU" ] || exit 0
 command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem conferir o app (passando)"; exit 0; }
 [ -f checks-app.js ] || { echo "[pre-commit] checks-app.js ausente — sem conferir o app (passando)"; exit 0; }
@@ -46,4 +46,8 @@ else
   node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
 fi
 rm -f "$BASE"
+# regras de negocio de ponta a ponta, sobre a MESMA versao do indice que a vacina acabou de ver
+if [ -f testes-nucleo.js ]; then
+  node testes-nucleo.js "$TMP" || { rm -f "$TMP"; exit 1; }
+fi
 rm -f "$TMP"
