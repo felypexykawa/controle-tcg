@@ -166,6 +166,60 @@ function telaFalsa() {
 /* ---------- o que o app NAO pode perder ---------- */
 const CAPACIDADES = [
   {
+    /* Handler inline que nao compila e MUDO: a tela desenha, o botao aparece, o clique nao faz
+       nada e ninguem recebe erro. Foi assim que "limpar tudo" foi ao ar morto em 21/08 — o
+       aviso levava \n dentro do atributo, o template literal emitiu a quebra de linha DE
+       VERDADE, e quebra de linha dentro de string de aspas simples e SyntaxError.
+
+       DUAS CAMADAS, de proposito:
+       (a) REGRA DURA, exata: nenhum atributo on* pode conter \n, \r ou \t. Sao os escapes que
+           o template EXPANDE em caractere de controle dentro do atributo, e nenhum handler
+           legitimo precisa disso — mensagem de mais de uma linha vira FUNCAO. Zero falso
+           positivo por construcao.
+       (b) COMPILACAO best-effort: reconstroi o atributo e compila. RESIDUAL DECLARADO: handler
+           que usa expressao regular fica de fora, porque reconstruir o texto exige um parser de
+           JS completo e as duas tentativas de fazer isso deram 21 e 12 falsos positivos. O
+           numero de nao-conferidos aparece na saida — nao e silencio, e limite declarado. */
+    nome: 'todo botao da tela compila (handlers inline)',
+    perde: 'botoes que aparecem na tela e nao fazem nada quando clicados — falha muda, sem erro visivel pra ninguem',
+    precisa: [],
+    recorta: [],
+    contexto: () => {
+      let fonte = '';
+      try { fonte = require('fs').readFileSync(alvo, 'utf8'); } catch (e) {}
+      return { _fonte: fonte };
+    },
+    exercicio: (F, ctx) => {
+      const src = ctx._fonte;
+      if (!src) throw new Error('DADOS: nao consegui ler o arquivo pra conferir os handlers');
+      const comControle = [], quebrados = [];
+      let total = 0, pulados = 0;
+      const re = /\son(?:click|change|input|submit|focus|blur|keyup|keydown|keypress)\s*=\s*"([^"]*)"/g;
+      let m;
+      while ((m = re.exec(src))) {
+        total++;
+        const bruto = m[1];
+        /* (a) regra dura */
+        if (/\\[nrt]/.test(bruto)) { comControle.push(bruto.slice(0, 80)); continue; }
+        /* (b) compilacao, onde da pra reconstruir com seguranca */
+        if (/\/[^\/\s][^"]*\/[gimsuy]*/.test(bruto)) { pulados++; continue; }   // usa regex: fora do alcance
+        let corpo = bruto.replace(/\$\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '_v');   /* identificador, nao numero: ${k} tambem aparece como NOME de propriedade (relSer.${k}) */
+        corpo = corpo.replace(/\\(['"`\\])/g, '$1');
+        corpo = corpo.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'");
+        if (/\$\{/.test(corpo)) { pulados++; continue; }      // interpolacao que a regex nao venceu
+        try { new Function(corpo); }
+        catch (e) { quebrados.push(bruto.slice(0, 80) + '  ->  ' + e.message); }
+      }
+      if (total < 30) throw new Error('DADOS: so ' + total + ' handler(s) encontrados — o arquivo nao parece o app');
+      return [
+        ['nenhum botao leva quebra de linha dentro do atributo (aviso de varias linhas vira funcao)' +
+          (comControle.length ? ' :: ' + comControle.slice(0, 2).join(' || ') : ''), comControle.length, 0],
+        ['nenhum handler com erro de sintaxe (' + (total - pulados - comControle.length) + ' compilados de ' + total + '; ' + pulados + ' usam regex e ficam fora do alcance)' +
+          (quebrados.length ? ' :: ' + quebrados.slice(0, 2).join(' || ') : ''), quebrados.length, 0]
+      ];
+    }
+  },
+  {
     /* A CURA de 2026-08-21. `mergePorId` era uniao pura: exclusao se expressa por AUSENCIA, e
        uniao de ausencia com presenca da PRESENCA — o lancamento apagado num aparelho voltava
        pelo outro. A esposa do dono perdeu TODAS as exclusoes dela por causa disso, e o sintoma
@@ -208,7 +262,10 @@ const CAPACIDADES = [
         ['registro recente sobrevive a poda', F.estaExcluido('v1'), true],
         ['o registro SOBE pra nuvem junto com os dados', /codigosResolvidos,\s*excluidos\s*\}/.test(ctx._fonte), true],
         ['o registro se funde quando os dois aparelhos gravam juntos', ctx._fonte.indexOf('excluidos:mergeDictRaso(excluidos,remoto.excluidos)') >= 0, true],
-        ['o registro VOLTA da nuvem e poda o que ja foi apagado', /if\(d\.excluidos&&typeof d\.excluidos===.object.\)/.test(ctx._fonte), true]
+        ['o registro VOLTA da nuvem e poda o que ja foi apagado', /if\(d\.excluidos&&typeof d\.excluidos===.object.\)/.test(ctx._fonte), true],
+        /* o filtro TEM de rodar fora do if: aparelho que ainda nao recarregou grava snapshot
+           sem o campo, e ai o filtro nunca rodava e tudo ressuscitava (revisao adversarial 21/08) */
+        ['o filtro vale mesmo em snapshot de aparelho desatualizado', /\}\s*\/\*[\s\S]{0,400}?\*\/\s*if\(Array\.isArray\(movs\)\)movs=movs\.filter\(m=>!estaExcluido/.test(ctx._fonte), true]
       ];
     }
   },
@@ -585,10 +642,10 @@ const CAPACIDADES = [
        so em `precisa` (existencia) e fora do `recorta`: nunca era executada. Duas mutacoes
        com perda de dado passavam verdes — tirar o pre-salvamento, e deixar a rotacao apagar
        justamente o ponto restaurado. Achado do 4o reataque adversarial, 2026-08-20. */
-    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario'],
+    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido'],
     atributos: [[/\bsalvarPontoNuvem\s*\(/g, 2, 'o botao "salvar ponto na nuvem" e a rotina diaria']],
     contexto: () => {
-      const gravados = []; const store = {}; const avisos = [];
+      const gravados = []; const store = {}; const avisos = []; const excluidos = {};   /* vai no objeto devolvido abaixo */
       /* "promessa" que resolve NA HORA: o codigo do app faz o trabalho dentro de .then(), e um
          Promise de verdade so rodaria depois das conferencias — o teste dava falso vermelho */
       const jah = v => ({ then: f => { const r = f(v); return (r && r.then) ? r : jah(r); }, catch: () => jah(v) });
@@ -601,6 +658,7 @@ const CAPACIDADES = [
       const col = { doc, orderBy: () => col, limit: () => col,
         get: () => jah({ forEach: f => existentes.forEach(id => f({ id, data: () => ({}) })) }) };
       return {
+        excluidos, gravaLocal: (k, v) => { store[k] = v; return true; },   /* restaurar um ponto ESQUECE a exclusao dos ids que voltam (21/08) */
         _gravados: gravados, _apagados: apagados, _aplicados: aplicados, _store: store, _avisos: avisos,
         _recusar: v => { recusar = v; }, _existentes: ids => { existentes = ids; },
         aplicarNuvem: o => aplicados.push(o), confirm: () => true, go: () => {},

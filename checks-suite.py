@@ -114,6 +114,15 @@ dano('X5', S.replace("const raiz=raizDe(m0)||m0;", "const raiz=m0;"))
 i, j = corta(S, 'voltarPeca')
 dano('X6', S[:i] + "function voltarPeca(peca,v){return 'Em estoque';}" + S[j:])
 
+# ---- correcoes da revisao adversarial (21/08) ----
+# X7: aviso de varias linhas volta pra DENTRO do botao -> o template emite quebra de linha
+#     de verdade no atributo, o handler nao compila e o clique fica mudo (bug real de 21/08)
+dano('X7', S.replace('onclick="limparTudo()"', 'onclick="if(confirm(\'Apagar TODOS?\\n\\nTem certeza?\')){movs=[];save();render()}"'))
+# X8: o filtro da exclusao volta a depender do campo vir no snapshot -> aparelho que ainda
+#     nao recarregou grava sem o campo e RESSUSCITA tudo (a cura valia so pela metade)
+dano('X8', S.replace('if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));',
+                     'if(d.excluidos&&Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));', 1))
+
 # ---- refatoracoes LEGITIMAS: nao podem barrar ----
 i, j = corta(S, 'codLimpo')
 corpo = S[i:j]

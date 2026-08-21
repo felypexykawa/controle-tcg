@@ -147,6 +147,22 @@ let codigosResolvidos=get('tcg_codres',{});const salvarCodRes=()=>gravaLocal('tc
    ressuscita, venha de onde vier. Limpeza automática depois de 120 dias (a essa altura o
    outro aparelho já sincronizou muitas vezes; guardar pra sempre incharia o documento). */
 let excluidos=get('tcg_excluidos',{});
+/* restaurar um ponto e dizer "quero isto de volta" — se o registro de exclusao continuar
+   valendo, o item reaparece na tela e some no primeiro merge (a rede de seguranca vira
+   armadilha). Achado da revisao adversarial de 21/08. */
+function desmarcaExcluido(...ids){let mexeu=false;
+  ids.flat().forEach(id=>{if(id&&excluidos[id]){delete excluidos[id];mexeu=true;}});
+  if(mexeu)gravaLocal('tcg_excluidos',JSON.stringify(excluidos));return mexeu;}
+function esqueceExclusaoDe(o){if(!o)return;
+  const ids=[];
+  (Array.isArray(o.movs)?o.movs:[]).forEach(m=>{if(m&&m.id)ids.push(m.id);});
+  (Array.isArray(o.cadastros)?o.cadastros:[]).forEach(c=>{if(c&&c.id)ids.push(c.id);});
+  (Array.isArray(o.contasBanc)?o.contasBanc:[]).forEach(c=>{if(c&&c.id)ids.push(c.id);});
+  (Array.isArray(o.pess)?o.pess:[]).forEach(n=>{if(n)ids.push('pess:'+n);});
+  (Array.isArray(o.pgs)?o.pgs:[]).forEach(n=>{if(n)ids.push('pgs:'+n);});
+  (Array.isArray(o.jogos)?o.jogos:[]).forEach(n=>{if(n)ids.push('jogos:'+n);});
+  (Array.isArray(o.cols)?o.cols:[]).forEach(n=>{if(n)ids.push('cols:'+n);});
+  desmarcaExcluido(ids);}
 function marcaExcluido(...ids){const t=Date.now();ids.flat().forEach(id=>{if(id)excluidos[id]=t;});podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
 function podaExcluidos(){const lim=Date.now()-120*864e5;Object.keys(excluidos).forEach(k=>{if(!(excluidos[k]>lim))delete excluidos[k];});}
 function estaExcluido(id){return !!(id&&excluidos[id]);}
@@ -310,8 +326,12 @@ function famDe(id){const m0=movs.find(x=>x.id===id);if(!m0)return null;
   const por=st=>fam.filter(x=>sitDe(x)===st);
   return {raiz:raiz,fam:fam,vendas:vendas,
     saiu:fam.filter(x=>sitDe(x)==='Vendido'||sitDe(x)==='Trocado'),
-    estoque:por('Em estoque'),pedido:por('Pedido'),colecao:por('Coleção')};}
-const somaV=a=>a.reduce((s,x)=>s+(+x.valor||0),0);
+    estoque:por('Em estoque'),pedido:por('Pedido'),colecao:por('Coleção'),
+    abertos:por('Aberto')};}
+/* mesma regra do motor(): 'Aberto' e 'Trocado' NAO entram no custo — o valor deles ja
+   foi redistribuido nos pedacos filhos, somar os dois conta o mesmo dinheiro duas vezes. */
+const somaV=a=>a.reduce((s,x)=>{const st=sitDe(x);return (st==='Aberto'||st==='Trocado')?s:s+(+x.valor||0);},0);
+const somaVBruta=a=>a.reduce((s,x)=>s+(+x.valor||0),0);
 const somaQ=a=>a.reduce((s,x)=>s+(+x.qtd||1),0);
 /* aviso em tela: o que existe hoje + cada saida com a consequencia escrita por extenso */
 function modalAviso(titulo,corpo,botoes){
@@ -366,12 +386,13 @@ function exclCompra(m){const f=famDe(m.id);if(!f)return;
   const naoVend=f.estoque.concat(f.pedido,f.colecao);
   let corpo='<div class="meta" style="line-height:1.5">Compra de <b>'+rotDe(raiz)+'</b> em '+dataBRde(raiz)
     +(raiz.contraparte?' de <b>'+raiz.contraparte+'</b>':'')+' — custo total hoje '+fmt(cTot)+'.</div>';
-  if(eParte)corpo+='<div class="meta" style="margin-top:8px;line-height:1.5;color:var(--amber)">⚠ Este item é <b>parte</b> dessa compra. Excluir mexe na compra inteira — o estoque e o pedido do mesmo produto vão junto.</div>';
+  if(eParte)corpo+='<div class="meta" style="margin-top:8px;line-height:1.5;color:var(--amber)">⚠ Este item é <b>parte</b> dessa compra. Excluir mexe na compra inteira — tudo o que saiu <b>deste mesmo lote</b> (estoque, pedido, coleção) vai junto. Outra compra do mesmo produto não é tocada.</div>';
   corpo+='<div class="meta" style="margin-top:10px;line-height:1.6"><b>Como ela está hoje:</b><br>';
   if(f.estoque.length)corpo+='• '+somaQ(f.estoque)+' un. em <b>estoque</b> (custo '+fmt(somaV(f.estoque))+')<br>';
   if(f.pedido.length)corpo+='• '+somaQ(f.pedido)+' un. no <b>pedido</b>, a caminho (custo '+fmt(somaV(f.pedido))+')<br>';
   if(f.colecao.length)corpo+='• '+somaQ(f.colecao)+' un. na <b>coleção</b> (custo '+fmt(somaV(f.colecao))+')<br>';
   if(f.saiu.length)corpo+='• '+somaQ(f.saiu)+' un. já <b>saíram</b> (vendidas ou trocadas — custo '+fmt(somaV(f.saiu))+')<br>';
+  if(f.abertos.length)corpo+='• '+f.abertos.length+' caixa(s) <b>já abertas</b> — o custo delas está nos itens que saíram de dentro<br>';
   if(f.vendas.length)corpo+='• <b>'+f.vendas.length+' venda(s)</b> registradas, somando '+fmt(recV)+' de faturamento<br>';
   corpo+='</div>';
   const bts=[{rot:'🗑 Apagar TUDO'+(f.vendas.length?' — inclusive as '+f.vendas.length+' venda(s)':''),cor:'var(--red)',
@@ -380,7 +401,7 @@ function exclCompra(m){const f=famDe(m.id);if(!f)return;
        +'. Use quando a compra inteira foi lançada errada.',
     acao:"execExcl('"+m.id+"','compraTudo')"}];
   if(f.vendas.length&&naoVend.length)bts.push({rot:'📌 Apagar só o que NÃO vendeu — manter as '+f.vendas.length+' venda(s)',cor:'var(--amber)',
-    exp:'Some '+somaQ(naoVend)+' un. de estoque/pedido/coleção (−'+fmt(somaV(naoVend))+' de custo). As '+f.vendas.length+' venda(s) continuam valendo '+fmt(recV)+', e o custo do que foi vendido ('+fmt(somaV(f.saiu))+') fica guardado como histórico — senão a venda ficaria sem custo e seu lucro sairia falso.',
+    exp:'Some '+somaQ(naoVend)+' un. de estoque/pedido/coleção (−'+fmt(somaV(naoVend))+' de custo). As '+f.vendas.length+' venda(s) continuam valendo '+fmt(recV)+', e o custo do que foi vendido ('+fmt(somaV(f.saiu))+') fica guardado como histórico'+(f.vendas.some(v=>!pecaDaVenda(v))?'. ⚠ Atenção: '+f.vendas.filter(v=>!pecaDaVenda(v)).length+' venda(s) não têm produto casável, então essas ficam SEM custo e o lucro delas sai inflado — a prova real vai apontar':' — senão a venda ficaria sem custo e seu lucro sairia falso')+'.',
     acao:"execExcl('"+m.id+"','compraSobra')"});
   modalAviso('🗑 Excluir esta compra?',corpo,bts);}
 /* --------- executor unico: toda saida passa por aqui e REGISTRA a exclusao --------- */
@@ -404,11 +425,25 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
     const fica={};f.saiu.forEach(x=>fica[x.id]=1);
     /* religar cada venda no pedaco que fica: sem isto ela apontaria pro lote-pai apagado */
     f.vendas.forEach(v=>{const pc=pecaDaVenda(v);if(pc&&fica[pc.id]){v.origemId=pc.id;pc.vendaRef=v.id;}});
-    /* pedaco que fica vira raiz propria: sem pai, a conservacao vale contra ele mesmo */
-    f.saiu.forEach(x=>{if(!fica[x.loteOrigem]){delete x.loteOrigem;x.valorOrig=+x.valor||0;}});
+    /* pedaco que fica vira raiz propria: sem pai, a conservacao passa a valer contra a
+       SUBFAMILIA que sobreviveu (nao contra o valor dele sozinho) — senao a prova real fica
+       vermelha logo depois de uma acao que o proprio app ofereceu. */
+    const subSoma=raizId=>{let t=0;const fila=[raizId];const visto={};
+      while(fila.length){const id=fila.shift();if(visto[id])continue;visto[id]=1;
+        const it=movs.find(y=>y.id===id);if(it&&fica[id])t+=(+it.valor||0);
+        f.fam.forEach(y=>{if(y.loteOrigem===id&&fica[y.id])fila.push(y.id);});}
+      return Math.round(t*100)/100;};
+    f.saiu.forEach(x=>{if(!fica[x.loteOrigem]){delete x.loteOrigem;x.valorOrig=subSoma(x.id);}});
     some(f.fam.filter(x=>!fica[x.id]).map(x=>x.id));save();render();
     toast('Apagado o que não vendeu — '+f.vendas.length+' venda(s) mantida(s)');return;}}
 /* --------- DEVOLUCAO: o produto voltou de verdade (diferente de excluir) --------- */
+/* fora do atributo de proposito: texto com quebra de linha DENTRO de onclick="" nao compila
+   (o template literal emite a quebra de verdade). Regra da casa desde 21/08: acao com aviso
+   de mais de uma linha vira FUNCAO, nunca fica no atributo. */
+function limparTudo(){
+  if(!movs.length){toast('Não há lançamentos pra apagar');return;}
+  if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura.\n\nNão dá pra desfazer depois. Tem certeza?'))return;
+  marcaExcluido(movs.map(x=>x.id));movs=[];save();render();toast('Tudo apagado');}
 function devolver(id){const v=movs.find(x=>x.id===id);
   if(!v||v.tipo!=='VENDA'){toast('Devolução só vale pra venda');return;}
   const peca=pecaDaVenda(v),val=+v.valor||0,quem=v.contraparte?' de <b>'+v.contraparte+'</b>':'';
@@ -429,7 +464,9 @@ function devolver(id){const v=movs.find(x=>x.id===id);
 function execDev(id){fecharModal();const v=movs.find(x=>x.id===id);if(!v)return;
   const peca=pecaDaVenda(v);
   if(!peca){marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);save();render();toast('Venda removida dos números');return;}
-  const motivo=(prompt('Motivo da devolução (fica gravado no item):','produto devolvido')||'').trim()||'produto devolvido';
+  const resp=prompt('Motivo da devolução (fica gravado no item):','produto devolvido');
+  if(resp===null){toast('Devolução cancelada — nada mudou');return;}   /* Cancelar CANCELA */
+  const motivo=resp.trim()||'produto devolvido';
   const volta=voltarPeca(peca,v);
   const hj=new Date().toISOString().slice(0,10);
   peca.devObs='↩ devolvido em '+dBR(new Date(hj+'T00:00:00'))+' — '+motivo+(v.contraparte?' ('+v.contraparte+')':'')+' · a venda era '+fmt(+v.valor||0);
@@ -1355,7 +1392,7 @@ function vPainel(){
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
     ${USAR_NUVEM&&_userEmail?`<div class="lnk" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}
     ${resultadoHTML}
-    <div class="lnk" onclick="if(confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura.\n\nNão dá pra desfazer depois. Tem certeza?')){marcaExcluido(movs.map(x=>x.id));movs=[];save();render()}">limpar tudo</div>`;
+    <div class="lnk" onclick="limparTudo()">limpar tudo</div>`;
 }
 
 function selOpts(lista,val){return `<option value="">— selecionar —</option>`+lista.map(x=>`<option ${x===val?'selected':''}>${x}</option>`).join('')+`<option value="__add__">➕ adicionar novo…</option>`;}
@@ -2527,6 +2564,7 @@ function restaurarPontoNuvem(ts){
       if(!d.exists){alert('Esse ponto nao esta mais na nuvem.');return;}
       let o=null;try{o=JSON.parse((d.data()||{}).dados||'null');}catch(e){}
       if(!o||!Array.isArray(o.movs)){alert('Nao consegui ler esse ponto.');return;}
+      esqueceExclusaoDe(o);   /* antes de aplicar: o ponto e uma decisao de trazer de volta */
       aplicarNuvem(o);
       /* a trava entra DEPOIS de aplicar (aplicarNuvem ignora tudo enquanto ela esta ligada) e
          segura o snapshot de volta, senao a nuvem reaplicava o estado velho por cima em
@@ -2611,12 +2649,12 @@ function renomearCol(j,c){const nv=(prompt('Renomear coleção:',c)||'').trim();
 function excluirCol(j,c){const n=movs.filter(m=>(m.jogo||'Pokémon')===j&&m.colecao===c).length;
   if(n>0){alert('Essa coleção tem '+n+' lançamento(s). Renomeie ou mova os lançamentos antes de excluir.');return;}
   if(!confirm('Excluir a coleção "'+c+'"?'))return;
-  colsJ[j]=colsJ[j].filter(x=>x!==c);if(colsG[j])delete colsG[j][c];cols=cols.filter(x=>x!==c);salvarColsG();saveL();abrirCols(j);}
+  marcaExcluido('cols:'+c);colsJ[j]=colsJ[j].filter(x=>x!==c);if(colsG[j])delete colsG[j][c];cols=cols.filter(x=>x!==c);salvarColsG();saveL();abrirCols(j);}
 function addColModal(j){const n=(document.getElementById('novaCol')?.value||'').trim(),g=(document.getElementById('novaColG')?.value||'').trim();if(!n)return;
   if(!colsJ[j])colsJ[j]=[];if(!colsJ[j].includes(n))colsJ[j].push(n);if(!cols.includes(n))cols.push(n);
   if(g){if(!colsG[j])colsG[j]={};colsG[j][n]=g;}salvarColsG();saveL();abrirCols(j);}
 function renomearJogo(i){const antigo=jogos[i],nv=(prompt('Renomear jogo:',antigo)||'').trim();if(!nv||nv===antigo)return;if(jogos.includes(nv)){alert('Já existe um jogo com esse nome.');return;}jogos[i]=nv;movs.forEach(m=>{if((m.jogo||'Pokémon')===antigo)m.jogo=nv;});saveL();save();fecharModal();abrirJogos();}
-function excluirJogo(i){if(jogos.length<=1){alert('Precisa ter ao menos 1 jogo.');return;}const j=jogos[i],n=movs.filter(m=>(m.jogo||'Pokémon')===j).length,destino=jogos.find((x,k)=>k!==i);if(n>0){if(!confirm(`${n} lançamento(s) usam "${j}". Excluir e mover esses pra "${destino}"?`))return;}else if(!confirm(`Excluir o jogo "${j}"?`))return;movs.forEach(m=>{if((m.jogo||'Pokémon')===j)m.jogo=destino;});jogos.splice(i,1);saveL();save();fecharModal();abrirJogos();}
+function excluirJogo(i){if(jogos.length<=1){alert('Precisa ter ao menos 1 jogo.');return;}const j=jogos[i],n=movs.filter(m=>(m.jogo||'Pokémon')===j).length,destino=jogos.find((x,k)=>k!==i);if(n>0){if(!confirm(`${n} lançamento(s) usam "${j}". Excluir e mover esses pra "${destino}"?`))return;}else if(!confirm(`Excluir o jogo "${j}"?`))return;movs.forEach(m=>{if((m.jogo||'Pokémon')===j)m.jogo=destino;});marcaExcluido('jogos:'+j);jogos.splice(i,1);saveL();save();fecharModal();abrirJogos();}
 function vCadastros(){
   const tag=t=>t==='fornecedor'?'<span class="tag c">fornecedor</span>':'<span class="tag v">cliente</span>';
   const esc=s=>(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
@@ -2787,8 +2825,8 @@ function excluirConta(id){const c=contasBanc.find(x=>x.id===id);if(!c)return;
   const uso=movs.filter(m=>m.conta===c.nome||m.contaDe===c.nome||m.contaPara===c.nome||m.dinConta===c.nome
     ||(m.pgParcelas&&Object.values(m.pgParcelas).some(p=>p&&typeof p==='object'&&p.conta===c.nome))).length;
   if(!confirm('Excluir o cadastro da conta "'+c.nome+'"?'+(uso?'\n\nEla tem '+uso+' lançamento(s) — eles continuam, só os dados bancários somem.':'')))return;
-  contasBanc=contasBanc.filter(x=>x.id!==id);
-  if(!uso&&pgs.includes(c.nome)&&confirm('Tirar "'+c.nome+'" também da lista de contas dos lançamentos?'))pgs=pgs.filter(p=>p!==c.nome);
+  marcaExcluido(id);contasBanc=contasBanc.filter(x=>x.id!==id);
+  if(!uso&&pgs.includes(c.nome)&&confirm('Tirar "'+c.nome+'" também da lista de contas dos lançamentos?')){marcaExcluido('pgs:'+c.nome);pgs=pgs.filter(p=>p!==c.nome);}
   salvarCB();saveL();render();}
 function abrirCadastro(id){let c;if(id&&id.indexOf('auto:')===0){const pre=id.slice(5);const isV=movs.some(m=>m.contraparte===pre&&m.tipo==='VENDA'),isC=movs.some(m=>m.contraparte===pre&&m.tipo!=='VENDA');c={nome:pre,tipo:(isC&&!isV)?'fornecedor':'cliente'};id=null;}else c=id?cadastros.find(x=>x.id===id):{};cadTip=c.tipo||'cliente';
   const f=(k,lbl,ph,tp)=>`<label>${lbl}</label><input id="cad_${k}" type="${tp||'text'}" value="${(c[k]||'').toString().replace(/"/g,'&quot;')}" placeholder="${ph||''}">`;
@@ -2817,7 +2855,10 @@ function excluirPess(nome){const n=movs.filter(m=>(m.contraparte||'')===nome).le
     movs.forEach(m=>{if((m.contraparte||'')===nome)m.contraparte=dest;});
     if(!pess.includes(dest))pess.push(dest);}
   else if(!confirm('Excluir "'+nome+'" da lista de clientes/fornecedores?'))return;
-  marcaExcluido('pess:'+nome);pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
+  /* o NOME sai da lista de texto e o CADASTRO sai por id — os dois precisam de registro,
+     senao o cadastro volta pelo merge por id (achado da revisao adversarial de 21/08). */
+  marcaExcluido('pess:'+nome, cadastros.filter(c=>c.nome===nome).map(c=>c.id));
+  pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
   salvarCad();save();saveL();toast('"'+nome+'" excluído ✓');render();}
 const pessOrd=()=>pess.slice().sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base'}));
 function restaurarBackup(ts){
@@ -2830,6 +2871,7 @@ function restaurarBackup(ts){
      a nuvem ficava com o estado velho e o próximo snapshot desfazia a restauração em silêncio) */
   _restaurando=true;
   movs=x.dados.map(m=>({...m}));
+  esqueceExclusaoDe({movs});   /* senao o que voltou some no primeiro merge */
   save();
   setTimeout(()=>{_restaurando=false;if(USAR_NUVEM&&_syncReady)salvarNuvem();},3000);
   fecharModal();go('painel');toast('Restaurado ✓');
@@ -3235,11 +3277,11 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
       fundiu=true;
       final={
         movs:mergePorId(movs,remoto.movs),
-        jogos:mergeArrUniao(jogos,remoto.jogos),
+        jogos:mergeArrUniao(jogos,remoto.jogos,'jogos:'),
         cats:mergeArrUniao(cats,remoto.cats),
-        cols:mergeArrUniao(cols,remoto.cols),
+        cols:mergeArrUniao(cols,remoto.cols,'cols:'),
         pess:mergeArrUniao(pess,remoto.pess,'pess:'),
-        pgs:mergeArrUniao(pgs,remoto.pgs),
+        pgs:mergeArrUniao(pgs,remoto.pgs,'pgs:'),
         despCats:mergeArrUniao(despCats,remoto.despCats),
         cadastros:mergePorId(cadastros,remoto.cadastros),
         contasBanc:mergePorId(contasBanc,remoto.contasBanc),
@@ -3313,7 +3355,12 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
      formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
      fluxo normal abaixo. */
   if(d._upd&&d._upd===_ultimoUpdAplicado)return;
-  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeDictRaso(excluidos,d.excluidos);podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));}gravaLocal(MK,JSON.stringify(movs));
+  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeDictRaso(excluidos,d.excluidos);podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+  /* FORA do if de proposito: aparelho que ainda nao recarregou grava snapshot SEM este campo,
+     e ai o filtro nunca rodava — tudo ressuscitava. O registro que manda e o DESTE aparelho. */
+  if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));
+  if(Array.isArray(cadastros))cadastros=cadastros.filter(c=>!estaExcluido(c&&c.id));
+  if(Array.isArray(contasBanc))contasBanc=contasBanc.filter(c=>!estaExcluido(c&&c.id));gravaLocal(MK,JSON.stringify(movs));
   if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
   render();}
 /* [CORRIGIDO 2026-08-19 — loop de login no iPhone, reportado pelo Felype: "clica pra logar,
@@ -3437,11 +3484,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 00h22';
+const BUILD_TAG='21/08 00h39';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787282545676;
+const BUILD_TS=1787283558500;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
