@@ -22,6 +22,26 @@
 # ESCAPE: git commit --no-verify  (ou apague este arquivo).
 set -e
 MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js|checks-suite.py|testes-nucleo.js' || true)
+
+# TRAVA DO DADO DE PRECO (2026-08-21). O filtro acima so olha o CODIGO do app; o precos.json,
+# que e o dado que o Felype de fato le na tela, nao era conferido por nada — commit que mexia
+# so nele passava por zero trava. Foi assim que "Vaporeon (tg02-tg30)" perdeu o preco de
+# R$200,00 em silencio: o robo renomeou a ficha e a linha do cadastro ficou orfa.
+# Confere a versao do INDICE, nao a do disco — e o que vai ser commitado de verdade.
+DADO=$(git diff --cached --name-only | grep -xE 'precos.json|robo/codigos.txt' || true)
+if [ -n "$DADO" ]; then
+  if ! command -v node >/dev/null 2>&1 || [ ! -f robo/check-fichas-rachadas.js ]; then
+    echo "[pre-commit] node ou check-fichas-rachadas.js ausente — sem conferir o dado de preco (passando)"
+  else
+    TP=$(mktemp 2>/dev/null || echo "/tmp/precommit-precos.json")
+    TC=$(mktemp 2>/dev/null || echo "/tmp/precommit-codigos.txt")
+    git show :precos.json      > "$TP" 2>/dev/null || git show HEAD:precos.json      > "$TP" 2>/dev/null || true
+    git show :robo/codigos.txt > "$TC" 2>/dev/null || git show HEAD:robo/codigos.txt > "$TC" 2>/dev/null || true
+    PRECOS_JSON="$TP" CODIGOS_TXT="$TC" node robo/check-fichas-rachadas.js || { rm -f "$TP" "$TC"; exit 1; }
+    rm -f "$TP" "$TC"
+  fi
+fi
+
 [ -n "$MUDOU" ] || exit 0
 command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem conferir o app (passando)"; exit 0; }
 [ -f checks-app.js ] || { echo "[pre-commit] checks-app.js ausente — sem conferir o app (passando)"; exit 0; }

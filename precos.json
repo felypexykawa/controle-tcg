@@ -1,5 +1,5 @@
 {
- "atualizadoEm": "2026-08-21T13:35:00Z",
+ "atualizadoEm": "2026-08-21T14:05:00Z",
  "fonte": "Chrome local — extrator v2",
  "cartas": {
   "135/108": {
@@ -2175,6 +2175,37 @@
    "verificadoEm": "2026-08-21",
    "motivo": "carta de One Piece — a Liga Pokemon nao indexa esse catalogo (busca devolveu 0 resultados); fonte seria a Liga One Piece, fora do escopo desta rotina",
    "versoes": []
+  },
+  "tg02-tg30": {
+   "codigo": "tg02-tg30",
+   "status": "OK",
+   "titulo": "Vaporeon (TG02/TG30)",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 200,
+     "md": 200,
+     "mx": 200
+    },
+    {
+     "v": "Foil",
+     "mn": 139.95,
+     "md": 233.54,
+     "mx": 315
+    }
+   ],
+   "menor": 200,
+   "medio": 200,
+   "maior": 200,
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Vaporeon%20%28TG02%2FTG30%29",
+   "verificadoEm": "2026-08-21",
+   "idiomaConferido": {
+    "pten": 1,
+    "pt": 33,
+    "en": 15
+   },
+   "aliasDe": "tg02/tg30",
+   "notaAlias": "mesmo card que tg02/tg30 (hifen x barra no cadastro) — preco espelhado, historico so na canonica"
   }
  },
  "historico": {
