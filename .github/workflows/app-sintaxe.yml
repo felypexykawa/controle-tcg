@@ -20,6 +20,14 @@ on:
       - 'checks-app.js'
       - 'checks-suite.py'
       - 'testes-nucleo.js'
+      # [2026-08-21] O DADO tambem viaja por aqui. Ate hoje esta lista so olhava o CODIGO do
+      # app; um push que mexia so no precos.json nao disparava CI nenhum — e foi por essa
+      # fresta que "Vaporeon (tg02-tg30)" perdeu R$200,00 sem ninguem ver. O hook local pega
+      # na maquina do Felype; esta linha pega quem escreveu direto pela API do GitHub ou usou
+      # --no-verify, que e o mesmo motivo pelo qual as quatro linhas acima existem.
+      - 'precos.json'
+      - 'robo/codigos.txt'
+      - 'robo/check-fichas-rachadas.js'
   workflow_dispatch:
 
 jobs:
@@ -30,6 +38,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2   # precisa do commit ANTERIOR pra conferir linha paralela
+
+      # Roda antes do check do app: e barato (le dois arquivos, zero rede) e cobre a rota
+      # que ate 21/08 nao tinha rede nenhuma. Nao roda se os arquivos nao existirem no push —
+      # o proprio script sai limpo nesse caso (fail-open de ambiente).
+      - name: o cadastro acha preco? (ficha rachada)
+        run: node robo/check-fichas-rachadas.js
 
       - name: o app parseia E nao perdeu capacidade?
         run: node checks-app.js index.html

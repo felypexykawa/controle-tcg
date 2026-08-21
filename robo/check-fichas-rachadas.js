@@ -8,7 +8,8 @@
  * tinha preco R$200,00 publicado no dia anterior e passou a devolver NADA, em silencio, porque o
  * merge renomeou a ficha para "tg02/tg30" e a linha do cadastro continuou com o hifen.
  * A classe ja tinha reincidido antes (caso Spiritomb, 2026-08-12) e mesmo assim nao havia
- * detector: o app tem 273 checagens e o precos.json, que e o dado que o Felype LE, tinha zero.
+ * detector: o app tem 198 checagens (105 comportamentos no checks-app.js + 93 no testes-nucleo.js,
+ * conferido rodando os dois) e o precos.json, que e o dado que o Felype LE, tinha zero.
  * O pre-commit tambem nao cobria — o filtro dele so olha index.html, checks-app.js,
  * checks-suite.py e testes-nucleo.js, entao commit que mexe so no precos.json nao acionava nada.
  *
@@ -39,9 +40,13 @@ function codLimpo(cod) {
   const t = cod.match(new RegExp('\\s([0-9A-Za-z]{1,6}\\/[0-9A-Za-z' + INF + ']{1,6})\\s*$'));
   return t ? normCod(t[1]) : cod;
 }
-// so-alfanumerico: o desempate final, que faz hifen e barra caírem no mesmo balde
+// so-alfanumerico: o desempate final, que faz hifen e barra caírem no mesmo balde.
+// O infinito vira a letra "inf" ANTES da limpeza: se ele fosse simplesmente removido,
+// "Quaxly (063/∞)" viraria a chave "063" — tres digitos, que casam por acidente com meio
+// arquivo. Ha 12 fichas NNN/∞ aqui; cada uma seria uma mina.
 function chave(cod) {
-  return normCod(cod).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
+  return normCod(cod).toLowerCase().replace(new RegExp(INF, 'g'), 'inf')
+    .normalize('NFKD').replace(/[^a-z0-9]/g, '');
 }
 
 function ler() {
@@ -57,6 +62,11 @@ function ler() {
   const linhas = fs.readFileSync(fCod, 'utf8').split(/\r?\n/)
     .map((t, i) => ({ n: i + 1, t: t.trim() }))
     .filter(l => l.t && !l.t.startsWith('#'));
+  if (!fs.readFileSync(fPre, 'utf8').trim() || !fs.readFileSync(fCod, 'utf8').trim()) {
+    console.log('[fichas-rachadas] codigos.txt ou precos.json veio VAZIO — sem conferir (passando).' +
+      ' Isso e falha de ambiente (git show que nao devolveu nada), nao dado ruim.');
+    process.exit(0);
+  }
   let precos;
   try { precos = JSON.parse(fs.readFileSync(fPre, 'utf8')); }
   catch (e) { console.error('[fichas-rachadas] precos.json NAO e JSON valido: ' + e.message); process.exit(1); }
@@ -77,33 +87,30 @@ function main() {
   Object.keys(cartas).forEach(k => { idx[normCod(k)] = cartas[k]; idx[codLimpo(k)] = cartas[k]; });
 
   // (A) ORIGEM: duas linhas do cadastro que sao a mesma carta escrita de jeitos diferentes.
-  // Duas lentes, porque a rodada de 2026-08-21 produziu as duas formas:
-  //   A1 — mesma chave alfanumerica, codLimpo diferente: hifen x barra, emoji x infinito
-  //        ("Vaporeon (tg02/tg30)" x "Vaporeon (tg02-tg30)")
-  //   A2 — um codigo e PREFIXO do outro (ate 3 caracteres a mais) E o nome cadastrado e o mesmo
-  //        ("Jolteon-v (swsh183)" x "Jolteon-v (swsh183/71)")
-  // A2 exige o nome igual de proposito: so o prefixo acusaria "036/08" x "036/081", que podem
-  // ser cartas de verdade diferentes. O nome do cadastro e a prova barata de que e a mesma.
-  const nomeDe = t => chave(normCod(t).replace(/\s*\([^()]*\)\s*$/, '')
-    .replace(new RegExp('\\s[0-9A-Za-z]{1,6}\\/[0-9A-Za-z' + INF + ']{1,6}$'), ''));
-  const pai = new Map();
-  const acha = x => { while (pai.get(x) !== x) { pai.set(x, pai.get(pai.get(x))); x = pai.get(x); } return x; };
-  const une = (a, b) => { a = acha(a); b = acha(b); if (a !== b) pai.set(a, b); };
-  linhas.forEach(l => pai.set(l, l));
-  for (let i = 0; i < linhas.length; i++) {
-    for (let j = i + 1; j < linhas.length; j++) {
-      const a = linhas[i], b = linhas[j];
-      const ca = chave(codLimpo(a.t)), cb = chave(codLimpo(b.t));
-      if (!ca || !cb) continue;
-      const a1 = ca === cb && codLimpo(a.t) !== codLimpo(b.t);
-      const pref = ca !== cb && (ca.startsWith(cb) || cb.startsWith(ca)) && Math.abs(ca.length - cb.length) <= 3;
-      const a2 = pref && nomeDe(a.t) && nomeDe(a.t) === nomeDe(b.t);
-      if (a1 || a2) une(a, b);
-    }
-  }
-  const grupos = new Map();
-  linhas.forEach(l => { const r = acha(l); if (!grupos.has(r)) grupos.set(r, []); grupos.get(r).push(l); });
-  const colisoes = [...grupos.values()].filter(g => g.length > 1);
+  // UMA lente so, de proposito: mesma chave alfanumerica com codLimpo diferente — separador
+  // trocado (hifen x barra x infinito/emoji). Separador nao carrega significado em codigo de
+  // carta, entao aqui juntar e sempre certo. Foi essa lente que pegou o caso real de
+  // 2026-08-21: "Vaporeon (tg02/tg30)" x "Vaporeon (tg02-tg30)", R$200,00 sumindo da tela.
+  //
+  // TINHA UMA SEGUNDA LENTE (prefixo de ate 3 caracteres + nome cadastrado igual) e ela foi
+  // REMOVIDA no mesmo dia, pela revisao adversarial, antes de rodar em producao. Ela juntava
+  // "Charmander (168/165)" com "Charmander (168/165jp)" — inglesa e japonesa, cartas diferentes
+  // com precos diferentes. Barrava o commit do Felype por nada E, pior, a mensagem de cura
+  // mandava espelhar o preco de uma na outra: a trava instruindo a corrupcao que veio impedir.
+  // Mesmo defeito em "Pikachu (SM12)" x "Pikachu (SM120)" e em promo de arte paralela.
+  // NAO reintroduzir prefixo sem um criterio que distinga "mesma carta escrita torto" de
+  // "carta diferente do mesmo Pokemon" — nome igual NAO distingue, foi o que se provou.
+  // Consequencia assumida: par que difere no proprio codigo (swsh183 x swsh183/71) esta FORA
+  // do alcance desta trava. Fica declarado aqui em vez de coberto por uma lente que erra.
+  const porChave = {};
+  linhas.forEach(l => {
+    const c = chave(codLimpo(l.t));
+    if (!c) return;
+    (porChave[c] = porChave[c] || []).push(l);
+  });
+  const colisoes = Object.keys(porChave)
+    .filter(c => new Set(porChave[c].map(l => codLimpo(l.t))).size > 1)
+    .map(c => porChave[c]);
   const grupoDe = new Map();
   colisoes.forEach(g => g.forEach(l => grupoDe.set(l, g)));
 
