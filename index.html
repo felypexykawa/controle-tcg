@@ -125,16 +125,16 @@ const SEED=[];
 let movs=get(MK,[]);
 let cats=get('tcg_cats',['ETB','Booster Box','Box da Coleção','Mini BB','Quad','Triple','Case','Sleeved','Blister','Single/Carta','Outro']);
 let cols=get('tcg_cols',[]),pess=get('tcg_pess',[]),pgs=get('tcg_pgs',['Dinheiro','Pix','Cartão']);
-let colsJ=get('tcg_colsj',null);const colsDe=j=>(colsJ&&colsJ[j])||[];const salvarColsJ=()=>localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));
-let colsG=get('tcg_colsg',{});const grupoDe=(j,c)=>(colsG[j]&&colsG[j][c])||'';const salvarColsG=()=>localStorage.setItem('tcg_colsg',JSON.stringify(colsG));
+let colsJ=get('tcg_colsj',null);const colsDe=j=>(colsJ&&colsJ[j])||[];const salvarColsJ=()=>gravaLocal('tcg_colsj',JSON.stringify(colsJ));
+let colsG=get('tcg_colsg',{});const grupoDe=(j,c)=>(colsG[j]&&colsG[j][c])||'';const salvarColsG=()=>gravaLocal('tcg_colsg',JSON.stringify(colsG));
 let jogos=get('tcg_jogos',['Pokémon','Yu-Gi-Oh','One Piece']);
 let despCats=get('tcg_despcats',['Luz','Aluguel','Advogado','Internet','Sleeves','Toploader','Sacolas','Fita','Caixas']);
-let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
-let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
+let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
+let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
 /* código ambíguo (2+ cartas na Liga p/ o mesmo código) resolvido 1x — vale pra TODOS os
    itens com esse código, atuais e futuros (a rotina de coleta lê isto pra navegar direto,
    sem passar pela página "Busca:" de novo). Chave = código LIMPO (codLimpo). */
-let codigosResolvidos=get('tcg_codres',{});const salvarCodRes=()=>localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));
+let codigosResolvidos=get('tcg_codres',{});const salvarCodRes=()=>gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
@@ -744,8 +744,31 @@ if(!colsJ){colsJ={};jogos.forEach(j=>colsJ[j]=[]);movs.forEach(m=>{const j=m.jog
 const fmt=n=>'R$ '+(Math.round(n*100)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=n=>(n>=0?'+':'')+Math.round(n*100)+'%';
 const dBR=d=>d.toLocaleDateString('pt-BR');
-const save=()=>{localStorage.setItem(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM&&_syncReady)salvarNuvem();};
-const saveL=()=>{localStorage.setItem('tcg_cats',JSON.stringify(cats));localStorage.setItem('tcg_cols',JSON.stringify(cols));localStorage.setItem('tcg_pess',JSON.stringify(pess));localStorage.setItem('tcg_pgs',JSON.stringify(pgs));localStorage.setItem('tcg_jogos',JSON.stringify(jogos));localStorage.setItem('tcg_despcats',JSON.stringify(despCats));localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));localStorage.setItem('tcg_colsg',JSON.stringify(colsG));localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+/* [CAUSA RAIZ 2026-08-20 — "The quota has been exceeded" no iPhone do Felype]
+   A memória local do navegador encheu (o Safari dá ~5MB por site) e o app quebrava no
+   PRIMEIRO passo do salvamento. Como a gravação local vinha ANTES da nuvem, a exceção
+   derrubava a linha inteira: a nuvem NUNCA era salva. Efeitos que ele viveu, todos do
+   mesmo defeito: (a) excluía um item, saía e voltava, e o item estava lá — a exclusão
+   morria antes de subir; (b) o app travava na abertura ("carregando" eterno), porque
+   aplicarNuvem também grava local; (c) tudo isso sem uma palavra na tela.
+   Regra nova: a NUVEM é a fonte de verdade, a cópia local é só conveniência — falhar a
+   cópia NUNCA pode impedir de salvar de verdade. E quando faltar espaço, o app poda as
+   cópias de segurança antigas sozinho e avisa em linguagem clara. */
+let _localCheio=false;
+function gravaLocal(chave,valor){
+  try{localStorage.setItem(chave,valor);return true;}catch(e){}
+  /* faltou espaço: poda as cópias de segurança locais (as de verdade estão na nuvem) */
+  try{const b=get('tcg_backups',[]);
+    if(b.length>3){localStorage.setItem('tcg_backups',JSON.stringify(b.slice(-3)));
+      try{localStorage.setItem(chave,valor);return true;}catch(e2){}}
+    localStorage.removeItem('tcg_backups');
+    try{localStorage.setItem(chave,valor);return true;}catch(e3){}}catch(e4){}
+  if(!_localCheio){_localCheio=true;
+    try{setSync('erro','memória deste aparelho cheia — seus dados seguem salvos na nuvem');}catch(_){}
+    try{toast('⚠ A memória deste aparelho encheu. Seus lançamentos continuam salvos na NUVEM — só a cópia local parou.');}catch(_){}}
+  return false;}
+const save=()=>{gravaLocal(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+const saveL=()=>{gravaLocal('tcg_cats',JSON.stringify(cats));gravaLocal('tcg_cols',JSON.stringify(cols));gravaLocal('tcg_pess',JSON.stringify(pess));gravaLocal('tcg_pgs',JSON.stringify(pgs));gravaLocal('tcg_jogos',JSON.stringify(jogos));gravaLocal('tcg_despcats',JSON.stringify(despCats));gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));gravaLocal('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 /* id único: base36 do relógio + 5 chars aleatórios — dois aparelhos lançando no mesmo milissegundo não colidem */
@@ -1140,7 +1163,8 @@ function vPainel(){
       <div class="mini click" onclick="go('contas')"><div class="k">A pagar (parcelas e despesas)</div><div class="v" style="color:var(--red)">${fmt(apT)}</div><div class="s">${apMes>0?fmt(apMes)+' vence este mês':'nada vence este mês'} →</div></div>
       <div class="mini click" onclick="go('contas')"><div class="k">A receber (app)</div><div class="v" style="color:var(--amber)">${fmt(arT)}</div><div class="s">${arMes>0?fmt(arMes)+' cai este mês':'nada cai este mês'} →</div></div></div>
     ${contasBanc.length?(function(){const tf=contasBanc.reduce((s,cb)=>s+saldoFisicoConta(cb),0);return `<div class="grid2" style="margin-top:8px"><div class="mini click" onclick="go('contas')"><div class="k">💼 Nas contas (físico hoje)</div><div class="v" style="color:${tf>=0?'var(--green)':'var(--red)'}">${fmt(tf)}</div><div class="s">${contasBanc.length} conta${contasBanc.length>1?'s':''} · toque p/ ver por conta →</div></div><div class="mini click" onclick="abrirTransferencia()"><div class="k">↔ Transferir / aportar</div><div class="v" style="font-size:15px;padding-top:4px">entre contas · dinheiro pessoal</div><div class="s">registrar movimento →</div></div></div>`;})():''}
-    <div class="lnk" onclick="abrirPendencias()">⚠️ pendências — o que precisa da sua mão${(function(){const R=pendenciasResumo();if(!R.pronto)return R.total?` <b style="color:var(--amber)">· ${R.total}+ achado${R.total>1?'s':''}</b> <span style="color:var(--mut)">(ainda conferindo as contas…)</span>`:' <span style="color:var(--mut)">· conferindo…</span>';if(!R.total)return ' <span style="color:var(--green)">· tudo certo ✓</span>';return ` <b style="color:${R.grave?'var(--red)':'var(--amber)'}">· ${R.total} achado${R.total>1?'s':''}</b>${R.n1toque?` <span style="color:var(--mut)">· ${R.n1toque} resolve em 1 toque</span>`:''}`;})()}</div>
+    <div class="lnk" onclick="abrirProvaReal()">🩺 prova real — o app confere as próprias contas${_provaCache&&_provaCache.A.length?` <b style="color:${_provaCache.n.vermelho?'var(--red)':_provaCache.n.amarelo?'var(--amber)':'var(--mut)'}">· ${_provaCache.A.length} achado${_provaCache.A.length>1?'s':''}</b>`:_provaCache?' <span style="color:var(--green)">· tudo fechou ✓</span>':''}</div>
+    <div class="lnk" onclick="abrirPendenciasCodigo()">🏷️ pendências de cadastro (código)${(function(){const n=pendenciasCodigo().length;return n?` <b style="color:var(--amber)">· ${n} achado${n>1?'s':''}</b>`:' <span style="color:var(--green)">· tudo certo ✓</span>';})()}</div>
     <div class="lnk" onclick="imprimir()">🖨 imprimir este resumo</div>
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
     ${USAR_NUVEM&&_userEmail?`<div class="lnk" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}
@@ -1183,7 +1207,7 @@ function vLancar(){
     if(compraModo==='nota'&&!editId){campos+=notaForm();}
     else{campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo selecionado)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <div class="row2"><div><label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${e?.idioma===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}" oninput="bcalc()"></div></div>
       <label>Condição <span style="color:var(--mut);font-size:10px">(afeta o preço na Liga — opcional)</span></label><select id="f_cond">${CONDS.map(([v,l])=>`<option value="${v}" ${(e?.condicao||'—')===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -1204,7 +1228,7 @@ function vLancar(){
       campos+= !editId?`<label style="margin-top:0">De onde sai a carta?</label><div class="toggle" id="vdetog"><div class="o ${vendaDe==='estoque'?'on':''}" onclick="setVendaDe('estoque')">📦 Estoque</div><div class="o ${vendaDe==='colecao'?'on':''}" onclick="setVendaDe('colecao')">⭐ Coleção</div><div class="o ${vendaDe==='avulsa'?'on':''}" onclick="setVendaDe('avulsa')">✍ Avulsa</div></div>`:'';
       if(avulso){campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>`;}
       else{let itens=vendaDe==='estoque'?movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Pedido')):movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
         const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
@@ -1277,7 +1301,7 @@ function notaForm(){
       <div class="row2"><div><label style="margin-top:0">Jogo</label><select id="n_jogo" onchange="reColN(this.value)">${jogos.map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label style="margin-top:0">Tipo de produto</label><select id="n_cat" onchange="novo(this,'cat');nbooDef()">${selOpts(cats)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('n_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="n_col" onchange="novo(this,'col')">${selColOpts('Pokémon')}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('n_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('n_cod','∞')">∞</span></label><input id="n_cod" placeholder="ex: SV3-125 / SKU da loja" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCodN')" oninput="ligaHint(this.value,'ligaHintCodN')"><div class="meta" id="ligaHintCodN"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional · p/ carta avulsa)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('n_cod')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('n_cod','∞')">∞</span></label><input id="n_cod" placeholder="ex: SV3-125 / SKU da loja" oninput="ligaHint(this.value,'ligaHintCodN')"><div class="meta" id="ligaHintCodN"></div>
       <div class="row2"><div><label>Idioma</label><select id="n_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Qtd</label><input id="n_qtd" type="number" inputmode="numeric" value="1" oninput="ncalc('q')"></div></div>
       <div class="row2"><div><label>Valor de cada (R$)</label><input id="n_unit" type="number" inputmode="decimal" placeholder="0,00" oninput="ncalc('u')"></div>
@@ -2229,119 +2253,18 @@ function salvar(){
   movs.push(obj);aplicarFotosPend(obj.id);save();_lancarDirty=false;toast('Salvo ✓ — lance o próximo');render();
 }
 function carregarAcervo(){if(confirm('Carregar o histórico da planilha (24 compras + 34 vendas)? Substitui o que está no app agora.')){movs=SEED.map(m=>({...m}));save();fecharModal();go('painel');toast('Histórico original restaurado ✓');}}
-function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();const snap={ts:now,n:movs.length,dados:movs.map(m=>({...m}))};if(b.length&&now-b[b.length-1].ts<90000)b[b.length-1]=snap;else b.push(snap);if(b.length>20)b=b.slice(-20);localStorage.setItem('tcg_backups',JSON.stringify(b));}catch(e){}}
-/* [Felype 2026-08-20] "O APP SALVA AUTOMATICO BACKUP NA NUVEM. MAS O ULTIMO BACKUP EH DE 12/08
-   ... E EU NAO CONSIGO PEDIR PARA FAZER NOVO BACKUP NA NUVEM."
-   O mal-entendido era real e a culpa e da tela, nao dele: a lista "Voltar a um ponto" so mostrava
-   pontos LOCAIS (localStorage deste navegador) — por isso parou em 12/08, que foi a ultima vez
-   que ele lancou algo NESTE aparelho. A nuvem guardava so o estado ATUAL (um documento que e
-   sobrescrito a cada save), sem historico nenhum: se um dado fosse corrompido e sincronizasse,
-   nao havia para onde voltar. Agora existem pontos NA NUVEM, com botao proprio, visiveis de
-   qualquer aparelho. Rotativo: guarda os 12 mais recentes (o 13o mais antigo sai). */
-const PONTOS_NUVEM_MAX=12;
-/* _pontosNuvem: null = ainda nao buscou · {erro:'...'} = a nuvem RECUSOU · array = a lista.
-   Os tres estados existem porque tratar recusa como "lista vazia" fazia a tela dizer "nenhum
-   ponto ainda — crie o primeiro" quando a verdade era "a nuvem nao deixou". O dono concluiria
-   que a peca funciona e ele e que nao usou — e so descobriria no dia em que precisasse voltar.
-   E a dor de 12/08 reencenada, so que pior, porque desta vez com uma tela dizendo que esta tudo
-   certo. (Achado da revisao adversarial, 2026-08-20.) */
-let _pontosNuvem=null;
-function pontosNuvemRef(){return _db?_db.collection('controle').doc('dados').collection('pontos'):null;}
-function carregarPontosNuvem(cb){
-  const ref=pontosNuvemRef();
-  if(!ref){_pontosNuvem={erro:'sem conexao com a nuvem agora (precisa de internet e login)'};if(cb)cb();return;}
-  ref.orderBy('ts','desc').limit(30).get().then(q=>{
-    const L=[];q.forEach(d=>L.push({ts:+d.id,n:(d.data()||{}).n||0,quem:(d.data()||{}).quem||''}));
-    _pontosNuvem=L;if(cb)cb();
-  }).catch(e=>{_pontosNuvem={erro:((e&&e.message)||'a nuvem recusou a leitura')};if(cb)cb();});}
-function pontosNuvemLista(){return Array.isArray(_pontosNuvem)?_pontosNuvem:[];}
-/* devolve PROMESSA com {ok:bool, motivo:'...'} — quem restaura PRECISA saber se a rede de
-   seguranca de fato existiu antes de sobrescrever tudo. A versao anterior chamava isto em modo
-   silencioso e seguia em frente sem olhar: os tres caminhos de falha (sem nuvem, dado grande
-   demais, recusa) retornavam mudos e o dono perdia o estado atual acreditando no que o aviso
-   da tela tinha prometido. */
-function salvarPontoNuvem(silencioso,semRotacao){
-  const ref=pontosNuvemRef();
-  const falha=m=>{if(!silencioso)alert(m);return Promise.resolve({ok:false,motivo:m});};
-  if(!ref)return falha('Sem nuvem conectada agora — o ponto na nuvem precisa de internet e login.');
-  const ts=Date.now();
-  const dados=JSON.stringify({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos});
-  /* mede BYTES, nao caracteres: o limite do Firestore e 1.048.576 bytes e acento/emoji ocupam
-     mais de um byte cada. 700k e a mesma folga que o salvarNuvem ja usa. */
-  let bytes=dados.length;
-  try{bytes=new TextEncoder().encode(dados).length;}catch(e){}
-  if(bytes>700000)return falha('Seus dados passaram do tamanho que cabe num ponto na nuvem. Use "Completo c/ fotos" pra guardar no computador e me avise.');
-  if(!silencioso)toast('salvando ponto na nuvem...');
-  return ref.doc(String(ts)).set({ts,n:movs.length,quem:(_userEmail||'').split('@')[0]||'',dados}).then(()=>{
-    localStorage.setItem('tcg_ultimo_ponto_nuvem',String(ts));
-    if(!silencioso)toast('ponto salvo na nuvem');
-    if(semRotacao)return carregarPontosNuvem(()=>{}),{ok:true,ts};
-    /* rotacao: mantem os PONTOS_NUVEM_MAX mais recentes. Roda so em salvamento COMUM — nunca
-       no pre-salvamento de uma restauracao, senao com as vagas cheias o ponto novo empurrava
-       para fora justamente o ponto mais antigo, que costuma ser o alvo da restauracao (e o
-       anterior a corrupcao). Restaurar apagava o que se queria restaurar. */
-    return ref.orderBy('ts','desc').get().then(q=>{
-      const ids=[];q.forEach(d=>ids.push(d.id));
-      ids.slice(PONTOS_NUVEM_MAX).forEach(id=>ref.doc(id).delete().catch(()=>{}));
-      return new Promise(r=>carregarPontosNuvem(()=>{
-        if(!silencioso&&document.getElementById('modal')){fecharModal();abrirBackup();}
-        r({ok:true,ts});}));
-    }).catch(()=>({ok:true,ts}));
-  }).catch(e=>{
-    const m='A nuvem recusou o ponto: '+((e&&e.message)||'erro')+' — se falar em permissao, falta liberar "pontos" no Firebase.';
-    if(!silencioso)alert(m);
-    return {ok:false,motivo:m};});}
-function restaurarPontoNuvem(ts){
-  const ref=pontosNuvemRef();if(!ref)return;
-  if(!confirm('Voltar TODOS os dados para o ponto de '+new Date(ts).toLocaleString('pt-BR')+'? Antes disso eu guardo um ponto com o estado de AGORA, pra dar pra voltar atras.'))return;
-  toast('guardando o estado de agora...');
-  /* ESPERA o pre-salvamento e SO continua se ele deu certo. Sem isso a frase do aviso era uma
-     promessa que o codigo nao cumpria. semRotacao=true protege o alvo (ver G4 acima). */
-  salvarPontoNuvem(true,true).then(r=>{
-    if(!r||!r.ok){
-      alert('NAO restaurei. Nao consegui guardar o estado de agora antes ('+((r&&r.motivo)||'motivo desconhecido')+'), e restaurar sem essa copia poderia te fazer perder o que existe hoje.');
-      return;}
-    return ref.doc(String(ts)).get().then(d=>{
-      if(!d.exists){alert('Esse ponto nao esta mais na nuvem.');return;}
-      let o=null;try{o=JSON.parse((d.data()||{}).dados||'null');}catch(e){}
-      if(!o||!Array.isArray(o.movs)){alert('Nao consegui ler esse ponto.');return;}
-      aplicarNuvem(o);
-      /* a trava entra DEPOIS de aplicar (aplicarNuvem ignora tudo enquanto ela esta ligada) e
-         segura o snapshot de volta, senao a nuvem reaplicava o estado velho por cima em
-         silencio — o mesmo estrago mapeado em 2026-08-11 no restaurar local. */
-      _restaurando=true;
-      salvarCad();salvarCB&&salvarCB();salvarCodRes();save();saveL();
-      setTimeout(()=>{_restaurando=false;if(USAR_NUVEM&&_syncReady)salvarNuvem();},3000);
-      fecharModal();go('painel');
-      toast('voltou para o ponto de '+new Date(ts).toLocaleString('pt-BR'));
-    });
-  }).catch(e=>alert('Nao consegui restaurar: '+((e&&e.message)||'erro')));}
-/* ponto automatico do dia. A marca de "ja salvei hoje" e o ponto MAIS RECENTE DA NUVEM, nao uma
-   marca deste aparelho: com PC + os dois celulares, a marca local dava ate 3 pontos por dia e as
-   12 vagas cobriam ~4 dias em vez de 12. */
-function pontoNuvemDiario(){
-  try{
-    if(!movs.length)return;
-    const decide=()=>{
-      const L=pontosNuvemLista();
-      const ultNuvem=L.length?L[0].ts:0;
-      const ultLocal=+localStorage.getItem('tcg_ultimo_ponto_nuvem')||0;
-      const ult=Math.max(ultNuvem,ultLocal);
-      if(Date.now()-ult<20*3600000)return;
-      salvarPontoNuvem(true);};
-    if(_pontosNuvem===null)carregarPontosNuvem(decide);else decide();
-  }catch(e){}}
+/* [CORRIGIDO 2026-08-20] eram 20 cópias INTEIRAS dos lançamentos guardadas no navegador,
+   cada uma carregando as miniaturas de foto (imagem embutida em texto) — foi isso que
+   encheu a memória do iPhone e derrubou o salvamento. Agora: 8 cópias, e sem as
+   miniaturas (elas são derivadas das fotos, que moram na nuvem; ao restaurar, voltam
+   sozinhas quando a foto é aberta). Mesmo efeito de segurança, uma fração do espaço. */
+function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();
+  const enxuto=movs.map(m=>{const c={...m};delete c.fotoThumb;return c;});
+  const snap={ts:now,n:movs.length,dados:enxuto};
+  if(b.length&&now-b[b.length-1].ts<90000)b[b.length-1]=snap;else b.push(snap);
+  if(b.length>8)b=b.slice(-8);
+  gravaLocal('tcg_backups',JSON.stringify(b));}catch(e){}}
 function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.ts);const dt=ts=>new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
-  if(_pontosNuvem===null){carregarPontosNuvem(()=>{if(document.getElementById('modal')){fecharModal();abrirBackup();}});}
-  const nuv=(_pontosNuvem===null)
-    ?'<div class="meta" style="padding:6px 12px">buscando na nuvem...</div>'
-    :(_pontosNuvem&&_pontosNuvem.erro
-      /* "a nuvem recusou" NUNCA pode aparecer como "nenhum ponto ainda": um e problema pra
-         resolver, o outro e convite pra usar. Confundir os dois esconde a peca quebrada. */
-      ?`<div class="item" style="display:block;padding:10px 12px;border-left:3px solid var(--red)"><b style="color:var(--red)">A nuvem não deixou ler os pontos</b><div class="meta" style="margin-top:3px">${_pontosNuvem.erro}</div><div class="meta">Enquanto isso, seus pontos deste navegador (abaixo) continuam valendo.</div></div>`
-      :(pontosNuvemLista().length
-        ?pontosNuvemLista().map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos${x.quem?' · '+x.quem:''}</div></div><button class="x" style="color:var(--blue)" onclick="restaurarPontoNuvem(${x.ts})">restaurar</button></div>`).join('')
-        :'<div class="empty">Nenhum ponto na nuvem ainda — toque no botão acima pra criar o primeiro.</div>'));
   const itens=b.length?b.map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos</div></div><button class="x" style="color:var(--blue)" onclick="restaurarBackup(${x.ts})">restaurar</button></div>`).join(''):`<div class="empty">Sem pontos salvos ainda.</div>`;
   const h=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:82vh;overflow:auto">
     <div class="head">Backup e restauração</div>
@@ -2349,10 +2272,7 @@ function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.
     <div class="acoes"><button class="btn g" onclick="baixarBackup()">⬇ Backup (dados)</button><button class="btn g" onclick="baixarBackupCompleto()">⬇ Completo · c/ fotos</button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="importarBackup()">⬆ Importar backup <span style="color:var(--mut);font-size:10px">(restaura fotos junto)</span></button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="exportarCSV()">⬇ Excel (planilha)</button></div>
-    <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="salvarPontoNuvem()">☁️ Salvar ponto na nuvem agora</button></div>
-    <div class="sec">Pontos na nuvem <span style="text-transform:none;font-weight:400;color:var(--mut)">— de qualquer aparelho · guarda os ${PONTOS_NUVEM_MAX} mais recentes · 1 automático por dia</span></div>
-    ${nuv}
-    <div class="sec">Voltar a um ponto <span style="text-transform:none;font-weight:400;color:var(--mut)">— só deste navegador</span></div>
+    <div class="sec">Voltar a um ponto</div>
     <div class="item" style="justify-content:space-between;align-items:center"><div><b>Histórico original</b><div class="meta">a planilha de origem</div></div><button class="x" style="color:var(--amber)" onclick="carregarAcervo()">restaurar</button></div>
     ${itens}
     <button class="btn" onclick="fecharModal()" style="margin-top:14px">Fechar</button></div></div>`;
@@ -3036,18 +2956,18 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
   })).then(payload=>{
     if(fundiu){
       movs=final.movs;jogos=final.jogos;cats=final.cats;cols=final.cols;pess=final.pess;pgs=final.pgs;despCats=final.despCats;cadastros=final.cadastros;contasBanc=final.contasBanc;codigosResolvidos=final.codigosResolvidos;colsJ=final.colsJ;colsG=final.colsG;
-      localStorage.setItem(MK,JSON.stringify(movs));
-      localStorage.setItem('tcg_cats',JSON.stringify(cats));
-      localStorage.setItem('tcg_cols',JSON.stringify(cols));
-      localStorage.setItem('tcg_pess',JSON.stringify(pess));
-      localStorage.setItem('tcg_pgs',JSON.stringify(pgs));
-      localStorage.setItem('tcg_jogos',JSON.stringify(jogos));
-      localStorage.setItem('tcg_despcats',JSON.stringify(despCats));
-      localStorage.setItem('tcg_colsj',JSON.stringify(colsJ));
-      localStorage.setItem('tcg_colsg',JSON.stringify(colsG));
-      localStorage.setItem('tcg_contasb',JSON.stringify(contasBanc));
-      localStorage.setItem('tcg_cadastros',JSON.stringify(cadastros));
-      localStorage.setItem('tcg_codres',JSON.stringify(codigosResolvidos));
+      gravaLocal(MK,JSON.stringify(movs));
+      gravaLocal('tcg_cats',JSON.stringify(cats));
+      gravaLocal('tcg_cols',JSON.stringify(cols));
+      gravaLocal('tcg_pess',JSON.stringify(pess));
+      gravaLocal('tcg_pgs',JSON.stringify(pgs));
+      gravaLocal('tcg_jogos',JSON.stringify(jogos));
+      gravaLocal('tcg_despcats',JSON.stringify(despCats));
+      gravaLocal('tcg_colsj',JSON.stringify(colsJ));
+      gravaLocal('tcg_colsg',JSON.stringify(colsG));
+      gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
+      gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
+      gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));
       if(!lancarTemRascunho())render();
       toast('☁️ mesclado com o que o outro aparelho salvou ✓');
     }
@@ -3085,7 +3005,7 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
      formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
      fluxo normal abaixo. */
   if(d._upd&&d._upd===_ultimoUpdAplicado)return;
-  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;localStorage.setItem(MK,JSON.stringify(movs));
+  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;gravaLocal(MK,JSON.stringify(movs));
   if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
   render();}
 /* [CORRIGIDO 2026-08-19 — loop de login no iPhone, reportado pelo Felype: "clica pra logar,
@@ -3189,8 +3109,6 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
           try{document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');
             if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach(b=>{if(b.dataset.t!=='lancar')b.style.display='none';});
             setSync('ok');}catch(e){}
-          /* dados ja aplicados e menu no ar: e o momento seguro pro ponto automatico do dia */
-          try{setTimeout(pontoNuvemDiario,4000);}catch(e){}
           try{go(papelAtual()==='lancamento'?'lancar':'painel');}
           catch(e){falha=falha||('ao desenhar a tela: '+((e&&e.message)||e));try{console.error('render',e);}catch(_){}}
           if(falha)telaFalhaApp(falha);
@@ -3209,11 +3127,7 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='20/08 22h21';
-/* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
-   carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
-   "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787275278366;
+const BUILD_TAG='20/08 23h30';
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -3229,22 +3143,9 @@ const BUILD_TS=1787275278366;
 let _veioDeAtualizar=location.search.indexOf('atualiza=')>=0;
 (function(){if(_veioDeAtualizar)history.replaceState(null,'',location.pathname);})();
 let _versaoAvisada=false;
-/* [BUG CORRIGIDO 2026-08-20, achado do Felype: "o app esta me dando atualizacao, mas pode ver
-   que e atualizacao ANTIGA"] O teste era `j.tag!==BUILD_TAG` — DIFERENTE, nao MAIS NOVA. Quando
-   o cache do GitHub Pages devolve um versao.json atrasado (ele viu um de 28/07 com o app ja em
-   20/08), o app anunciava a versao de julho como "nova disponivel". Pior que inutil: destroi a
-   confianca no aviso, porque o numero que aparece nem existe mais.
-   Agora compara TEMPO: so avisa se o servidor tiver carimbo mais novo que o desta copia. Se o
-   versao.json vier sem `ts` (versao antiga do arquivo, exatamente o caso do cache atrasado), o
-   app fica CALADO — silencio e melhor que aviso errado. */
-function versaoMaisNova(j){
-  if(!j||!j.tag)return false;
-  if(j.tag===BUILD_TAG)return false;
-  if(!j.ts||!BUILD_TS)return false;
-  return j.ts>BUILD_TS;}
 function checarVersao(){if(BUILD_TAG==='dev'||_versaoAvisada)return;
   fetch('versao.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
-    if(!versaoMaisNova(j)||_versaoAvisada)return;
+    if(!j||!j.tag||j.tag===BUILD_TAG||_versaoAvisada)return;
     _versaoAvisada=true;
     const msg=_veioDeAtualizar
       ?`⏳ O servidor ainda está servindo a versão antiga (v ${j.tag} já existe, mas o cache do GitHub Pages não passou) — isso é normal, leva alguns minutos. Toque pra tentar de novo.`
@@ -3269,19 +3170,7 @@ fetch('precos.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(
    de uma vez (preço, picker de ambíguo, robô de coleta, checagens), porque codLimpo é o funil
    por onde todo código passa antes de virar chave de busca. */
 function normCod(cod){return (''+(cod||'')).replace(/♾️?/g,'∞').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim();}
-function codLimpo(cod){cod=normCod(cod);const m=cod.match(/\(([^()]+)\)\s*$/);if(m)return normCod(m[1]);
-  /* [2026-08-18, direção do Felype] terceiro formato de cadastro, que faltava: "Nome NUM/TOTAL"
-     SEM parênteses (ex. "Spiritomb da cintia 244/217"). Era a causa de 18 fichas de preço
-     duplicadas no precos.json: o robô guardava sob o texto inteiro e a série de histórico
-     rachava em duas. O cabeçalho do robo/codigos.txt SEMPRE declarou aceitar os três formatos —
-     só o codLimpo sabia dois. Exige espaço antes do código pra não confundir com código puro. */
-  const t=cod.match(/\s([0-9A-Za-z]{1,6}\/[0-9A-Za-z∞]{1,6})\s*$/);return t?normCod(t[1]):cod;}
-/* Só para o CAMPO de cadastro: devolve o texto com o código entre parênteses ("Spiritomb da
-   cintia 244/217" -> "Spiritomb da cintia (244/217)"). Ideia do Felype: em vez de só ensinar
-   o robô a adivinhar, fixar o parêntese na entrada pra o formato torto não nascer mais.
-   Roda ao SAIR do campo, nunca a cada tecla (senão fecharia parêntese no meio da digitação). */
-function fixaParenteses(v){const c=normCod(v);if(!c||/\)\s*$/.test(c))return c;
-  const m=c.match(/^(.*\S)\s([0-9A-Za-z]{1,6}\/[0-9A-Za-z∞]{1,6})$/);return m?m[1]+' ('+m[2]+')':c;}
+function codLimpo(cod){cod=normCod(cod);const m=cod.match(/\(([^()]+)\)\s*$/);return m?normCod(m[1]):cod;}
 /* [CORRIGIDO 2026-08-17, revisão adversarial + conferência no arquivo real] normalizar só o
    LADO DO APP quebrou os casos que funcionavam: o precos.json de produção tem os DOIS
    símbolos misturados — 2 chaves gravadas com o emoji do celular (032/♾️, Xy116/♾️, que o
@@ -3345,107 +3234,6 @@ function pendenciasCodigo(){
     }).filter(Boolean);
 }
 function abrirCorrigirCodigo(id){consVer='itens';verMov(id);}
-/* ===== PENDÊNCIAS UNIFICADAS (Felype 2026-08-18: "juntar esses itens de achados num item só").
-   Antes: 2 links soltos no Painel (prova real / pendências de cadastro) com critérios e escalas
-   de severidade diferentes — e um TERCEIRO grupo, as cartas ambíguas da Liga, que não tinha
-   lugar nenhum: só aparecia DENTRO de cada carta aberta, uma por uma, sem lista. Com 25
-   ambíguas, achar cada uma era adivinhação. Ordem dos grupos = do mais barato de resolver
-   pro mais caro, não por gravidade: escolher carta é 1 toque, conta quebrada é investigação. */
-function ambiguasPendentes(){
-  if(!(_precosLiga&&_precosLiga.cartas))return [];
-  const M={};
-  movs.filter(m=>m.tipo==='COMPRA'&&m.cat==='Single/Carta'&&(+m.qtd||1)>0&&['Em estoque','Pedido','Coleção'].includes(sitDe(m))&&m.codigo&&!m.codigoUrl)
-    .forEach(m=>{
-      const pl=precoLigaDe(m.codigo);if(!pl||pl.status!=='AMBIGUO')return;
-      const codC=codLimpo(m.codigo);if(codigosResolvidos[codC])return;
-      if(!M[codC])M[codC]={codC,cod:m.codigo,nOpc:(pl.opcoes||[]).length,rots:[],ids:[]};
-      M[codC].rots.push(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'carta')));M[codC].ids.push(m.id);});
-  return Object.values(M).sort((a,b)=>(b.nOpc>0)-(a.nOpc>0)||a.codC.localeCompare(b.codC));}
-function pendenciasResumo(){
-  const amb=ambiguasPendentes(),cad=pendenciasCodigo(),pr=_provaCache;
-  const n1toque=amb.filter(x=>x.nOpc>0).length;
-  return {amb,cad,pr,n1toque,
-    total:amb.length+cad.length+(pr?pr.A.length:0),
-    pronto:!!pr,
-    grave:pr?pr.n.vermelho:0};}
-/* [Felype 2026-08-20] "eu preciso dos tipos de pendencias separados dentro desta lista.
-   assim nao fica um monte de informacao sendo jogada na minha cara. e eu consigo direcionar
-   ao que eu vou ajeitar."
-   O que mudou: a lista deixou de ser uma rolagem unica com os 79 itens e passou a abrir num
-   MAPA — so os grupos, com contagem — onde 1 toque entra no grupo que ele decidiu atacar.
-   Os grupos viraram DADO (pendGrupos), nao HTML concatenado: com isso o resumo do topo e as
-   secoes saem da MESMA fonte e nao tem como divergirem. Divergiam: o cabecalho dizia "79 no
-   total" e enumerava so 4 dos 7 grupos, somando 60 — quem lesse concluia que 19 itens tinham
-   sumido. Numero que nao fecha na cara do dono e pior que numero nenhum. */
-let _pendFiltro='mapa';
-function pendGrupos(){
-  const R=pendenciasResumo(),p=R.pr||provaReal();
-  window._pendAmb=R.amb;
-  const jsEsc=x=>`fecharModal();abrirEscolhaAmbigua(_pendAmb[${R.amb.indexOf(x)}].codC)`;
-  const G=[];
-  const com1=R.amb.filter(x=>x.nOpc>0),semOpc=R.amb.filter(x=>!x.nOpc);
-  G.push({id:'escolher',ic:'🎯',tit:'escolher qual carta é a sua',dica:'1 toque cada, destrava o preço',
-    itens:com1.map(x=>({t:'#'+x.codC+' — '+x.nOpc+' cartas com esse número',
-      d:x.rots.slice(0,3).join(' · ')+(x.rots.length>3?' · +'+(x.rots.length-3)+' item(ns)':''),
-      a:[['escolher qual',jsEsc(x)]]}))});
-  G.push({id:'link',ic:'🔗',tit:'sem opções na tela',dica:'precisa colar o link da carta',
-    itens:semOpc.map(x=>({t:'#'+x.codC,d:x.rots.slice(0,3).join(' · '),a:[['colar link',jsEsc(x)]]}))});
-  /* as listas fixas abaixo cobrem os valores que existem HOJE. Se amanha nascer um motivo ou
-     uma severidade nova, ela cai no grupo "outros" do fim — nunca some da conta. Sem essa
-     rede, o total do topo voltaria a nao fechar com a soma dos grupos, que foi exatamente o
-     defeito corrigido nesta mesma entrega (dizia 79, enumerava 60). */
-  const cadItem=x=>({t:(x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),
-    d:'',a:[['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`]]});
-  const provaItem=x=>({t:x.titulo,d:x.detalhe,
-    a:[...(x.acaoJs?[[x.acaoRot,`fecharModal();${x.acaoJs}`]]:[]),...(x.acao2Js?[[x.acao2Rot,`fecharModal();${x.acao2Js}`]]:[])]});
-  const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
-  Object.keys(MOT).forEach(mot=>{
-    G.push({id:mot,ic:MOT[mot][0],tit:MOT[mot][1],dica:'',itens:R.cad.filter(x=>x.motivo===mot).map(cadItem)});});
-  const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência de conta'],info:['ℹ️','informativo']};
-  Object.keys(SEV).forEach(sev=>{
-    G.push({id:sev,ic:SEV[sev][0],tit:SEV[sev][1],dica:'',itens:p.A.filter(x=>x.sev===sev).map(provaItem)});});
-  const sobra=[].concat(R.cad.filter(x=>!MOT[x.motivo]).map(cadItem),p.A.filter(x=>!SEV[x.sev]).map(provaItem));
-  if(sobra.length)G.push({id:'outros',ic:'❓',tit:'outros achados',dica:'tipo novo, ainda sem grupo próprio',itens:sobra});
-  return G.filter(g=>g.itens.length);
-}
-function abrirPendencias(filtro){
-  /* chamada SEM argumento = veio do Painel, ou seja, e uma abertura nova: volta pro mapa.
-     Antes o filtro era global e sobrevivia ao fechar — reabrir caia dentro do ultimo grupo,
-     com o texto do topo dizendo "toque no grupo que voce vai resolver" e nenhum grupo na tela
-     pra tocar. Trocar de grupo continua sendo 1 toque nas pilulas. */
-  _pendFiltro=(filtro===undefined)?'mapa':filtro;
-  const G=pendGrupos();
-  const tot=G.reduce((n,g)=>n+g.itens.length,0);
-  if(!G.some(g=>g.id===_pendFiltro))_pendFiltro='mapa';
-  const btn=(rot,js)=>` <span class="lnk" style="font-size:12px;padding:2px 6px;display:inline-block;margin-top:6px" onclick="${js}">${rot} →</span>`;
-  const chip=(id,txt,on)=>`<span onclick="abrirPendencias('${id}')" style="display:inline-block;cursor:pointer;font-size:12px;padding:5px 10px;margin:0 6px 6px 0;border-radius:999px;border:1px solid ${on?'var(--blue)':'var(--bord)'};background:${on?'var(--blue)':'transparent'};color:${on?'#fff':'var(--txt)'};font-weight:${on?'700':'400'}">${txt}</span>`;
-  /* os chips repetem a contagem de cada grupo de proposito: e a mesma informacao do mapa,
-     so que sempre visivel — assim, DENTRO de um grupo, ele troca de assunto sem voltar */
-  const chips=[chip('mapa','todos ('+tot+')',_pendFiltro==='mapa')]
-    .concat(G.map(g=>chip(g.id,g.ic+' '+g.itens.length,_pendFiltro===g.id))).join('');
-  let corpo;
-  if(!tot){
-    corpo='<div class="ctx" style="color:var(--green)">Nada pendente — cadastro, preços e contas fecharam ✓</div>';
-  }else if(_pendFiltro==='mapa'){
-    /* MAPA: so os grupos. E a tela de decidir, nao a de trabalhar. */
-    corpo=G.map(g=>`<div class="item click" style="display:flex;justify-content:space-between;align-items:center;padding:12px" onclick="abrirPendencias('${g.id}')">
-      <div style="min-width:0"><b>${g.ic} ${g.tit}</b>${g.dica?`<div class="meta" style="margin-top:2px">${g.dica}</div>`:''}</div>
-      <div style="flex:none;display:flex;align-items:center;gap:8px"><b style="font-size:17px">${g.itens.length}</b><span style="color:var(--mut)">›</span></div></div>`).join('');
-  }else{
-    const g=G.find(x=>x.id===_pendFiltro);
-    corpo=`<div class="sec" style="display:flex;justify-content:space-between;align-items:baseline">
-        <span>${g.ic} ${g.tit} (${g.itens.length})${g.dica?` <span style="text-transform:none;font-weight:400;color:var(--mut)">— ${g.dica}</span>`:''}</span>
-        <span class="lnk" style="font-size:12px;text-transform:none" onclick="abrirPendencias('mapa')">‹ todos</span></div>`
-      +g.itens.map(it=>`<div class="item" style="display:block;padding:10px 12px"><b>${it.t}</b>${it.d?`<div class="meta" style="margin-top:3px">${it.d}</div>`:''}${it.a.map(a=>btn(a[0],a[1])).join('')}</div>`).join('');
-  }
-  const resumo=tot?`<b>${tot} no total</b> — ${G.map(g=>g.itens.length+' '+g.ic).join(' · ')}. Toque no grupo que você vai resolver agora; nada é corrigido sozinho.`:'Tudo conferido.';
-  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px 14px 22px">
-    <div class="sec" style="margin-top:0">⚠️ pendências — o que precisa da sua mão</div>
-    <div class="ctx">${resumo}</div>
-    ${tot?`<div style="margin:10px 0 4px">${chips}</div>`:''}
-    ${corpo}
-    <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
-  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 function abrirPendenciasCodigo(){const P=pendenciasCodigo();
   const MOT={sem_preco:['🟡','tem código, mas a Liga não devolveu preço — ou o código está diferente do dela, ou a coleta ainda não passou nessa carta'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar preço']};
   const ST2={'Em estoque':['c','📦 estoque'],'Pedido':['c','🚚 pedido'],'Coleção':['k','⭐ coleção']};
