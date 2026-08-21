@@ -2,7 +2,7 @@
 # Alimentado pela leitura do estoque real (tcg_movs_v2, COMPRA ativa) + fallback manual.
 # Uniao ADITIVA: o estoque ADICIONA codigos, nunca remove (anti-regressao, CLAUDE.md Regra 13).
 # Formato aceito: "NUM/TOTAL" puro OU "Nome (NUM/TOTAL)" OU "Nome NUM/TOTAL".
-# Atualizado 2026-08-20 pela leitura do estoque (92 itens ativos + 4 mantidos por
+# Atualizado 2026-08-21 pela leitura do estoque (99 itens ativos + 10 mantidos por
 # anti-regressao que nao aparecem mais no estoque atual).
 122/086
 Kingdra (tg03/tg30)
@@ -13,19 +13,12 @@ Ivysaur (167jp/165)
 Mew (052
 Gyarados (040/098)
 Flareon (tg01/tg30)
-Jolteon
+Jolteon (tg04/tg30)
 Eevee (tg11/tg30)
 Mega gardevoir ex (032/∞)
 Mega charizard x ex (109/094)
 Meowth (106/094)
 Mega zygarde ex (120/088)
-Charizard (211/172)
-Flareon-v (swsh179)
-Jolteon-v (swsh183/71)
-Vaporeon-v (swsh181-71)
-Pikachu (160/159)
-Vaporeon (tg02-tg30)
-Starmie-v (tg13/tg30)
 Mega greninja ex
 036/08
 053/081
@@ -47,7 +40,7 @@ Mega greninja ex
 094/084
 Bulk
 217/217
-Xy116/♾️
+Xy116/∞
 Sylveon-gx (140/145)
 Noibat (111/100)
 183/172
@@ -65,15 +58,6 @@ Dawn (118/094)
 232/191
 133/191
 Magneton (159/∞)
-Treecko (055/∞)
-Torchic (056/∞)
-Mudkip (057/∞)
-Froakie (060/∞)
-Fennekin (059/∞)
-Chespin (058/∞)
-Quaxly (063/∞)
-Fuecoco (062/∞)
-Sprigatito (061/∞)
 Frosmoth 192/184
 Milotic 070/068
 Morpeko da marine 206/∞
@@ -96,16 +80,36 @@ Wyrdeer 070/067
 Kingdra 190/184
 ST 14
 ST 22
+Torchic (056/∞)
+Treecko (055/∞)
+Mudkip (057/∞)
+Fennekin (059/∞)
+Chespin (058/∞)
+Froakie (060/∞)
+Fuecoco (062/∞)
+Sprigatito (061/∞)
+Quaxly (063/∞)
+Traquinagem da acerola (183/132)
+Mega venusaur ex (177/132)
+Starmie-v (tg13/tg30)
+Jolteon-v (swsh183)
+Vaporeon (tg02/tg30)
+Vaporeon-v (swsh181)
+Flareon-v (swsh179)
+Amigos em sinnoh (149/159)
+Pesquisa de Professores: Prof. Carvalho (24/25)
+Boa hancock (Op13-051)
+S-snake (op13-114)
+Jewelry bonney (op13-108)
+Nami (op15-086)
+Pikachu (160/159)
+Jolteon
+Charizard (211/172)
+Jolteon-v (swsh183/71)
+Vaporeon-v (swsh181-71)
+Vaporeon (tg02-tg30)
+Xy116/♾️
 135/108
 015/081
 188/172
 245/198
-# --- Nao coletaveis automaticamente (nao inventar busca sem identificador) ---
-# Jolteon            -> cadastrado SEM codigo; so coletavel via link direto (codigoUrl no app)
-# Mew (052           -> codigo truncado no cadastro (falta /TOTAL e o fecha-parenteses); corrigir no app
-# Bulk / Mega greninja ex -> sem codigo; nao coletaveis sem identificador
-# ST 14 / ST 22      -> Starter Deck 14 e 22 de ONE PIECE (cadastro: colecao "ST Deck"); a Liga
-#                       Pokemon nao cobre esse TCG, entao nao ha preco a coletar la
-# XXX/(infinito)     -> total do codigo e placeholder do cadastro; sem o total real a busca nao
-#                       identifica a carta (familia 055, 056, 057, 058, 059, 060, 061, 062, 063,
-#                       159, 195, 206 e 032)
