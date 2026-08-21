@@ -3118,10 +3118,37 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
           /* padrão permissivo de propósito: aceita prefixo de letra dos dois lados (TG12/TG30,
              GG01/GG70, SV49/SV94) além do formato mais comum. NÃO é régua de aprovação — é só
              pra CAPTURAR o que a câmera leu; julgar se está certo é com você. */
-          let m=bruto.match(/([A-Z]{0,3}\s*\d{1,4})\s*(JP|C)?\s*\/\s*([A-Z]{0,3}\s*\d{1,4}|∞)/i);
-          if(!m){const mp=bruto.match(/([A-Z]{0,3}\s*\d{1,4})\s*(JP|C)?\s*\/\s*(?:[o0c8∞\s]{0,3})(?![\dA-Z])/i);
+          /* CADEIA DE PADROES, do mais especifico pro mais frouxo. Alargada em 2026-08-21 contra
+             o gabarito real das 16 fotos do Felype: a regra anterior exigia `numero/total` e
+             REJEITAVA 6 delas mesmo com leitura perfeita — XY116, 062, 080, 082, No. 130 e
+             001/SV-P. O formato que o app tratava como unico era MINORIA na amostra real.
+             `soNum` marca o codigo que nao tem "/" (promocional): la nao existe lugar pra
+             letra de idioma, entao a tela mostra um chip so em vez dos quatro. */
+          let m=null,soNum=false,certeza='alta';
+          m=bruto.match(/([A-Z]{0,3}\d{1,4})\s*(JP|C)?\s*\/\s*([A-Z]{0,3}\d{1,4}|∞)/i);
+          if(!m){/* promocional com infinito: o modelo nao conhece o glifo e devolve 8/o/oo/co */
+            const mp=bruto.match(/([A-Z]{0,3}\d{1,4})\s*(JP|C)?\s*\/\s*(?:[o0c8∞\s]{0,3})(?![\dA-Z])/i);
             if(mp)m=[mp[0],mp[1],mp[2],'∞'];}
-          if(m){m[1]=(m[1]||'').replace(/\s+/g,'');m[3]=(m[3]||'').replace(/\s+/g,'');}
+          if(!m){/* letras DEPOIS da barra: 001/SV-P (promo chinesa do gabarito) */
+            const mL=bruto.match(/([A-Z]{0,3}\d{1,4})\s*\/\s*([A-Z]{1,4}(?:\s*-\s*[A-Z]{1,2})?)(?!\d)/i);
+            if(mL)m=[mL[0],mL[1],'',mL[2]];}
+          if(!m){/* japones antigo: "No. 130" */
+            const mN=bruto.match(/(?:^|[^A-Z])N[oO0°º]\s*\.\s*(\d{1,4})\b/i);
+            if(mN){m=[mN[0],'No. '+mN[1],'',''];soNum=true;certeza='media';}}
+          if(!m){/* promo com prefixo de letras e SEM barra: XY116, SWSH020, SM210 */
+            const mP=bruto.match(/(?:^|[^A-Z0-9])([A-Z]{2,4}\d{1,4})(?![\dA-Z])(?!\s*\/)/i);
+            if(mP){m=[mP[0],mP[1],'',''];soNum=true;certeza='media';}}
+          if(!m){/* ultimo recurso: numero solto de 2 a 4 digitos (promo tipo 062, 080, 082).
+                    Ano de copyright fica de fora — senao 2026 vira "codigo" toda vez. */
+            /* numero solto SO conta com ZERO A ESQUERDA (062, 080, 0504) — que e a marca do
+               numero de carta promocional. Sem esta trava o leitor pegava dano (-30) e ataque
+               (120), os numeros mais comuns da carta, e o dono aplicava de 1 toque. Ano de
+               copyright continua fora. Medido no teste com rodape real, 21/08. */
+            const cand=[...bruto.matchAll(/(?:^|[^\d])(0\d{1,3})(?![\d])/g)].map(x=>x[1])
+              .filter(x=>!/^(19|20)\d{2}$/.test(x));
+            if(cand.length){const esc=cand.sort((a,b)=>b.length-a.length)[0];
+              m=[esc,esc,'',''];soNum=true;certeza='baixa';}}
+          if(m){m[1]=(m[1]||'').replace(/\s+/g,' ').trim();m[3]=(m[3]||'').replace(/\s+/g,'');}
           /* [CORRIGIDO 2026-08-17] a detecção automática de ESCRITA (w.detect) NUNCA funcionou:
              testada ao vivo em 2 configurações (worker 'eng' OEM 2, e worker 'osd' OEM 0 com
              legacyCore) devolve TODOS os campos nulos — script, confiança e orientação. O
@@ -3132,11 +3159,25 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
              a tela prometer o que não entrega, assumimos o que é verdade e foi MEDIDO: a
              máquina lê o CÓDIGO (92% de confiança em texto limpo); o IDIOMA quem diz é você,
              num toque. */
-          if(!m){if(hint)hint.innerHTML='📷 Não achei o código'+(bruto.trim()?' (li: <b>'+bruto.trim().slice(0,24)+'</b>)':'')+' — tente de novo com a BASE da carta bem visível e iluminada, ou digite à mão.';return;}
+          /* [MEDIDO 2026-08-21 — 16 fotos, 14 cartas distintas, do estoque do dono]
+             "tente de novo com a base bem visivel" era mentira educada: com a foto da carta
+             INTEIRA, este leitor acerta o codigo em ~0 de 16. Nao e a foto do dono, e o motor.
+             O que MELHORA de verdade (medido): chegar perto, so a faixa do codigo enchendo a
+             tela — ai ele passa a acertar algumas.
+             CORRIGIDO NA REVISAO: a versao anterior deste comentario afirmava que o leitor le a
+             linha de copyright "PERFEITA" e citava "2026 Pokemon / Nintendo / Creatures / GAME
+             FREAK". Ele NUNCA devolveu isso e nao podia — a lista de caracteres permitidos, 6
+             linhas acima, nao tem minusculas. O que sai de verdade e "02026 P / N / C / GAME
+             FREAK". Eu tinha embelezado a saida da maquina e usado a versao embelezada como
+             argumento. Fica registrado porque a licao vale mais que o conserto.
+             E a versao anterior tambem generalizava "fonte prateada sobre holografico": das 12
+             cartas conferidas, so 3 sao assim — ha codigo preto sobre dourado, branco sobre
+             roxo, preto sobre azul claro. */
+          if(!m){if(hint)hint.innerHTML='📷 Não consegui ler o código'+(bruto.trim()?' (li: <b>'+bruto.trim().slice(0,24)+'</b>)':'')+'.<div class="meta" style="margin-top:3px">Provavelmente não é a sua foto: com a carta inteira no quadro este leitor quase nunca acerta — foi medido em 16 fotos suas. <b>O que ajuda:</b> aproximar até o número da carta encher a tela, e evitar o brilho em cima dele. Se não sair, <b>digite o código</b> — leva menos tempo que insistir.</div>';return;}
           const escrita='latina';
           const sufLido=(m[2]||'').toUpperCase(),num=m[1],tot=m[3];
           /* se a escrita foi cravada (ou o sufixo veio impresso), sugere direto; senão, 3 chips de 1 toque */
-          const chip=(suf,rot,idi)=>{const c=num+suf+'/'+tot;
+          const chip=(suf,rot,idi)=>{const c=soNum?num:(num+suf+'/'+tot);
             return '<span class="lnk" style="font-weight:800;border:1px solid var(--blue);border-radius:8px;padding:2px 9px;display:inline-block;margin:2px 3px 0 0" onclick="aplicarScan(\''+codId+'\',\''+c+'\',\''+idiSelId+'\',\''+idi+'\',\''+hintId+'\')">'+rot+'</span>';};
           /* [2026-08-17, insight do Felype] o PADRÃO de código volta aqui — mas como GUIA da
              MÁQUINA, não como régua que reprova o humano. É a distinção que ele fez: reprovar
@@ -3150,11 +3191,36 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
              Secret rare tem número MAIOR que o total da coleção (é justamente a carta cara);
              os próprios exemplos do app (245/198) são secret rare. Plausível = os dois lados
              existem e cabem em 4 dígitos. Nada além disso. */
-          const plausivel=(/\d/.test(num)&&num.length<=7&&(tot==='∞'||(/\d/.test(tot)&&tot.length<=7)));
+          const plausivel=(/\d/.test(num)&&num.length<=8&&(soNum||tot==='∞'||(/\d/.test(tot)&&tot.length<=7)||/^[A-Z]/i.test(tot)));
           const seguro=conf>=75&&plausivel;
+          /* [REVISAO ADVERSARIAL 21/08] a cadeia alargada TRIPLICOU as sugestoes falsas no ruido
+             REAL do OCR (1 -> 3 em 16 fotos) — porque o meu teste de ruido eram 7 frases que EU
+             escrevi, e o ruido de verdade e outro ("13 95 B 02 83 15 TKM5 7 144..." virava
+             "TKM5", com botao de 1 toque pra aplicar). Regra nova: abaixo de 60% de confianca o
+             app MOSTRA o que leu, mas NAO oferece o botao de aplicar. Sugerir codigo errado com
+             1 toque e pior que nao sugerir nada — o dono aplica e o cadastro entra torto. */
+          /* MEDIDO nas 16 fotos, resolucao nativa: 2 acertos (168/165 e 122/086) com
+             confianca 13% e 20%; 9 leituras erradas com confianca 12% a 30%. Ou seja: a
+             confianca do motor NAO separa certo de errado nestas fotos — o corte em 60 nao e
+             um filtro esperto, e um "nunca aplique sozinho a partir deste leitor", que e a
+             decisao certa com 12,5% de acerto. Quando/se o motor melhorar, o corte volta a
+             significar alguma coisa. O que o app faz agora: MOSTRA o que leu (mesmo errado) e
+             deixa o dono comparar com a carta e digitar — informacao sem risco. */
+          const confiavel=conf>=60;
           const selo=seguro?'':' <span class="tag c" style="font-size:9px">⚠ leitura duvidosa'+(conf?' ('+conf+'%)':'')+' — confira na carta</span>';
           if(hint){
-            if(sufLido){
+            if(!confiavel){
+              hint.innerHTML='📷 Li isto: <b style="font-size:16px">'+(soNum?num:(num+'/'+tot))+'</b>'
+                +'<div class="meta" style="margin-top:3px"><b>Confira na carta antes de usar</b> — este leitor acerta pouco (2 em 16, medido nas suas fotos), então ele não aplica sozinho. Se bater, digite; se não bater, aproxime até o número encher a tela e tente de novo.</div>';
+            }else if(soNum){
+              /* codigo sem barra (promocional): nao existe lugar pra letra de idioma aqui —
+                 um chip so, e o aviso de certeza diz o quanto confiar. */
+              const aviso=certeza==='baixa'
+                ? ' <span class="tag c" style="font-size:9px">⚠ é só um número solto na carta — confira antes de usar</span>'
+                : (certeza==='media' ? ' <span class="tag c" style="font-size:9px">promocional — confira na carta</span>' : '');
+              hint.innerHTML='📷 Li: <b>'+num+'</b>'+aviso+' '+chip('','✔ usar '+num,'')
+                +'<div class="meta" style="margin-top:2px">Carta promocional costuma ter só o número (ex.: <b>080</b>, <b>XY116</b>, <b>No. 130</b>), sem o “/total”.</div>';
+            }else if(sufLido){
               const cod=num+sufLido+'/'+tot;
               hint.innerHTML='📷 Li: <b>'+cod+'</b> (sufixo impresso na carta)'+selo+' '+chip(sufLido,'✔ usar '+cod,'')+' <span style="color:var(--mut)">· confira com a carta na mão</span>';
             }else{
@@ -3523,11 +3589,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 01h35';
+const BUILD_TAG='21/08 03h22';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787286935347;
+const BUILD_TS=1787293332523;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
