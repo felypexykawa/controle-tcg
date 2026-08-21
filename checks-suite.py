@@ -78,6 +78,18 @@ dano('F4', S.replace(ON, '').replace(ONN, '').replace('function normCod(', '/* f
 i, j = corta(S, 'telaCarregando')
 dano('F5', S[:i] + 'function telaCarregando(){}' + S[j:])
 
+# ---- mutacoes do 4o reataque (2026-08-20): as 3 que passavam VERDE com dano real ----
+def troca(nome, velho, novo_txt):
+    if velho in S:
+        dano(nome, S.replace(velho, novo_txt, 1))
+    else:
+        print('  AVISO: alvo de %s nao existe mais no index.html — mutacao NAO gerada' % nome)
+
+troca('M4', 'salvarPontoNuvem(true,true).then(r=>{', 'Promise.resolve({ok:true}).then(r=>{')
+troca('M5', 'ids.slice(PONTOS_NUVEM_MAX).forEach', 'ids.slice(1).forEach')
+troca('M6', "const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência de conta'],info:['ℹ️','informativo']};",
+            "const SEV={vermelho:['🔴','conta quebrada']};")
+
 # ---- refatoracoes LEGITIMAS: nao podem barrar ----
 i, j = corta(S, 'codLimpo')
 corpo = S[i:j]

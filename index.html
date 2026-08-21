@@ -2239,62 +2239,109 @@ function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();const sna
    nao havia para onde voltar. Agora existem pontos NA NUVEM, com botao proprio, visiveis de
    qualquer aparelho. Rotativo: guarda os 12 mais recentes (o 13o mais antigo sai). */
 const PONTOS_NUVEM_MAX=12;
+/* _pontosNuvem: null = ainda nao buscou · {erro:'...'} = a nuvem RECUSOU · array = a lista.
+   Os tres estados existem porque tratar recusa como "lista vazia" fazia a tela dizer "nenhum
+   ponto ainda — crie o primeiro" quando a verdade era "a nuvem nao deixou". O dono concluiria
+   que a peca funciona e ele e que nao usou — e so descobriria no dia em que precisasse voltar.
+   E a dor de 12/08 reencenada, so que pior, porque desta vez com uma tela dizendo que esta tudo
+   certo. (Achado da revisao adversarial, 2026-08-20.) */
 let _pontosNuvem=null;
 function pontosNuvemRef(){return _db?_db.collection('controle').doc('dados').collection('pontos'):null;}
 function carregarPontosNuvem(cb){
   const ref=pontosNuvemRef();
-  if(!ref){_pontosNuvem=[];if(cb)cb();return;}
+  if(!ref){_pontosNuvem={erro:'sem conexao com a nuvem agora (precisa de internet e login)'};if(cb)cb();return;}
   ref.orderBy('ts','desc').limit(30).get().then(q=>{
     const L=[];q.forEach(d=>L.push({ts:+d.id,n:(d.data()||{}).n||0,quem:(d.data()||{}).quem||''}));
     _pontosNuvem=L;if(cb)cb();
-  }).catch(()=>{_pontosNuvem=[];if(cb)cb();});}
-function salvarPontoNuvem(silencioso){
+  }).catch(e=>{_pontosNuvem={erro:((e&&e.message)||'a nuvem recusou a leitura')};if(cb)cb();});}
+function pontosNuvemLista(){return Array.isArray(_pontosNuvem)?_pontosNuvem:[];}
+/* devolve PROMESSA com {ok:bool, motivo:'...'} — quem restaura PRECISA saber se a rede de
+   seguranca de fato existiu antes de sobrescrever tudo. A versao anterior chamava isto em modo
+   silencioso e seguia em frente sem olhar: os tres caminhos de falha (sem nuvem, dado grande
+   demais, recusa) retornavam mudos e o dono perdia o estado atual acreditando no que o aviso
+   da tela tinha prometido. */
+function salvarPontoNuvem(silencioso,semRotacao){
   const ref=pontosNuvemRef();
-  if(!ref){if(!silencioso)alert('Sem nuvem conectada agora — o ponto na nuvem precisa de internet e login.');return;}
+  const falha=m=>{if(!silencioso)alert(m);return Promise.resolve({ok:false,motivo:m});};
+  if(!ref)return falha('Sem nuvem conectada agora — o ponto na nuvem precisa de internet e login.');
   const ts=Date.now();
-  const payload={ts,n:movs.length,quem:(_userEmail||'').split('@')[0]||'',
-    dados:JSON.stringify({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos})};
-  if(payload.dados.length>900000){
-    if(!silencioso)alert('Seus dados passaram do tamanho que cabe num ponto na nuvem. Use "Completo c/ fotos" pra guardar no computador e me avise.');
-    return;}
+  const dados=JSON.stringify({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos});
+  /* mede BYTES, nao caracteres: o limite do Firestore e 1.048.576 bytes e acento/emoji ocupam
+     mais de um byte cada. 700k e a mesma folga que o salvarNuvem ja usa. */
+  let bytes=dados.length;
+  try{bytes=new TextEncoder().encode(dados).length;}catch(e){}
+  if(bytes>700000)return falha('Seus dados passaram do tamanho que cabe num ponto na nuvem. Use "Completo c/ fotos" pra guardar no computador e me avise.');
   if(!silencioso)toast('salvando ponto na nuvem...');
-  ref.doc(String(ts)).set(payload).then(()=>{
+  return ref.doc(String(ts)).set({ts,n:movs.length,quem:(_userEmail||'').split('@')[0]||'',dados}).then(()=>{
     localStorage.setItem('tcg_ultimo_ponto_nuvem',String(ts));
     if(!silencioso)toast('ponto salvo na nuvem');
-    ref.orderBy('ts','desc').get().then(q=>{
+    if(semRotacao)return carregarPontosNuvem(()=>{}),{ok:true,ts};
+    /* rotacao: mantem os PONTOS_NUVEM_MAX mais recentes. Roda so em salvamento COMUM — nunca
+       no pre-salvamento de uma restauracao, senao com as vagas cheias o ponto novo empurrava
+       para fora justamente o ponto mais antigo, que costuma ser o alvo da restauracao (e o
+       anterior a corrupcao). Restaurar apagava o que se queria restaurar. */
+    return ref.orderBy('ts','desc').get().then(q=>{
       const ids=[];q.forEach(d=>ids.push(d.id));
       ids.slice(PONTOS_NUVEM_MAX).forEach(id=>ref.doc(id).delete().catch(()=>{}));
-      carregarPontosNuvem(()=>{if(!silencioso&&document.getElementById('modal')){fecharModal();abrirBackup();}});
-    }).catch(()=>{});
-  }).catch(e=>{if(!silencioso)alert('A nuvem recusou o ponto: '+((e&&e.message)||'erro')+' — se falar em permissao, falta publicar a regra de "pontos" no Firebase.');});}
+      return new Promise(r=>carregarPontosNuvem(()=>{
+        if(!silencioso&&document.getElementById('modal')){fecharModal();abrirBackup();}
+        r({ok:true,ts});}));
+    }).catch(()=>({ok:true,ts}));
+  }).catch(e=>{
+    const m='A nuvem recusou o ponto: '+((e&&e.message)||'erro')+' — se falar em permissao, falta liberar "pontos" no Firebase.';
+    if(!silencioso)alert(m);
+    return {ok:false,motivo:m};});}
 function restaurarPontoNuvem(ts){
   const ref=pontosNuvemRef();if(!ref)return;
-  if(!confirm('Voltar TODOS os dados para o ponto de '+new Date(ts).toLocaleString('pt-BR')+'? O estado de agora sai do ar (um ponto novo e salvo antes, pra dar pra voltar).'))return;
-  salvarPontoNuvem(true);
-  ref.doc(String(ts)).get().then(d=>{
-    if(!d.exists){alert('Esse ponto nao esta mais na nuvem.');return;}
-    let o=null;try{o=JSON.parse((d.data()||{}).dados||'null');}catch(e){}
-    if(!o||!Array.isArray(o.movs)){alert('Nao consegui ler esse ponto.');return;}
-    aplicarNuvem(o);save();saveL();salvarNuvem();fecharModal();render();
-    toast('voltou para o ponto de '+new Date(ts).toLocaleString('pt-BR'));
-  }).catch(e=>alert('Nao consegui buscar o ponto: '+((e&&e.message)||'erro')));}
-/* ponto automatico: 1 por dia, na primeira vez que o app abre com a nuvem pronta. Sem isso o
-   historico da nuvem so existiria quando alguem lembrasse de apertar o botao — e a dor original
-   foi exatamente essa (o ultimo ponto tinha 8 dias). */
+  if(!confirm('Voltar TODOS os dados para o ponto de '+new Date(ts).toLocaleString('pt-BR')+'? Antes disso eu guardo um ponto com o estado de AGORA, pra dar pra voltar atras.'))return;
+  toast('guardando o estado de agora...');
+  /* ESPERA o pre-salvamento e SO continua se ele deu certo. Sem isso a frase do aviso era uma
+     promessa que o codigo nao cumpria. semRotacao=true protege o alvo (ver G4 acima). */
+  salvarPontoNuvem(true,true).then(r=>{
+    if(!r||!r.ok){
+      alert('NAO restaurei. Nao consegui guardar o estado de agora antes ('+((r&&r.motivo)||'motivo desconhecido')+'), e restaurar sem essa copia poderia te fazer perder o que existe hoje.');
+      return;}
+    return ref.doc(String(ts)).get().then(d=>{
+      if(!d.exists){alert('Esse ponto nao esta mais na nuvem.');return;}
+      let o=null;try{o=JSON.parse((d.data()||{}).dados||'null');}catch(e){}
+      if(!o||!Array.isArray(o.movs)){alert('Nao consegui ler esse ponto.');return;}
+      aplicarNuvem(o);
+      /* a trava entra DEPOIS de aplicar (aplicarNuvem ignora tudo enquanto ela esta ligada) e
+         segura o snapshot de volta, senao a nuvem reaplicava o estado velho por cima em
+         silencio — o mesmo estrago mapeado em 2026-08-11 no restaurar local. */
+      _restaurando=true;
+      salvarCad();salvarCB&&salvarCB();salvarCodRes();save();saveL();
+      setTimeout(()=>{_restaurando=false;if(USAR_NUVEM&&_syncReady)salvarNuvem();},3000);
+      fecharModal();go('painel');
+      toast('voltou para o ponto de '+new Date(ts).toLocaleString('pt-BR'));
+    });
+  }).catch(e=>alert('Nao consegui restaurar: '+((e&&e.message)||'erro')));}
+/* ponto automatico do dia. A marca de "ja salvei hoje" e o ponto MAIS RECENTE DA NUVEM, nao uma
+   marca deste aparelho: com PC + os dois celulares, a marca local dava ate 3 pontos por dia e as
+   12 vagas cobriam ~4 dias em vez de 12. */
 function pontoNuvemDiario(){
   try{
-    const ult=+localStorage.getItem('tcg_ultimo_ponto_nuvem')||0;
-    if(Date.now()-ult<20*3600000)return;
     if(!movs.length)return;
-    salvarPontoNuvem(true);
+    const decide=()=>{
+      const L=pontosNuvemLista();
+      const ultNuvem=L.length?L[0].ts:0;
+      const ultLocal=+localStorage.getItem('tcg_ultimo_ponto_nuvem')||0;
+      const ult=Math.max(ultNuvem,ultLocal);
+      if(Date.now()-ult<20*3600000)return;
+      salvarPontoNuvem(true);};
+    if(_pontosNuvem===null)carregarPontosNuvem(decide);else decide();
   }catch(e){}}
 function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.ts);const dt=ts=>new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
   if(_pontosNuvem===null){carregarPontosNuvem(()=>{if(document.getElementById('modal')){fecharModal();abrirBackup();}});}
   const nuv=(_pontosNuvem===null)
     ?'<div class="meta" style="padding:6px 12px">buscando na nuvem...</div>'
-    :(_pontosNuvem.length
-      ?_pontosNuvem.map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos${x.quem?' · '+x.quem:''}</div></div><button class="x" style="color:var(--blue)" onclick="restaurarPontoNuvem(${x.ts})">restaurar</button></div>`).join('')
-      :'<div class="empty">Nenhum ponto na nuvem ainda — toque no botão acima pra criar o primeiro.</div>');
+    :(_pontosNuvem&&_pontosNuvem.erro
+      /* "a nuvem recusou" NUNCA pode aparecer como "nenhum ponto ainda": um e problema pra
+         resolver, o outro e convite pra usar. Confundir os dois esconde a peca quebrada. */
+      ?`<div class="item" style="display:block;padding:10px 12px;border-left:3px solid var(--red)"><b style="color:var(--red)">A nuvem não deixou ler os pontos</b><div class="meta" style="margin-top:3px">${_pontosNuvem.erro}</div><div class="meta">Enquanto isso, seus pontos deste navegador (abaixo) continuam valendo.</div></div>`
+      :(pontosNuvemLista().length
+        ?pontosNuvemLista().map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos${x.quem?' · '+x.quem:''}</div></div><button class="x" style="color:var(--blue)" onclick="restaurarPontoNuvem(${x.ts})">restaurar</button></div>`).join('')
+        :'<div class="empty">Nenhum ponto na nuvem ainda — toque no botão acima pra criar o primeiro.</div>'));
   const itens=b.length?b.map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos</div></div><button class="x" style="color:var(--blue)" onclick="restaurarBackup(${x.ts})">restaurar</button></div>`).join(''):`<div class="empty">Sem pontos salvos ainda.</div>`;
   const h=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:82vh;overflow:auto">
     <div class="head">Backup e restauração</div>
@@ -3162,11 +3209,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='20/08 21h57';
+const BUILD_TAG='20/08 22h21';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787273823579;
+const BUILD_TS=1787275278366;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -3343,21 +3390,30 @@ function pendGrupos(){
       a:[['escolher qual',jsEsc(x)]]}))});
   G.push({id:'link',ic:'🔗',tit:'sem opções na tela',dica:'precisa colar o link da carta',
     itens:semOpc.map(x=>({t:'#'+x.codC,d:x.rots.slice(0,3).join(' · '),a:[['colar link',jsEsc(x)]]}))});
+  /* as listas fixas abaixo cobrem os valores que existem HOJE. Se amanha nascer um motivo ou
+     uma severidade nova, ela cai no grupo "outros" do fim — nunca some da conta. Sem essa
+     rede, o total do topo voltaria a nao fechar com a soma dos grupos, que foi exatamente o
+     defeito corrigido nesta mesma entrega (dizia 79, enumerava 60). */
+  const cadItem=x=>({t:(x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),
+    d:'',a:[['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`]]});
+  const provaItem=x=>({t:x.titulo,d:x.detalhe,
+    a:[...(x.acaoJs?[[x.acaoRot,`fecharModal();${x.acaoJs}`]]:[]),...(x.acao2Js?[[x.acao2Rot,`fecharModal();${x.acao2Js}`]]:[])]});
   const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
-  ['sem_preco','sem_codigo'].forEach(mot=>{
-    G.push({id:mot,ic:MOT[mot][0],tit:MOT[mot][1],dica:'',
-      itens:R.cad.filter(x=>x.motivo===mot).map(x=>({
-        t:(x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),
-        d:'',a:[['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`]]}))});});
+  Object.keys(MOT).forEach(mot=>{
+    G.push({id:mot,ic:MOT[mot][0],tit:MOT[mot][1],dica:'',itens:R.cad.filter(x=>x.motivo===mot).map(cadItem)});});
   const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência de conta'],info:['ℹ️','informativo']};
-  ['vermelho','amarelo','info'].forEach(sev=>{
-    G.push({id:sev,ic:SEV[sev][0],tit:SEV[sev][1],dica:'',
-      itens:p.A.filter(x=>x.sev===sev).map(x=>({t:x.titulo,d:x.detalhe,
-        a:[...(x.acaoJs?[[x.acaoRot,`fecharModal();${x.acaoJs}`]]:[]),...(x.acao2Js?[[x.acao2Rot,`fecharModal();${x.acao2Js}`]]:[])]}))});});
+  Object.keys(SEV).forEach(sev=>{
+    G.push({id:sev,ic:SEV[sev][0],tit:SEV[sev][1],dica:'',itens:p.A.filter(x=>x.sev===sev).map(provaItem)});});
+  const sobra=[].concat(R.cad.filter(x=>!MOT[x.motivo]).map(cadItem),p.A.filter(x=>!SEV[x.sev]).map(provaItem));
+  if(sobra.length)G.push({id:'outros',ic:'❓',tit:'outros achados',dica:'tipo novo, ainda sem grupo próprio',itens:sobra});
   return G.filter(g=>g.itens.length);
 }
 function abrirPendencias(filtro){
-  if(filtro!==undefined)_pendFiltro=filtro;
+  /* chamada SEM argumento = veio do Painel, ou seja, e uma abertura nova: volta pro mapa.
+     Antes o filtro era global e sobrevivia ao fechar — reabrir caia dentro do ultimo grupo,
+     com o texto do topo dizendo "toque no grupo que voce vai resolver" e nenhum grupo na tela
+     pra tocar. Trocar de grupo continua sendo 1 toque nas pilulas. */
+  _pendFiltro=(filtro===undefined)?'mapa':filtro;
   const G=pendGrupos();
   const tot=G.reduce((n,g)=>n+g.itens.length,0);
   if(!G.some(g=>g.id===_pendFiltro))_pendFiltro='mapa';

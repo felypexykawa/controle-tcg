@@ -303,7 +303,12 @@ const CAPACIDADES = [
         sitDe: m => (m && m._vendida ? 'Vendido' : (m && m._sit) || 'Em estoque'),
         precoLigaDe: c => FICHAS[('' + c).trim()] || null,
         provaReal: () => ({ A: [], n: { vermelho: 0, amarelo: 0 } }),
-        _provaCache: { A: [{ sev: 'vermelho', titulo: 'conta quebrada', detalhe: 'x' }], n: { vermelho: 1, amarelo: 0 } },
+        /* as 3 severidades entram na fixture: com so uma, podar o mapa SEV mandava as outras
+           duas pro grupo "outros" — a soma continuava fechando e a vacina passava verde
+           enquanto 2 grupos inteiros sumiam da tela do dono (furo M6 do 4o reataque) */
+        _provaCache: { A: [{ sev: 'vermelho', titulo: 'conta quebrada', detalhe: 'x' },
+                           { sev: 'amarelo', titulo: 'parcela sem conta', detalhe: 'y' },
+                           { sev: 'info', titulo: 'so pra saber', detalhe: 'z' }], n: { vermelho: 1, amarelo: 1 } },
         document: tela.doc,
         window: {},
         _pendFiltro: 'mapa'
@@ -343,9 +348,27 @@ const CAPACIDADES = [
         ['poe quem resolve em 1 toque na frente', amb[1] && amb[1].codC, '188/172'],
         ['carta ja resolvida sai da lista', depoisDeResolver, 1],
         ['pendenciasCodigo() acha a carta com codigo que a Liga nao precificou', resumo.cad.length, 1],
-        ['pendenciasResumo() soma ambiguas + cadastro + contas', resumo.total, 2 + 1 + 1],
+        ['pendenciasResumo() soma ambiguas + cadastro + contas', resumo.total, 2 + 1 + 3],
+        ['cada severidade tem GRUPO PROPRIO (nao pode virar "outros")',
+          ['vermelho', 'amarelo', 'info'].filter(id => grupos.some(g => g.id === id)).length, 3],
         ['e conta quantas resolvem em 1 toque', resumo.n1toque, 1],
         ['pendGrupos() separa por tipo, sem grupo vazio', grupos.every(g => g.itens.length > 0) && grupos.length >= 3, true],
+        ['tipo NOVO nao some da conta: cai em "outros"', (() => {
+          ctx._provaCache.A.push({ sev: 'roxo-inventado', titulo: 'severidade nova', detalhe: '' });
+          const g2 = F.pendGrupos();
+          const soma = g2.reduce((n, g) => n + g.itens.length, 0);
+          const temOutros = g2.some(g => g.id === 'outros');
+          ctx._provaCache.A.pop();
+          return temOutros && soma === F.pendenciasResumo().total + 1;
+        })(), true],
+        ['abrir pelo Painel (sem argumento) cai no MAPA, nao no ultimo grupo', (() => {
+          F.abrirPendencias('escolher');
+          ctx._tela.escrito.length = 0;
+          F.abrirPendencias();
+          const h = ctx._tela.escrito.join('');
+          ctx._tela.escrito.length = 0;
+          return /conta quebrada/.test(h) && h.indexOf('192/184') < 0;
+        })(), true],
         ['o total do topo bate com a soma dos grupos (era 79 dizendo 60)', resumo.total, somaGrupos],
         ['o MAPA mostra os grupos...', /escolher qual carta é a sua/.test(mapa) && /conta quebrada/.test(mapa), true],
         ['...e NAO despeja os itens neles', mapa.indexOf('192/184') >= 0, false],
@@ -460,19 +483,34 @@ const CAPACIDADES = [
     nome: 'ponto de restauracao na nuvem',
     perde: 'o historico na nuvem — sem ele, dado corrompido que sincroniza nao tem volta, e o unico backup real vira o que estiver neste navegador',
     precisa: ['salvarPontoNuvem', 'carregarPontosNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario'],
-    recorta: ['pontosNuvemRef', 'salvarPontoNuvem', 'pontoNuvemDiario'],
+    /* `restaurarPontoNuvem` e a funcao que SOBRESCREVE todos os dados do dono. Ela estava
+       so em `precisa` (existencia) e fora do `recorta`: nunca era executada. Duas mutacoes
+       com perda de dado passavam verdes — tirar o pre-salvamento, e deixar a rotacao apagar
+       justamente o ponto restaurado. Achado do 4o reataque adversarial, 2026-08-20. */
+    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario'],
     atributos: [[/\bsalvarPontoNuvem\s*\(/g, 2, 'o botao "salvar ponto na nuvem" e a rotina diaria']],
     contexto: () => {
       const gravados = []; const store = {}; const avisos = [];
       /* "promessa" que resolve NA HORA: o codigo do app faz o trabalho dentro de .then(), e um
          Promise de verdade so rodaria depois das conferencias — o teste dava falso vermelho */
       const jah = v => ({ then: f => { const r = f(v); return (r && r.then) ? r : jah(r); }, catch: () => jah(v) });
-      const doc = id => ({ set: p => { gravados.push({ id, p }); return jah(); }, delete: () => jah() });
-      const col = { doc, orderBy: () => col, limit: () => col, get: () => jah({ forEach: () => {} }) };
+      const apagados = []; const aplicados = []; let recusar = false; let existentes = [];
+      const doc = id => ({
+        set: p => { if (recusar) return { then: () => ({ catch: f => jah(f(new Error('permissao'))) }) }; gravados.push({ id, p }); return jah(); },
+        delete: () => { apagados.push(id); return jah(); },
+        get: () => jah({ exists: true, data: () => ({ dados: JSON.stringify({ movs: [{ id: 'do-ponto' }] }) }) })
+      });
+      const col = { doc, orderBy: () => col, limit: () => col,
+        get: () => jah({ forEach: f => existentes.forEach(id => f({ id, data: () => ({}) })) }) };
       return {
-        _gravados: gravados, _store: store, _avisos: avisos,
+        _gravados: gravados, _apagados: apagados, _aplicados: aplicados, _store: store, _avisos: avisos,
+        _recusar: v => { recusar = v; }, _existentes: ids => { existentes = ids; },
+        aplicarNuvem: o => aplicados.push(o), confirm: () => true, go: () => {},
+        save: () => {}, saveL: () => {}, salvarCad: () => {}, salvarCodRes: () => {}, salvarCB: () => {},
+        salvarNuvem: () => {}, setTimeout: () => 0, USAR_NUVEM: true, _syncReady: true,
+        _restaurando: false,
         _db: { collection: () => ({ doc: () => ({ collection: () => col }) }) },
-        PONTOS_NUVEM_MAX: 12, _pontosNuvem: null, _userEmail: 'felype@x.com',
+        PONTOS_NUVEM_MAX: 2, _pontosNuvem: [], _userEmail: 'felype@x.com',
         movs: [{ id: 'a', tipo: 'COMPRA', valor: 10 }], jogos: [], cats: [], cols: [], colsJ: {}, colsG: {},
         pess: [], pgs: [], despCats: [], cadastros: [], contasBanc: [], codigosResolvidos: {},
         localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
@@ -495,8 +533,33 @@ const CAPACIDADES = [
       ctx._store['tcg_ultimo_ponto_nuvem'] = String(Date.now() - 30 * 3600000);
       F.pontoNuvemDiario();
       const depoisDeUmDia = ctx._gravados.length;
+      /* RESTAURAR: o aviso na tela promete "guardo um ponto com o estado de AGORA antes".
+         Se esse pre-salvamento falhar, restaurar apaga o presente sem rede. Entao: quando a
+         nuvem recusa, NAO pode aplicar nada. */
+      ctx._recusar(true);
+      const gravadosAntes = ctx._gravados.length;
+      F.restaurarPontoNuvem(123);
+      const aplicouComFalha = ctx._aplicados.length;
+      ctx._recusar(false);
+      F.restaurarPontoNuvem(123);
+      const aplicouOk = ctx._aplicados.length;
+      /* ROTACAO: com as vagas cheias, restaurar nao pode apagar o ponto-alvo. O pre-salvamento
+         da restauracao roda SEM rotacao justamente por isso. */
+      ctx._existentes(['1', '2', '3']);
+      ctx._apagados.length = 0;
+      F.salvarPontoNuvem(true, true);
+      const apagouNoPreSalvamento = ctx._apagados.length;
+      ctx._apagados.length = 0;
+      F.salvarPontoNuvem(true);
+      const apagouNoSalvamentoComum = ctx._apagados.length;
       return [
         ['salva o ponto na nuvem', ids.length >= 1, true],
+        ['nuvem recusando: NAO restaura nada (o presente esta protegido)', aplicouComFalha, 0],
+        ['nuvem ok: restaura de verdade', aplicouOk > aplicouComFalha, true],
+        ['o pre-salvamento da restauracao nao apaga ponto nenhum', apagouNoPreSalvamento, 0],
+        /* nao basta "apagou algo": `ids.slice(1)` no lugar de `ids.slice(TETO)` tambem apaga,
+           e varre o historico inteiro. Com 3 pontos e teto 2, o certo e apagar 1. */
+        ['a rotacao apaga so o excedente, nunca o historico', apagouNoSalvamentoComum, 1],
         ['com os lancamentos dentro', !!(dados && Array.isArray(dados.movs) && dados.movs.length === 1), true],
         ['e os catalogos junto (cadastros, contas, codigos resolvidos)',
           !!(dados && dados.cadastros && dados.contasBanc && dados.codigosResolvidos), true],

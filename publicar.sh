@@ -24,10 +24,20 @@ MSG=${1:-"app: atualizacao"}
 
 # 1) grava o carimbo nos dois lugares, a partir da MESMA variável
 python - "$TAG" <<'PY'
-import io,re,sys,time
+import io,re,sys,time,json
 tag=sys.argv[1]
 s=io.open('index.html',encoding='utf-8').read()
 ms=int(time.time()*1000)
+# o aviso de versao do app compara ts: se um build sair com relogio atrasado (ou dois no mesmo
+# milissegundo), o carimbo novo fica <= ao antigo e o app cala PARA SEMPRE — silencio que o dono
+# nao tem como perceber. Aqui o carimbo e forcado a andar sempre para frente.
+try:
+    ant=json.load(io.open('versao.json',encoding='utf-8')).get('ts',0)
+except Exception:
+    ant=0
+if ms<=ant:
+    print('AVISO: relogio da maquina nao passou do carimbo anterior — usando anterior+1s')
+    ms=int(ant)+1000
 novo,n=re.subn(r"const BUILD_TAG='[^']*'", "const BUILD_TAG='%s'"%tag, s, count=1)
 if n!=1:
     raise SystemExit('ERRO: nao achei o BUILD_TAG no index.html — nada foi gravado')
@@ -58,7 +68,9 @@ if command -v python >/dev/null 2>&1 && [ -f checks-suite.py ]; then
 fi
 
 # 3) publica
-git add index.html versao.json
+# a vacina vai junto: publicar o app com uma versao ANTIGA do checks-app.js deixaria a trava
+# atras do que ela protege, sem ninguem ver (achado da revisao adversarial de 2026-08-20)
+git add index.html versao.json checks-app.js checks-suite.py 2>/dev/null || git add index.html versao.json
 git commit -q -m "$MSG (v $TAG)"
 git push -q origin master
 echo "publicado: $(git rev-parse --short HEAD) as $(date '+%H:%M:%S')"
@@ -72,7 +84,12 @@ echo "conferindo o live..."
 TAG_CMP=$(printf '%s' "$TAG" | tr -d ' ')
 i=1
 while [ $i -le 6 ]; do
-  SERVIDO=$(curl -s "https://felypexykawa.github.io/controle-tcg/versao.json?cb=$i$$" | tr -d '{}" ' | sed 's/tag://')
+  # extrai SO o valor de "tag". A versao anterior fazia `tr -d '{}" ' | sed 's/tag://'`, o que
+  # funcionava enquanto o arquivo tinha um campo so; quando o "ts" entrou (2026-08-20), o valor
+  # comparado virou "20/0821h57,ts:1787..." e o vigia passou a gritar falso em TODA publicacao.
+  # Mesma armadilha que o comentario 15 linhas acima ja documenta: vigia que grita a toa ensina
+  # a ignorar vigia. Agora o campo e extraido por nome, entao campo novo nao quebra de novo.
+  SERVIDO=$(curl -s "https://felypexykawa.github.io/controle-tcg/versao.json?cb=$i$$" | sed -n 's/.*"tag"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tr -d ' ')
   if [ "$SERVIDO" = "$TAG_CMP" ]; then
     echo "LIVE OK — servindo $TAG"
     exit 0
