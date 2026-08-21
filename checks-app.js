@@ -267,8 +267,8 @@ const CAPACIDADES = [
   {
     nome: 'lista unificada de pendencias no Painel',
     perde: 'as cartas ambiguas da Liga voltam a nao ter lista nenhuma — so apareciam dentro de cada carta, uma por uma; com 24 ambiguas, achar cada uma vira adivinhacao',
-    precisa: ['ambiguasPendentes', 'pendenciasResumo', 'abrirPendencias'],
-    recorta: ['normCod', 'codLimpo', 'ligaVersoes', 'pendenciasCodigo', 'ambiguasPendentes', 'pendenciasResumo', 'abrirPendencias'],
+    precisa: ['ambiguasPendentes', 'pendenciasResumo', 'pendGrupos', 'abrirPendencias'],
+    recorta: ['normCod', 'codLimpo', 'ligaVersoes', 'pendenciasCodigo', 'ambiguasPendentes', 'pendenciasResumo', 'pendGrupos', 'abrirPendencias'],
     chamadas: [['abrirPendencias', 1, 'o link do Painel que abre a lista']],
     atributos: [[/on\s*click\s*=\s*(["'])(?:(?!\1)[\s\S])*?\babrirPendencias\s*\(\s*\)/g, 1, 'o link do Painel']],
     contexto: () => {
@@ -305,7 +305,8 @@ const CAPACIDADES = [
         provaReal: () => ({ A: [], n: { vermelho: 0, amarelo: 0 } }),
         _provaCache: { A: [{ sev: 'vermelho', titulo: 'conta quebrada', detalhe: 'x' }], n: { vermelho: 1, amarelo: 0 } },
         document: tela.doc,
-        window: {}
+        window: {},
+        _pendFiltro: 'mapa'
       };
     },
     exercicio: (F, ctx) => {
@@ -314,7 +315,19 @@ const CAPACIDADES = [
       ctx.codigosResolvidos['192/184'] = 'https://exemplo';
       const depoisDeResolver = F.ambiguasPendentes().length;
       ctx.codigosResolvidos['192/184'] = undefined; delete ctx.codigosResolvidos['192/184'];
-      F.abrirPendencias();
+      const grupos = F.pendGrupos();
+      const somaGrupos = grupos.reduce((n, g) => n + g.itens.length, 0);
+      /* MAPA: a tela de DECIDIR — mostra os grupos, nao despeja os itens.
+         Pedido do Felype em 2026-08-20: "preciso dos tipos separados... assim nao fica um monte
+         de informacao sendo jogada na minha cara". Se alguem voltar a listar tudo de uma vez,
+         este exercicio reprova. */
+      F.abrirPendencias('mapa');
+      const mapa = ctx._tela.escrito.join('');
+      ctx._tela.escrito.length = 0;
+      F.abrirPendencias('escolher');
+      const soUmGrupo = ctx._tela.escrito.join('');
+      ctx._tela.escrito.length = 0;
+      F.abrirPendencias('mapa');
       const html = ctx._tela.escrito.join('');
       return [
         ['ambiguasPendentes() acha as 2 ambiguas', amb.length, 2],
@@ -332,10 +345,14 @@ const CAPACIDADES = [
         ['pendenciasCodigo() acha a carta com codigo que a Liga nao precificou', resumo.cad.length, 1],
         ['pendenciasResumo() soma ambiguas + cadastro + contas', resumo.total, 2 + 1 + 1],
         ['e conta quantas resolvem em 1 toque', resumo.n1toque, 1],
-        ['abrirPendencias() desenha a secao de escolher carta', /escolher qual carta é a sua/.test(html), true],
-        ['com o codigo da carta na tela', html.indexOf('192/184') >= 0, true],
-        ['a secao de quem nao tem opcoes', /sem opções na tela/.test(html), true],
-        ['e o achado de conta vindo da prova real', html.indexOf('conta quebrada') >= 0, true]
+        ['pendGrupos() separa por tipo, sem grupo vazio', grupos.every(g => g.itens.length > 0) && grupos.length >= 3, true],
+        ['o total do topo bate com a soma dos grupos (era 79 dizendo 60)', resumo.total, somaGrupos],
+        ['o MAPA mostra os grupos...', /escolher qual carta é a sua/.test(mapa) && /conta quebrada/.test(mapa), true],
+        ['...e NAO despeja os itens neles', mapa.indexOf('192/184') >= 0, false],
+        ['entrar num grupo mostra os itens DELE...', soUmGrupo.indexOf('192/184') >= 0, true],
+        ['...e nao mistura os dos outros', soUmGrupo.indexOf('conta quebrada') >= 0, false],
+        ['e da o caminho de volta pro mapa', /todos/.test(soUmGrupo), true],
+        ['a secao de quem nao tem opcoes existe', grupos.some(g => g.id === 'link'), true]
       ];
     }
   },
@@ -415,6 +432,77 @@ const CAPACIDADES = [
           !!(persistido && JSON.parse(persistido)['192/184'] === 'https://ligapokemon/x'), true],
         ['a tela fecha e redesenha com o preco novo', ctx._ch.fechou >= 1 && ctx._ch.render >= 1, true],
         ['opcao sem link avisa em vez de gravar lixo', ctx.codigosResolvidos['999/999'] === undefined && ctx._store['tcg_codres'] === antes, true]
+      ];
+    }
+  },
+  {
+    /* [2026-08-20] O Felype viu o app anunciar a versao de 28/07 como "nova disponivel" estando
+       ele em 20/08. O teste era "e diferente?", nao "e mais nova?" — e o cache do GitHub Pages
+       serve arquivo atrasado com frequencia. Aviso que aponta versao que nem existe mais nao e
+       so inutil: ensina a ignorar o aviso. */
+    nome: 'aviso de versao so quando e MAIS NOVA',
+    perde: 'o app volta a anunciar versao velha do cache como novidade — e o aviso perde a credibilidade justamente quando houver atualizacao de verdade',
+    precisa: ['versaoMaisNova'],
+    recorta: ['versaoMaisNova'],
+    contexto: () => ({ BUILD_TAG: '20/08 18h55', BUILD_TS: 1755730500000 }),
+    exercicio: F => [
+      ['servidor mais novo -> avisa', F.versaoMaisNova({ tag: '21/08 09h00', ts: 1755820000000 }), true],
+      ['servidor mais VELHO -> cala (era o bug)', F.versaoMaisNova({ tag: '28/07 11h09', ts: 1753700000000 }), false],
+      ['mesma versao -> cala', F.versaoMaisNova({ tag: '20/08 18h55', ts: 1755730500000 }), false],
+      ['arquivo antigo sem carimbo de tempo -> cala', F.versaoMaisNova({ tag: '28/07 11h09' }), false],
+      ['resposta vazia -> cala', F.versaoMaisNova(null), false]
+    ]
+  },
+  {
+    /* [2026-08-20] "o ultimo backup eh de 12/08 ... e eu nao consigo pedir para fazer novo
+       backup na nuvem". A nuvem guardava so o estado atual, sobrescrito a cada save: nao havia
+       para onde voltar se um dado corrompido sincronizasse. */
+    nome: 'ponto de restauracao na nuvem',
+    perde: 'o historico na nuvem — sem ele, dado corrompido que sincroniza nao tem volta, e o unico backup real vira o que estiver neste navegador',
+    precisa: ['salvarPontoNuvem', 'carregarPontosNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario'],
+    recorta: ['pontosNuvemRef', 'salvarPontoNuvem', 'pontoNuvemDiario'],
+    atributos: [[/\bsalvarPontoNuvem\s*\(/g, 2, 'o botao "salvar ponto na nuvem" e a rotina diaria']],
+    contexto: () => {
+      const gravados = []; const store = {}; const avisos = [];
+      /* "promessa" que resolve NA HORA: o codigo do app faz o trabalho dentro de .then(), e um
+         Promise de verdade so rodaria depois das conferencias — o teste dava falso vermelho */
+      const jah = v => ({ then: f => { const r = f(v); return (r && r.then) ? r : jah(r); }, catch: () => jah(v) });
+      const doc = id => ({ set: p => { gravados.push({ id, p }); return jah(); }, delete: () => jah() });
+      const col = { doc, orderBy: () => col, limit: () => col, get: () => jah({ forEach: () => {} }) };
+      return {
+        _gravados: gravados, _store: store, _avisos: avisos,
+        _db: { collection: () => ({ doc: () => ({ collection: () => col }) }) },
+        PONTOS_NUVEM_MAX: 12, _pontosNuvem: null, _userEmail: 'felype@x.com',
+        movs: [{ id: 'a', tipo: 'COMPRA', valor: 10 }], jogos: [], cats: [], cols: [], colsJ: {}, colsG: {},
+        pess: [], pgs: [], despCats: [], cadastros: [], contasBanc: [], codigosResolvidos: {},
+        localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
+        toast: t => avisos.push(t), alert: m => avisos.push(m),
+        carregarPontosNuvem: cb => { if (cb) cb(); },
+        document: { getElementById: () => null }, fecharModal: () => {}, abrirBackup: () => {}
+      };
+    },
+    exercicio: (F, ctx) => {
+      F.salvarPontoNuvem(true);
+      const ids = ctx._gravados.map(g => g.id);
+      const p = ctx._gravados.length ? ctx._gravados[0].p : null;
+      let dados = null;
+      try { dados = JSON.parse(p.dados); } catch (e) {}
+      const carimbo = ctx._store['tcg_ultimo_ponto_nuvem'];
+      /* o automatico do dia NAO pode gravar de novo logo apos um ponto recente */
+      const antes = ctx._gravados.length;
+      F.pontoNuvemDiario();
+      const depois = ctx._gravados.length;
+      ctx._store['tcg_ultimo_ponto_nuvem'] = String(Date.now() - 30 * 3600000);
+      F.pontoNuvemDiario();
+      const depoisDeUmDia = ctx._gravados.length;
+      return [
+        ['salva o ponto na nuvem', ids.length >= 1, true],
+        ['com os lancamentos dentro', !!(dados && Array.isArray(dados.movs) && dados.movs.length === 1), true],
+        ['e os catalogos junto (cadastros, contas, codigos resolvidos)',
+          !!(dados && dados.cadastros && dados.contasBanc && dados.codigosResolvidos), true],
+        ['registra quando foi o ultimo', !!carimbo, true],
+        ['o automatico do dia nao repete se acabou de salvar', depois, antes],
+        ['mas salva quando passou mais de um dia', depoisDeUmDia > antes, true]
       ];
     }
   },

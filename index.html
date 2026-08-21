@@ -2230,7 +2230,71 @@ function salvar(){
 }
 function carregarAcervo(){if(confirm('Carregar o histórico da planilha (24 compras + 34 vendas)? Substitui o que está no app agora.')){movs=SEED.map(m=>({...m}));save();fecharModal();go('painel');toast('Histórico original restaurado ✓');}}
 function backup(){try{let b=get('tcg_backups',[]);const now=Date.now();const snap={ts:now,n:movs.length,dados:movs.map(m=>({...m}))};if(b.length&&now-b[b.length-1].ts<90000)b[b.length-1]=snap;else b.push(snap);if(b.length>20)b=b.slice(-20);localStorage.setItem('tcg_backups',JSON.stringify(b));}catch(e){}}
+/* [Felype 2026-08-20] "O APP SALVA AUTOMATICO BACKUP NA NUVEM. MAS O ULTIMO BACKUP EH DE 12/08
+   ... E EU NAO CONSIGO PEDIR PARA FAZER NOVO BACKUP NA NUVEM."
+   O mal-entendido era real e a culpa e da tela, nao dele: a lista "Voltar a um ponto" so mostrava
+   pontos LOCAIS (localStorage deste navegador) — por isso parou em 12/08, que foi a ultima vez
+   que ele lancou algo NESTE aparelho. A nuvem guardava so o estado ATUAL (um documento que e
+   sobrescrito a cada save), sem historico nenhum: se um dado fosse corrompido e sincronizasse,
+   nao havia para onde voltar. Agora existem pontos NA NUVEM, com botao proprio, visiveis de
+   qualquer aparelho. Rotativo: guarda os 12 mais recentes (o 13o mais antigo sai). */
+const PONTOS_NUVEM_MAX=12;
+let _pontosNuvem=null;
+function pontosNuvemRef(){return _db?_db.collection('controle').doc('dados').collection('pontos'):null;}
+function carregarPontosNuvem(cb){
+  const ref=pontosNuvemRef();
+  if(!ref){_pontosNuvem=[];if(cb)cb();return;}
+  ref.orderBy('ts','desc').limit(30).get().then(q=>{
+    const L=[];q.forEach(d=>L.push({ts:+d.id,n:(d.data()||{}).n||0,quem:(d.data()||{}).quem||''}));
+    _pontosNuvem=L;if(cb)cb();
+  }).catch(()=>{_pontosNuvem=[];if(cb)cb();});}
+function salvarPontoNuvem(silencioso){
+  const ref=pontosNuvemRef();
+  if(!ref){if(!silencioso)alert('Sem nuvem conectada agora — o ponto na nuvem precisa de internet e login.');return;}
+  const ts=Date.now();
+  const payload={ts,n:movs.length,quem:(_userEmail||'').split('@')[0]||'',
+    dados:JSON.stringify({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos})};
+  if(payload.dados.length>900000){
+    if(!silencioso)alert('Seus dados passaram do tamanho que cabe num ponto na nuvem. Use "Completo c/ fotos" pra guardar no computador e me avise.');
+    return;}
+  if(!silencioso)toast('salvando ponto na nuvem...');
+  ref.doc(String(ts)).set(payload).then(()=>{
+    localStorage.setItem('tcg_ultimo_ponto_nuvem',String(ts));
+    if(!silencioso)toast('ponto salvo na nuvem');
+    ref.orderBy('ts','desc').get().then(q=>{
+      const ids=[];q.forEach(d=>ids.push(d.id));
+      ids.slice(PONTOS_NUVEM_MAX).forEach(id=>ref.doc(id).delete().catch(()=>{}));
+      carregarPontosNuvem(()=>{if(!silencioso&&document.getElementById('modal')){fecharModal();abrirBackup();}});
+    }).catch(()=>{});
+  }).catch(e=>{if(!silencioso)alert('A nuvem recusou o ponto: '+((e&&e.message)||'erro')+' — se falar em permissao, falta publicar a regra de "pontos" no Firebase.');});}
+function restaurarPontoNuvem(ts){
+  const ref=pontosNuvemRef();if(!ref)return;
+  if(!confirm('Voltar TODOS os dados para o ponto de '+new Date(ts).toLocaleString('pt-BR')+'? O estado de agora sai do ar (um ponto novo e salvo antes, pra dar pra voltar).'))return;
+  salvarPontoNuvem(true);
+  ref.doc(String(ts)).get().then(d=>{
+    if(!d.exists){alert('Esse ponto nao esta mais na nuvem.');return;}
+    let o=null;try{o=JSON.parse((d.data()||{}).dados||'null');}catch(e){}
+    if(!o||!Array.isArray(o.movs)){alert('Nao consegui ler esse ponto.');return;}
+    aplicarNuvem(o);save();saveL();salvarNuvem();fecharModal();render();
+    toast('voltou para o ponto de '+new Date(ts).toLocaleString('pt-BR'));
+  }).catch(e=>alert('Nao consegui buscar o ponto: '+((e&&e.message)||'erro')));}
+/* ponto automatico: 1 por dia, na primeira vez que o app abre com a nuvem pronta. Sem isso o
+   historico da nuvem so existiria quando alguem lembrasse de apertar o botao — e a dor original
+   foi exatamente essa (o ultimo ponto tinha 8 dias). */
+function pontoNuvemDiario(){
+  try{
+    const ult=+localStorage.getItem('tcg_ultimo_ponto_nuvem')||0;
+    if(Date.now()-ult<20*3600000)return;
+    if(!movs.length)return;
+    salvarPontoNuvem(true);
+  }catch(e){}}
 function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.ts);const dt=ts=>new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+  if(_pontosNuvem===null){carregarPontosNuvem(()=>{if(document.getElementById('modal')){fecharModal();abrirBackup();}});}
+  const nuv=(_pontosNuvem===null)
+    ?'<div class="meta" style="padding:6px 12px">buscando na nuvem...</div>'
+    :(_pontosNuvem.length
+      ?_pontosNuvem.map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos${x.quem?' · '+x.quem:''}</div></div><button class="x" style="color:var(--blue)" onclick="restaurarPontoNuvem(${x.ts})">restaurar</button></div>`).join('')
+      :'<div class="empty">Nenhum ponto na nuvem ainda — toque no botão acima pra criar o primeiro.</div>');
   const itens=b.length?b.map(x=>`<div class="item" style="justify-content:space-between;align-items:center"><div><b>${dt(x.ts)}</b><div class="meta">${x.n} lançamentos</div></div><button class="x" style="color:var(--blue)" onclick="restaurarBackup(${x.ts})">restaurar</button></div>`).join(''):`<div class="empty">Sem pontos salvos ainda.</div>`;
   const h=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:82vh;overflow:auto">
     <div class="head">Backup e restauração</div>
@@ -2238,7 +2302,10 @@ function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.
     <div class="acoes"><button class="btn g" onclick="baixarBackup()">⬇ Backup (dados)</button><button class="btn g" onclick="baixarBackupCompleto()">⬇ Completo · c/ fotos</button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="importarBackup()">⬆ Importar backup <span style="color:var(--mut);font-size:10px">(restaura fotos junto)</span></button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="exportarCSV()">⬇ Excel (planilha)</button></div>
-    <div class="sec">Voltar a um ponto</div>
+    <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="salvarPontoNuvem()">☁️ Salvar ponto na nuvem agora</button></div>
+    <div class="sec">Pontos na nuvem <span style="text-transform:none;font-weight:400;color:var(--mut)">— de qualquer aparelho · guarda os ${PONTOS_NUVEM_MAX} mais recentes · 1 automático por dia</span></div>
+    ${nuv}
+    <div class="sec">Voltar a um ponto <span style="text-transform:none;font-weight:400;color:var(--mut)">— só deste navegador</span></div>
     <div class="item" style="justify-content:space-between;align-items:center"><div><b>Histórico original</b><div class="meta">a planilha de origem</div></div><button class="x" style="color:var(--amber)" onclick="carregarAcervo()">restaurar</button></div>
     ${itens}
     <button class="btn" onclick="fecharModal()" style="margin-top:14px">Fechar</button></div></div>`;
@@ -3075,6 +3142,8 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
           try{document.querySelectorAll('nav button,.htop').forEach(b=>b.style.display='');
             if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach(b=>{if(b.dataset.t!=='lancar')b.style.display='none';});
             setSync('ok');}catch(e){}
+          /* dados ja aplicados e menu no ar: e o momento seguro pro ponto automatico do dia */
+          try{setTimeout(pontoNuvemDiario,4000);}catch(e){}
           try{go(papelAtual()==='lancamento'?'lancar':'painel');}
           catch(e){falha=falha||('ao desenhar a tela: '+((e&&e.message)||e));try{console.error('render',e);}catch(_){}}
           if(falha)telaFalhaApp(falha);
@@ -3093,7 +3162,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='20/08 18h55';
+const BUILD_TAG='20/08 21h57';
+/* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
+   carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
+   "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
+const BUILD_TS=1787273823579;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -3109,9 +3182,22 @@ const BUILD_TAG='20/08 18h55';
 let _veioDeAtualizar=location.search.indexOf('atualiza=')>=0;
 (function(){if(_veioDeAtualizar)history.replaceState(null,'',location.pathname);})();
 let _versaoAvisada=false;
+/* [BUG CORRIGIDO 2026-08-20, achado do Felype: "o app esta me dando atualizacao, mas pode ver
+   que e atualizacao ANTIGA"] O teste era `j.tag!==BUILD_TAG` — DIFERENTE, nao MAIS NOVA. Quando
+   o cache do GitHub Pages devolve um versao.json atrasado (ele viu um de 28/07 com o app ja em
+   20/08), o app anunciava a versao de julho como "nova disponivel". Pior que inutil: destroi a
+   confianca no aviso, porque o numero que aparece nem existe mais.
+   Agora compara TEMPO: so avisa se o servidor tiver carimbo mais novo que o desta copia. Se o
+   versao.json vier sem `ts` (versao antiga do arquivo, exatamente o caso do cache atrasado), o
+   app fica CALADO — silencio e melhor que aviso errado. */
+function versaoMaisNova(j){
+  if(!j||!j.tag)return false;
+  if(j.tag===BUILD_TAG)return false;
+  if(!j.ts||!BUILD_TS)return false;
+  return j.ts>BUILD_TS;}
 function checarVersao(){if(BUILD_TAG==='dev'||_versaoAvisada)return;
   fetch('versao.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
-    if(!j||!j.tag||j.tag===BUILD_TAG||_versaoAvisada)return;
+    if(!versaoMaisNova(j)||_versaoAvisada)return;
     _versaoAvisada=true;
     const msg=_veioDeAtualizar
       ?`⏳ O servidor ainda está servindo a versão antiga (v ${j.tag} já existe, mas o cache do GitHub Pages não passou) — isso é normal, leva alguns minutos. Toque pra tentar de novo.`
@@ -3235,33 +3321,73 @@ function pendenciasResumo(){
     total:amb.length+cad.length+(pr?pr.A.length:0),
     pronto:!!pr,
     grave:pr?pr.n.vermelho:0};}
-function abrirPendencias(){
+/* [Felype 2026-08-20] "eu preciso dos tipos de pendencias separados dentro desta lista.
+   assim nao fica um monte de informacao sendo jogada na minha cara. e eu consigo direcionar
+   ao que eu vou ajeitar."
+   O que mudou: a lista deixou de ser uma rolagem unica com os 79 itens e passou a abrir num
+   MAPA — so os grupos, com contagem — onde 1 toque entra no grupo que ele decidiu atacar.
+   Os grupos viraram DADO (pendGrupos), nao HTML concatenado: com isso o resumo do topo e as
+   secoes saem da MESMA fonte e nao tem como divergirem. Divergiam: o cabecalho dizia "79 no
+   total" e enumerava so 4 dos 7 grupos, somando 60 — quem lesse concluia que 19 itens tinham
+   sumido. Numero que nao fecha na cara do dono e pior que numero nenhum. */
+let _pendFiltro='mapa';
+function pendGrupos(){
   const R=pendenciasResumo(),p=R.pr||provaReal();
   window._pendAmb=R.amb;
-  const jsEsc=i=>`fecharModal();abrirEscolhaAmbigua(_pendAmb[${i}].codC)`;
-  const linha=(tit,det,acoes)=>`<div class="item" style="display:block;padding:10px 12px"><b>${tit}</b>${det?`<div class="meta" style="margin-top:3px">${det}</div>`:''}${acoes||''}</div>`;
-  const btn=(rot,js)=>` <span class="lnk" style="font-size:12px;padding:2px 6px;display:inline-block;margin-top:6px" onclick="${js}">${rot}</span>`;
-  let h='';
+  const jsEsc=x=>`fecharModal();abrirEscolhaAmbigua(_pendAmb[${R.amb.indexOf(x)}].codC)`;
+  const G=[];
   const com1=R.amb.filter(x=>x.nOpc>0),semOpc=R.amb.filter(x=>!x.nOpc);
-  if(com1.length)h+=`<div class="sec">🎯 escolher qual carta é a sua (${com1.length}) <span style="text-transform:none;font-weight:400;color:var(--mut)">— 1 toque cada, destrava o preço</span></div>`+
-    com1.map(x=>linha('#'+x.codC+' — '+x.nOpc+' cartas com esse número',x.rots.slice(0,3).join(' · ')+(x.rots.length>3?' · +'+(x.rots.length-3)+' item(ns)':''),btn('escolher qual →',jsEsc(R.amb.indexOf(x))))).join('');
-  if(semOpc.length)h+=`<div class="sec">🔗 sem opções na tela (${semOpc.length}) <span style="text-transform:none;font-weight:400;color:var(--mut)">— precisa colar o link da carta</span></div>`+
-    semOpc.map(x=>linha('#'+x.codC,x.rots.slice(0,3).join(' · '),btn('colar link →',jsEsc(R.amb.indexOf(x))))).join('');
-  if(R.cad.length){
-    const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
-    ['sem_preco','sem_codigo'].forEach(mot=>{const its=R.cad.filter(x=>x.motivo===mot);if(!its.length)return;
-      h+=`<div class="sec">${MOT[mot][0]} ${MOT[mot][1]} (${its.length})</div>`+
-        its.map(x=>linha((x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),'',btn('abrir o lançamento →',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`))).join('');});}
+  G.push({id:'escolher',ic:'🎯',tit:'escolher qual carta é a sua',dica:'1 toque cada, destrava o preço',
+    itens:com1.map(x=>({t:'#'+x.codC+' — '+x.nOpc+' cartas com esse número',
+      d:x.rots.slice(0,3).join(' · ')+(x.rots.length>3?' · +'+(x.rots.length-3)+' item(ns)':''),
+      a:[['escolher qual',jsEsc(x)]]}))});
+  G.push({id:'link',ic:'🔗',tit:'sem opções na tela',dica:'precisa colar o link da carta',
+    itens:semOpc.map(x=>({t:'#'+x.codC,d:x.rots.slice(0,3).join(' · '),a:[['colar link',jsEsc(x)]]}))});
+  const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
+  ['sem_preco','sem_codigo'].forEach(mot=>{
+    G.push({id:mot,ic:MOT[mot][0],tit:MOT[mot][1],dica:'',
+      itens:R.cad.filter(x=>x.motivo===mot).map(x=>({
+        t:(x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),
+        d:'',a:[['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`]]}))});});
   const SEV={vermelho:['🔴','conta quebrada'],amarelo:['🟡','pendência de conta'],info:['ℹ️','informativo']};
-  ['vermelho','amarelo','info'].forEach(sev=>{const its=p.A.filter(x=>x.sev===sev);if(!its.length)return;
-    h+=`<div class="sec">${SEV[sev][0]} ${SEV[sev][1]} (${its.length})</div>`+
-      its.map(x=>linha(x.titulo,x.detalhe,(x.acaoJs?btn(x.acaoRot+' →',`fecharModal();${x.acaoJs}`):'')+(x.acao2Js?btn(x.acao2Rot+' →',`fecharModal();${x.acao2Js}`):''))).join('');});
-  if(!h)h='<div class="ctx" style="color:var(--green)">Nada pendente — cadastro, preços e contas fecharam ✓</div>';
-  const tot=R.amb.length+R.cad.length+p.A.length;
-  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px 14px 22px">
+  ['vermelho','amarelo','info'].forEach(sev=>{
+    G.push({id:sev,ic:SEV[sev][0],tit:SEV[sev][1],dica:'',
+      itens:p.A.filter(x=>x.sev===sev).map(x=>({t:x.titulo,d:x.detalhe,
+        a:[...(x.acaoJs?[[x.acaoRot,`fecharModal();${x.acaoJs}`]]:[]),...(x.acao2Js?[[x.acao2Rot,`fecharModal();${x.acao2Js}`]]:[])]}))});});
+  return G.filter(g=>g.itens.length);
+}
+function abrirPendencias(filtro){
+  if(filtro!==undefined)_pendFiltro=filtro;
+  const G=pendGrupos();
+  const tot=G.reduce((n,g)=>n+g.itens.length,0);
+  if(!G.some(g=>g.id===_pendFiltro))_pendFiltro='mapa';
+  const btn=(rot,js)=>` <span class="lnk" style="font-size:12px;padding:2px 6px;display:inline-block;margin-top:6px" onclick="${js}">${rot} →</span>`;
+  const chip=(id,txt,on)=>`<span onclick="abrirPendencias('${id}')" style="display:inline-block;cursor:pointer;font-size:12px;padding:5px 10px;margin:0 6px 6px 0;border-radius:999px;border:1px solid ${on?'var(--blue)':'var(--bord)'};background:${on?'var(--blue)':'transparent'};color:${on?'#fff':'var(--txt)'};font-weight:${on?'700':'400'}">${txt}</span>`;
+  /* os chips repetem a contagem de cada grupo de proposito: e a mesma informacao do mapa,
+     so que sempre visivel — assim, DENTRO de um grupo, ele troca de assunto sem voltar */
+  const chips=[chip('mapa','todos ('+tot+')',_pendFiltro==='mapa')]
+    .concat(G.map(g=>chip(g.id,g.ic+' '+g.itens.length,_pendFiltro===g.id))).join('');
+  let corpo;
+  if(!tot){
+    corpo='<div class="ctx" style="color:var(--green)">Nada pendente — cadastro, preços e contas fecharam ✓</div>';
+  }else if(_pendFiltro==='mapa'){
+    /* MAPA: so os grupos. E a tela de decidir, nao a de trabalhar. */
+    corpo=G.map(g=>`<div class="item click" style="display:flex;justify-content:space-between;align-items:center;padding:12px" onclick="abrirPendencias('${g.id}')">
+      <div style="min-width:0"><b>${g.ic} ${g.tit}</b>${g.dica?`<div class="meta" style="margin-top:2px">${g.dica}</div>`:''}</div>
+      <div style="flex:none;display:flex;align-items:center;gap:8px"><b style="font-size:17px">${g.itens.length}</b><span style="color:var(--mut)">›</span></div></div>`).join('');
+  }else{
+    const g=G.find(x=>x.id===_pendFiltro);
+    corpo=`<div class="sec" style="display:flex;justify-content:space-between;align-items:baseline">
+        <span>${g.ic} ${g.tit} (${g.itens.length})${g.dica?` <span style="text-transform:none;font-weight:400;color:var(--mut)">— ${g.dica}</span>`:''}</span>
+        <span class="lnk" style="font-size:12px;text-transform:none" onclick="abrirPendencias('mapa')">‹ todos</span></div>`
+      +g.itens.map(it=>`<div class="item" style="display:block;padding:10px 12px"><b>${it.t}</b>${it.d?`<div class="meta" style="margin-top:3px">${it.d}</div>`:''}${it.a.map(a=>btn(a[0],a[1])).join('')}</div>`).join('');
+  }
+  const resumo=tot?`<b>${tot} no total</b> — ${G.map(g=>g.itens.length+' '+g.ic).join(' · ')}. Toque no grupo que você vai resolver agora; nada é corrigido sozinho.`:'Tudo conferido.';
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px 14px 22px">
     <div class="sec" style="margin-top:0">⚠️ pendências — o que precisa da sua mão</div>
-    <div class="ctx">${tot?`<b>${tot} no total</b>: ${R.n1toque} 🎯 escolha de carta (1 toque) · ${R.cad.length} 🏷️ cadastro · ${p.n.vermelho} 🔴 conta quebrada · ${p.n.amarelo} 🟡 pendência de conta. Nada é corrigido sozinho — cada item leva ao lugar certo e você decide.`:'Tudo conferido.'}</div>
-    ${h}
+    <div class="ctx">${resumo}</div>
+    ${tot?`<div style="margin:10px 0 4px">${chips}</div>`:''}
+    ${corpo}
     <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
   document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
 function abrirPendenciasCodigo(){const P=pendenciasCodigo();

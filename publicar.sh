@@ -24,14 +24,20 @@ MSG=${1:-"app: atualizacao"}
 
 # 1) grava o carimbo nos dois lugares, a partir da MESMA variável
 python - "$TAG" <<'PY'
-import io,re,sys
+import io,re,sys,time
 tag=sys.argv[1]
 s=io.open('index.html',encoding='utf-8').read()
+ms=int(time.time()*1000)
 novo,n=re.subn(r"const BUILD_TAG='[^']*'", "const BUILD_TAG='%s'"%tag, s, count=1)
 if n!=1:
     raise SystemExit('ERRO: nao achei o BUILD_TAG no index.html — nada foi gravado')
+# carimbo em ms: e o que permite o app saber se a versao do servidor e MAIS NOVA, e nao apenas
+# diferente. Sem ele o app anunciava versao velha do cache como "nova disponivel" (20/08).
+novo,n2=re.subn(r"const BUILD_TS=\d+", "const BUILD_TS=%d"%ms, novo, count=1)
+if n2!=1:
+    raise SystemExit('ERRO: nao achei o BUILD_TS no index.html — nada foi gravado')
 io.open('index.html','w',encoding='utf-8',newline='').write(novo)
-io.open('versao.json','w',encoding='utf-8',newline='').write('{"tag": "%s"}'%tag)
+io.open('versao.json','w',encoding='utf-8',newline='').write('{"tag": "%s", "ts": %d}'%(tag,ms))
 PY
 
 # 2) trava: os dois carimbos TEM que bater, e o app nao pode ter perdido capacidade
