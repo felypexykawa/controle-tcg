@@ -570,6 +570,225 @@ setg('_precosTentado',true); hP=A('vPainel')();
 t('C8: depois, mostra o numero (ou "tudo certo")', /achado|tudo certo/.test(hP));
 reset(); setg('tela','painel'); setg('consMenu',true);
 
+console.log('\n=== 22. fotos F2: foto de cima = do GRUPO (nota/venda/troca), foto por carta na venda, visor de grupo, tumulo de grupo, avisos ===');
+/* dube SINCRONO de fotoAdd que registra o DESTINO (como nas secoes 15-17) */
+const fotoLog22=[]; const _fotoAddOrig22=g('fotoAdd');
+setg('fotoAdd',(movId,b64,cb)=>{fotoLog22.push({movId,b64});cb(true);});
+ctx.document.getElementById = _elCampo;
+/* D1 — NOTA: a foto de cima vai para o nid; as das cartas, para as cartas */
+reset(); setg('tela','lancar'); setg('tipoSel','COMPRA'); setg('compraModo','nota'); setg('editId',null);
+setg('notaItens',[{jogo:'Pokemon',cat:'Single/Carta',colecao:'',idioma:'Ingles',qtd:1,valor:10,vUnit:10,codigo:'A-1',boosters:0,condicao:'',fotos:['CARTA_A']},{jogo:'Pokemon',cat:'Single/Carta',colecao:'',idioma:'Ingles',qtd:1,valor:20,vUnit:20,codigo:'B-2',boosters:0,condicao:'',fotos:[]}]);
+setg('_fotosItem',[]); setg('_fotosPend',['COMPROVANTE']);
+setg('notaHead',{frete:0,taxa:0,cp:'F',conta:'',sit:'Em estoque',data:'2026-08-23',num:'77',pg:'A vista',nParc:3,venc1:'',obs:''});
+ctx.confirm=()=>true; fotoLog22.length=0;
+A('salvarNota')();
+const itsN=M().filter(m=>m.tipo==='COMPRA'&&m.notaId); const nid22=itsN.length?itsN[0].notaId:null;
+t('D1 nota: salvou 2 itens com notaId', itsN.length===2 && !!nid22, 'itens='+itsN.length);
+t('D1 nota: o COMPROVANTE foi para a NOTA (id do grupo), nao para o 1o item', fotoLog22.some(f=>f.b64==='COMPROVANTE'&&f.movId===nid22) && !fotoLog22.some(f=>f.b64==='COMPROVANTE'&&itsN.some(i=>i.id===f.movId)), JSON.stringify(fotoLog22));
+t('D1 nota: a foto da carta A foi para a carta A', fotoLog22.some(f=>f.b64==='CARTA_A'&&f.movId===(itsN.find(i=>i.codigo==='A-1')||{}).id), JSON.stringify(fotoLog22));
+t('D1 nota: nenhum item ganhou contador pela foto do comprovante', itsN.every(i=>(i.codigo==='A-1'?(+i.nFotos===1):!(+i.nFotos))), JSON.stringify(itsN.map(i=>[i.codigo,i.nFotos])));
+/* D2 — VENDA de varios: cada carta leva a sua; o comprovante vai para o vid */
+reset(); fotoLog22.length=0; setg('tela','lancar'); setg('tipoSel','VENDA'); setg('vendaModo','varios'); setg('editId',null);
+setg('vendaItens',[{jogo:'Pokemon',cat:'Single/Carta',colecao:'',idioma:'Ingles',qtd:1,valor:100,codigo:'V-1',fotos:['CARTA_V1']},{jogo:'Pokemon',cat:'Single/Carta',colecao:'',idioma:'Ingles',qtd:1,valor:50,codigo:'V-2',fotos:[]}]);
+setg('vendaHead',{cp:'Cliente',canal:'Pix',taxa:0,recDias:0,conta:'',data:'2026-08-23'}); setg('_fotosPend',['COMPROVANTE_V']); setg('_fotosItem',[]);
+A('salvarVendaVarios')();
+const itsV=M().filter(m=>m.tipo==='VENDA'&&m.vendaId); const vid22=itsV.length?itsV[0].vendaId:null;
+t('D2 venda: salvou 2 itens com vendaId', itsV.length===2 && !!vid22, 'itens='+itsV.length);
+t('D2 venda: a foto da carta V-1 foi para o item V-1', fotoLog22.some(f=>f.b64==='CARTA_V1'&&f.movId===(itsV.find(i=>i.codigo==='V-1')||{}).id), JSON.stringify(fotoLog22));
+t('D1 venda: o comprovante foi para a VENDA (grupo), nao para o 1o item', fotoLog22.some(f=>f.b64==='COMPROVANTE_V'&&f.movId===vid22), JSON.stringify(fotoLog22));
+/* D1 — TROCA: o comprovante vai para o tid (grupo); a foto da carta recebida vai para a carta */
+reset(); fotoLog22.length=0; setg('tela','lancar'); setg('tipoSel','TROCA'); setg('editId',null); setg('_fotosItem',[]);
+setg('trocaDei',[{desc:'carta X',custo:10}]); setg('trocaDin',0); setg('trocaRecebi',[{desc:'carta Y',valorMercado:30,sit:'Em estoque',cat:'Single/Carta',colecao:'',jogo:'Pokemon',idioma:'Ingles',fotos:['CARTA_T']}]);
+setg('_fotosPend',['COMPROVANTE_T']); Object.assign(_campos,{t_cp:'',t_dinconta:''});
+A('salvarTroca')();
+const itsT=M().filter(m=>m.trocaId); const tid22=itsT.length?itsT[0].trocaId:null;
+t('D1 troca: o comprovante foi para a TROCA (grupo tid), nao para o recebido', !!tid22 && fotoLog22.some(f=>f.b64==='COMPROVANTE_T'&&f.movId===tid22) && !fotoLog22.some(f=>f.b64==='COMPROVANTE_T'&&f.movId===itsT[0].id), 'tid='+tid22+' '+JSON.stringify(fotoLog22));
+t('D2 troca: a foto da carta recebida foi para a carta', !!tid22 && fotoLog22.some(f=>f.b64==='CARTA_T'&&f.movId===itsT[0].id), JSON.stringify(fotoLog22));
+/* D2 — addItemVenda carrega a foto da carta em digitacao */
+reset(); setg('vendaItens',[]); setg('_fotosItem',['F_AVULSA']); setg('vvOrig','avulso'); setg('tipoSel','VENDA'); setg('vendaModo','varios');
+Object.assign(_campos,{v_val:'30',v_col:'',v_cat:'Single/Carta',v_jogo:'Pokemon',v_idi:'Ingles',v_qtd:'1',v_cod:'X-1'});
+A('addItemVenda')();
+t('D2: adicionar item avulso a venda leva a foto da carta e esvazia o balde', !!(g('vendaItens')[0]||{}).fotos && g('vendaItens')[0].fotos[0]==='F_AVULSA' && g('_fotosItem').length===0, JSON.stringify(g('vendaItens')));
+setg('_fotosPend',[]); setg('vendaHead',{cp:'C',canal:'Pix',taxa:0,recDias:0,conta:'',data:'2026-08-23'}); let perguntou22=false; ctx.confirm=(m)=>{if(/SEM foto/.test(String(m)))perguntou22=true;return true;};
+A('salvarVendaVarios')(); ctx.confirm=()=>true;
+t('D2: venda cujas cartas tem foto NAO pergunta "vai ficar sem foto"', perguntou22===false);
+/* rotulos por modo */
+setg('tela','lancar'); setg('editId',null); setg('tipoSel','COMPRA'); setg('compraModo','nota'); let hL=A('vLancar')();
+t('D1 rotulo: na nota o botao de cima diz "fotos da nota (comprovante)"', /📷 fotos da nota \(comprovante\)/.test(hL));
+setg('tipoSel','VENDA'); setg('vendaModo','varios'); hL=A('vLancar')();
+t('D1/D2 rotulo: na venda de varios diz "fotos da venda (comprovante)" e tem "foto DESTA carta"', /📷 fotos da venda \(comprovante\)/.test(hL) && /📷 foto DESTA carta/.test(hL));
+setg('tipoSel','TROCA'); hL=A('vLancar')();
+t('D1 rotulo: na troca diz "fotos da troca (comprovante)"', /📷 fotos da troca \(comprovante\)/.test(hL));
+setg('tipoSel','COMPRA'); setg('compraModo','item'); hL=A('vLancar')();
+t('D1 rotulo: em 1 item continua "fotos do lançamento"', /📷 fotos do lançamento/.test(hL) && !/comprovante\)/.test(hL));
+/* [revisao F2, M1] o balde de cima muda de significado com o modo: trocar nota <-> 1 item dentro do Lancar descarta (e diz) */
+setg('tela','lancar'); setg('editId',null); setg('tipoSel','COMPRA'); setg('compraModo','nota'); setg('_fotosPend',['NF']); setg('_gpAnt',null); A('guardaBaldePend')();
+setg('compraModo','item'); A('guardaBaldePend')();
+t('revisao F2 M1: trocar nota -> 1 item dentro do Lançar descarta o balde do comprovante', g('_fotosPend').length===0);
+setg('_fotosPend',['NF2']); A('guardaBaldePend')(); A('guardaBaldePend')();
+t('revisao F2 M1: sem trocar o modo, o balde fica', g('_fotosPend').length===1);
+setg('tipoSel','VENDA'); setg('vendaModo','varios'); A('guardaBaldePend')();
+t('revisao F2 M1: trocar 1 item de compra -> venda de varios tambem descarta', g('_fotosPend').length===0);
+/* [revisao F2, menor 7] remover item com foto da carta pergunta; sem foto sai direto */
+setg('notaItens',[{codigo:'Q',fotos:['x']},{codigo:'R',fotos:[]}]); let perg22=0; ctx.confirm=(m)=>{perg22++;return false;}; A('removeItemNota')(0);
+t('revisao F2: remover item da nota que TEM foto pergunta e, recusando, mantem', perg22===1 && g('notaItens').length===2);
+ctx.confirm=()=>true; A('removeItemNota')(1); t('revisao F2: item SEM foto sai sem perguntar', perg22===1 && g('notaItens').length===1 && g('notaItens')[0].codigo==='Q');
+setg('vendaItens',[{codigo:'W',fotos:['y']}]); perg22=0; ctx.confirm=(m)=>{perg22++;return true;}; A('removeItemVenda')(0);
+t('revisao F2: remover item da venda com foto pergunta e, aceitando, remove', perg22===1 && g('vendaItens').length===0);
+setg('trocaRecebi',[{desc:'Z',fotos:['z']}]); perg22=0; A('removeRecebi')(0);
+t('revisao F2: remover recebido da troca com foto pergunta', perg22===1 && g('trocaRecebi').length===0); ctx.confirm=()=>true;
+/* visor de grupo */
+let htmlG=''; const _ins22=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlG=h;};
+A('abrirFotosGrupo')('nid-x','📷 Fotos da nota (comprovante)');
+t('D1 visor de grupo abre sem exigir lancamento, com o titulo e perfil documento', /📷 Fotos da nota \(comprovante\)/.test(htmlG) && /fotoEscolhida\('nid-x',this,'doc'\)/.test(htmlG));
+/* [revisao F2, M1] fechar o visor do comprovante reabre o dono; as aspas do retorno vao escapadas para o atributo */
+htmlG=''; A('abrirFotosGrupo')('nid-y','📷 Fotos da nota (comprovante)','abrirNota("nid-y")');
+t('revisao F2 M1: o botao fechar (e o fundo) do visor do comprovante reabrem o dono, com aspas escapadas', /onclick="fecharModal\(\);abrirNota\(&quot;nid-y&quot;\)">fechar</.test(htmlG) && /\{fecharModal\(\);abrirNota\(&quot;nid-y&quot;\)\}/.test(htmlG) && g('_gradeDe')==='nid-y', htmlG.slice(0,200));
+htmlG=''; A('abrirFotosGrupo')('nid-z','📷 Fotos da nota (comprovante)');
+t('revisao F2 M1: sem retorno declarado, fechar so fecha (nao quebra o atributo)', /onclick="fecharModal\(\);">fechar</.test(htmlG));
+/* entradas: abrirNota, verVenda, card expandido */
+reset(); setg('movs',[{id:'i1',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',qtd:1,valor:10,situacao:'Em estoque',notaId:'n9',notaNum:'9'},{id:'i2',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',qtd:1,valor:10,situacao:'Em estoque',notaId:'n9',notaNum:'9'},{id:'s1',tipo:'VENDA',data:'2026-08-02',cat:'ETB',qtd:1,valor:30,vendaId:'v9',contraparte:'X'},{id:'s2',tipo:'VENDA',data:'2026-08-02',cat:'ETB',qtd:1,valor:30,vendaId:'v9',contraparte:'X'}]);
+htmlG=''; A('abrirNota')('n9'); t('D1 entrada: a nota aberta tem o botao "fotos da nota (comprovante)"', /abrirFotosGrupo\('n9'/.test(htmlG));
+htmlG=''; A('verVenda')('v9'); t('D1 entrada: a venda aberta tem o botao "fotos da venda (comprovante)"', /abrirFotosGrupo\('v9'/.test(htmlG));
+ctx.document.body.insertAdjacentHTML=_ins22;
+setg('tela','consultar'); setg('consMenu',false); setg('consF','tudo'); setg('consVer','itens'); setg('expandId','i1'); setg('perSel','tudo'); setg('perDe',''); setg('perAte',''); setg('consJogo','todos'); setg('consCol',''); setg('consPess',''); setg('consConta',''); setg('consCat','');
+const hC22=A('vConsultar')(); t('D1 entrada: o card expandido de item de nota tem "fotos da nota"', /abrirFotosGrupo\('n9'/.test(hC22));
+setg('expandId',null);
+/* tumulos de grupo */
+reset(); setg('excluidos',{}); setg('movs',[{id:'i1',tipo:'COMPRA',valor:10,notaId:'n1',notaNum:'1'},{id:'i2',tipo:'COMPRA',valor:10,notaId:'n1',notaNum:'1'}]);
+A('desfazerNotaFaz')('n1'); t('D1 tumulo: desfazer a nota marca nota:n1', A('estaExcluido')('nota:n1') && !M().some(m=>m.notaId));
+setg('excluidos',{}); setg('movs',[{id:'i1',tipo:'COMPRA',valor:10,notaId:'n2'},{id:'i2',tipo:'COMPRA',valor:10,notaId:'n2'}]);
+A('separarDaNota')('i1'); t('D1 tumulo: separar o penultimo NAO marca', !A('estaExcluido')('nota:n2'));
+A('separarDaNotaFaz')('i2'); t('D1 tumulo: separar o ultimo marca nota:n2', A('estaExcluido')('nota:n2'));
+/* [revisao F2] grupo que ficou sem nenhum item ganha tumulo; grupo que ainda tem item NAO (venda/nota/troca) */
+setg('excluidos',{}); setg('movs',[{id:'k2',tipo:'COMPRA',valor:10,notaId:'nK'},{id:'k3',tipo:'COMPRA',valor:10,notaId:'nK'},{id:'k4',tipo:'COMPRA',valor:10,trocaId:'tK'}]);
+A('enterraGruposVazios')([{vendaId:'vK'},{notaId:'nK'},{trocaId:'tK'},null]);
+t('revisao F2: enterraGruposVazios marca venda que ficou vazia e poupa nota/troca que ainda tem item', A('estaExcluido')('venda:vK') && !A('estaExcluido')('nota:nK') && !A('estaExcluido')('troca:tK'));
+/* caminho do dono: excluir (so este) o UNICO item de uma venda -> a venda ganha tumulo */
+setg('excluidos',{}); setg('movs',[{id:'s7',tipo:'VENDA',valor:10,vendaId:'v7'},{id:'c7',tipo:'COMPRA',valor:10}]);
+A('execExcl')('s7','so'); t('revisao F2: excluir o unico item de uma venda enterra a venda (venda:v7)', A('estaExcluido')('s7') && A('estaExcluido')('venda:v7') && !M().some(m=>m.id==='s7'), JSON.stringify(Object.keys(g('excluidos'))));
+setg('excluidos',{}); setg('movs',[{id:'i1',tipo:'COMPRA',valor:10,notaId:'n3'},{id:'i2',tipo:'COMPRA',valor:10,notaId:'n3'}]);
+A('excluirNotaInteira')('n3'); t('D1 tumulo: excluir a nota inteira marca itens E nota:n3', A('estaExcluido')('nota:n3') && A('estaExcluido')('i1'));
+setg('excluidos',{}); setg('movs',[{id:'i1',tipo:'COMPRA',valor:10,notaId:'n4'},{id:'s1',tipo:'VENDA',valor:10,vendaId:'v4'},{id:'r1',tipo:'COMPRA',valor:10,trocaId:'t4'}]);
+A('limparTudo')(); t('D1 tumulo: limpar tudo marca nota/venda/troca', A('estaExcluido')('nota:n4') && A('estaExcluido')('venda:v4') && A('estaExcluido')('troca:t4'));
+A('esqueceExclusaoDe')({movs:[{id:'i1',notaId:'n4'},{id:'s1',vendaId:'v4'}]});
+t('D1 tumulo: restaurar desmarca os grupos dos lancamentos que voltam', !A('estaExcluido')('nota:n4') && !A('estaExcluido')('venda:v4') && A('estaExcluido')('troca:t4'));
+/* desfazer nota COM fotos: 3 saidas; sem fotos: confirm; leitura falhou: 2 saidas */
+/* app "reaberto" com um disco dado (mesma receita do novoContexto da secao 19, que vive dentro do bloco async) */
+function novoContexto22(storeInit){const st2=Object.assign({},storeInit||{});const c2=Object.assign({},ctx);
+  c2.localStorage={getItem:k=>(k in st2?st2[k]:null),setItem:(k,v)=>{st2[k]=String(v);},removeItem:k=>{delete st2[k];},clear:()=>{for(const k in st2)delete st2[k];}};
+  c2.window=c2;c2.globalThis=c2;c2.self=c2;vm.createContext(c2);vm.runInContext(src,c2,{filename:'app-reaberto-22.js'});
+  return {ctx:c2,store:st2,g:n=>vm.runInContext(n,c2)};}
+let avisos22=[]; const _modalOrig=g('modalAviso'); setg('modalAviso',(t1,c,b)=>{avisos22.push({t1,n:b.length,rots:b.map(x=>x.rot),acoes:b.map(x=>x.acao)});});
+/* roda so a parte moverFotosDe(...) da acao do botao (sem fecharModal/toast, que dependem do DOM) */
+const rodaMover=(acao)=>{acao=String(acao||'');if(!/moverFotosDe\(/.test(acao))return;vm.runInContext(acao.replace(/^[\s\S]*?moverFotosDe\(/,'moverFotosDe('), ctx);};
+const _fotoListOrig22=g('fotoList'); let fotosGrupo=[{id:'f1',b64:'a'},{id:'f2',b64:'b'}]; let fotosDest={};
+/* dube por DONO: ids de grupo (n…) devolvem fotosGrupo (null = leitura falhou); destinos devolvem o que fotosDest disser (ou vazio) */
+setg('fotoList',(id,cb)=>{cb(fotosGrupo===null?null:(/^n/.test(String(id))?fotosGrupo:(fotosDest[id]||[])));});
+setg('excluidos',{}); setg('movs',[{id:'i1',tipo:'COMPRA',valor:10,notaId:'n5',cat:'ETB'},{id:'i2',tipo:'COMPRA',valor:10,notaId:'n5',cat:'ETB'}]);
+A('desfazerNota')('n5');
+t('D1 aviso: nota COM fotos -> pergunta com 3 saidas (mover pro 1o, deixar guardadas, cancelar) e NAO desfaz sozinha', avisos22.length===1 && avisos22[0].n===3 && /Mover as fotos/.test(avisos22[0].rots[0]) && M().every(m=>m.notaId==='n5'), JSON.stringify(avisos22));
+avisos22=[]; fotosGrupo=null; A('desfazerNota')('n5');
+t('D1 aviso: leitura das fotos falhou -> pergunta com 2 saidas (deixar guardadas / cancelar)', avisos22.length===1 && avisos22[0].n===2, JSON.stringify(avisos22));
+avisos22=[]; fotosGrupo=[]; let confirmou22=false; ctx.confirm=(m)=>{confirmou22=/Desfazer a nota/.test(String(m));return true;}; A('desfazerNota')('n5'); ctx.confirm=()=>true;
+t('D1 aviso: nota SEM fotos -> confirm simples e desfaz', confirmou22 && avisos22.length===0 && !M().some(m=>m.notaId));
+/* [revisao F2, G2] desfazer nota com comprovante: mover PARCIAL (1 de 2) avisa e NAO desfaz; completo desfaz */
+const _moverOrigP=g('moverFotosDe'); const _alertOrig22=ctx.alert; let alertou22=''; ctx.alert=(m)=>{alertou22=String(m);};
+avisos22=[]; fotosGrupo=[{id:'f1',b64:'a'},{id:'f2',b64:'b'}]; setg('excluidos',{}); setg('movs',[{id:'p1',tipo:'COMPRA',valor:10,notaId:'n7',cat:'ETB'},{id:'p2',tipo:'COMPRA',valor:10,notaId:'n7',cat:'ETB'}]);
+setg('moverFotosDe',(o,d,cb)=>{cb&&cb(1,2);}); A('desfazerNota')('n7'); rodaMover(avisos22[0]&&avisos22[0].acoes[0]);
+t('revisao F2 G2: mover PARCIAL (1 de 2) -> avisa "NAO foi desfeita" e a nota continua inteira', /NÃO foi desfeita/.test(alertou22) && M().every(m=>m.notaId==='n7') && !A('estaExcluido')('nota:n7'), alertou22||'(sem alerta)');
+setg('moverFotosDe',(o,d,cb)=>{cb&&cb(2,2);}); alertou22=''; avisos22=[]; A('desfazerNota')('n7'); rodaMover(avisos22[0]&&avisos22[0].acoes[0]);
+t('revisao F2 G2: mover COMPLETO (2 de 2) -> desfaz a nota e marca o tumulo', !alertou22 && !M().some(m=>m.notaId) && A('estaExcluido')('nota:n7'));
+/* [revisao F2, M3] tirar o ULTIMO produto de nota com comprovante pergunta (3 saidas) e nao separa sozinho */
+avisos22=[]; fotosGrupo=[{id:'f1',b64:'a'}]; setg('excluidos',{}); setg('movs',[{id:'u1',tipo:'COMPRA',valor:10,notaId:'n6',cat:'ETB'}]);
+A('separarDaNota')('u1');
+t('revisao F2 M3: tirar o ultimo produto de nota COM fotos -> pergunta com 3 saidas e o produto continua na nota', avisos22.length===1 && avisos22[0].n===3 && /Mover as fotos/.test(avisos22[0].rots[0]) && M()[0].notaId==='n6' && !A('estaExcluido')('nota:n6'), JSON.stringify(avisos22.map(a=>[a.n,a.rots])));
+avisos22=[]; fotosGrupo=null; A('separarDaNota')('u1');
+t('revisao F2 M3: leitura das fotos falhou -> 2 saidas e o produto continua na nota', avisos22.length===1 && avisos22[0].n===2 && M()[0].notaId==='n6', JSON.stringify(avisos22.map(a=>[a.n,a.rots])));
+avisos22=[]; fotosGrupo=[]; A('separarDaNota')('u1');
+t('revisao F2 M3: nota SEM fotos -> separa direto e a nota ganha tumulo', avisos22.length===0 && !M()[0].notaId && A('estaExcluido')('nota:n6'));
+avisos22=[]; fotosGrupo=[{id:'f1',b64:'a'}]; setg('excluidos',{}); setg('movs',[{id:'u2',tipo:'COMPRA',valor:10,notaId:'n8',cat:'ETB'}]); setg('moverFotosDe',(o,d,cb)=>{cb&&cb(1,1);});
+A('separarDaNota')('u2'); rodaMover(avisos22[0]&&avisos22[0].acoes[0]);
+t('revisao F2 M3: "mover as fotos para este produto" -> ele sai da nota e a nota ganha tumulo', !M()[0].notaId && A('estaExcluido')('nota:n8'));
+setg('moverFotosDe',(o,d,cb)=>{cb&&cb(0,1);}); avisos22=[]; alertou22=''; setg('excluidos',{}); setg('movs',[{id:'u3',tipo:'COMPRA',valor:10,notaId:'n8b',cat:'ETB'}]);
+A('separarDaNota')('u3'); rodaMover(avisos22[0]&&avisos22[0].acoes[0]);
+t('revisao F2 M3: mover falhou -> avisa e o produto NAO sai da nota', /NÃO foi tirado da nota/.test(alertou22) && M()[0].notaId==='n8b' && !A('estaExcluido')('nota:n8b'), alertou22||'(sem alerta)');
+ctx.alert=_alertOrig22; setg('moverFotosDe',_moverOrigP);
+setg('modalAviso',_modalOrig);
+/* moverFotosDe: grava no destino, apaga da origem, conta no item destino */
+const fDel22=[]; const _fotoDelOrig22=g('fotoDel'); setg('fotoDel',(fid,cb)=>{fDel22.push(fid);cb(true);});
+fotosGrupo=[{id:'f1',b64:'a'},{id:'f2',b64:'b'}]; fotoLog22.length=0;
+setg('movs',[{id:'d1',tipo:'COMPRA',valor:10}]); let movidas=null; A('moverFotosDe')('n5','d1',n=>{movidas=n;});
+t('D3-nucleo: moverFotosDe grava as 2 no destino, apaga as 2 da origem e conta no item', movidas===2 && fotoLog22.filter(f=>f.movId==='d1').length===2 && fDel22.length===2 && +(M().find(m=>m.id==='d1').nFotos)===2, 'movidas='+movidas+' adds='+JSON.stringify(fotoLog22)+' dels='+JSON.stringify(fDel22));
+/* [revisao F2, G1] ordem do mover: se gravar no destino FALHA, a foto NAO e apagada da origem */
+fDel22.length=0; const _faSync=g('fotoAdd'); setg('fotoAdd',(mid,b,cb)=>{cb(false);}); let okMove=null; A('fotoMove')({id:'fz',b64:'z'},'d1',ok=>{okMove=ok;});
+t('revisao F2 G1: gravar no destino falhou -> devolve falso e NAO apaga da origem', okMove===false && fDel22.length===0);
+let movidas2=null; fotosGrupo=[{id:'f3',b64:'c'}]; A('moverFotosDe')('n5','d1',(n,tot)=>{movidas2=[n,tot];});
+t('revisao F2 G1: moverFotosDe devolve (0 de 1) quando nada moveu — quem chama nao conclui o gesto', movidas2 && movidas2[0]===0 && movidas2[1]===1 && +(M().find(m=>m.id==='d1').nFotos)===2, JSON.stringify(movidas2));
+setg('fotoAdd',_faSync);
+/* [revisao F2, M5] reenvio so redesenha a grade de fotos se ela e a DO dono da foto */
+const _frOrig=g('fotoRefresh'); let refreshes=[]; setg('fotoRefresh',(id)=>{refreshes.push(id);}); const _geOrig=ctx.document.getElementById; ctx.document.getElementById=()=>elStub();
+setg('movs',[{id:'zz',tipo:'COMPRA',valor:1}]); setg('_fotosFalhadas',[{movId:'zz',b64:'q'}]); setg('_gradeDe','outro'); A('reenviarFotosFalhadas')('zz');
+t('revisao F2 M5: reenvio com a grade de OUTRO dono aberta -> grava, mas NAO redesenha a grade alheia', refreshes.length===0 && g('_fotosFalhadas').length===0, JSON.stringify(refreshes));
+setg('_fotosFalhadas',[{movId:'zz',b64:'q'}]); setg('_gradeDe','zz'); A('reenviarFotosFalhadas')('zz');
+t('revisao F2 M5: reenvio com a grade DO dono aberta -> redesenha', refreshes.length===1 && refreshes[0]==='zz', JSON.stringify(refreshes));
+setg('fotoRefresh',_frOrig); ctx.document.getElementById=_geOrig; setg('_gradeDe',null);
+/* [re-checagem F2, menor 1] repetir o gesto depois de falha parcial NAO duplica: o que ja esta no destino so sai da origem */
+fotosGrupo=[{id:'f1',b64:'P1'},{id:'f2',b64:'P2'}]; fotosDest={d2:[{id:'x9',b64:'P2'}]}; fDel22.length=0; fotoLog22.length=0;
+setg('movs',[{id:'d2',tipo:'COMPRA',valor:1}]); let rDup=null; A('moverFotosDe')('n5','d2',(n,t)=>{rDup=[n,t];});
+t('re-checagem F2 menor 1: foto que JA esta no destino nao e gravada de novo — so sai da origem; as duas contam como movidas', rDup&&rDup[0]===2&&rDup[1]===2 && fotoLog22.filter(f=>f.movId==='d2').length===1 && fotoLog22[0].b64==='P1' && fDel22.length===2 && +(M().find(m=>m.id==='d2').nFotos)===2, 'r='+JSON.stringify(rDup)+' adds='+JSON.stringify(fotoLog22)+' dels='+JSON.stringify(fDel22));
+fotosDest={};
+/* [re-checagem F2, medio 2] as duas pecas que curam o G2: prazo de 8 s e filtro _moveEmVoo */
+const _stOrig22=ctx.setTimeout; const timers22=[]; ctx.setTimeout=(fn,ms)=>{timers22.push({fn,ms});return 0;};
+let nAdd22=0; setg('fotoAdd',(mid,b,cb)=>{nAdd22++;});   /* destino que NUNCA responde */
+fotosGrupo=[{id:'f1',b64:'a'},{id:'f2',b64:'b'}]; setg('movs',[{id:'d3',tipo:'COMPRA',valor:1}]); vm.runInContext('_moveEmVoo=new Set();',ctx);
+let r8=null; A('moverFotosDe')('n5','d3',(n,t)=>{r8=[n,t];});
+t('re-checagem F2: com o destino mudo o gesto fica pendurado e arma o prazo de 8 s', r8===null && nAdd22===2 && timers22.some(x=>x.ms===8000), 'r='+JSON.stringify(r8)+' timers='+JSON.stringify(timers22.map(x=>x.ms)));
+let r8b=null; A('moverFotosDe')('n5','d3',(n,t)=>{r8b=[n,t];});
+t('re-checagem F2: repetir o gesto com as fotos em voo NAO enfileira de novo (_moveEmVoo) e responde na hora (0 de 2)', r8b&&r8b[0]===0&&r8b[1]===2 && nAdd22===2, 'r='+JSON.stringify(r8b)+' adds='+nAdd22);
+timers22.filter(x=>x.ms===8000).forEach(x=>x.fn());
+t('re-checagem F2: passados os 8 s, o gesto responde com o parcial (0 de 2) em vez de travar para sempre', r8&&r8[0]===0&&r8[1]===2, 'r='+JSON.stringify(r8));
+ctx.setTimeout=_stOrig22; setg('fotoAdd',_faSync); vm.runInContext('_moveEmVoo=new Set();',ctx); timers22.length=0;
+/* [re-checagem F2, medio 1] devolucao (execDev) era a 4a porta sem tumulo de grupo */
+setg('excluidos',{}); ctx.prompt=()=>'errada'; ctx.confirm=()=>true;
+setg('movs',[{id:'og',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',destIni:'Em estoque',vendaRef:'s1'},{id:'s1',tipo:'VENDA',data:'2026-08-02',cat:'ETB',qtd:1,valor:200,origemId:'og',vendaId:'vX',contraparte:'C'}]);
+A('execDev')('s1');
+t('re-checagem F2 medio 1: devolver a unica venda do grupo enterra venda:vX', !M().some(m=>m.id==='s1') && A('estaExcluido')('venda:vX'), 'exc='+JSON.stringify(Object.keys(g('excluidos')))+' ids='+JSON.stringify(M().map(m=>m.id)));
+/* [re-checagem F2, menor 2] item que e de nota E de troca: excluir a nota inteira enterra a troca vazia */
+setg('excluidos',{}); setg('movs',[{id:'r1',tipo:'COMPRA',origem:'TROCA',valor:10,trocaId:'tQ',notaId:'nQ',cat:'Single/Carta'}]);
+A('excluirNotaInteira')('nQ');
+t('re-checagem F2 menor 2: excluir a nota inteira enterra tambem a troca que ficou vazia', A('estaExcluido')('nota:nQ') && A('estaExcluido')('troca:tQ'), 'exc='+JSON.stringify(Object.keys(g('excluidos'))));
+/* [re-checagem F2, menor 3] trocar o TIPO (compra 1 item -> venda) tambem descarta o balde do comprovante */
+setg('tela','lancar'); setg('editId',null); setg('tipoSel','COMPRA'); setg('compraModo','item'); setg('_fotosPend',['X']); setg('_gpAnt',null); A('guardaBaldePend')();
+setg('tipoSel','VENDA'); setg('vendaModo','um'); A('guardaBaldePend')();
+t('re-checagem F2 menor 3: compra de 1 item -> venda descarta o balde (mesma regua do balde da carta)', g('_fotosPend').length===0);
+/* [re-checagem F2, medio 2] addItemVenda no ramo ESTOQUE leva a foto da carta (so o avulso era dirigido) */
+ctx.document.getElementById=_elCampo; reset(); setg('tela','lancar'); setg('tipoSel','VENDA'); setg('vendaModo','varios'); setg('vvOrig','estoque'); setg('vendaItens',[]); setg('_fotosItem',['F_EST']);
+setg('movs',[{id:'e1',tipo:'COMPRA',qtd:3,valor:30,cat:'ETB',boosters:0,situacao:'Em estoque',destino:'Vender',jogo:'Pokemon'}]);
+Object.assign(_campos,{v_orig:'e1',v_un:'un',v_qtd2:'1',v_val2:'50'}); ctx.confirm=()=>true;
+A('addItemVenda')();
+t('re-checagem F2 medio 2: item do ESTOQUE entra na venda com a foto da carta e o balde esvazia', (g('vendaItens')[0]||{}).origemId==='e1' && !!(g('vendaItens')[0]||{}).fotos && g('vendaItens')[0].fotos[0]==='F_EST' && g('_fotosItem').length===0, JSON.stringify(g('vendaItens')));
+/* fusao de notas move o comprovante das perdedoras para a vencedora e marca tumulo */
+let movCalls=[]; const _moverOrig=g('moverFotosDe'); setg('moverFotosDe',(o,d,cb)=>{movCalls.push([o,d]);cb&&cb(1,1);});
+setg('excluidos',{}); setg('selIds',{}); ctx.confirm=()=>true; ctx.prompt=()=>''; setg('_movesPendentes',[]);
+setg('movs',[{id:'a1',tipo:'COMPRA',valor:100,notaId:'nA',notaNum:'A'},{id:'b1',tipo:'COMPRA',valor:10,notaId:'nB',notaNum:'B'}]);
+A('juntarNotaCore')(['a1','b1']);
+t('D1 fusao: as fotos da nota perdedora (menor) vao para a vencedora e a perdedora ganha tumulo', movCalls.length===1 && movCalls[0][0]==='nB' && movCalls[0][1]==='nA' && A('estaExcluido')('nota:nB') && M().every(m=>m.notaId==='nA') && g('_movesPendentes').length===0, JSON.stringify(movCalls)+' notas='+JSON.stringify(M().map(m=>m.notaId)));
+/* [revisao F2, G3] mover que FALHOU na fusao: a perdedora NAO ganha tumulo, o gesto entra na fila e e retomado no commit seguinte */
+movCalls=[]; setg('moverFotosDe',(o,d,cb)=>{movCalls.push([o,d]);cb&&cb(0,1);}); setg('excluidos',{}); setg('selIds',{});
+setg('movs',[{id:'c1',tipo:'COMPRA',valor:100,notaId:'nC',notaNum:'C'},{id:'d1',tipo:'COMPRA',valor:10,notaId:'nD',notaNum:'D'}]);
+A('juntarNotaCore')(['c1','d1']);
+t('revisao F2 G3: fusao com mover que falhou -> itens fundidos, perdedora SEM tumulo, gesto na fila de retomada', M().every(m=>m.notaId==='nC') && !A('estaExcluido')('nota:nD') && g('_movesPendentes').length===1 && g('_movesPendentes')[0].origem==='nD' && g('_movesPendentes')[0].destino==='nC' && g('_movesPendentes')[0].tumulo==='nota:nD', JSON.stringify(g('_movesPendentes')));
+t('re-checagem F2 medio 3: a fila de retomada foi para o disco (fechar o app nao cancela a promessa)', JSON.parse(store['tcg_moves_pend']||'[]').length===1 && JSON.parse(store['tcg_moves_pend'])[0].origem==='nD', String(store['tcg_moves_pend']));
+const Rmp=novoContexto22({'tcg_moves_pend':store['tcg_moves_pend'],'tcg_seed_v1':'1','tcg_movs_v2':'[]','tcg_excluidos':'{}'});
+t('re-checagem F2 medio 3: app reaberto carrega a fila do disco', Rmp.g('_movesPendentes').length===1 && Rmp.g('_movesPendentes')[0].destino==='nC', JSON.stringify(Rmp.g('_movesPendentes')));
+setg('moverFotosDe',(o,d,cb)=>{cb&&cb(1,1);}); A('retomarMovesPendentes')();
+t('revisao F2 G3: no commit seguinte da nuvem o gesto e retomado -> tumulo marcado e fila vazia (memoria E disco)', A('estaExcluido')('nota:nD') && g('_movesPendentes').length===0 && store['tcg_moves_pend']==='[]', String(store['tcg_moves_pend']));
+setg('moverFotosDe',(o,d,cb)=>{cb&&cb(null,0);}); setg('_movesPendentes',[{origem:'nX',destino:'nY',tumulo:'nota:nX'}]); A('retomarMovesPendentes')();
+t('revisao F2 G3: retomada que falha de novo devolve o gesto a fila (nao perde)', g('_movesPendentes').length===1 && !A('estaExcluido')('nota:nX')); setg('_movesPendentes',[]);
+setg('moverFotosDe',_moverOrig); setg('fotoDel',_fotoDelOrig22); setg('fotoList',_fotoListOrig22); setg('fotoAdd',_fotoAddOrig22);
+ctx.document.getElementById = () => elStub(); ctx.prompt=(q,d)=>d; ctx.confirm=()=>true; reset(); setg('tela','painel'); setg('consMenu',true); setg('excluidos',{});
+
 console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
 /* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
    transacao exige servidor) -> a Laura salva em casa -> quando o sinal volta, o snapshot dela
@@ -690,6 +909,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     runTransaction(fn){const tx={get(){return Promise.resolve({exists:true,data:()=>cloud19});},set(r,p){cloud19=p;}};
       return fn(tx).then(p=>new Promise(res=>{commitLibera=()=>res(p);}));}};
   setg('_db',db19); setg('_syncReady',true); setg('_ultimoUpdAplicado',1);
+  /* [re-checagem F2] a fiacao: o commit bem-sucedido da nuvem e quem ACORDA a retomada dos moves pendentes */
+  const _retOrig19=g('retomarMovesPendentes'); let retomou19=0; setg('retomarMovesPendentes',()=>{retomou19++;});
   setg('movs',[{id:'a1',tipo:'COMPRA',valor:10},{id:'b2',tipo:'COMPRA',valor:20}]);
   A('marcaPendNuvem')(); A('salvarNuvem')();
   await tick();
@@ -700,6 +921,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   t('G3: ...nem do disco', JSON.parse(store['tcg_movs_v2']||'[]').some(m=>m.id==='novo1'));
   t('G3: e o que o outro aparelho tinha (r7) entrou', M().some(m=>m.id==='r7'), 'ids: '+idsDe(M()));
   t('G3: a pendencia do save do meio continua marcada (commit antigo nao a limpa)', A('pendNuvem')()===true);
+  t('re-checagem F2: o commit bem-sucedido da nuvem chamou a retomada dos moves pendentes (fiacao real, nao chamada direta)', retomou19===1, 'chamadas='+retomou19);
+  setg('retomarMovesPendentes',_retOrig19);
   /* (M2) transacao que falha DEPOIS do callback nao deixa tumulo remoto "adiantado" na memoria */
   setg('movs',[{id:'a1',tipo:'COMPRA',valor:10},{id:'z9',tipo:'COMPRA',valor:9}]); setg('excluidos',{});
   cloud19={_upd:600,movs:[{id:'a1',tipo:'COMPRA',valor:10}],excluidos:{z9:Date.now()}};

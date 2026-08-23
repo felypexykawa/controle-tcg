@@ -215,6 +215,8 @@ function esqueceExclusaoDe(o){if(!o)return;
   (Array.isArray(o.pgs)?o.pgs:[]).forEach(n=>{if(n)ids.push('pgs:'+n);});
   (Array.isArray(o.jogos)?o.jogos:[]).forEach(n=>{if(n)ids.push('jogos:'+n);});
   (Array.isArray(o.cols)?o.cols:[]).forEach(n=>{if(n)ids.push('cols:'+n);});
+  /* [fotos D1] restaurar traz os grupos de volta: desmarca os túmulos de nota/venda/troca dos lançamentos que voltam */
+  (Array.isArray(o.movs)?o.movs:[]).forEach(m=>{if(!m)return;if(m.notaId)ids.push('nota:'+m.notaId);if(m.vendaId)ids.push('venda:'+m.vendaId);if(m.trocaId)ids.push('troca:'+m.trocaId);});
   desmarcaExcluido(ids);}
 function marcaExcluido(...ids){const t=Date.now();ids.flat().forEach(id=>{if(id)excluidos[id]=t;});podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
 function podaExcluidos(){const lim=Date.now()-120*864e5;Object.keys(excluidos).forEach(k=>{if(!(excluidos[k]>lim))delete excluidos[k];});}
@@ -248,13 +250,37 @@ function juntarNotaCore(ids){const its=movs.filter(m=>ids.includes(m.id)&&m.tipo
     const nid=notasSel[0],h=movs.find(m=>m.notaId===nid);
     aplica(nid,h.notaNum||'',h,soltas);return true;}
   const tots=notasSel.map(nid=>({nid,tot:movs.filter(m=>m.notaId===nid).reduce((s,x)=>s+(+x.valor||0),0)})).sort((a,b)=>b.tot-a.tot);
-  if(!confirm('Você marcou '+notasSel.length+' notas'+(soltas.length?' + '+soltas.length+' compra(s) solta(s)':'')+'.\n\nFUNDIR tudo numa nota só? O pagamento e o nº ficam os da nota de maior valor ('+fmt(tots[0].tot)+').'))return false;
+  if(!confirm('Você marcou '+notasSel.length+' notas'+(soltas.length?' + '+soltas.length+' compra(s) solta(s)':'')+'.\n\nFUNDIR tudo numa nota só? O pagamento e o nº ficam os da nota de maior valor, e o comprovante (fotos) das outras notas passa para ela ('+fmt(tots[0].tot)+').'))return false;
   const nid=tots[0].nid,h=movs.find(m=>m.notaId===nid);
   const mover=movs.filter(m=>m.notaId&&notasSel.includes(m.notaId)&&m.notaId!==nid).concat(soltas);
+  /* [fotos D1] fundir notas: o comprovante das notas perdedoras vai para a vencedora (criar + apagar, verbos já em
+     uso), e os grupos perdedores ganham túmulo — sem isto as fotos ficariam órfãs em silêncio */
+  /* [revisão F2, G3] mover PRIMEIRO; o túmulo da nota perdedora só quando o comprovante confirmou a mudança de casa;
+     sem rede/parcial fica em _movesPendentes e é retomado no próximo commit da nuvem */
+  notasSel.filter(x=>x!==nid).forEach(x=>{moverFotosDe(x,nid,function(n,total){if(n!==null&&n===total)marcaExcluido('nota:'+x);else{_movesPendentes.push({origem:x,destino:nid,tumulo:'nota:'+x});gravaMovesPend();toast('⚠ o comprovante da nota antiga ainda não mudou de lugar (sem internet?) — ficou anotado: eu tento de novo quando a nuvem responder ou na próxima abertura do app');}});});
   aplica(nid,h.notaNum||'',h,mover);return true;}
 function juntarNota(){if(juntarNotaCore(Object.keys(selIds))){selMode=false;selIds={};}render();}
 function juntarFx(){if(juntarNotaCore(Object.keys(fxSel))){fxSelMode=false;fxSel={};}render();}
-function separarDaNota(id){const m=movs.find(x=>x.id===id);if(!m)return;delete m.notaId;delete m.notaNum;save();toast('Item separado da nota ✓');render();}
+/* [fotos D1 / revisão F2] grupo (nota/venda/troca) que ficou sem nenhum item ganha túmulo — o comprovante precisa de
+   rastro. Chamado por quem remove/solta itens: execExcl, separarDaNota, soltarIntrusa. */
+function enterraGruposVazios(removidos){const g=[];(removidos||[]).forEach(x=>{if(!x)return;
+  if(x.notaId&&!movs.some(y=>y.notaId===x.notaId))g.push('nota:'+x.notaId);
+  if(x.vendaId&&!movs.some(y=>y.vendaId===x.vendaId))g.push('venda:'+x.vendaId);
+  if(x.trocaId&&!movs.some(y=>y.trocaId===x.trocaId))g.push('troca:'+x.trocaId);});
+  if(g.length)marcaExcluido([...new Set(g)]);}
+/* [revisão F2, M3] tirar o ÚLTIMO produto mata a nota — se ela tem comprovante, o dono escolhe (igual ao desfazer) */
+function separarDaNota(id){const m=movs.find(x=>x.id===id);if(!m)return;const nid=m.notaId;
+  const ultimo=!!nid&&!movs.some(x=>x.notaId===nid&&x.id!==id);
+  if(!ultimo){separarDaNotaFaz(id);return;}
+  fotoList(nid,L=>{const n=L?L.length:0;
+    if(L!==null&&!n){separarDaNotaFaz(id);return;}
+    modalAviso('Tirar o último produto da nota?',(n?'A nota tem <b>'+n+' foto'+(n>1?'s':'')+'</b> (comprovante). Tirando o último produto, a nota deixa de existir e essas fotos ficam sem lugar para aparecer (continuam guardadas).':'<b>Não consegui conferir as fotos da nota agora</b> (sem conexão?). Se houver comprovante, ele fica guardado sem lugar para aparecer.'),
+      (n?[{rot:'Mover as fotos para este produto e tirar da nota',cor:'var(--blue)',exp:'As '+n+' foto'+(n>1?'s passam':' passa')+' a ficar em "'+rotDe(m)+'".',acao:"fecharModal();toast('movendo fotos…');moverFotosDe('"+nid+"','"+id+"',function(q,tot){if(q===null||q<tot){alert('Não consegui mover as fotos (sem internet?). O produto NÃO foi tirado da nota; tente de novo com conexão.');return;}separarDaNotaFaz('"+id+"');})"}]:[]).concat([
+      {rot:'Tirar da nota e deixar as fotos guardadas',cor:'var(--amber)',exp:'As fotos continuam na nuvem sem lançamento para aparecer.',acao:"fecharModal();separarDaNotaFaz('"+id+"')"},
+      {rot:'Cancelar',cor:'var(--mut)',exp:'Nada muda.',acao:'fecharModal()'}]));});}
+function separarDaNotaFaz(id){const m=movs.find(x=>x.id===id);if(!m)return;const nid=m.notaId;delete m.notaId;delete m.notaNum;
+  if(nid&&!movs.some(x=>x.notaId===nid))marcaExcluido('nota:'+nid);   /* saiu o último: a nota (grupo) morre com túmulo */
+  save();toast('Item separado da nota ✓');render();}
 function venderDe(id){const m=movs.find(x=>x.id===id);if(!m)return;_preSel=id;vendaJogoF='';tipoSel='VENDA';vendaModo='item';vendaDe=(sitDe(m)==='Coleção')?'colecao':'estoque';editId=null;go('lancar');}
 function guardarDe(id){_preSel=id;tipoSel='CONSUMO';editId=null;go('lancar');}
 /* Vínculo retroativo compra↔venda — pra quando a venda já foi lançada solta (nota antiga,
@@ -413,7 +439,7 @@ function exclSerie(m){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=
      exp:'As previsões somem do seu fluxo de caixa. Nada do que já foi pago é tocado.',
      acao:"execExcl('"+m.id+"','serie')"}]);}
 function exclSimples(m){
-  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números. Nada mais é afetado.</div>';
+  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números. Nada mais é afetado. As fotos dele (se houver) ficam guardadas na nuvem, sem lugar para aparecer.</div>';
   modalAviso('🗑 Excluir este lançamento?',corpo,[
     {rot:'🗑 Apagar',cor:'var(--red)',exp:'Some dos números. Não dá pra desfazer depois.',acao:"execExcl('"+m.id+"','so')"}]);}
 function exclVenda(v){const peca=pecaDaVenda(v),val=+v.valor||0;
@@ -460,7 +486,9 @@ function exclCompra(m){const f=famDe(m.id);if(!f)return;
 /* --------- executor unico: toda saida passa por aqui e REGISTRA a exclusao --------- */
 function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)return;
   const some=lista=>{const st={};[].concat(lista).forEach(x=>{if(x)st[x]=1;});
-    marcaExcluido(Object.keys(st));movs=movs.filter(x=>!st[x.id]);};
+    const removidos=movs.filter(x=>st[x.id]);
+    marcaExcluido(Object.keys(st));movs=movs.filter(x=>!st[x.id]);
+    enterraGruposVazios(removidos);   /* [fotos D1 / revisão F2] venda/nota/troca que ficou sem item ganha túmulo (comprovante com rastro) */};
   if(modo==='serie'){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar');
     some(alvos.map(x=>x.id));save();render();toast(alvos.length+' previsão(ões) apagada(s)');return;}
   if(modo==='so'){some([m.id]);save();render();toast('Lançamento apagado');return;}
@@ -507,7 +535,7 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
    Por captura no document: nenhum botao precisa ser alterado e botao NOVO ja nasce protegido.
    Fora da lista de proposito: os "+ adicionar" e a navegacao — la tocar duas vezes rapido e
    uso legitimo. */
-const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
+const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|desfazerNotaFaz|separarDaNotaFaz|moverFotosDe|reenviarFotosFalhadas|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
 /* a chave e o ATRIBUTO inteiro (funcao + argumentos), nao o elemento. Se a tela repintar
    entre um toque e outro, o botao novo e outro ELEMENTO mas tem o mesmo atributo — pela
    identidade do elemento o segundo toque passaria e a venda entraria 2x assim mesmo. Usar os
@@ -532,8 +560,10 @@ let _ultToque={chave:null,ts:0};
 }catch(e){}})();
 function limparTudo(){
   if(!movs.length){toast('Não há lançamentos pra apagar');return;}
-  if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura.\n\nNão dá pra desfazer depois. Tem certeza?'))return;
-  marcaExcluido(movs.map(x=>x.id));movs=[];save();render();toast('Tudo apagado');}
+  if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura. As FOTOS não são apagadas (ficam guardadas na nuvem, sem lançamento para aparecer; voltam se você restaurar um ponto anterior).\n\nNão dá pra desfazer depois. Tem certeza?'))return;
+  /* [fotos D1] os grupos (nota/venda/troca) também ganham túmulo, para a foto do comprovante ter rastro */
+  const gids=[...new Set(movs.flatMap(x=>[x.notaId?'nota:'+x.notaId:null,x.vendaId?'venda:'+x.vendaId:null,x.trocaId?'troca:'+x.trocaId:null].filter(Boolean)))];
+  marcaExcluido(movs.map(x=>x.id).concat(gids));movs=[];save();render();toast('Tudo apagado');}
 function devolver(id){const v=movs.find(x=>x.id===id);
   if(!v||v.tipo!=='VENDA'){toast('Devolução só vale pra venda');return;}
   const peca=pecaDaVenda(v),val=+v.valor||0,quem=v.contraparte?' de <b>'+v.contraparte+'</b>':'';
@@ -553,14 +583,14 @@ function devolver(id){const v=movs.find(x=>x.id===id);
     {rot:'↩ Confirmar devolução',cor:'var(--green)',exp:'Vou pedir o motivo (produto devolvido, pessoa errada, produto errado…) e devolver o produto '+praRot(volta)+'.',acao:"execDev('"+v.id+"')"}]);}
 function execDev(id){fecharModal();const v=movs.find(x=>x.id===id);if(!v)return;
   const peca=pecaDaVenda(v);
-  if(!peca){marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);save();render();toast('Venda removida dos números');return;}
+  if(!peca){marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);enterraGruposVazios([v]);   /* [re-checagem F2, medio 1] devolução era a 4ª porta sem túmulo de grupo */save();render();toast('Venda removida dos números');return;}
   const resp=prompt('Motivo da devolução (fica gravado no item):','produto devolvido');
   if(resp===null){toast('Devolução cancelada — nada mudou');return;}   /* Cancelar CANCELA */
   const motivo=resp.trim()||'produto devolvido';
   const volta=voltarPeca(peca,v);
   const hj=new Date().toISOString().slice(0,10);
   peca.devObs='↩ devolvido em '+dBR(new Date(hj+'T00:00:00'))+' — '+motivo+(v.contraparte?' ('+v.contraparte+')':'')+' · a venda era '+fmt(+v.valor||0);
-  marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);
+  marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);enterraGruposVazios([v]);   /* [re-checagem F2, medio 1] devolução era a 4ª porta sem túmulo de grupo */
   save();render();toast('↩ Devolvido — voltou '+praRot(volta)+' ✓');}
 function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)return;
   const alvo=movs.find(x=>x.id===v.origemId);
@@ -698,6 +728,7 @@ function verVenda(vid){const its=movs.filter(x=>x.tipo==='VENDA'&&x.vendaId===vi
     <div class="sec" style="margin-top:0">🧾 Venda completa — ${its.length} itens</div>
     <div class="ctx">${cab.data?dBR(new Date(cab.data+'T00:00:00')):'—'}${cab.contraparte?' · cliente <b>'+cab.contraparte+'</b>':''}${cab.canal==='App'?' · app':' · Pix'}</div>
     ${lin}
+    <button class="btn g" style="margin-top:8px;color:var(--purple)" onclick="abrirFotosGrupo('${vid}','📷 Fotos da venda (comprovante)','verVenda(&quot;${vid}&quot;)')">📷 fotos da venda (comprovante)</button><!-- alvo-alterado: intencional (fechar as fotos reabre a venda) -->
     <div class="calc" style="margin-top:10px">Total da venda: <b>${fmt(tot)}</b>${liq<tot-0.01?' · líquido <b>'+fmt(liq)+'</b>':''}${custoT>0?' · custo vinculado '+fmt(custoT)+' · lucro <b style="color:var(--green)">'+fmt(liq-custoT)+(custoT>0?' ('+(liq-custoT>=0?'+':'')+Math.round((liq-custoT)/custoT*1000)/10+'%)':'')+'</b>':''}${semV?'<br>⚠ '+semV+' item(ns) ainda sem vínculo — falta o custo deles na conta, então o lucro real é MENOR que o mostrado':''}</div>
     <button class="btn g" style="margin-top:12px" onclick="fecharModal()">fechar</button></div></div>`;
   document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
@@ -752,7 +783,7 @@ function soltarIntrusa(raizId){
     'Depois disso a conta do lote fecha: '+fmt(d.soma-(+x.valor||0))+' = '+fmt(d.ref)+'.\n\n'+
     'Nada é apagado. Dá pra desfazer refazendo o vínculo.'))return;
   delete x.loteOrigem;
-  if(sitDe(x)==='Trocado'){x.situacao='Em estoque';x.destino='Vender';delete x.dataTroca;delete x.trocaId;}
+  if(sitDe(x)==='Trocado'){const tidX=x.trocaId;x.situacao='Em estoque';x.destino='Vender';delete x.dataTroca;delete x.trocaId;enterraGruposVazios([{trocaId:tidX}]);}
   if(x.valorOrig==null)x.valorOrig=+x.valor||0;
   x.obs=((x.obs||'')+' [solta do lote em '+new Date().toISOString().slice(0,10)+' — estava somando na conta de outra nota]').trim();
   save();fecharModal();
@@ -1153,7 +1184,7 @@ function abrirFotosItem(){const old=document.getElementById('modal');if(old)old.
   const thumbs=_fotosItem.length?_fotosItem.map((b,i)=>`<div style="position:relative"><img src="${b}" style="width:100%;height:92px;object-fit:cover;border-radius:8px"><button class="x" style="position:absolute;top:2px;right:4px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 7px" onclick="_fotosItem.splice(${i},1);abrirFotosItem()">✕</button></div>`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto desta carta ainda.</div>';
   const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();atualizarBadgeFotoItem()}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div style="font-weight:800;font-size:16px;margin-bottom:4px">📷 Foto desta carta</div>
-    <div class="meta" style="margin-bottom:10px">Fica com <b>este item</b>, não com a nota. Ao adicionar o item à lista, a foto vai junto — você não precisa voltar depois.</div>
+    <div class="meta" style="margin-bottom:10px">Fica com <b>este item</b>, não com a nota/venda/troca. Ao adicionar o item à lista, a foto vai junto — você não precisa voltar depois.</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${thumbs}</div>
     <input type="file" id="fotoItemCam" accept="image/*" capture="environment" style="display:none" onchange="fotoItemEscolhida(this)">
     <input type="file" id="fotoItemArq" accept="image/*" multiple style="display:none" onchange="fotoItemEscolhida(this)">
@@ -1178,7 +1209,7 @@ function fotoThumbDe(b64,cb){const img=new Image();img.onload=()=>{let w=img.wid
    mostrando foto "pendente" de um lançamento já salvo), mas cada foto viaja em `_fotosEmVoo`; no sucesso
    conta e gera miniatura; na recusa VOLTA ao balde com aviso; se nada responder em 8 s (sem rede o envio fica
    pendurado), avisa para não sair do app. */
-let _fotosEmVoo=[],_fotosFalhadas=[];   /* _fotosFalhadas: {movId,b64,ts} — fila POR LANÇAMENTO, nunca o balde da tela */
+let _fotosEmVoo=[],_fotosFalhadas=[],_gradeDe=null;   /* _gradeDe: dono (item ou grupo) da grade de fotos aberta agora — o reenvio só redesenha a grade se ela é DELE. _fotosFalhadas: {movId,b64,ts} — fila POR LANÇAMENTO, nunca o balde da tela */
 /* [revisão F1, F1-A/F1-B] a foto recusada NÃO volta ao balde da tela: o balde é de quem está digitando agora, e a
    foto é de um lançamento já salvo — devolver ao balde colava a foto no lançamento SEGUINTE (ou, na nota, o
    item perdia a foto). Vai para a fila por lançamento e é reenviada: sozinha, no próximo commit bem-sucedido
@@ -1190,7 +1221,7 @@ function contarFotoGravada(m,b64){if(!m)return;m.nFotos=(+m.nFotos||0)+1;if(!m.f
 function reenviarFotosFalhadas(movId){const fila=_fotosFalhadas.filter(f=>(!movId||f.movId===movId)&&!f.enviando);if(!fila.length)return 0;
   fila.forEach(f=>{f.enviando=true;
     fotoAdd(f.movId,f.b64,ok=>{const i=_fotosFalhadas.indexOf(f);
-      if(ok){if(i>=0)_fotosFalhadas.splice(i,1);contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid'))fotoRefresh(f.movId);}
+      if(ok){if(i>=0)_fotosFalhadas.splice(i,1);contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid')&&_gradeDe===f.movId)fotoRefresh(f.movId);   /* [revisão F2, M5] só redesenha se a grade aberta é a DO dono da foto */}
       else{f.enviando=false;}},true);});
   return fila.length;}
 /* [re-checagem F1, Q2] enquanto a fila viver só na memória, o limite tem de ser visível: sair da página com
@@ -1202,13 +1233,16 @@ function aplicarFotosPend(movId){if(!_fotosPend.length||!movId)return;const L=_f
   L.forEach(b64=>{_fotosEmVoo.push(b64);
     fotoAdd(movId,b64,ok=>{respondidas++;const i=_fotosEmVoo.indexOf(b64);if(i>=0)_fotosEmVoo.splice(i,1);
       if(ok)contarFotoGravada(m,b64);
-      else{_fotosFalhadas.push({movId,b64,ts:Date.now()});toast('⚠ Não consegui gravar 1 foto deste lançamento — ficou na fila: quando a nuvem voltar eu reenvio sozinho, ou abra "📷 fotos" dele e toque em reenviar.');}},true);});
+      else{_fotosFalhadas.push({movId,b64,ts:Date.now()});
+        /* [revisão F2, M4] se o dono da foto é um GRUPO, a faixa de reenvio mora no visor do comprovante, não no do item */
+        const onde=m?'abra "📷 fotos" dele':(movs.some(x=>x.notaId===movId)?'abra a nota e toque em "📷 fotos da nota (comprovante)"':movs.some(x=>x.vendaId===movId)?'abra a venda e toque em "📷 fotos da venda (comprovante)"':'abra um item da troca e toque em "📷 fotos da troca (comprovante)"');
+        toast('⚠ Não consegui gravar 1 foto — ficou na fila: quando a nuvem voltar eu reenvio sozinho, ou '+onde+' e toque em reenviar.');}},true);});
   setTimeout(()=>{if(respondidas<L.length&&!avisouPendurado){avisouPendurado=true;toast('📷 foto ainda enviando — fique com o app aberto até o contador aparecer (sem internet o envio fica esperando).');}},8000);}
 function abrirFotosPend(){const old=document.getElementById('modal');if(old)old.remove();
   const thumbs=_fotosPend.length?_fotosPend.map((b,i)=>`<div style="position:relative"><img src="${b}" style="width:100%;height:92px;object-fit:cover;border-radius:8px"><button class="x" style="position:absolute;top:2px;right:4px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 7px" onclick="_fotosPend.splice(${i},1);abrirFotosPend()">✕</button></div>`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda — adicione abaixo.</div>';
   const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();atualizarBadgeFotos()}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
-    <div class="sec" style="margin-top:0">📷 Fotos deste lançamento</div>
-    <div class="ctx">Elas ficam junto quando você salvar o lançamento.</div>
+    <div class="sec" style="margin-top:0">📷 Fotos ${grupoPend()?'da '+grupoPend()+' (comprovante)':'deste lançamento'}</div>
+    <div class="ctx">${grupoPend()?'Ficam com a '+grupoPend()+' INTEIRA (nota fiscal, boleto, comprovante). A foto de cada carta vai em "📷 foto DESTA carta".':'Elas ficam junto quando você salvar o lançamento.'}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0">${thumbs}</div>
     <input type="file" id="fotoFilePendCam" accept="image/*" capture="environment" style="display:none" onchange="fotoPendEscolhida(this)">
     <input type="file" id="fotoFilePend" accept="image/*" style="display:none" onchange="fotoPendEscolhida(this)">
@@ -1220,8 +1254,20 @@ function abrirFotosPend(){const old=document.getElementById('modal');if(old)old.
 function atualizarBadgeFotos(){const s=document.getElementById('fotosLancTxt');if(!s)return;
   const n=editId?(+((movs.find(m=>m.id===editId)||{}).nFotos)||0):_fotosPend.length;
   s.textContent=n>0?' ('+n+')':'';}
+/* [fotos D1] o balde de cima é de um GRUPO quando o formulário é de vários: nota (compra em nota), venda de vários
+   itens ou troca — aí a foto é o comprovante da operação inteira (e sai com o perfil "documento" na compressão) */
+function grupoPend(){if(tela!=='lancar'||editId)return '';if(tipoSel==='COMPRA'&&compraModo==='nota')return 'nota';if(tipoSel==='VENDA'&&vendaModo==='varios')return 'venda';if(tipoSel==='TROCA')return 'troca';return '';}
+/* [revisão F2, M1] o balde de cima muda de SIGNIFICADO com o modo (em "nota" é o comprovante da nota inteira; em
+   "1 item" é a foto daquele lançamento). Mesma regra única do balde da carta: se o dono troca de modo dentro do
+   Lançar com foto no balde, o balde vai embora e DIZ — senão a nota fiscal tirada no modo nota virava foto do
+   item seguinte (a queixa de 21/08 por outra porta). Sair do Lançar já é coberto por go()/voltar(). */
+let _gpAnt=null;
+function guardaBaldePend(){const gp=(tela==='lancar'?(tipoSel+':'+(grupoPend()||'item')):'fora')+'|'+(editId||'');   /* [re-checagem F2, menor 3] mesma régua do balde da carta: trocar o TIPO (compra→venda) também muda o significado */
+  if(_gpAnt!==null&&gp!==_gpAnt&&tela==='lancar'&&_fotosPend.length){const n=_fotosPend.length;_fotosPend=[];
+    try{toast(n+' foto'+(n>1?'s':'')+' do comprovante descartada'+(n>1?'s':'')+' — você trocou o tipo de lançamento; tire de novo no formulário certo');}catch(e){}}
+  _gpAnt=gp;}
 function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
-  fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');return;}_fotosPend.push(b64);abrirFotosPend();});}
+  fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');return;}_fotosPend.push(b64);abrirFotosPend();},grupoPend()?'doc':'');}
 function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',1);
   rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});};
   rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);}catch(e){cb(null);}}
@@ -1243,10 +1289,66 @@ function fotoList(movId,cb){
 function fotoDel(fid,cb){
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).delete().then(()=>cb(true)).catch(()=>cb(false));}
   else idbOpen(db=>{if(!db){cb(false);return;}const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').delete(fid);tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
-function fotoComprime(file,cb){const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{
-  let w=img.width,h=img.height;const MX=1280;if(w>=h&&w>MX){h=Math.round(h*MX/w);w=MX;}else if(h>w&&h>MX){w=Math.round(w*MX/h);h=MX;}
-  const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);
-  cb(cv.toDataURL('image/jpeg',0.72));};img.onerror=()=>cb(null);img.src=e.target.result;};rd.onerror=()=>cb(null);rd.readAsDataURL(file);}
+function fotoComprime(file,cb,perfil){const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{
+  const faz=(MX,q)=>{let w=img.width,h=img.height;if(w>=h&&w>MX){h=Math.round(h*MX/w);w=MX;}else if(h>w&&h>MX){w=Math.round(w*MX/h);h=MX;}
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);return cv.toDataURL('image/jpeg',q);};
+  /* [fotos D1] comprovante (nota fiscal, boleto — letra miúda; decisão do Felype de 27/06: "manter definição pra
+     ler números") sai com mais definição que foto de carta: 2000px/0,75 com teto de ~900 KB (o documento de
+     foto na nuvem tem 1 MiB); se estourar, volta ao perfil da carta (1280px/0,72). */
+  if(perfil==='doc'){const d=faz(2000,0.75);cb(d.length>900000?faz(1280,0.72):d);return;}
+  cb(faz(1280,0.72));};img.onerror=()=>cb(null);img.src=e.target.result;};rd.onerror=()=>cb(null);rd.readAsDataURL(file);}
+/* [fotos D1] visor do GRUPO (nota/venda/troca): a mesma tela do visor de item, sem exigir lançamento — o id é o
+   da nota/venda/troca (nid/vid/tid) e as fotos moram na mesma subcoleção. Grupo não tem contador nem
+   miniatura (nada derivado = nada para derivar errado); a contagem aparece ao abrir. */
+/* [revisão F2, M1] voltaJs: o que reabrir ao fechar (a nota/venda de onde veio) — sem isso, fechar o comprovante
+   soltava o dono no cartão atrás do modal. Vai para dentro de atributo, então escapa aspas.
+   <!-- alvo-alterado: intencional — o fechar do fundo e o botão "fechar" deste modal ganham o retorno ao dono --> */
+function abrirFotosGrupo(gid,titulo,voltaJs){if(!gid)return;const old=document.getElementById('modal');if(old)old.remove();
+  const vj=String(voltaJs||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();${vj}}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">${titulo||'📷 Fotos da nota (comprovante)'}</div>
+    <div class="ctx">Comprovante da operação INTEIRA (nota fiscal, boleto, recibo) — fica guardado junto${USAR_NUVEM?' na nuvem (você e a Laura veem em qualquer aparelho)':' neste aparelho'}. A foto de cada carta fica no próprio item.</div>
+    ${(function(){const n=_fotosFalhadas.filter(f=>f.movId===gid).length;return n?`<div class="soon" style="background:var(--nobg);color:var(--red);cursor:pointer" onclick="this.textContent='reenviando…';reenviarFotosFalhadas('${gid}')">⚠ ${n} foto${n>1?'s':''} não ${n>1?'foram gravadas':'foi gravada'} — toque para reenviar</div>`:'';})()}
+    <div id="fotoGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0"><div class="meta" style="grid-column:1/-1">carregando…</div></div>
+    <input type="file" id="fotoFileCam" accept="image/*" capture="environment" style="display:none" onchange="fotoEscolhida('${gid}',this,'doc')">
+    <input type="file" id="fotoFile" accept="image/*" style="display:none" onchange="fotoEscolhida('${gid}',this,'doc')">
+    <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFileCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFile').click()">🖼 da galeria</button></div></div>
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal();${vj}">fechar</button><!-- alvo-alterado: intencional (fechar volta ao dono) --></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);
+  _gradeDe=gid;fotoRefresh(gid);}
+/* [fotos D3 — núcleo] mover foto = gravar no destino e só ENTÃO apagar da origem (verbos já em uso: criar + apagar;
+   não depende de regra de update na nuvem). Contadores: quem chama ajusta (o grupo não tem; o item ganha no
+   moverFotosDe). */
+function fotoMove(f,destinoId,cb){if(!f||!f.id||!f.b64||!destinoId){cb&&cb(false);return;}
+  fotoAdd(destinoId,f.b64,ok=>{if(!ok){cb&&cb(false);return;}fotoDel(f.id,ok2=>{cb&&cb(!!ok2);});},true);}
+/* move TODAS as fotos de um id (grupo ou item) para outro — fusão de notas, desfazer nota movendo pro 1º produto.
+   cb(n) = quantas moveram; cb(null) = não consegui ler a origem. */
+/* [revisão F2, G1/G2] cb(n,total): n = fotos que chegaram E saíram da origem; total = quantas havia. null = não
+   consegui ler. Quem chama só conclui o gesto do dono (desfazer/tirar da nota/fundir) com n===total; parcial ou
+   zero AVISA e não conclui. Sem rede o set fica pendurado — 8 s sem resposta devolve o parcial (mesmo padrão do
+   aplicarFotosPend). `_moveEmVoo` barra a mesma foto ser enfileirada duas vezes se ele repetir o gesto. Gesto que
+   não completou (fusão) vai para `_movesPendentes` e é retomado no próximo commit bem-sucedido da nuvem. */
+let _moveEmVoo=new Set(),_movesPendentes=[];
+try{const mp=JSON.parse(localStorage.getItem('tcg_moves_pend')||'[]');if(Array.isArray(mp))_movesPendentes=mp.filter(p=>p&&p.origem&&p.destino);}catch(e){_movesPendentes=[];}
+setTimeout(()=>{try{retomarMovesPendentes();}catch(e){}},4000);   /* retomada na abertura (também no modo local) */
+function moverFotosDe(origemId,destinoId,cb){if(!origemId||!destinoId||origemId===destinoId){cb&&cb(0,0);return;}
+  fotoList(origemId,L=>{if(L===null){cb&&cb(null,0);return;}const fila=L.filter(f=>!_moveEmVoo.has(f.id));if(!fila.length){cb&&cb(0,L.length);return;}
+    /* [re-checagem F2, menor 1] repetir o gesto depois de uma falha parcial (gravou no destino, não apagou da origem)
+       NÃO duplica: o que já está no destino só sai da origem. Se não der para ler o destino, segue como antes. */
+    fotoList(destinoId,D=>{const jaLa=new Set((D||[]).map(x=>x.b64));
+      let n=0,falta=fila.length,respondeu=false;const total=L.length;
+      const fim=()=>{if(respondeu)return;respondeu=true;const m=movs.find(x=>x.id===destinoId);
+        if(m&&n){m.nFotos=(+m.nFotos||0)+n;if(!m.fotoThumb&&fila[0]&&fila[0].b64){fotoThumbDe(fila[0].b64,t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}else save();}
+        cb&&cb(n,total);};
+      fila.forEach(f=>{_moveEmVoo.add(f.id);
+        if(jaLa.has(f.b64)){fotoDel(f.id,ok2=>{_moveEmVoo.delete(f.id);if(ok2)n++;if(--falta===0)fim();});return;}
+        fotoMove(f,destinoId,ok=>{_moveEmVoo.delete(f.id);if(ok)n++;if(--falta===0)fim();});});
+      setTimeout(()=>{if(!respondeu)fim();},8000);});});}
+/* [re-checagem F2, medio 3] a fila de retomada vai para o disco (tcg_moves_pend) — fechar o app não cancela a promessa
+   "tento de novo"; e a retomada também roda na abertura (modo local não tem commit de nuvem para acordá-la). */
+function gravaMovesPend(){try{gravaLocal('tcg_moves_pend',JSON.stringify(_movesPendentes));}catch(e){}}
+function retomarMovesPendentes(){if(!_movesPendentes.length)return;const fila=_movesPendentes.slice();_movesPendentes=[];gravaMovesPend();
+  fila.forEach(p=>moverFotosDe(p.origem,p.destino,(n,total)=>{if(n!==null&&n===total){if(p.tumulo)marcaExcluido(p.tumulo);}else _movesPendentes.push(p);gravaMovesPend();}));}
 function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
   const old=document.getElementById('modal');if(old)old.remove();
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
@@ -1259,7 +1361,7 @@ function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
     <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFileCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFile').click()">🖼 da galeria</button></div></div>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal();atualizarBadgeFotos()">fechar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);
-  fotoRefresh(movId);}
+  _gradeDe=movId;fotoRefresh(movId);}
 function fotoRefresh(movId){fotoList(movId,L=>{const g=document.getElementById('fotoGrid');
   /* [fotos F1, P0-1] leitura que falhou: diz na tela e NÃO toca em contador nem miniatura */
   if(L===null){_fotosCache=[];if(g)g.innerHTML='<div class="meta" style="grid-column:1/-1;color:var(--amber)">⚠ Não consegui carregar as fotos agora (sem conexão?). As fotos continuam guardadas — tente de novo em instantes.</div>';return;}
@@ -1269,10 +1371,10 @@ function fotoRefresh(movId){fotoList(movId,L=>{const g=document.getElementById('
   /* [fotos F1, P0-3] só grava (e sobe pra nuvem) se algo MUDOU — abrir o visor não é escrita */
   if(L.length){let mudou=false;if((+m.nFotos||0)!==L.length){m.nFotos=L.length;mudou=true;}fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;}if(mudou)save();});}
   else{let mudou=false;if(+m.nFotos){m.nFotos=0;mudou=true;}if(m.fotoThumb){delete m.fotoThumb;mudou=true;}if(mudou)save();}});}
-function fotoEscolhida(movId,inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
+function fotoEscolhida(movId,inp,perfil){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
   const g=document.getElementById('fotoGrid');if(g)g.innerHTML='<div class="meta" style="grid-column:1/-1">guardando foto…</div>';
   fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');fotoRefresh(movId);return;}
-    fotoAdd(movId,b64,ok=>{if(ok)toast('Foto guardada ✓');fotoRefresh(movId);});});}
+    fotoAdd(movId,b64,ok=>{if(ok)toast('Foto guardada ✓');fotoRefresh(movId);});},perfil);}
 function verFoto(fid,movId){const f=_fotosCache.find(x=>x.id===fid);if(!f)return;
   const v=`<div id="fotoview" onclick="this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px"><img src="${f.b64}" style="max-width:96%;max-height:80%;border-radius:8px"><button class="btn g" style="width:auto;padding:10px 18px" onclick="event.stopPropagation();if(confirm('Excluir esta foto?')){fotoDel('${fid}',ok=>{if(ok)toast('Foto excluída');document.getElementById('fotoview')&&document.getElementById('fotoview').remove();fotoRefresh('${movId}');});}">🗑 excluir</button><div style="color:#aaa;font-size:12px">toque fora da foto pra fechar</div></div>`;
   document.body.insertAdjacentHTML('beforeend',v);}
@@ -1534,7 +1636,7 @@ function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;
    do login resolver, não só o dos preços — por isso a trava mora aqui dentro, e não no
    fetch: enquanto a tela de login estiver no ar, render() não pinta por cima dela. */
 let _telaLoginNoAr=false;
-function render(){guardaBaldeItem();if(_telaLoginNoAr)return;
+function render(){guardaBaldeItem();guardaBaldePend();if(_telaLoginNoAr)return;
   if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
   const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
@@ -1719,7 +1821,8 @@ function vLancar(){
   const pode=(t==='COMPRA'||t==='VENDA'||t==='TROCA'||t==='DESPESA'||(t==='CONSUMO'&&motor().disp.length>0));const ehNota=(t==='COMPRA'&&compraModo==='nota'&&!editId);const ehVV=(t==='VENDA'&&vendaModo==='varios'&&!editId);
   return `<div class="card"><div class="types">${tipos.map(([k,ic,l])=>`<div class="tbtn ${t===k?'on':''}" onclick="tipoSel='${k}';editId=${editId?`'${editId}'`:'null'};render()"><span style="font-size:16px;margin-right:3px">${ic}</span>${l}</div>`).join('')}</div>
     ${ehNota||ehVV||t==='ABRIR'?'':`<label>Data de emissão</label><input id="f_data" type="date" value="${e?.data||hoje}">`}${campos}
-    ${(pode||ehNota||ehVV)?`<button class="btn g" id="btnFotosLanc" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">📷 fotos do lançamento<span id="fotosLancTxt">${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')}</span> <span style="color:var(--mut);font-size:10px">nota, boleto, a carta…</span></button>`:''}
+    ${(pode||ehNota||ehVV)?`<button class="btn g" id="btnFotosLanc" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">${editId?'📷 fotos do lançamento':ehNota?'📷 fotos da nota (comprovante)':ehVV?'📷 fotos da venda (comprovante)':tipoSel==='TROCA'?'📷 fotos da troca (comprovante)':'📷 fotos do lançamento'}<span id="fotosLancTxt">${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')}</span> <span style="color:var(--mut);font-size:10px">${(!editId&&(ehNota||ehVV||tipoSel==='TROCA'))?'da operação inteira; cada carta tem o seu "📷 foto DESTA carta"':'nota, boleto, a carta…'}</span></button>`:''}
+    ${(editId&&e&&(e.notaId||e.vendaId||e.trocaId))?`<button class="btn g" style="margin-bottom:8px" onclick="abrirFotosGrupo('${e.notaId||e.vendaId||e.trocaId}','📷 Fotos da ${e.notaId?'nota':e.vendaId?'venda':'troca'} (comprovante)')">📷 fotos da ${e.notaId?'nota':e.vendaId?'venda':'troca'} (comprovante)</button>`:''}
     ${ehNota?`<button class="btn" onclick="salvarNota()">Salvar nota · ${notaItens.length} ${notaItens.length===1?'item':'itens'}</button>`:ehVV?`<button class="btn" onclick="salvarVendaVarios()">Salvar venda · ${vendaItens.length} ${vendaItens.length===1?'item':'itens'}</button>`:t==='TROCA'?`<button class="btn" onclick="salvarTroca()">Registrar troca</button>`:(pode?`<button class="btn" onclick="salvar()">${e?'Salvar alteração':'Salvar e lançar outro'}</button>`:'')}
     ${e?`<button class="btn g" onclick="editId=null;go('consultar')">Cancelar</button>`:''}
     ${USAR_NUVEM&&_userEmail&&papelAtual()==='lancamento'?`<div class="lnk" style="margin-top:10px" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}</div>`;
@@ -1775,7 +1878,8 @@ function addItemNota(){const g=id=>document.getElementById(id);const cat=g('n_ca
   if(unit<=0&&val>0)unit=Math.round((val/qtd)*100)/100;
   if(val<=0){alert('Informe o valor de cada item (ou o total).');return;}
   const col=g('n_col')?.value,cod=(g('n_cod')?.value||'').trim(),cond=g('n_cond')?.value;notaItens.push({jogo:g('n_jogo').value,cat,colecao:(col&&col!=='__add__')?col:'',idioma:g('n_idi').value,qtd,valor:val,vUnit:unit,codigo:cod,boosters:+g('n_boo')?.value||0,condicao:(cond&&cond!=='—')?cond:'',fotos:_fotosItem.slice()});_fotosItem=[];render();}
-function removeItemNota(i){notaItens.splice(i,1);render();}
+/* [revisão F2, menor 7] remover item que já tem foto da carta: avisar antes — a foto vai junto */
+function removeItemNota(i){const it=notaItens[i];if(it&&it.fotos&&it.fotos.length&&!confirm('Este item tem '+it.fotos.length+' foto'+(it.fotos.length>1?'s':'')+' da carta. Remover o item da nota apaga a foto também. Remover?'))return;notaItens.splice(i,1);render();}
 function editItemNota(i){if(!baldeItemLivre())return;const it=notaItens.splice(i,1)[0];
   /* [21/08 revisao] faltava esta linha: o editRecebi devolvia as fotos ao balde e este nao —
      corrigir um item da nota perdia as fotos dele em silencio. */
@@ -1813,7 +1917,7 @@ function salvarNota(){
   notaItens.forEach((it,i)=>{const custo=Math.round((it.valor+rF[i]+rT[i])*100)/100;
     const _idIt=novoId();
     movs.push({id:_idIt,tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,condicao:it.condicao||'',qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:rF[i],taxaRateio:rT[i],situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:((rF[i]+rT[i])>0?`nota · +${fmt(rF[i]+rT[i])} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});aplicarFotosDoItem(it.fotos,_idIt);});
-  const f1=movs.find(m=>m.notaId===nid);aplicarFotosPend(f1&&f1.id);
+  aplicarFotosPend(nid);   /* [fotos D1] a foto de cima é da NOTA inteira (comprovante) — vai para o GRUPO, não para o 1º item (a queixa de 21/08) */
   const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
   const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.origemId?'📦 ':''}${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span>${it.origemId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd+(it.un==='boo'?' boosters':''):''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
@@ -1834,6 +1938,7 @@ function vendaForm(){
       <div class="row2"><div><label>Idioma</label><select id="v_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option>${x}</option>`).join('')}</select></div>
         <div><label>Qtd</label><input id="v_qtd" type="number" inputmode="numeric" value="1"></div></div>
       <label>Valor da venda (R$)</label><input id="v_val" type="number" inputmode="decimal" placeholder="0,00">`}
+      <button class="btn g" style="margin:8px 0 4px" onclick="abrirFotosItem()">📷 foto DESTA carta<span id="fotoItemTxt">${_fotosItem.length?' ('+_fotosItem.length+')':''}</span> <span style="color:var(--mut);font-size:10px">vai junto quando você adicionar à venda</span></button>
       <button class="btn g" style="margin-top:10px" onclick="addItemVenda()">+ adicionar à venda</button></div>
     <div class="calc" style="margin:6px 0">Total da venda: <b>${fmt(tot)}</b></div>
     <label>Canal</label><div class="toggle"><div class="o ${!app?'on':''}" onclick="vendaHead.canal='Pix';render()">Pix / na hora</div><div class="o ${app?'on':''}" onclick="vendaHead.canal='App';render()">App / a prazo</div></div>
@@ -1854,15 +1959,15 @@ function addItemVenda(){const g=id=>document.getElementById(id);
     if(q>dispI){alert('Você só tem '+dispI+(boo?' boosters':' un')+' desse item.');return;}
     const val=+g('v_val2')?.value||0;if(val<=0){alert('Informe o valor da venda deste item.');return;}
     if(sitDe(src)==='Pedido'&&!confirm('🚚 Esse item está marcado como PEDIDO (a caminho, ainda não chegou).\n\nVender assim mesmo? A parte vendida sai do pedido direto como vendida — o que sobrar continua a caminho.'))return;
-    vendaItens.push({origemId:src.id,un:boo?'boo':'un',qtd:q,valor:val,jogo:src.jogo||'Pokémon',cat:boo?'Booster':(src.cat||''),colecao:src.colecao||'',idioma:src.idioma||'',condicao:src.condicao||''});render();return;}
-  const val=+g('v_val')?.value||0;if(val<=0){alert('Informe o valor do item.');return;}const col=g('v_col')?.value,cat=g('v_cat').value;vendaItens.push({jogo:g('v_jogo').value,cat:(cat&&cat!=='__add__')?cat:'',colecao:(col&&col!=='__add__')?col:'',idioma:g('v_idi').value,qtd:+g('v_qtd').value||1,valor:val,codigo:(g('v_cod')?.value||'').trim()});render();}
-function removeItemVenda(i){vendaItens.splice(i,1);render();}
+    vendaItens.push({origemId:src.id,un:boo?'boo':'un',qtd:q,valor:val,jogo:src.jogo||'Pokémon',cat:boo?'Booster':(src.cat||''),colecao:src.colecao||'',idioma:src.idioma||'',condicao:src.condicao||'',fotos:_fotosItem.slice()});_fotosItem=[];render();return;}
+  const val=+g('v_val')?.value||0;if(val<=0){alert('Informe o valor do item.');return;}const col=g('v_col')?.value,cat=g('v_cat').value;vendaItens.push({jogo:g('v_jogo').value,cat:(cat&&cat!=='__add__')?cat:'',colecao:(col&&col!=='__add__')?col:'',idioma:g('v_idi').value,qtd:+g('v_qtd').value||1,valor:val,codigo:(g('v_cod')?.value||'').trim(),fotos:_fotosItem.slice()});_fotosItem=[];render();}
+function removeItemVenda(i){const it=vendaItens[i];if(it&&it.fotos&&it.fotos.length&&!confirm('Este item tem '+it.fotos.length+' foto'+(it.fotos.length>1?'s':'')+' da carta. Remover o item da venda apaga a foto também. Remover?'))return;vendaItens.splice(i,1);render();}
 function salvarVendaVarios(){
   if(!vendaItens.length){alert('Adicione pelo menos um item à venda.');return;}
   const cp=(vendaHead.cp&&vendaHead.cp!=='__add__')?vendaHead.cp:'';if(!cp){alert('O cliente é obrigatório.');return;}
   if(!avisaSemConta((vendaHead.conta&&vendaHead.conta!=='__add__')?vendaHead.conta:'','Venda'))return;
-  const temF=_fotosPend.length>0||vendaItens.some(it=>{if(!it.origemId)return false;const s=movs.find(z=>z.id===it.origemId);return s&&(((+s.nFotos)||0)>0||s.fotoThumb);});
-  if(!temF&&!confirm('📷 Essa venda vai ficar SEM foto (e nenhum item de origem tem).\n\nOK = salvar sem foto · Cancelar = voltar pra anexar em "📷 fotos do lançamento".'))return;
+  const temF=_fotosPend.length>0||vendaItens.some(it=>it.fotos&&it.fotos.length)||vendaItens.some(it=>{if(!it.origemId)return false;const s=movs.find(z=>z.id===it.origemId);return s&&(((+s.nFotos)||0)>0||s.fotoThumb);});
+  if(!temF&&!confirm('📷 Essa venda vai ficar SEM foto (nenhuma carta tem foto e nenhum item de origem tem).\n\nOK = salvar sem foto · Cancelar = voltar pra anexar em "📷 fotos da venda (comprovante)" ou em "📷 foto DESTA carta".'))return;
   const app=vendaHead.canal==='App',data=vendaHead.data||new Date().toISOString().slice(0,10),conta=(vendaHead.conta&&vendaHead.conta!=='__add__')?vendaHead.conta:'',vid=novoId('v');let k=0;
   vendaItens.forEach(it=>{const base={id:novoId(),tipo:'VENDA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,condicao:it.condicao||'',qtd:it.qtd,valor:it.valor,codigo:it.codigo||'',canal:vendaHead.canal,taxa:app?(+vendaHead.taxa||0):0,recDias:app?(+vendaHead.recDias||0):0,conta,contraparte:cp,destino:'Vender',vendaId:vid,obs:''};
     if(it.origemId){const src=movs.find(m=>m.id===it.origemId);
@@ -1874,8 +1979,8 @@ function salvarVendaVarios(){
         Object.assign(base,{qtd:qv,codigo:src.codigo||'',vendaDe:sitS==='Pedido'?'pedido':'estoque',origemId:src.id,custoOrigem:Math.round(vU*qv*100)/100,vendaTipo:'material'});
         if(pedVV&&pedVV.id!==src.id)pedVV.vendaRef=base.id;}
       else alert('⚠ "'+((it.colecao?it.colecao+' · ':'')+(it.cat||'item'))+'" não está mais disponível ('+(src?('situação: '+sitS):'item não existe mais')+') — esse item da venda entra SEM vínculo e sem baixar estoque. Depois dá pra corrigir abrindo a venda e tocando "🔗 de onde saiu?".');}
-    movs.push(base);});
-  const fv1=movs.find(m=>m.vendaId===vid);aplicarFotosPend(fv1&&fv1.id);
+    movs.push(base);aplicarFotosDoItem(it.fotos,base.id);});   /* [fotos D2] cada carta da venda leva a SUA foto */
+  aplicarFotosPend(vid);   /* [fotos D1] comprovante da VENDA inteira (grupo) */
   const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
 function trocaForm(){
   /* [Felype 21/08] "nao consigo trocar nada da colecao — so tenho opcao de trocar estoque".
@@ -1943,7 +2048,7 @@ function editRecebi(i){if(!baldeItemLivre())return;const r=trocaRecebi.splice(i,
   if(r.linkUrl)_linkPend['r_cod']=r.linkUrl;
   toast('De volta nos campos — corrija e toque em "+ adicionar" de novo');}
 function addRecebi(){const g=id=>document.getElementById(id)?.value;const desc=g('r_desc')||'item',val=+g('r_val')||0,col=g('r_col'),sit=g('r_sit')||'Em estoque',jogo=g('r_jogo')||'Pokémon',idi=g('r_idi')||'—';const cat=(g('r_cat')&&g('r_cat')!=='__add__')?g('r_cat'):'Single/Carta';trocaRecebi.push({desc,valorMercado:val,colecao:(col&&col!=='__add__')?col:'',sit,jogo,idioma:idi,cat,codigo:(g('r_cod')||'').trim(),boosters:+g('r_boo')||0,condicao:(g('r_cond')&&g('r_cond')!=='—')?g('r_cond'):'',linkUrl:_linkPend['r_cod']||'',fotos:_fotosItem.slice()});_fotosItem=[];delete _linkPend['r_cod'];render();}
-function removeRecebi(i){trocaRecebi.splice(i,1);render();}
+function removeRecebi(i){const it=trocaRecebi[i];if(it&&it.fotos&&it.fotos.length&&!confirm('Este item tem '+it.fotos.length+' foto'+(it.fotos.length>1?'s':'')+' da carta. Remover o item da troca apaga a foto também. Remover?'))return;trocaRecebi.splice(i,1);render();}
 function trocaRatPrev(){const el=document.getElementById('trocaRat');if(el)el.innerHTML=trocaRatTxt();}
 function trocaRatTxt(){const custoTot=trocaDei.reduce((s,d)=>s+(+d.custo||0),0)+(+trocaDin||0),vTot=trocaRecebi.reduce((s,r)=>s+(+r.valorMercado||0),0);
   if(!trocaDei.length&&!trocaDin)return 'Adicione o que você deu pra ver o custo.';
@@ -1963,7 +2068,7 @@ function salvarTroca(){
     const nvT={id:novoId(),tipo:'COMPRA',origem:'TROCA',data,qtd:1,valor:Math.round(c*100)/100,cat:r.cat||'Single/Carta',codigo:r.codigo||'',boosters:+r.boosters||0,colecao:r.colecao,jogo:r.jogo||'Pokémon',idioma:r.idioma||'—',condicao:r.condicao||'',situacao:r.sit,destino:r.sit==='Coleção'?'Coleção':'Vender',destIni:r.sit==='Coleção'?'Coleção':'Em estoque',contraparte:cont,valorMercado:r.valorMercado,trocaId:tid,taxa:0,pgTipo:'À vista',obs:`${r.desc} (🔄 troca: dei ${deiDesc})`};
     if(r.linkUrl)nvT.codigoUrl=r.linkUrl;
     movs.push(nvT);aplicarFotosDoItem(r.fotos,nvT.id);});
-  const ft1=movs.find(m=>m.trocaId===tid);aplicarFotosPend(ft1&&ft1.id);
+  const ft1=movs.find(m=>m.trocaId===tid);aplicarFotosPend(tid);   /* [fotos D1] comprovante da TROCA inteira (grupo); din/dinConta continuam no 1º recebido */
   /* dinheiro dado na troca sai de uma conta de verdade: gravado no 1º recebido (din/dinConta)
      — o saldo e o extrato da conta passam a ver essa saída */
   if(ft1&&+trocaDin>0){ft1.din=Math.round(trocaDin*100)/100;ft1.dinConta=document.getElementById('t_dinconta')?.value||'';}
@@ -2125,10 +2230,12 @@ function vConsultar(){
           return `<span class="meta" style="flex-basis:100%;color:var(--green)">🔍 Liga: <b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
         ${(!m.codigo&&!m.codigoUrl&&!m.codigoNA)?`<span class="meta" style="flex-basis:100%">💡 Sem código — normal em cartas antigas. Busque à mão na Liga do jogo desta carta pelo nome (formato <b>Nome (código-se-tiver)</b>) e cole o link em 🔗.</span>${(m.tipo==='COMPRA'&&m.cat==='Single/Carta')?`<button class="x" style="color:var(--blue)" onclick="marcarLoteSemCodigo('${m.id}')">📚 é lote de cartas avulsas (sem código único)</button>`:''}`:''}
         ${m.codigoNA==='lote'?`<span class="meta" style="flex-basis:100%">📚 Lote de cartas avulsas — sem código único, fora das pendências de código.</span><button class="x" style="color:var(--mut)" onclick="desmarcarLoteSemCodigo('${m.id}')">↩ não é lote</button>`:''}
+        ${(m.notaId||m.vendaId||m.trocaId)?`<button class="x" style="color:var(--purple)" onclick="abrirFotosGrupo('${m.notaId||m.vendaId||m.trocaId}','📷 Fotos da ${m.notaId?'nota':m.vendaId?'venda':'troca'} (comprovante)')">📷 fotos da ${m.notaId?'nota':m.vendaId?'venda':'troca'} (comprovante)</button>`:''}
         ${(function(){const nP=+m.nFotos||0;
-          if(nP>0||!venda||!m.origemId)return `<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${nP>0?' ('+nP+')':''}</button>`;
+          if(!venda||!m.origemId)return `<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos${nP>0?' ('+nP+')':''}</button>`;
           const og=movs.find(z=>z.id===m.origemId),nO=og?(+og.nFotos||0):0;
-          return nO>0?`<button class="x" style="color:var(--purple)" onclick="abrirFotos('${og.id}')">📷 fotos do item (${nO})</button><button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 foto própria</button>`:`<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 fotos</button>`;})()}
+          /* [revisão F2, M2] venda com foto própria NÃO pode esconder as fotos da compra de origem: os dois botões */
+          return (nO>0?`<button class="x" style="color:var(--purple)" onclick="abrirFotos('${og.id}')">📷 fotos do item (${nO})</button>`:'')+`<button class="x" style="color:var(--purple)" onclick="abrirFotos('${m.id}')">📷 foto própria${nP>0?' ('+nP+')':''}</button>`;})()}
         <button class="x" onclick="abrir('${m.id}')" style="color:var(--blue)">✏️ editar</button>
         ${venda?`<button class="x" style="color:var(--green)" onclick="devolver('${m.id}')">↩ devolução</button>`:''}
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
@@ -2344,6 +2451,7 @@ function abrirNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.len
          return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();verLote('${pz.id}')"><div><b>${EMOP[s]||''} ${(+pz.qtd||1)} un · ${pz.cat||'item'}</b>${pz.colecao?`<div class="meta">${pz.colecao} · ${s.toLowerCase()}</div>`:`<div class="meta">${s.toLowerCase()}</div>`}</div><div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+pz.valor||0)}<div class="meta" style="color:var(--blue)">ver o lote →</div></div></div>`;}).join(''))}
     <div style="display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:8px;padding-top:8px;font-weight:700"><span>Total (${itens.length} ${itens.length===1?'produto':'produtos'})</span><span>${fmt(tot)}</span></div>
     <div class="ctx" style="margin-top:8px">Entrou junto mas era separado? Toque num produto pra editar, use "✂ tirar da nota" na Consultar (um a um) ou desfaça a nota inteira:</div>
+    <button class="btn g" style="margin-top:8px;color:var(--purple)" onclick="abrirFotosGrupo('${nid}','📷 Fotos da nota (comprovante)','abrirNota(&quot;${nid}&quot;)')">📷 fotos da nota (comprovante)</button><!-- alvo-alterado: intencional (fechar as fotos reabre a nota) -->
     <button class="btn g" style="margin-top:4px" onclick="desfazerNota('${nid}')">✂ desfazer nota — cada produto vira compra solta</button>
     <button class="btn g" style="margin-top:8px;color:var(--red)" onclick="excluirNotaInteira('${nid}')">🗑 excluir a nota INTEIRA — apaga os lançamentos</button>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal()">fechar</button></div></div>`;
@@ -2406,11 +2514,24 @@ function salvarEdicaoNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!to
   save();toast('Nota corrigida ✓');fecharModal();abrirNota(nid);render();}
 function excluirNotaInteira(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   const tot=its.reduce((s,x)=>s+(+x.valor||0),0);
-  if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números, como se nunca tivessem existido.\n\nUse pra relançar do zero. Excluir?'))return;
-  marcaExcluido(its.map(x=>x.id));movs=movs.filter(m=>m.notaId!==nid);save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos apagados');render();}
+  if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números. As fotos (dos itens e o comprovante da nota) NÃO são apagadas: ficam guardadas e voltam se você restaurar um ponto anterior.\n\nUse pra relançar do zero. Excluir?'))return;
+  /* [fotos D1] a nota (grupo) também ganha túmulo — sem ele a foto do comprovante ficava sem rastro nenhum */
+  marcaExcluido(its.map(x=>x.id).concat(['nota:'+nid]));movs=movs.filter(m=>m.notaId!==nid);enterraGruposVazios(its);   /* [re-checagem F2, menor 2] item que também era de uma troca: a troca vazia ganha túmulo */save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos apagados');render();}
+/* [fotos D1] desfazer a nota com comprovante: o grupo morre e as fotos ficariam sem lugar para aparecer — ele
+   ESCOLHE (mover para o 1º produto / deixar guardadas / cancelar), nunca automático. Sem fotos, o confirm de
+   sempre. Leitura das fotos falhou (sem rede) → avisa e trata como "não sei", oferecendo só deixar guardadas. */
 function desfazerNota(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
-  if(!confirm('Desfazer a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+'? Os '+its.length+' produtos viram compras SOLTAS (cada um mantém seu valor e pagamento) — os lançamentos não são apagados.'))return;
-  its.forEach(m=>{delete m.notaId;delete m.notaNum;});
+  const num=its[0].notaNum?' '+its[0].notaNum:'';
+  fotoList(nid,L=>{const n=L?L.length:0;
+    const soltas=its.length===1?'O produto vira compra SOLTA (mantém seu valor e pagamento)':'Os '+its.length+' produtos viram compras SOLTAS (cada um mantém seu valor e pagamento)';
+    if(L!==null&&!n){if(!confirm('Desfazer a nota'+num+'? '+soltas+' — os lançamentos não são apagados.'))return;desfazerNotaFaz(nid);return;}
+    const temFotos=n>0;
+    modalAviso('Desfazer a nota'+num+'?',(temFotos?'A nota tem <b>'+n+' foto'+(n>1?'s':'')+'</b> (comprovante). Desfeita a nota, essas fotos ficam sem lugar para aparecer (continuam guardadas).':'<b>Não consegui conferir as fotos da nota agora</b> (sem conexão?). Se houver comprovante, ele fica guardado sem lugar para aparecer.')+' '+soltas+'; nenhum lançamento é apagado.',
+      (temFotos?[{rot:'Mover as fotos para o 1º produto e desfazer',cor:'var(--blue)',exp:'As '+n+' foto'+(n>1?'s passam':' passa')+' a ficar em "'+rotDe(its[0])+'" e a nota é desfeita.',acao:"fecharModal();toast('movendo fotos…');moverFotosDe('"+nid+"','"+its[0].id+"',function(q,tot){if(q===null||q<tot){alert('Não consegui mover '+(q===null?'as fotos (não consegui ler — sem conexão?)':(tot-(q||0))+' de '+tot+' foto(s) (sem conexão?)')+'. A nota NÃO foi desfeita; tente de novo com internet.');return;}desfazerNotaFaz('"+nid+"');})"}]:[]).concat([
+      {rot:'Desfazer e deixar as fotos guardadas',cor:'var(--amber)',exp:'As fotos continuam na nuvem sem lançamento para aparecer (voltam se você restaurar um ponto anterior).',acao:"fecharModal();desfazerNotaFaz('"+nid+"')"},
+      {rot:'Cancelar',cor:'var(--mut)',exp:'Nada muda.',acao:'fecharModal()'}]));});}
+function desfazerNotaFaz(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;its.forEach(m=>{delete m.notaId;delete m.notaNum;});
+  marcaExcluido('nota:'+nid);   /* [fotos D1] o grupo morre com túmulo */
   save();fecharModal();toast('Nota desfeita — '+its.length+' produtos soltos ✓');render();}
 function vSimular(){
   const real=simMatModo==='real';
@@ -3786,7 +3907,8 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     /* [F0 22/08] commit confirmado: limpa a pendência ATÉ o seq capturado na montagem do
        payload — um save mais novo que entrou em voo continua pendente. */
     publicaBase(baseCap);setSync('ok');limpaPendNuvem(seqCap);
-    if(_fotosFalhadas.length)reenviarFotosFalhadas();   /* a nuvem respondeu: tenta de novo as fotos que ela tinha recusado */})
+    if(_fotosFalhadas.length)reenviarFotosFalhadas();   /* a nuvem respondeu: tenta de novo as fotos que ela tinha recusado */
+    retomarMovesPendentes();})
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
 /* Rascunho aberto no Lançar (editando um existente OU digitando um novo, ainda sem salvar)
@@ -3965,11 +4087,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='23/08 02h16';
+const BUILD_TAG='23/08 03h34';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787462180769;
+const BUILD_TS=1787466876824;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
