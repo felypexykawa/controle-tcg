@@ -339,7 +339,12 @@ const CAPACIDADES = [
         ['registro velho e podado (o registro nao cresce pra sempre)', F.estaExcluido('antigo'), false],
         ['registro recente sobrevive a poda', F.estaExcluido('v1'), true],
         ['o registro SOBE pra nuvem junto com os dados', /codigosResolvidos,\s*excluidos\s*\}/.test(ctx._fonte), true],
-        ['o registro se funde quando os dois aparelhos gravam juntos', ctx._fonte.indexOf('excluidos:mergeDictRaso(excluidos,remoto.excluidos)') >= 0, true],
+        /* [F0 22/08] a fusao saiu do corpo do salvarNuvem e virou fundirComRemoto (uma funcao pras
+           duas portas, tumulos ANTES da uniao). Aceita as duas formas — trava que barra
+           refatoracao legitima ensina a usar --no-verify, e ai nao protege mais nada. */
+        ['o registro se funde quando os dois aparelhos gravam juntos',
+          ctx._fonte.indexOf('excluidos:mergeDictRaso(excluidos,remoto.excluidos)') >= 0
+          || (/final=fundirComRemoto\(remoto\)/.test(ctx._fonte) && /mergeDictRaso\(excluidos,r\.excluidos\)/.test(ctx._fonte)), true],
         ['o registro VOLTA da nuvem e poda o que ja foi apagado', /if\(d\.excluidos&&typeof d\.excluidos===.object.\)/.test(ctx._fonte), true],
         /* o filtro TEM de rodar fora do if: aparelho que ainda nao recarregou grava snapshot
            sem o campo, e ai o filtro nunca rodava e tudo ressuscitava (revisao adversarial 21/08) */
@@ -741,7 +746,10 @@ const CAPACIDADES = [
        so em `precisa` (existencia) e fora do `recorta`: nunca era executada. Duas mutacoes
        com perda de dado passavam verdes — tirar o pre-salvamento, e deixar a rotacao apagar
        justamente o ponto restaurado. Achado do 4o reataque adversarial, 2026-08-20. */
-    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido'],
+    /* [F0, revisao 23/08] restaurarPontoNuvem passou a limpar a pendencia de nuvem antes de aplicar
+       o ponto (limpaPendNuvem/pendNuvem) — sem elas aqui a funcao recortada explode e a
+       capacidade se recusa a passar (foi o que barrou o build em 23/08 00h40). */
+    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido', 'limpaPendNuvem', 'pendNuvem'],
     atributos: [[/\bsalvarPontoNuvem\s*\(/g, 2, 'o botao "salvar ponto na nuvem" e a rotina diaria']],
     contexto: () => {
       const gravados = []; const store = {}; const avisos = []; const excluidos = {};   /* vai no objeto devolvido abaixo */
@@ -763,7 +771,7 @@ const CAPACIDADES = [
         aplicarNuvem: o => aplicados.push(o), confirm: () => true, go: () => {},
         save: () => {}, saveL: () => {}, salvarCad: () => {}, salvarCodRes: () => {}, salvarCB: () => {},
         salvarNuvem: () => {}, setTimeout: () => 0, USAR_NUVEM: true, _syncReady: true,
-        _restaurando: false,
+        _restaurando: false, _pendSeq: 0, _pendOk: 0,
         _db: { collection: () => ({ doc: () => ({ collection: () => col }) }) },
         PONTOS_NUVEM_MAX: 2, _pontosNuvem: [], _userEmail: 'felype@x.com',
         movs: [{ id: 'a', tipo: 'COMPRA', valor: 10 }], jogos: [], cats: [], cols: [], colsJ: {}, colsG: {},

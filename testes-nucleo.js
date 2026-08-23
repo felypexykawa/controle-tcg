@@ -444,6 +444,149 @@ setg('toast', _toastOrig); ctx.setTimeout = _stOrig;
 
 ctx.document.getElementById = () => elStub();   /* devolve o dube padrao pras secoes seguintes */
 
-console.log('\n----------------------------------------');
-console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
-process.exit(fail ? 1 : 0);
+console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
+/* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
+   transacao exige servidor) -> a Laura salva em casa -> quando o sinal volta, o snapshot dela
+   chega com _upd diferente e, ate hoje, aplicarNuvem SUBSTITUIA os movs locais: o lancamento
+   feito sem internet sumia em silencio. Dube de Firestore com transacao controlavel
+   (offline/online); a secao e assincrona, por isso o placar final roda depois dela. */
+let cloud18=null, offline18=true, txCalls18=0;
+const ref18={};
+const db18={collection(){return {doc(){return ref18;}};},
+  runTransaction(fn){txCalls18++;
+    if(offline18) return Promise.reject(new Error('Failed to get document because the client is offline.'));
+    const tx={get(){return Promise.resolve({exists:!!cloud18,data:()=>cloud18});}, set(r,p){cloud18=p;}};
+    return fn(tx);}};
+const tick=()=>new Promise(r=>setImmediate(r));
+const idsDe=L=>(L||[]).map(m=>m.id).join(',');
+(async()=>{
+  reset(); setg('_db',db18); setg('_syncReady',true); setg('_restaurando',false); setg('tela','painel'); setg('editId',null);
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  setg('movs',[{id:'a1',tipo:'COMPRA',valor:10}]);
+  cloud18={_upd:100,movs:[{id:'a1',tipo:'COMPRA',valor:10}],excluidos:{}};
+  setg('_ultimoUpdAplicado',100);
+  /* 1) lancamento sem rede: a pendencia fica marcada e a transacao falha */
+  M().push({id:'b2',tipo:'COMPRA',valor:20});
+  A('marcaPendNuvem')(); A('salvarNuvem')();
+  await tick();
+  t('sem rede, a marca de pendencia fica (memoria E disco)',
+    A('pendNuvem')()===true && store['tcg_pend_nuvem']==='1', 'pend='+A('pendNuvem')()+' disco='+store['tcg_pend_nuvem']);
+  /* 2) a rede voltou e o snapshot do OUTRO aparelho chega primeiro (ele lancou c3) */
+  offline18=false; txCalls18=0;
+  A('aplicarNuvem')({_upd:200,movs:[{id:'a1',tipo:'COMPRA',valor:10},{id:'c3',tipo:'COMPRA',valor:30}],excluidos:{}});
+  t('o lancamento feito sem internet NAO sumiu', M().some(m=>m.id==='b2'), 'ids: '+idsDe(M()));
+  t('o lancamento do outro aparelho entrou', M().some(m=>m.id==='c3'), 'ids: '+idsDe(M()));
+  await tick();
+  t('a uniao subiu pra nuvem em seguida', txCalls18>=1 && !!cloud18 && ['a1','b2','c3'].every(x=>(cloud18.movs||[]).some(m=>m.id===x)),
+    'transacoes='+txCalls18+' nuvem='+idsDe(cloud18&&cloud18.movs));
+  t('e a pendencia foi limpa (memoria E disco)', A('pendNuvem')()===false && !store['tcg_pend_nuvem'],
+    'pend='+A('pendNuvem')()+' disco='+store['tcg_pend_nuvem']);
+  /* 3) falso-positivo: sem pendencia, o snapshot manda (substitui, como sempre) */
+  A('aplicarNuvem')({_upd:300,movs:[{id:'a1',tipo:'COMPRA',valor:10}],excluidos:{}});
+  t('sem pendencia, o snapshot substitui (a nuvem manda)', M().length===1 && M()[0].id==='a1', 'ids: '+idsDe(M()));
+  /* 4) tumulo do outro lado vale ANTES de unir: o que a Laura apagou nao ressuscita pela pendencia */
+  setg('movs',[{id:'a1',tipo:'COMPRA',valor:10},{id:'z9',tipo:'COMPRA',valor:9},{id:'n7',tipo:'COMPRA',valor:7}]);
+  A('marcaPendNuvem')();
+  A('aplicarNuvem')({_upd:400,movs:[{id:'a1',tipo:'COMPRA',valor:10}],excluidos:{z9:Date.now()}});
+  t('item apagado no outro aparelho nao ressuscita pela pendencia', !M().some(m=>m.id==='z9'), 'ids: '+idsDe(M()));
+  t('e o lancamento local novo continua', M().some(m=>m.id==='n7'), 'ids: '+idsDe(M()));
+  await tick();
+  /* 5) dois saves em voo: o commit do 1o nao limpa a pendencia do 2o */
+  setg('_pendSeq',0); setg('_pendOk',0);
+  A('marcaPendNuvem')(); A('limpaPendNuvem')(1);
+  t('commit do proprio seq limpa a pendencia', A('pendNuvem')()===false && !store['tcg_pend_nuvem']);
+  A('marcaPendNuvem')(); A('marcaPendNuvem')(); A('limpaPendNuvem')(2);
+  t('commit antigo NAO limpa mudanca mais nova', A('pendNuvem')()===true && store['tcg_pend_nuvem']==='1');
+  A('limpaPendNuvem')(3);
+  t('commit do ultimo limpa tudo', A('pendNuvem')()===false && !store['tcg_pend_nuvem']);
+  /* 6) a porta antiga (salvarNuvem) tambem aplica o tumulo remoto ANTES de unir */
+  setg('movs',[{id:'a1'},{id:'z9'}]); setg('excluidos',{});
+  const f6=A('fundirComRemoto')({movs:[{id:'a1'}],excluidos:{z9:Date.now()}});
+  t('fusao: tumulo remoto vale antes da uniao (nao ressuscita z9)', !f6.movs.some(m=>m.id==='z9') && f6.movs.some(m=>m.id==='a1'), 'ids: '+idsDe(f6.movs));
+  setg('_db',null); setg('_syncReady',false); setg('excluidos',{});
+
+  /* ===== 19. fatia 0 — ajustes da revisao adversarial de 23/08 (G1/G2/G3/M2/M3) ===== */
+  console.log('\n=== 19. fatia 0, revisao 23/08: fiacao do save, boot com a marca no disco, save durante o commit ===');
+  /* (M3-i) a FIACAO: save()/saveL()/setGrupoCol marcam a pendencia — so no modo NUVEM (arquivo de deploy).
+     O revisor mostrou que tirar marcaPendNuvem() do saveL passava verde: a secao 18 chamava tudo na mao. */
+  reset(); setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  setg('_db',null); setg('_syncReady',false); setg('colsG',{});
+  A('save')(); A('saveL')(); A('setGrupoCol')('Pokémon','Col Teste','Grupo T');
+  if(g('USAR_NUVEM')){
+    t('modo nuvem: save()+saveL()+setGrupoCol marcam pendencia (memoria E disco)', g('_pendSeq')===3 && store['tcg_pend_nuvem']==='1', 'seq='+g('_pendSeq')+' disco='+store['tcg_pend_nuvem']);
+  }else{
+    t('modo local: save()/saveL()/setGrupoCol NAO tocam na pendencia', g('_pendSeq')===0 && !store['tcg_pend_nuvem'], 'seq='+g('_pendSeq'));
+  }
+  /* (G2) memoria do aparelho cheia: a marca tem de passar pela escada de poda do gravaLocal —
+     um setItem cru engolia o erro, o lancamento ficava no disco e a marca nao, e ao reabrir o
+     1o snapshot apagava o lancamento sem rede em silencio. Dube: a cota so abre depois que os
+     pontos de restauracao locais (tcg_backups) forem podados a 3. */
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  store['tcg_backups']=JSON.stringify([{t:1},{t:2},{t:3},{t:4},{t:5}]);
+  const _setOrig=ctx.localStorage.setItem;
+  ctx.localStorage.setItem=(k,v)=>{if(k!=='tcg_backups'&&JSON.parse(store['tcg_backups']||'[]').length>3){const e=new Error('QuotaExceededError');e.name='QuotaExceededError';throw e;}store[k]=String(v);};
+  setg('_avisouPoda',false);
+  A('marcaPendNuvem')();
+  ctx.localStorage.setItem=_setOrig;
+  t('G2: com a memoria cheia, a marca de pendencia ainda chega ao disco (poda abriu espaco)', store['tcg_pend_nuvem']==='1', 'disco='+store['tcg_pend_nuvem']+' backups='+(store['tcg_backups']||'').length);
+  t('G2: a poda deixou so os 3 pontos mais recentes deste aparelho', JSON.parse(store['tcg_backups']||'[]').length===3);
+  delete store['tcg_backups']; delete store['tcg_pend_nuvem']; setg('_pendSeq',0);
+  /* (M3-ii + G1) reabrir o app com a marca no disco e copia local VELHA: o 1o snapshot FUNDE (o
+     lancamento sem rede, id so local, sobrevive) e o que o OUTRO aparelho editou VENCE a copia velha. */
+  function novoContexto(storeInit){
+    const st2=Object.assign({},storeInit||{});
+    const c2=Object.assign({},ctx);
+    c2.localStorage={getItem:k=>(k in st2?st2[k]:null),setItem:(k,v)=>{st2[k]=String(v);},removeItem:k=>{delete st2[k];},clear:()=>{for(const k in st2)delete st2[k];}};
+    c2.window=c2;c2.globalThis=c2;c2.self=c2;
+    vm.createContext(c2);
+    vm.runInContext(src,c2,{filename:'app-reaberto.js'});
+    return {ctx:c2,store:st2,g:n=>vm.runInContext(n,c2),set:(n,v)=>{c2.__tmp=v;vm.runInContext(n+' = __tmp;',c2);}};
+  }
+  /* tcg_seed_v1: o arquivo de DEV carrega o acervo de exemplo num disco sem essa marca e
+     sobrescreveria os movs do cenario (o de deploy tem SEED vazio) — um aparelho reaberto
+     de verdade sempre tem a marca. */
+  const R2=novoContexto({'tcg_pend_nuvem':'1','tcg_seed_v1':'1',
+    'tcg_movs_v2':JSON.stringify([{id:'a1',tipo:'COMPRA',valor:10,situacao:'Em estoque'},{id:'off1',tipo:'COMPRA',valor:5}]),
+    'tcg_excluidos':'{}'});
+  t('reaberto com a marca no disco: pendencia ligada no boot', R2.g('pendNuvem()')===true, 'seq='+R2.g('_pendSeq')+' ok='+R2.g('_pendOk'));
+  t('reaberto: os movs locais (com o feito sem rede) vieram do disco', R2.g('movs').some(m=>m.id==='off1'), 'ids: '+idsDe(R2.g('movs')));
+  R2.set('_syncReady',true); R2.set('_restaurando',false); R2.set('_db',null); R2.set('tela','painel'); R2.set('editId',null);
+  vm.runInContext("aplicarNuvem({_upd:777,movs:[{id:'a1',tipo:'COMPRA',valor:10,situacao:'Vendido'}],excluidos:{}})",R2.ctx);
+  const mv2=R2.g('movs');
+  t('1o snapshot FUNDE em vez de substituir: o lancamento feito sem rede sobrevive', mv2.some(m=>m.id==='off1'), 'ids: '+idsDe(mv2));
+  t('G1: a edicao feita no OUTRO aparelho vence a copia velha daqui (remoto vence o empate)', (mv2.find(m=>m.id==='a1')||{}).situacao==='Vendido', JSON.stringify(mv2.find(m=>m.id==='a1')));
+  t('reaberto: o disco dele recebeu a uniao', JSON.parse(R2.store['tcg_movs_v2']||'[]').some(m=>m.id==='off1'));
+  /* (G3) lancamento feito DURANTE a ida-e-volta do commit nao e apagado pelo .then da transacao */
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null);
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  let commitLibera=null, cloud19={_upd:500,movs:[{id:'a1',tipo:'COMPRA',valor:10},{id:'r7',tipo:'COMPRA',valor:7}],excluidos:{}};
+  const db19={collection(){return {doc(){return {};}};},
+    runTransaction(fn){const tx={get(){return Promise.resolve({exists:true,data:()=>cloud19});},set(r,p){cloud19=p;}};
+      return fn(tx).then(p=>new Promise(res=>{commitLibera=()=>res(p);}));}};
+  setg('_db',db19); setg('_syncReady',true); setg('_ultimoUpdAplicado',1);
+  setg('movs',[{id:'a1',tipo:'COMPRA',valor:10},{id:'b2',tipo:'COMPRA',valor:20}]);
+  A('marcaPendNuvem')(); A('salvarNuvem')();
+  await tick();
+  M().push({id:'novo1',tipo:'COMPRA',valor:1}); A('marcaPendNuvem')();
+  t('G3 cenario: commit ainda em voo quando o dono lancou', typeof commitLibera==='function');
+  if(commitLibera)commitLibera(); await tick();
+  t('G3: o lancamento feito durante o commit NAO foi apagado da memoria', M().some(m=>m.id==='novo1'), 'ids: '+idsDe(M()));
+  t('G3: ...nem do disco', JSON.parse(store['tcg_movs_v2']||'[]').some(m=>m.id==='novo1'));
+  t('G3: e o que o outro aparelho tinha (r7) entrou', M().some(m=>m.id==='r7'), 'ids: '+idsDe(M()));
+  t('G3: a pendencia do save do meio continua marcada (commit antigo nao a limpa)', A('pendNuvem')()===true);
+  /* (M2) transacao que falha DEPOIS do callback nao deixa tumulo remoto "adiantado" na memoria */
+  setg('movs',[{id:'a1',tipo:'COMPRA',valor:10},{id:'z9',tipo:'COMPRA',valor:9}]); setg('excluidos',{});
+  cloud19={_upd:600,movs:[{id:'a1',tipo:'COMPRA',valor:10}],excluidos:{z9:Date.now()}};
+  const db19b={collection(){return {doc(){return {};}};},
+    runTransaction(fn){const tx={get(){return Promise.resolve({exists:true,data:()=>cloud19});},set(){}};
+      return fn(tx).then(()=>Promise.reject(new Error('commit falhou')));}};
+  setg('_db',db19b); setg('_ultimoUpdAplicado',1);
+  A('salvarNuvem')(); await tick();
+  t('M2: commit falhou -> o registro de exclusao NAO foi adiantado na memoria', Object.keys(g('excluidos')).length===0, JSON.stringify(g('excluidos')));
+  t('M2: e o item continua na tela (nao virou fantasma)', M().some(m=>m.id==='z9'), 'ids: '+idsDe(M()));
+  setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); reset();
+})().catch(e=>{fail++;console.log('  FALHOU  secao 18/19 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
+  console.log('\n----------------------------------------');
+  console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
+  process.exit(fail ? 1 : 0);
+});

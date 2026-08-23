@@ -121,6 +121,27 @@ let _db=null,_auth=null,_syncReady=false,_userEmail='',_restaurando=false;
    pra saber se alguém salvou por cima entre a última leitura e agora (corrida de 2 saves,
    mapeado 2026-08-11: ver comentário completo em salvarNuvem). */
 let _ultimoUpdAplicado=0;
+/* [F0 22/08 — lançamento feito SEM INTERNET não pode sumir quando a rede volta]
+   Até aqui: sem rede, salvarNuvem falhava (a transação exige servidor) e o lançamento vivia só
+   neste aparelho; se o OUTRO aparelho salvasse qualquer coisa antes do próximo save daqui, o
+   snapshot dele chegava com _upd diferente e aplicarNuvem SUBSTITUÍA os movs — o lançamento
+   feito sem rede sumia em silêncio (reproduzido pelo revisor do mundo real contra o arquivo do
+   ar, 22/08). Contador de "mudança local ainda não confirmada na nuvem": save()/saveL() avançam
+   _pendSeq; a transação captura o valor quando monta o payload e, no commit, limpa até ali
+   (dois saves em voo: o commit do 1º NÃO limpa o 2º). Persistido em localStorage porque o caso
+   real inclui FECHAR o app sem rede e reabrir com rede — sem a marca no disco, o 1º snapshot do
+   boot substituiria os movs locais e o lançamento de ontem sumiria do mesmo jeito.
+   Consumidor: aplicarNuvem — com pendência, FUNDE (mesma regra do salvarNuvem: túmulos primeiro,
+   local vence no empate de id) em vez de substituir, e sobe a união em seguida. */
+let _pendSeq=0,_pendOk=0;
+try{if(localStorage.getItem('tcg_pend_nuvem')==='1')_pendSeq=1;}catch(e){}
+/* [revisão 23/08, G2] a marca passa pelo gravaLocal — é 1 byte, e com a cota cheia o setItem
+   cru engolia o erro: o lançamento ficava no disco e a marca não; ao reabrir, o 1º snapshot
+   substituía e o lançamento sem rede sumia calado. Pelo gravaLocal a poda abre espaço e, se
+   nem assim couber, o dono é avisado. */
+function marcaPendNuvem(){_pendSeq++;gravaLocal('tcg_pend_nuvem','1');}
+function pendNuvem(){return _pendSeq>_pendOk;}
+function limpaPendNuvem(seq){if(seq>_pendOk)_pendOk=seq;if(!pendNuvem()){try{localStorage.removeItem('tcg_pend_nuvem');}catch(e){}}}
 const MK='tcg_movs_v2';
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
 const SEED=[];
@@ -1030,8 +1051,8 @@ function gravaLocal(chave,valor){
     try{setSync('erro','memória deste aparelho cheia — seus dados seguem salvos na nuvem');}catch(_){}
     try{toast('⚠ A memória deste aparelho encheu. Seus lançamentos continuam salvos na NUVEM — só a cópia local parou.');}catch(_){}}
   return false;}
-const save=()=>{gravaLocal(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM&&_syncReady)salvarNuvem();};
-const saveL=()=>{gravaLocal('tcg_cats',JSON.stringify(cats));gravaLocal('tcg_cols',JSON.stringify(cols));gravaLocal('tcg_pess',JSON.stringify(pess));gravaLocal('tcg_pgs',JSON.stringify(pgs));gravaLocal('tcg_jogos',JSON.stringify(jogos));gravaLocal('tcg_despcats',JSON.stringify(despCats));gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));gravaLocal('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM&&_syncReady)salvarNuvem();};
+const save=()=>{gravaLocal(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}};
+const saveL=()=>{gravaLocal('tcg_cats',JSON.stringify(cats));gravaLocal('tcg_cols',JSON.stringify(cols));gravaLocal('tcg_pess',JSON.stringify(pess));gravaLocal('tcg_pgs',JSON.stringify(pgs));gravaLocal('tcg_jogos',JSON.stringify(jogos));gravaLocal('tcg_despcats',JSON.stringify(despCats));gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));gravaLocal('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 /* id único: base36 do relógio + 5 chars aleatórios — dois aparelhos lançando no mesmo milissegundo não colidem */
@@ -2670,6 +2691,10 @@ function restaurarPontoNuvem(ts){
       let o=null;try{o=JSON.parse((d.data()||{}).dados||'null');}catch(e){}
       if(!o||!Array.isArray(o.movs)){alert('Nao consegui ler esse ponto.');return;}
       esqueceExclusaoDe(o);   /* antes de aplicar: o ponto e uma decisao de trazer de volta */
+      /* [revisão 23/08, M1] quem manda restaurar já decidiu descartar o estado local: sem isto,
+         com pendência ligada, o ponto entrava como "remoto" da fusão e a restauração não
+         restaurava (e nada avisava). */
+      limpaPendNuvem(_pendSeq);
       aplicarNuvem(o);
       /* a trava entra DEPOIS de aplicar (aplicarNuvem ignora tudo enquanto ela esta ligada) e
          segura o snapshot de volta, senao a nuvem reaplicava o estado velho por cima em
@@ -2745,7 +2770,7 @@ function abrirCols(jogo){jogo=(jogo&&jogo!=='__add__')?jogo:'Pokémon';const L=c
     <button class="btn" style="margin-top:8px" onclick="fecharModal();atualizarColSel('${esc(jogo)}')">fechar</button></div></div>`;
   const old=document.getElementById('modal');if(old)old.remove();
   document.body.insertAdjacentHTML('beforeend',h);}
-function setGrupoCol(j,c,g){g=(g||'').trim();if(!colsG[j])colsG[j]={};if(g)colsG[j][c]=g;else delete colsG[j][c];salvarColsG();if(USAR_NUVEM&&_syncReady)salvarNuvem();toast(g?('📁 '+c+' → '+g):'grupo removido');}
+function setGrupoCol(j,c,g){g=(g||'').trim();if(!colsG[j])colsG[j]={};if(g)colsG[j][c]=g;else delete colsG[j][c];salvarColsG();if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}toast(g?('📁 '+c+' → '+g):'grupo removido');}
 function renomearCol(j,c){const nv=(prompt('Renomear coleção:',c)||'').trim();if(!nv||nv===c)return;if(colsDe(j).includes(nv)){alert('Já existe uma coleção com esse nome.');return;}
   colsJ[j]=colsJ[j].map(x=>x===c?nv:x);const g=grupoDe(j,c);if(g){if(!colsG[j])colsG[j]={};colsG[j][nv]=g;delete colsG[j][c];}
   movs.forEach(m=>{if((m.jogo||'Pokémon')===j&&m.colecao===c)m.colecao=nv;});
@@ -3468,13 +3493,70 @@ function mergeColsG(local,remoto){
   new Set([...Object.keys(local||{}),...Object.keys(remoto||{})]).forEach(j=>{out[j]=mergeDictRaso((local||{})[j],(remoto||{})[j]);});
   return out;
 }
+/* [F0 22/08] grava neste aparelho TUDO que acabou de ser fundido com a nuvem. Antes eram 12
+   linhas repetidas dentro do salvarNuvem — e `tcg_excluidos` não estava entre elas (túmulo
+   fundido ficava só na memória até o próximo marcaExcluido). Agora uma função, usada pelas duas
+   portas que fundem (salvarNuvem e aplicarNuvem). */
+function gravaTudoLocal(){
+  gravaLocal(MK,JSON.stringify(movs));
+  gravaLocal('tcg_cats',JSON.stringify(cats));
+  gravaLocal('tcg_cols',JSON.stringify(cols));
+  gravaLocal('tcg_pess',JSON.stringify(pess));
+  gravaLocal('tcg_pgs',JSON.stringify(pgs));
+  gravaLocal('tcg_jogos',JSON.stringify(jogos));
+  gravaLocal('tcg_despcats',JSON.stringify(despCats));
+  gravaLocal('tcg_colsj',JSON.stringify(colsJ));
+  gravaLocal('tcg_colsg',JSON.stringify(colsG));
+  gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
+  gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
+  gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));
+  gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+/* [F0 22/08] UMA função para as duas portas que fundem o estado deste aparelho com o remoto:
+   salvarNuvem (quando o _upd do servidor mudou por baixo) e aplicarNuvem (quando há mudança
+   local que a nuvem ainda não confirmou — o lançamento feito sem internet). Túmulos PRIMEIRO:
+   a exclusão feita no outro aparelho tem de valer antes de unir, porque mergePorId filtra pelo
+   registro DESTE aparelho — sem isto o item que ele apagou e este ainda tinha ressuscitava.
+   Regra de empate inalterada: mesma id dos dois lados, o local vence (mergePorId). */
+function fundirComRemoto(r,remotoVence){r=r||{};
+  /* [revisão 23/08, M2] não mexe no global antes do commit: os túmulos fundidos ficam num
+     dicionário próprio, que só assume o lugar do global DURANTE a conta (mergePorId lê
+     estaExcluido) e volta ao fim — quem chama assume `excluidos` do resultado só no sucesso.
+     [revisão 23/08, G1] remotoVence: no boot com a marca no disco, ou numa reconexão, a cópia
+     local pode ser VELHA em relação ao que o outro aparelho editou nesse meio-tempo. Com "local
+     vence no empate" a fusão revertia TODA edição dele (medido: 40 de 40) e subia a reversão.
+     Então, na porta da pendência, empate de id vai pro REMOTO; só id que não existe do outro
+     lado entra pelo local — que é exatamente o lançamento feito sem internet (id novo). Edição
+     feita sem internet de item já existente continua se perdendo, como hoje: zero regressão, e
+     a cura completa (fusão em 3 pontas com a última base confirmada) fica registrada no backlog.
+     A porta do salvarNuvem (base fresca, janela de uma ida-e-volta) mantém "local vence". */
+  const exc=mergeDictRaso(excluidos,r.excluidos);const excAntes=excluidos;excluidos=exc;
+  try{podaExcluidos();
+    const M=(a,b)=>remotoVence?mergePorId(b,a):mergePorId(a,b);      /* a=local, b=remoto */
+    const D=(a,b)=>remotoVence?mergeDictRaso(b,a):mergeDictRaso(a,b);
+    const G=(a,b)=>remotoVence?mergeColsG(b,a):mergeColsG(a,b);
+    return {
+      movs:M(movs,r.movs),
+      jogos:mergeArrUniao(jogos,r.jogos,'jogos:'),
+      cats:mergeArrUniao(cats,r.cats),
+      cols:mergeArrUniao(cols,r.cols,'cols:'),
+      pess:mergeArrUniao(pess,r.pess,'pess:'),
+      pgs:mergeArrUniao(pgs,r.pgs,'pgs:'),
+      despCats:mergeArrUniao(despCats,r.despCats),
+      cadastros:M(cadastros,r.cadastros),
+      contasBanc:M(contasBanc,r.contasBanc),
+      codigosResolvidos:D(codigosResolvidos,r.codigosResolvidos),
+      excluidos:exc,
+      colsJ:mergeColsJ(colsJ,r.colsJ),
+      colsG:G(colsG,r.colsG),
+    };}
+  finally{excluidos=excAntes;}}
 function salvarNuvem(){if(!_db||!_syncReady)return;
   setSync('saving');
   const ref=_db.collection('controle').doc('dados');
-  let final=null,fundiu=false;
+  let final=null,fundiu=false,seqCap=0;
   _db.runTransaction(tx=>tx.get(ref).then(snap=>{
     const remoto=snap.exists?snap.data():null;
-    fundiu=false;
+    fundiu=false;seqCap=_pendSeq;
     final={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,excluidos};
     /* outro aparelho já salvou uma versão que este cliente ainda não tinha aplicado (_upd
        diferente do último que ele viu) — em vez de sobrescrever o documento inteiro (o bug:
@@ -3484,21 +3566,11 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
        aparelhos podiam se perder em silêncio do mesmo jeito que os lançamentos perdiam). */
     if(remoto&&remoto._upd&&remoto._upd!==_ultimoUpdAplicado){
       fundiu=true;
-      final={
-        movs:mergePorId(movs,remoto.movs),
-        jogos:mergeArrUniao(jogos,remoto.jogos,'jogos:'),
-        cats:mergeArrUniao(cats,remoto.cats),
-        cols:mergeArrUniao(cols,remoto.cols,'cols:'),
-        pess:mergeArrUniao(pess,remoto.pess,'pess:'),
-        pgs:mergeArrUniao(pgs,remoto.pgs,'pgs:'),
-        despCats:mergeArrUniao(despCats,remoto.despCats),
-        cadastros:mergePorId(cadastros,remoto.cadastros),
-        contasBanc:mergePorId(contasBanc,remoto.contasBanc),
-        codigosResolvidos:mergeDictRaso(codigosResolvidos,remoto.codigosResolvidos),
-        excluidos:mergeDictRaso(excluidos,remoto.excluidos),
-        colsJ:mergeColsJ(colsJ,remoto.colsJ),
-        colsG:mergeColsG(colsG,remoto.colsG),
-      };
+      /* [F0 22/08] a fusão mora numa função só (fundirComRemoto), dividida com aplicarNuvem —
+         e com os túmulos do outro lado aplicados ANTES da união: aqui a ordem antiga unia os
+         movs primeiro e só depois fundia `excluidos`, então o item que o outro aparelho tinha
+         apagado (ausente lá, presente aqui) ressuscitava no payload. */
+      final=fundirComRemoto(remoto);
     }
     const payload={...final,_upd:Date.now(),_by:_userEmail};
     try{const kb=Math.round(JSON.stringify(payload).length/1024);
@@ -3514,23 +3586,19 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     return payload;
   })).then(payload=>{
     if(fundiu){
-      movs=final.movs;jogos=final.jogos;cats=final.cats;cols=final.cols;pess=final.pess;pgs=final.pgs;despCats=final.despCats;cadastros=final.cadastros;contasBanc=final.contasBanc;codigosResolvidos=final.codigosResolvidos;if(final.excluidos)excluidos=final.excluidos;colsJ=final.colsJ;colsG=final.colsG;
-      gravaLocal(MK,JSON.stringify(movs));
-      gravaLocal('tcg_cats',JSON.stringify(cats));
-      gravaLocal('tcg_cols',JSON.stringify(cols));
-      gravaLocal('tcg_pess',JSON.stringify(pess));
-      gravaLocal('tcg_pgs',JSON.stringify(pgs));
-      gravaLocal('tcg_jogos',JSON.stringify(jogos));
-      gravaLocal('tcg_despcats',JSON.stringify(despCats));
-      gravaLocal('tcg_colsj',JSON.stringify(colsJ));
-      gravaLocal('tcg_colsg',JSON.stringify(colsG));
-      gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
-      gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
-      gravaLocal('tcg_codres',JSON.stringify(codigosResolvidos));
+      /* [revisão 23/08, G3 — pré-existente] atribuir `final.*` por cima apagava o lançamento feito
+         DURANTE a ida-e-volta do commit (memória E disco), e a marca de pendência ficava apontando
+         para um dado que não existia mais. Refunde com o estado de agora: local vence (o que entrou
+         no meio fica) e o que o commit trouxe do outro aparelho entra. */
+      const g=fundirComRemoto(final);
+      movs=g.movs;jogos=g.jogos;cats=g.cats;cols=g.cols;pess=g.pess;pgs=g.pgs;despCats=g.despCats;cadastros=g.cadastros;contasBanc=g.contasBanc;codigosResolvidos=g.codigosResolvidos;excluidos=g.excluidos;colsJ=g.colsJ;colsG=g.colsG;
+      gravaTudoLocal();
       if(!lancarTemRascunho())render();
       toast('☁️ mesclado com o que o outro aparelho salvou ✓');
     }
-    setSync('ok');})
+    /* [F0 22/08] commit confirmado: limpa a pendência ATÉ o seq capturado na montagem do
+       payload — um save mais novo que entrou em voo continua pendente. */
+    setSync('ok');limpaPendNuvem(seqCap);})
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
 /* Rascunho aberto no Lançar (editando um existente OU digitando um novo, ainda sem salvar)
@@ -3564,7 +3632,21 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
      formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
      fluxo normal abaixo. */
   if(d._upd&&d._upd===_ultimoUpdAplicado)return;
-  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeDictRaso(excluidos,d.excluidos);podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;
+  if(pendNuvem()){
+    /* [F0 22/08] há mudança local que a nuvem ainda NÃO confirmou (sem rede na hora de salvar,
+       ou app fechado sem rede e reaberto agora). Substituir pelo remoto apagaria o lançamento
+       feito sem internet — e era exatamente isso que acontecia, em silêncio, sempre que o outro
+       aparelho salvava primeiro. Funde pela MESMA regra do salvarNuvem (túmulos primeiro, local
+       vence no empate de id), grava no aparelho, e sobe a união em seguida — a transação do
+       salvarNuvem roda depois deste bloco, já com o estado fundido. */
+    const f=fundirComRemoto(d,true);d=Object.assign({},d,f);   /* remoto vence o empate (G1) */
+    movs=f.movs;jogos=f.jogos;cats=f.cats;cols=f.cols;pess=f.pess;pgs=f.pgs;despCats=f.despCats;cadastros=f.cadastros;contasBanc=f.contasBanc;codigosResolvidos=f.codigosResolvidos;excluidos=f.excluidos;colsJ=f.colsJ;colsG=f.colsG;
+    gravaTudoLocal();
+    if(!lancarTemRascunho())toast('☁️ outro aparelho salvou enquanto você estava sem internet — juntei os dois lados');
+    if(_syncReady)salvarNuvem();
+  }
+  if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeDictRaso(excluidos,d.excluidos);podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
   /* FORA do if de proposito: aparelho que ainda nao recarregou grava snapshot SEM este campo,
      e ai o filtro nunca rodava — tudo ressuscitava. O registro que manda e o DESTE aparelho. */
   if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));
@@ -3693,11 +3775,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/08 06h11';
+const BUILD_TAG='23/08 00h34';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787303488238;
+const BUILD_TS=1787456067179;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
