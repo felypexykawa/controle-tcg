@@ -516,7 +516,7 @@ const CAPACIDADES = [
         '211/172': { status: 'OK', versoes: [{ v: 'Normal', mn: 1, md: 1, mx: 1 }] }
       };
       return {
-        _tela: tela,
+        _tela: tela, _precosTentado: true,   /* [C8 23/08] o resumo das pendencias le se o fetch dos precos ja terminou */
         /* a fixture PRECISA ter caso negativo: com so casos positivos, apagar os filtros de
            dentro da funcao passa verde (furo achado no reataque adversarial de 2026-08-20) */
         movs: [
@@ -749,7 +749,7 @@ const CAPACIDADES = [
     /* [F0, revisao 23/08] restaurarPontoNuvem passou a limpar a pendencia de nuvem antes de aplicar
        o ponto (limpaPendNuvem/pendNuvem) — sem elas aqui a funcao recortada explode e a
        capacidade se recusa a passar (foi o que barrou o build em 23/08 00h40). */
-    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido', 'limpaPendNuvem', 'pendNuvem'],
+    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido', 'limpaPendNuvem', 'pendNuvem', 'publicaBase'],
     atributos: [[/\bsalvarPontoNuvem\s*\(/g, 2, 'o botao "salvar ponto na nuvem" e a rotina diaria']],
     contexto: () => {
       const gravados = []; const store = {}; const avisos = []; const excluidos = {};   /* vai no objeto devolvido abaixo */
@@ -771,7 +771,7 @@ const CAPACIDADES = [
         aplicarNuvem: o => aplicados.push(o), confirm: () => true, go: () => {},
         save: () => {}, saveL: () => {}, salvarCad: () => {}, salvarCodRes: () => {}, salvarCB: () => {},
         salvarNuvem: () => {}, setTimeout: () => 0, USAR_NUVEM: true, _syncReady: true,
-        _restaurando: false, _pendSeq: 0, _pendOk: 0,
+        _restaurando: false, _pendSeq: 0, _pendOk: 0, _baseH: {},
         _db: { collection: () => ({ doc: () => ({ collection: () => col }) }) },
         PONTOS_NUVEM_MAX: 2, _pontosNuvem: [], _userEmail: 'felype@x.com',
         movs: [{ id: 'a', tipo: 'COMPRA', valor: 10 }], jogos: [], cats: [], cols: [], colsJ: {}, colsG: {},

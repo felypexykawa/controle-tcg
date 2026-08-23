@@ -444,6 +444,114 @@ setg('toast', _toastOrig); ctx.setTimeout = _stOrig;
 
 ctx.document.getElementById = () => elStub();   /* devolve o dube padrao pras secoes seguintes */
 
+console.log('\n=== 20. Consultar sem confusao (Felype 22/08 23h: aba visivel, chip de tipo, Todos nao soma, lote = 1 card, voltar no lugar, book = lote) ===');
+reset(); setg('tela','consultar'); setg('consMenu',false); setg('consQ',''); setg('perSel','tudo'); setg('perDe',''); setg('perAte','');
+setg('consJogo','todos'); setg('consCol',''); setg('consPess',''); setg('consConta',''); setg('consCat',''); setg('consOrd','emissao'); setg('consGrupoFech',{}); setg('expandId',null); setg('selMode',false); setg('editId',null);
+const movsC0=[{id:'L1',tipo:'COMPRA',data:'2026-07-04',cat:'Box da Coleção',colecao:'Caos',qtd:2,valor:210,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',pgTipo:'Parcelado',nParc:3},
+  {id:'L1p',tipo:'COMPRA',data:'2026-07-04',cat:'Box da Coleção',colecao:'Caos',qtd:1,valor:105,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'L1',dataVenda:'2026-08-10'},
+  {id:'V1',tipo:'VENDA',data:'2026-08-10',cat:'Box da Coleção',colecao:'Caos',qtd:1,valor:180,origemId:'L1p',custoOrigem:105,contraparte:'compradores',canal:'Pix'},
+  {id:'D1',tipo:'DESPESA',data:'2026-08-11',valor:37,status:'pago',natureza:'ordinaria',cat:'Luz'}];
+setg('movs',JSON.parse(JSON.stringify(movsC0)));
+setg('consF','tudo'); setg('consVer','itens');
+let hC=A('vConsultar')();
+t('C2: toda linha diz o tipo (chip compra / venda / despesa)', /🛒 compra<\/span>/.test(hC) && /💰 venda<\/span>/.test(hC) && /🧾 despesa<\/span>/.test(hC));
+t('C3: em "Todos" o mes separa comprado de vendido e NAO soma os dois (217 = 180+37 nao aparece)', /💰 R\$\s?180/.test(hC) && /🧾 R\$\s?37/.test(hC) && !/R\$\s?217/.test(hC));
+t('C3: a barra do total em "Todos" diz comprado X · vendido Y', /comprado <b>/.test(hC) && /vendido <b>/.test(hC));
+t('C2: pedaco de lote se declara na linha', /🧩 parte de lote/.test(hC));
+t('C6: a compra vendida com venda ligada diz 🔗 vinculada, como a venda', (hC.match(/🔗 vinculada/g)||[]).length>=2, 'ocorrencias='+(hC.match(/🔗 vinculada/g)||[]).length);
+t('C1: a barra de Filtros (a que sobrevive a rolagem) comeca pelo nome da aba', /🗂 Tudo · /.test(hC));
+setg('consF','COMPRA'); setg('consVer','notas'); hC=A('vConsultar')();
+t('C4: na vista por nota a compra fracionada e UM card de R$315 (nao dois avulsos)', /R\$\s?315/.test(hC) && /compra de 3 Box da Coleção · 2 partes/.test(hC) && !/avulso, sem nota/.test(hC), hC.slice(hC.indexOf('partes')-120, hC.indexOf('partes')+20));
+t('C4: o card diz o resumo miudo (1 vendido · 2 em estoque · 1 venda por R$180)', /1 vendido/.test(hC) && /2 em estoque/.test(hC) && /1 venda por R\$\s?180/.test(hC));
+t('C4: o toque abre o lote completo (verLote)', /verLote\('L1'\)/.test(hC));
+t('N1: o contador diz 1 compra avulsa (o lote conta como UMA), nao 2 itens', /1 compra\(s\) avulsa\(s\)/.test(hC) && !/2 compra\(s\) avulsa/.test(hC));
+/* revisao C 23/08 — A1: em Pedidos NAO ha card de lote (vista por situacao, cada parte separada) */
+setg('consF','PEDIDO'); setg('consVer','notas');
+setg('movs',[{id:'P1',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',colecao:'Caos',qtd:2,valor:200,situacao:'Pedido',destino:'Vender',contraparte:'ASMODEE'},
+  {id:'P1p',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'P1'}]);
+hC=A('vConsultar')();
+t('A1: em Pedidos o lote nao vira card (nada de "partes"; so o que e pedido aparece, R$200)', !/partes/.test(hC) && /R\$\s?200/.test(hC) && !/R\$\s?300/.test(hC));
+/* A2: caixa aberta em boosters nao vira "41 un" */
+setg('consF','COMPRA'); setg('consVer','notas');
+const boosters=Array.from({length:36},(_,i)=>({id:'bst'+i,tipo:'COMPRA',data:'2026-08-01',cat:'Booster',colecao:'Caos',qtd:1,valor:10,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'BX'}));
+setg('movs',[{id:'BX',tipo:'COMPRA',data:'2026-08-01',cat:'Booster Box',colecao:'Caos',qtd:5,valor:500,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',boosters:36},
+  {id:'BXa',tipo:'COMPRA',data:'2026-08-01',cat:'Booster Box',colecao:'Caos',qtd:1,valor:100,situacao:'Aberto',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'BX'}].concat(boosters));
+hC=A('vConsultar')();
+t('A2: 6 caixas compradas = "compra de 6 Booster Box" (nao 41 un), boosters abertos a parte', /compra de 6 Booster Box/.test(hC) && /\+36 Booster \(aberto\)/.test(hC) && !/compra de 41/.test(hC), hC.slice(hC.indexOf('compra de')-10, hC.indexOf('compra de')+60));
+/* M4: raiz dentro de uma NOTA + pedaco solto: o pedaco e card avulso, sem somar o dinheiro da nota de novo */
+setg('movs',[{id:'R1',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',colecao:'Caos',qtd:2,valor:200,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',notaId:'N1',notaNum:'77'},
+  {id:'R1p',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'R1'}]);
+hC=A('vConsultar')();
+t('M4: pedaco fora da nota e card avulso (sem "partes"), e a nota continua no card dela — o dinheiro nao sai duas vezes', !/partes/.test(hC) && /avulso, sem nota/.test(hC) && (hC.match(/R\$\s?200,00/g)||[]).length===1 && (hC.match(/R\$\s?100,00/g)||[]).length===1, 'R$200 x'+(hC.match(/R\$\s?200,00/g)||[]).length+' R$100 x'+(hC.match(/R\$\s?100,00/g)||[]).length);
+/* M5: filtro de periodo deixa a raiz de fora -> o card avisa "o filtro atual mostra 1 de 2 partes" */
+setg('movs',[{id:'L1',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:2,valor:200,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE'},
+  {id:'L1p',tipo:'COMPRA',data:'2026-08-15',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'L1'}]);
+setg('perSel','custom'); setg('perDe','2026-08-01'); setg('perAte','2026-08-31');
+hC=A('vConsultar')();
+t('M5: com filtro de periodo, o card de lote AVISA que mostra 1 de 2 partes', /o filtro atual mostra 1 de 2 partes/.test(hC), hC.slice(hC.indexOf('partes')-40, hC.indexOf('partes')+120));
+setg('perSel','tudo'); setg('perDe',''); setg('perAte','');
+/* M3: so a venda que aponta para ESTE pedaco da a etiqueta 🔗 vinculada; irmao vendido sem venda nao ganha */
+setg('consF','tudo'); setg('consVer','itens');
+setg('movs',[{id:'L1',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE'},
+  {id:'L1a',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'L1'},
+  {id:'L1b',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'L1'},
+  {id:'V1',tipo:'VENDA',data:'2026-08-10',cat:'ETB',colecao:'Caos',qtd:1,valor:180,origemId:'L1',custoOrigem:100,contraparte:'x',canal:'Pix'}]);
+hC=A('vConsultar')();
+/* a venda aponta pro PAI (formato "venda criada ja vinculada"): a etiqueta da linha segue a MESMA regra do
+   bloco expandido (v.origemId===m.id) — so a venda leva 🔗; os dois irmaos Vendido sem venda propria nao
+   ganham selo (o velho "pelo pai" etiquetava os dois e prometia um vinculo que o expandido nao mostrava) */
+t('M3: 🔗 vinculada so onde a venda aponta para o proprio registro (1 ocorrencia: a da venda)', (hC.match(/🔗 vinculada/g)||[]).length===1, 'ocorrencias='+(hC.match(/🔗 vinculada/g)||[]).length);
+setg('movs',[{id:'L1',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE'},
+  {id:'V1',tipo:'VENDA',data:'2026-08-10',cat:'ETB',colecao:'Caos',qtd:1,valor:180,origemId:'L1',custoOrigem:100,contraparte:'x',canal:'Pix'}]);
+hC=A('vConsultar')();
+t('M3: quando a venda aponta para o item vendido, os DOIS lados dizem 🔗 vinculada', (hC.match(/🔗 vinculada/g)||[]).length===2, 'ocorrencias='+(hC.match(/🔗 vinculada/g)||[]).length);
+/* A3: "Todos" so com despesas/transferencias nao afirma "comprado R$0 · vendido R$0" */
+setg('movs',[{id:'D1',tipo:'DESPESA',data:'2026-08-11',valor:37,status:'pago',natureza:'ordinaria',cat:'Luz'},{id:'D2',tipo:'DESPESA',data:'2026-08-12',valor:120,status:'pago',natureza:'ordinaria',cat:'Net'},{id:'T1',tipo:'TRANSF',data:'2026-08-13',valor:500,contaDe:'Nubank',contaPara:'Itau'}]);
+hC=A('vConsultar')();
+t('A3: em Todos so com despesa/transferencia, nada de "comprado R$ 0"; diz despesas e transferido', !/comprado/.test(hC) && !/vendido/.test(hC) && /🧾 despesas <b>R\$\s?157/.test(hC) && /↔ transferido <b>R\$\s?500/.test(hC), hC.slice(hC.indexOf('lançamentos'), hC.indexOf('lançamentos')+160));
+t('A3: o cabecalho do mes tambem nomeia despesa e transferencia', /🧾 R\$\s?157/.test(hC) && /↔ R\$\s?500/.test(hC));
+setg('movs',JSON.parse(JSON.stringify(movsC0)));   /* de volta ao cenario-base (os blocos acima trocaram os movs) */
+A('irDetalhe')('L1'); t('premissa: irDetalhe poe a vista em itens', g('consVer')==='itens');
+A('verFiltro')('COMPRA'); t('C5: entrar pela aba volta a vista por nota', g('consVer')==='notas' && g('consF')==='COMPRA');
+/* C7: voltar devolve aba, vista, filtro, item aberto e rolagem */
+setg('tela','consultar'); setg('consF','COMPRA'); setg('consVer','itens'); setg('expandId','L1p'); setg('consCol','Caos'); ctx.scrollY=777; setg('navHist',[]);
+const snapC=A('snap')();
+t('C7: o snapshot guarda item aberto, vista, filtro e rolagem', snapC.expandId==='L1p' && snapC.consVer==='itens' && snapC.consCol==='Caos' && snapC.scrollY===777, JSON.stringify(snapC));
+A('abrir')('L1p');
+t('C7: abrir a edicao foi pro Lancar com o item', g('tela')==='lancar' && g('editId')==='L1p');
+setg('expandId',null); setg('consCol',''); setg('consVer','notas'); setg('editId',null);
+A('voltarDaEdicao')();
+t('C7: voltar depois de salvar devolve aba, vista, filtro e item aberto', g('tela')==='consultar' && g('consF')==='COMPRA' && g('consVer')==='itens' && g('consCol')==='Caos' && g('expandId')==='L1p',
+  JSON.stringify({tela:g('tela'),consF:g('consF'),consVer:g('consVer'),consCol:g('consCol'),expandId:g('expandId')}));
+ctx.scrollY=0; setg('consCol',''); setg('expandId',null);
+/* C9: book = lote de cartas avulsas, nao carta sem codigo */
+setg('movs',[{id:'B1',tipo:'COMPRA',cat:'Single/Carta',qtd:200,valor:100,situacao:'Em estoque',obs:'book 200 cartas'}]);
+t('C9: sem codigo, o book aparece nas pendencias de codigo', A('pendenciasCodigo')().some(x=>x.m.id==='B1'));
+A('marcarLoteSemCodigo')('B1');
+t('C9: marcado como lote, sai das pendencias e ganha a marca', !A('pendenciasCodigo')().some(x=>x.m.id==='B1') && M()[0].codigoNA==='lote');
+A('desmarcarLoteSemCodigo')('B1');
+t('C9: desfazer volta a contar', A('pendenciasCodigo')().some(x=>x.m.id==='B1') && !M()[0].codigoNA);
+/* M1 (revisao C 23/08): o atalho das Pendencias desarma ao navegar; editar algo sem relacao NAO reabre o modal */
+setg('movs',[{id:'B1',tipo:'COMPRA',cat:'Single/Carta',qtd:200,valor:100,situacao:'Em estoque',obs:'book'},{id:'D9',tipo:'DESPESA',data:'2026-08-11',valor:5,status:'pago',natureza:'ordinaria',cat:'Luz'}]);
+let _abriuPend=[]; const _abrirPendOrig=g('abrirPendencias'); setg('abrirPendencias',(f)=>{_abriuPend.push(f);});
+setg('navHist',[]); setg('tela','painel'); setg('_pendVolta',null);
+A('abrirCorrigirCodigo')('B1');
+t('M1 premissa: abrir pelas Pendencias arma o atalho', g('_pendVolta')!==null, 'pendVolta='+g('_pendVolta'));
+A('go')('painel'); A('go')('consultar');
+t('M1: navegar para outra tela DESARMA o atalho', g('_pendVolta')===null, 'pendVolta='+g('_pendVolta'));
+A('abrir')('D9'); A('voltarDaEdicao')();
+t('M1: salvar uma edicao sem relacao NAO reabre as Pendencias', _abriuPend.length===0, JSON.stringify(_abriuPend));
+/* e o caminho certo continua: veio das Pendencias -> editou -> voltou -> reabre o grupo */
+setg('tela','painel'); A('abrirCorrigirCodigo')('B1'); A('abrir')('B1'); A('voltarDaEdicao')();
+t('M1: vindo das Pendencias, salvar reabre o mesmo grupo (uma vez)', _abriuPend.length===1, JSON.stringify(_abriuPend));
+setg('abrirPendencias',_abrirPendOrig); setg('_pendVolta',null);
+/* C8: numero de pendencias so depois de os precos chegarem */
+setg('_precosTentado',false); setg('tela','painel'); let hP=A('vPainel')();
+t('C8: antes de os precos chegarem o Painel diz "conferindo…" SEM numero', /conferindo…/.test(hP) && !/achado/.test(hP));
+setg('_precosTentado',true); hP=A('vPainel')();
+t('C8: depois, mostra o numero (ou "tudo certo")', /achado|tudo certo/.test(hP));
+reset(); setg('tela','painel'); setg('consMenu',true);
+
 console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
 /* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
    transacao exige servidor) -> a Laura salva em casa -> quando o sinal volta, o snapshot dela
@@ -584,7 +692,109 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   A('salvarNuvem')(); await tick();
   t('M2: commit falhou -> o registro de exclusao NAO foi adiantado na memoria', Object.keys(g('excluidos')).length===0, JSON.stringify(g('excluidos')));
   t('M2: e o item continua na tela (nao virou fantasma)', M().some(m=>m.id==='z9'), 'ids: '+idsDe(M()));
-  setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); reset();
+  /* (N1, re-checagem 23/08) operacao COMPOSTA feita sem rede (baixa de lote: pai editado + pedaco novo)
+     nao pode ser rasgada pela fusao. Com a BASE CONFIRMADA (hash por registro): o pai mudou AQUI desde a
+     ultima confirmacao -> local vence; o que NAO mudou aqui -> remoto vence (G1 continua curado). */
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null); setg('_db',null); setg('_syncReady',false);
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  setg('movs',[{id:'c1',tipo:'COMPRA',qtd:10,valor:1000,situacao:'Em estoque',destino:'Vender'},{id:'a1',tipo:'COMPRA',valor:10,situacao:'Em estoque'}]);
+  A('gravaBaseConfirmada')({movs:g('movs')});
+  t('base confirmada gravada (memoria E disco)', g('_baseH').c1!==undefined && /c1/.test(store['tcg_base_h']||''));
+  const pedN1=A('baixarLote')('c1',2,'Vendido',{dataVenda:'2026-08-23'});
+  A('marcaPendNuvem')(); setg('_syncReady',true);
+  A('aplicarNuvem')({_upd:900,movs:[{id:'c1',tipo:'COMPRA',qtd:10,valor:1000,situacao:'Em estoque',destino:'Vender'},{id:'a1',tipo:'COMPRA',valor:10,situacao:'Vendido'},{id:'outro',tipo:'COMPRA',qtd:1,valor:50}],excluidos:{}});
+  const c1N1=M().find(m=>m.id==='c1'),somaQ=M().filter(m=>m.tipo==='COMPRA').reduce((s,m)=>s+(+m.qtd||1),0);
+  t('N1: o pai da baixa feita sem rede continua baixado (qtd 8 / R$800), nao voltou a 10/1000', !!c1N1&&+c1N1.qtd===8&&+c1N1.valor===800, JSON.stringify(c1N1));
+  t('N1: o pedaco novo continua', !!pedN1&&M().some(m=>m.id===pedN1.id), 'ids: '+idsDe(M()));
+  t('N1: o total de unidades fecha (8+2+1+1=12), sem inventar estoque', somaQ===12, 'soma='+somaQ+' ids: '+idsDe(M()));
+  t('G1 continua: o item que NAO mudou aqui recebe a edicao do outro aparelho', (M().find(m=>m.id==='a1')||{}).situacao==='Vendido', JSON.stringify(M().find(m=>m.id==='a1')));
+  /* sem base (1a sessao depois da atualizacao): o pai referenciado por registro novo ainda vence */
+  setg('_baseH',{}); setg('movs',[{id:'c2',tipo:'COMPRA',qtd:8,valor:800,situacao:'Em estoque'},{id:'p2',tipo:'COMPRA',qtd:2,valor:200,situacao:'Vendido',loteOrigem:'c2'}]);
+  A('marcaPendNuvem')();
+  A('aplicarNuvem')({_upd:901,movs:[{id:'c2',tipo:'COMPRA',qtd:10,valor:1000,situacao:'Em estoque'}],excluidos:{}});
+  const c2N1=M().find(m=>m.id==='c2');
+  t('N1 sem base: pai referenciado pelo pedaco novo vence (8/800)', !!c2N1&&+c2N1.qtd===8&&+c2N1.valor===800, JSON.stringify(c2N1));
+  /* snapshot sem pendencia grava a base confirmada */
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  A('aplicarNuvem')({_upd:950,movs:[{id:'q1',tipo:'COMPRA',valor:1}],excluidos:{}});
+  t('snapshot sem pendencia grava a base confirmada (memoria e disco)', g('_baseH').q1!==undefined && /q1/.test(store['tcg_base_h']||''), JSON.stringify(g('_baseH')));
+  /* (N3, re-checagem 2) o hash enxerga mudanca DENTRO de objeto aninhado e ignora a ordem das chaves */
+  t('N3: hash muda quando uma parcela e paga (objeto aninhado)', A('hashReg')({id:'c1',pgParcelas:{}})!==A('hashReg')({id:'c1',pgParcelas:{0:{d:'2026-08-01',v:35}}}));
+  t('N3: hash nao depende da ordem das chaves (em qualquer nivel)', A('hashReg')({a:1,b:{x:1,y:2}})===A('hashReg')({b:{y:2,x:1},a:1}));
+  /* (N2, re-checagem 2) a base guarda o que SUBIU no commit, nao o objeto vivo de depois: correcao feita
+     durante a ida-e-volta do commit continua "mudei aqui" (hash != base) e sobrevive a fusao seguinte */
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null);
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem']; setg('_baseH',{});
+  let commitN2=null, cloudN2={_upd:50,movs:[{id:'x1',tipo:'COMPRA',valor:100,obs:'A'}],excluidos:{}};
+  const dbN2={collection(){return {doc(){return {};}};},
+    runTransaction(fn){const tx={get(){return Promise.resolve({exists:true,data:()=>cloudN2});},set(r,p){cloudN2=JSON.parse(JSON.stringify(p));}};
+      return fn(tx).then(p=>new Promise(res=>{commitN2=()=>res(p);}));}};
+  setg('_db',dbN2); setg('_syncReady',true); setg('_ultimoUpdAplicado',50);
+  setg('movs',[{id:'x1',tipo:'COMPRA',valor:100,obs:'A'}]);
+  A('marcaPendNuvem')(); A('salvarNuvem')();
+  await tick();
+  const hashA=A('hashReg')({id:'x1',tipo:'COMPRA',valor:100,obs:'A'});
+  M()[0].obs='CORRIGI SEM REDE'; M()[0].valor=175; A('marcaPendNuvem')();   /* correcao no meio do commit; o save dela cai sem rede */
+  t('N2 cenario: commit ainda em voo quando a correcao foi feita', typeof commitN2==='function');
+  if(commitN2)commitN2(); await tick();
+  t('N2: a base guardou o que SUBIU (obs A), nao o objeto vivo corrigido', g('_baseH').x1===hashA && g('_baseH').x1!==A('hashReg')(M()[0]), 'base='+g('_baseH').x1+' hashA='+hashA+' hashAgora='+A('hashReg')(M()[0]));
+  A('aplicarNuvem')({_upd:60,movs:[{id:'x1',tipo:'COMPRA',valor:100,obs:'A'},{id:'y1',tipo:'COMPRA',valor:1}],excluidos:{}});
+  t('N2: na fusao seguinte a correcao feita sem rede SOBREVIVE (local mudou desde a base)', (M().find(m=>m.id==='x1')||{}).obs==='CORRIGI SEM REDE' && +(M().find(m=>m.id==='x1')||{}).valor===175, JSON.stringify(M().find(m=>m.id==='x1')));
+  await tick();
+  /* (N4, re-checagem 2) sem base: troca feita sem rede (item dado vira Trocado + recebido novo, ligados
+     so pelo trocaId) nao pode ficar com os dois em estoque */
+  setg('_db',null); setg('_syncReady',false); setg('_baseH',{}); setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+  setg('movs',[{id:'d1',tipo:'COMPRA',qtd:1,valor:80,situacao:'Trocado',trocaId:'t1',deu:true},{id:'r1',tipo:'COMPRA',qtd:1,valor:80,situacao:'Em estoque',trocaId:'t1'}]);
+  A('marcaPendNuvem')(); setg('_syncReady',true);
+  A('aplicarNuvem')({_upd:70,movs:[{id:'d1',tipo:'COMPRA',qtd:1,valor:80,situacao:'Em estoque'}],excluidos:{}});
+  const d1N4=M().find(m=>m.id==='d1');
+  t('N4 sem base: o item DADO na troca feita sem rede continua Trocado (nao volta ao estoque)', !!d1N4&&d1N4.situacao==='Trocado', JSON.stringify(d1N4));
+  t('N4 sem base: o item recebido continua', M().some(m=>m.id==='r1'));
+  t('N4 sem base: nao ficou com os dois em estoque', M().filter(m=>m.situacao==='Em estoque').length===1, 'ids em estoque: '+idsDe(M().filter(m=>m.situacao==='Em estoque')));
+  /* (N4-1) primeiro boot depois da atualizacao, sem base e sem pendencia: grava a base do estado local (modo nuvem) */
+  const R3=novoContexto({'tcg_seed_v1':'1','tcg_movs_v2':JSON.stringify([{id:'k1',tipo:'COMPRA',valor:9}]),'tcg_excluidos':'{}'});
+  if(g('USAR_NUVEM')){
+    t('N4-1 (nuvem): boot sem base e sem pendencia grava a base do estado local', R3.g('_baseH').k1!==undefined && /k1/.test(R3.store['tcg_base_h']||''), JSON.stringify(R3.g('_baseH')));
+  }else{
+    t('N4-1 (local): sem nuvem nao grava base', !R3.store['tcg_base_h']);
+  }
+  /* (N5, re-checagem 3) restaurar um ponto da nuvem com a subida falhando: o snapshot seguinte NAO pode
+     desfazer a restauracao. Sequencia do restaurarPontoNuvem (2763+) reproduzida aqui porque o modal e
+     a gravacao previa do ponto exigiriam dublar a subcolecao inteira; a linha do remendo e conferida
+     tambem pelo build (texto). */
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null);
+  setg('movs',[{id:'p1',tipo:'COMPRA',valor:900,obs:'HOJE'}]); setg('excluidos',{});
+  A('gravaBaseConfirmada')({movs:g('movs')});                    /* estado confirmado pela nuvem = HOJE */
+  const hashHoje=A('hashReg')(M()[0]);
+  const ponto={movs:[{id:'p1',tipo:'COMPRA',valor:100,obs:'ORIGINAL'}],excluidos:{}};
+  /* dube da subcolecao de pontos: guarda o ponto 777 e responde ao get/set/orderBy/limit; a transacao
+     (subida) FALHA — e o cenario do N5 */
+  const pontosN5={'777':{ts:777,n:1,quem:'',dados:JSON.stringify(ponto)}};
+  const refP={doc(id){return {get(){return Promise.resolve({exists:!!pontosN5[id],data:()=>pontosN5[id]});},set(p){pontosN5[id]=p;return Promise.resolve();},delete(){delete pontosN5[id];return Promise.resolve();}};},
+    orderBy(){return refP;},limit(){return refP;},get(){return Promise.resolve({forEach(){},docs:[],size:0});}};
+  const docDados={collection(){return refP;},get(){return Promise.resolve({exists:false,data:()=>({})});},set(){return Promise.resolve();}};
+  setg('_db',{collection(){return {doc(){return docDados;}};},runTransaction(){return Promise.reject(new Error('offline'));}}); setg('_syncReady',true);
+  setg('_pendSeq',3); setg('_pendOk',0); setg('_restaurando',false);
+  A('restaurarPontoNuvem')(777);                                  /* a porta REAL: confirm -> pre-salva -> le o ponto -> aplica */
+  for(let i=0;i<6;i++)await tick();
+  t('N5: o ponto foi restaurado de verdade pela funcao (obs ORIGINAL)', (M().find(m=>m.id==='p1')||{}).obs==='ORIGINAL', JSON.stringify(M()));
+  t('N5: depois de restaurar, a base continua sendo a anterior (o ponto NAO vira "confirmado")', g('_baseH').p1===hashHoje, 'base='+g('_baseH').p1+' hoje='+hashHoje);
+  setg('_restaurando',false);                                     /* o timer de 3 s do app (stub de setTimeout nao dispara) */
+  A('marcaPendNuvem')(); A('salvarNuvem')(); await tick();        /* a subida falhou (offline) */
+  A('aplicarNuvem')({_upd:80,movs:[{id:'p1',tipo:'COMPRA',valor:900,obs:'HOJE'}],excluidos:{}});
+  t('N5: o snapshot seguinte NAO desfaz a restauracao (o ponto restaurado sobrevive)', (M().find(m=>m.id==='p1')||{}).obs==='ORIGINAL', JSON.stringify(M().find(m=>m.id==='p1')));
+  /* (M2, revisao C 23/08) a FIACAO do contador de pendencias: com o precos.json chegando COM sucesso, a marca
+     `_precosTentado` tem de ligar (a versao anterior so ligava no caminho de falha, e o Painel ficava em
+     "conferindo…" ate algo mais repintar) — contexto novo com fetch que resolve */
+  const fetchOrig=ctx.fetch;
+  ctx.fetch=()=>Promise.resolve({ok:true,json:()=>Promise.resolve({cartas:{},atualizadoEm:'2026-08-23'})});
+  const R4=novoContexto({'tcg_seed_v1':'1','tcg_movs_v2':'[]','tcg_excluidos':'{}'});
+  ctx.fetch=fetchOrig;
+  for(let i=0;i<6;i++)await tick();
+  t('M2: precos carregados com sucesso -> a marca de "precos tentados" liga', R4.g('_precosTentado')===true && !!R4.g('_precosLiga'), 'tentado='+R4.g('_precosTentado')+' liga='+!!R4.g('_precosLiga'));
+  R4.set('tela','painel');
+  t('M2: e o Painel deixa de dizer "conferindo…"', !/conferindo…/.test(R4.g('vPainel()')));
+  setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();
 })().catch(e=>{fail++;console.log('  FALHOU  secao 18/19 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');
   console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
