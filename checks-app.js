@@ -213,7 +213,9 @@ const CAPACIDADES = [
       const lista = (src.match(/const RE_GRAVA=\/([^/]+)\//) || [])[1] || '';
       const protegidos = ['salvar', 'salvarNota', 'salvarVendaVarios', 'salvarTroca',
                           'salvarTransferencia', 'excluir', 'execExcl', 'execDev', 'devolver',
-                          'limparTudo', 'marcarPago'];
+                          'limparTudo', 'marcarPago',
+                          /* [fotos F2/F3 23/08] gestos que gravam/apagam FOTO tambem sao toque protegido */
+                          'desfazerNotaFaz', 'separarDaNotaFaz', 'moverFotosDe', 'moverFotoPara'];
       /* TOKEN EXATO, nunca substring. Com `indexOf`, tirar `salvar|` da lista continuava
          "achando" salvar dentro de salvarNota — e a vacina passava VERDE justamente nos dois
          nomes da queixa que originou a peca ("clica em salvar a venda... salvou 3 vendas").

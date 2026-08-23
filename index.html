@@ -134,14 +134,17 @@ let _ultimoUpdAplicado=0;
    Consumidor: aplicarNuvem — com pendência, FUNDE (mesma regra do salvarNuvem: túmulos primeiro,
    local vence no empate de id) em vez de substituir, e sobe a união em seguida. */
 let _pendSeq=0,_pendOk=0;
-try{if(localStorage.getItem('tcg_pend_nuvem')==='1')_pendSeq=1;}catch(e){}
+let _pendDesde=0;   /* [revisão F3, médio 1] desde quando há pendência sem confirmação (0 = nenhuma) — só pendência VELHA (>10 s) vale como "sem internet"; a fresca é o commit normal em voo */
+try{if(localStorage.getItem('tcg_pend_nuvem')==='1'){_pendSeq=1;_pendDesde=Date.now();}}catch(e){}
 /* [revisão 23/08, G2] a marca passa pelo gravaLocal — é 1 byte, e com a cota cheia o setItem
    cru engolia o erro: o lançamento ficava no disco e a marca não; ao reabrir, o 1º snapshot
    substituía e o lançamento sem rede sumia calado. Pelo gravaLocal a poda abre espaço e, se
    nem assim couber, o dono é avisado. */
-function marcaPendNuvem(){_pendSeq++;gravaLocal('tcg_pend_nuvem','1');}
+function marcaPendNuvem(){if(!pendNuvem())_pendDesde=Date.now();_pendSeq++;gravaLocal('tcg_pend_nuvem','1');}
 function pendNuvem(){return _pendSeq>_pendOk;}
-function limpaPendNuvem(seq){if(seq>_pendOk)_pendOk=seq;if(!pendNuvem()){try{localStorage.removeItem('tcg_pend_nuvem');}catch(e){}}}
+/* pendência VELHA = nada confirmado há mais de 10 s: é o sinal de "sem internet" que o modo avião não dá (wifi sem rede) */
+function pendNuvemVelha(){return pendNuvem()&&_pendDesde>0&&(Date.now()-_pendDesde)>10000;}
+function limpaPendNuvem(seq){if(seq>_pendOk)_pendOk=seq;if(!pendNuvem()){_pendDesde=0;try{localStorage.removeItem('tcg_pend_nuvem');}catch(e){}}}
 /* [re-checagem 23/08, N1] BASE CONFIRMADA: o que a nuvem confirmou por último, por registro (hash). A
    regra "remoto vence o empate" sozinha rasgava operação composta feita sem rede: a baixa de lote edita
    o PAI (id dos dois lados → voltava ao valor da nuvem) e cria o FILHO (id novo → ficava) — estoque e
@@ -535,7 +538,7 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
    Por captura no document: nenhum botao precisa ser alterado e botao NOVO ja nasce protegido.
    Fora da lista de proposito: os "+ adicionar" e a navegacao — la tocar duas vezes rapido e
    uso legitimo. */
-const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|desfazerNotaFaz|separarDaNotaFaz|moverFotosDe|reenviarFotosFalhadas|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
+const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|desfazerNotaFaz|separarDaNotaFaz|moverFotosDe|moverFotoPara|reenviarFotosFalhadas|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
 /* a chave e o ATRIBUTO inteiro (funcao + argumentos), nao o elemento. Se a tela repintar
    entre um toque e outro, o botao novo e outro ELEMENTO mas tem o mesmo atributo — pela
    identidade do elemento o segundo toque passaria e a venda entraria 2x assim mesmo. Usar os
@@ -1209,6 +1212,7 @@ function fotoThumbDe(b64,cb){const img=new Image();img.onload=()=>{let w=img.wid
    mostrando foto "pendente" de um lançamento já salvo), mas cada foto viaja em `_fotosEmVoo`; no sucesso
    conta e gera miniatura; na recusa VOLTA ao balde com aviso; se nada responder em 8 s (sem rede o envio fica
    pendurado), avisa para não sair do app. */
+let _gradeMeta=null;   /* [fotos F3] título/retorno da grade de GRUPO aberta — para reabri-la igual depois de mover uma foto */
 let _fotosEmVoo=[],_fotosFalhadas=[],_gradeDe=null;   /* _gradeDe: dono (item ou grupo) da grade de fotos aberta agora — o reenvio só redesenha a grade se ela é DELE. _fotosFalhadas: {movId,b64,ts} — fila POR LANÇAMENTO, nunca o balde da tela */
 /* [revisão F1, F1-A/F1-B] a foto recusada NÃO volta ao balde da tela: o balde é de quem está digitando agora, e a
    foto é de um lançamento já salvo — devolver ao balde colava a foto no lançamento SEGUINTE (ou, na nota, o
@@ -1315,7 +1319,7 @@ function abrirFotosGrupo(gid,titulo,voltaJs){if(!gid)return;const old=document.g
     <div class="row2"><div><button class="btn" onclick="document.getElementById('fotoFileCam').click()">📷 tirar foto</button></div><div><button class="btn g" onclick="document.getElementById('fotoFile').click()">🖼 da galeria</button></div></div>
     <button class="btn g" style="margin-top:8px" onclick="fecharModal();${vj}">fechar</button><!-- alvo-alterado: intencional (fechar volta ao dono) --></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);
-  _gradeDe=gid;fotoRefresh(gid);}
+  _gradeDe=gid;_gradeMeta={titulo:titulo||'📷 Fotos da nota (comprovante)',voltaJs:String(voltaJs||'')};fotoRefresh(gid);}
 /* [fotos D3 — núcleo] mover foto = gravar no destino e só ENTÃO apagar da origem (verbos já em uso: criar + apagar;
    não depende de regra de update na nuvem). Contadores: quem chama ajusta (o grupo não tem; o item ganha no
    moverFotosDe). */
@@ -1376,8 +1380,75 @@ function fotoEscolhida(movId,inp,perfil){const file=inp.files&&inp.files[0];if(!
   fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');fotoRefresh(movId);return;}
     fotoAdd(movId,b64,ok=>{if(ok)toast('Foto guardada ✓');fotoRefresh(movId);});},perfil);}
 function verFoto(fid,movId){const f=_fotosCache.find(x=>x.id===fid);if(!f)return;
-  const v=`<div id="fotoview" onclick="this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px"><img src="${f.b64}" style="max-width:96%;max-height:80%;border-radius:8px"><button class="btn g" style="width:auto;padding:10px 18px" onclick="event.stopPropagation();if(confirm('Excluir esta foto?')){fotoDel('${fid}',ok=>{if(ok)toast('Foto excluída');document.getElementById('fotoview')&&document.getElementById('fotoview').remove();fotoRefresh('${movId}');});}">🗑 excluir</button><div style="color:#aaa;font-size:12px">toque fora da foto pra fechar</div></div>`;
+  const v=`<div id="fotoview" onclick="this.remove()" style="position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px"><img src="${f.b64}" style="max-width:96%;max-height:80%;border-radius:8px"><div style="display:flex;gap:10px"><button class="btn g" style="width:auto;padding:10px 18px" onclick="event.stopPropagation();abrirMoverFoto('${fid}','${movId}')">🔀 mover</button><button class="btn g" style="width:auto;padding:10px 18px" onclick="event.stopPropagation();if(confirm('Excluir esta foto?')){fotoDel('${fid}',ok=>{if(ok)toast('Foto excluída');document.getElementById('fotoview')&&document.getElementById('fotoview').remove();fotoRefresh('${movId}');});}">🗑 excluir</button></div><div style="color:#aaa;font-size:12px">toque fora da foto pra fechar</div></div>`;
   document.body.insertAdjacentHTML('beforeend',v);}
+/* [fotos F3 — D3] gesto "🔀 mover foto": conserta a foto que ficou no dono errado (o dado de ontem e o erro de amanhã).
+   Candidatos na ordem do desenho: irmãos do mesmo grupo → o comprovante do grupo (ou, saindo de um grupo, os itens
+   dele) → lançamentos dos últimos 90 dias. Mecânica = fotoMove (grava no destino e SÓ ENTÃO apaga da origem).
+   Com nuvem e sem internet, recusa ANTES de encostar em qualquer coisa. Depois, reabre a grade de onde a foto saiu. */
+function rotMoverFoto(d){return `${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${d.idioma&&d.idioma!=='—'?' ('+d.idioma+')':''}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${d.tipo==='VENDA'?'vendido por ':'custou '}${fmt(+d.valor||0)} · ${dataBRde(d)}`;}
+function candidatosMoverFoto(movId,tudo){const m=movs.find(x=>x.id===movId);const out=[],visto=new Set([movId]);
+  const add=(id,rot)=>{if(!id||visto.has(id))return;visto.add(id);out.push({id,rot});};
+  const gidDe=x=>x.notaId?['nota',x.notaId,'nota'+(x.notaNum?' '+x.notaNum:'')]:x.vendaId?['venda',x.vendaId,'venda'+(x.contraparte?' p/ '+x.contraparte:'')]:x.trocaId?['troca',x.trocaId,'troca']:null;
+  if(m){const g=gidDe(m);
+    if(g){movs.filter(x=>x.id!==m.id&&x[g[0]+'Id']===g[1]).forEach(x=>add(x.id,'🧩 mesma '+g[0]+': '+rotMoverFoto(x)));
+      add(g[1],'📎 comprovante da '+g[2]);}}
+  else{movs.filter(x=>x.notaId===movId||x.vendaId===movId||x.trocaId===movId).forEach(x=>add(x.id,'↘ item deste grupo: '+rotMoverFoto(x)));}
+  const lim=tudo?'':new Date(Date.now()-90*864e5).toISOString().slice(0,10);   /* tudo = "incluir antigos" (revisão F3, M4) */
+  movs.filter(x=>(x.tipo==='COMPRA'||x.tipo==='VENDA')&&(x.data||'')>=lim).sort((a,b)=>(b.data||'').localeCompare(a.data||'')).forEach(x=>add(x.id,rotMoverFoto(x)));
+  return out;}
+function abrirMoverFoto(fid,movId,tudo){const f=_fotosCache.find(x=>x.id===fid);const v=document.getElementById('fotoview');if(!f||!v)return;
+  const cands=candidatosMoverFoto(movId,!!tudo);
+  v.innerHTML=`<div onclick="event.stopPropagation()" style="background:var(--card);width:94%;max-width:520px;border-radius:14px;padding:14px;max-height:88vh;overflow:visible">
+    <div class="sec" style="margin-top:0">🔀 Mover esta foto para…</div>
+    <div class="ctx">A foto sai de onde está e passa a aparecer no destino. Nada é apagado antes de chegar lá.</div>
+    <img src="${f.b64}" style="width:100%;max-height:140px;object-fit:contain;border-radius:8px;margin:6px 0">
+    <label>Destino <span style="color:var(--mut);font-size:10px">(digite pra filtrar · primeiro os do mesmo grupo${tudo?' · mostrando também os antigos':' · últimos 90 dias'})</span></label>
+    ${cands.length?selBusca('mvf_dest',cands,null,'digite pra filtrar… (ex.: nota 77, pitch triple)',null):`<div class="soon">Nenhum lançamento ${tudo?'':'recente '}para receber a foto${tudo?'.':' — toque em "incluir antigos" abaixo.'}</div><input type="hidden" id="mvf_dest" value="">`}
+    ${tudo?'':`<div class="meta" style="margin-top:4px"><a href="#" style="color:var(--blue)" onclick="event.preventDefault();abrirMoverFoto('${fid}','${movId}',true)">🔎 incluir lançamentos com mais de 90 dias</a></div>`}
+    <div class="row2" style="margin-top:10px"><div><button class="btn" id="mvf_btn" onclick="moverFotoPara('${fid}','${movId}')">🔀 mover pra cá</button></div><div><button class="btn g" onclick="document.getElementById('fotoview')&&document.getElementById('fotoview').remove()">cancelar</button></div></div>
+  </div>`;
+  /* [revisão F3, G2] o fundo do visor fechava com QUALQUER toque — a lista de destino pintada sobre ele fechava tudo ao
+     escolher. Enquanto o painel de mover está aberto, só o "cancelar" fecha. */
+  v.onclick=null;}
+/* [revisão F3, M2/M3] contador e miniatura de um dono NUNCA por ±1 cego: releitura da lista (mesma regra do visor, P0-1:
+   leitura falhada não toca em nada). */
+function recontarFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
+  fotoList(movId,L=>{if(L===null)return;let mudou=false;if((+m.nFotos||0)!==L.length){m.nFotos=L.length;mudou=true;}
+    if(L.length){fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;}if(mudou)save();});}
+    else{if(m.fotoThumb){delete m.fotoThumb;mudou=true;}if(mudou)save();}});}
+function moverFotoPara(fid,movId){const f=_fotosCache.find(x=>x.id===fid);const destino=(document.getElementById('mvf_dest')||{}).value||'';
+  if(!f){alert('Não achei essa foto na lista — feche e abra o visor de novo.');return;}
+  if(!destino){alert('Escolha o destino na lista (toque numa das opções).');return;}
+  if(destino===movId){alert('A foto já está aí.');return;}
+  /* _db ligado = as fotos moram na nuvem (mesmo sinal que fotoAdd/fotoDel usam para escolher o caminho). Sem internet — modo
+     avião OU salvamento ainda não confirmado pela nuvem (pendNuvem) — recusar ANTES de encostar em qualquer coisa. */
+  if(_db&&((typeof navigator!=='undefined'&&navigator&&navigator.onLine===false)||pendNuvemVelha())){alert('Sem internet agora (ou a nuvem não confirma nada há mais de 10 segundos) — mover foto precisa da nuvem. A foto continua onde está; tente quando a conexão voltar.');return;}
+  const sb=_sbDados['mvf_dest'],alvo=sb&&sb.itens.find(x=>x.id===destino);
+  if(!confirm('Mover esta foto para:\n'+(alvo?alvo.rot:destino)+'\n\nEla sai de onde está e passa a aparecer lá.'))return;
+  const btn=document.getElementById('mvf_btn');if(btn){btn.disabled=true;btn.textContent='movendo…';}
+  let respondeu=false,tm=null;
+  const fecharVisor=()=>{const fv=document.getElementById('fotoview');if(fv&&fv.remove)fv.remove();};
+  /* [revisão F3, G1] prazo de socorro (mesmo dos outros gestos de foto): wifi sem internet não rejeita, fica pendurado.
+     Armado para a leitura prévia e RE-armado depois dela (re-checagem, médio 2: lista grande não pode comer o prazo). */
+  const socorro=()=>{if(respondeu)return;respondeu=true;fecharVisor();
+    alert('A nuvem não respondeu em 8 segundos — a foto continua onde estava. Se ela aparecer no destino mais tarde, é porque chegou; mover de novo não duplica.');reabrirGrade(movId);};
+  const armar=()=>{if(tm!==null&&typeof clearTimeout==='function')clearTimeout(tm);tm=setTimeout(socorro,8000);};
+  /* (re-checagem, médio 2) UMA leitura da nuvem por gesto: a lista do destino já lida (D) dá o contador dele; a origem
+     só é relida se o provisório zerou (é só aí que a miniatura precisa de decisão) — o visor reaberto reconta o resto. */
+  const fim=(ok,jaEstavaLa,D)=>{if(respondeu)return;respondeu=true;fecharVisor();
+    if(!ok){alert('Não consegui concluir o mover (sem internet?). A foto NÃO se perdeu: ou continua na origem, ou ficou nos dois lugares — mova de novo quando a conexão voltar (eu não duplico).');reabrirGrade(movId);return;}
+    const mDest=movs.find(x=>x.id===destino);if(mDest){if(D)mDest.nFotos=D.length+(jaEstavaLa?0:1);else if(!jaEstavaLa)mDest.nFotos=(+mDest.nFotos||0)+1;
+      if(!mDest.fotoThumb)fotoThumbDe(f.b64,t=>{if(t&&!mDest.fotoThumb){mDest.fotoThumb=t;save();}});save();}
+    const mOri=movs.find(x=>x.id===movId);if(mOri){if(+mOri.nFotos>0){mOri.nFotos=+mOri.nFotos-1;save();}if(!mOri.nFotos)recontarFotos(movId);}
+    toast('Foto movida ✓');reabrirGrade(movId);};
+  armar();
+  /* [revisão F3, M1] tentativa anterior que gravou no destino e não apagou da origem: agora só apaga — não duplica */
+  fotoList(destino,D=>{if(respondeu)return;armar();
+    if(D&&D.some(x=>x.b64===f.b64))fotoDel(f.id,ok2=>fim(!!ok2,true,D));
+    else fotoMove(f,destino,ok=>fim(ok,false,D));});}
+/* reabre a grade de quem PERDEU a foto: item → visor do item; grupo → visor do comprovante com o mesmo título/retorno */
+function reabrirGrade(id){if(movs.find(x=>x.id===id))abrirFotos(id);else abrirFotosGrupo(id,_gradeMeta&&_gradeMeta.titulo,_gradeMeta&&_gradeMeta.voltaJs);}
 function unMiolo(it,togId,hintId,setter,un){if(!it)return '<div class="meta">escolha o item acima</div>';const bpu=Math.max(1,+it.boosters||1),q=+it.qtd||1;
   if(bpu>1)return `<div class="toggle" id="${togId}"><div class="o ${un!=='boo'?'on':''}" data-v="un" onclick="${setter}('un')">📦 unidades inteiras</div><div class="o ${un==='boo'?'on':''}" data-v="boo" onclick="${setter}('boo')">🃏 boosters avulsos</div></div><div class="meta" id="${hintId}" style="margin-top:4px">${un==='boo'?('disponível: '+q+' un × '+bpu+' = '+(q*bpu)+' boosters'):('disponível: '+q+' un ('+bpu+' boosters cada)')}</div>`;
   return `<div class="meta">Pra mexer em booster avulso, diga quantos boosters tem cada unidade deste item:</div><div class="row2" style="margin-top:4px"><div><input id="${togId}_bpu" type="number" inputmode="numeric" placeholder="ex: 36"></div><div><button class="btn g" style="margin:0" onclick="setBpu('${it.id}','${togId}_bpu')">aplicar</button></div></div>`;}
@@ -4087,11 +4158,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='23/08 03h34';
+const BUILD_TAG='23/08 04h53';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787466876824;
+const BUILD_TS=1787471621213;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

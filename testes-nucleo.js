@@ -789,6 +789,118 @@ t('revisao F2 G3: retomada que falha de novo devolve o gesto a fila (nao perde)'
 setg('moverFotosDe',_moverOrig); setg('fotoDel',_fotoDelOrig22); setg('fotoList',_fotoListOrig22); setg('fotoAdd',_fotoAddOrig22);
 ctx.document.getElementById = () => elStub(); ctx.prompt=(q,d)=>d; ctx.confirm=()=>true; reset(); setg('tela','painel'); setg('consMenu',true); setg('excluidos',{});
 
+console.log('\n=== 23. fotos F3: gesto "mover foto" — candidatos na ordem, grava->apaga sem duplicar, recusa sem internet, prazo de socorro, contador relido, reabre a grade ===');
+const fotoLog23=[]; const fDel23=[]; const _fotoAddOrig23=g('fotoAdd'), _fotoDelOrig23=g('fotoDel'), _fotoListOrig23=g('fotoList');
+/* "nuvem" VIVA do teste: fotosPorDono[id] = o que cada dono tem; fotoAdd grava nela, fotoDel apaga dela, fotoList le dela
+   (o gesto le o destino ANTES de mover e RELE origem/destino DEPOIS — por isso o dube precisa ser vivo, nao fixo) */
+let fotosPorDono={};
+const addVivo=(movId,b64,cb)=>{fotoLog23.push({movId,b64});(fotosPorDono[movId]=fotosPorDono[movId]||[]).push({id:'novo'+fotoLog23.length,b64});cb(true);};
+const delVivo=(fid,cb)=>{fDel23.push(fid);Object.keys(fotosPorDono).forEach(k=>{if(Array.isArray(fotosPorDono[k]))fotosPorDono[k]=fotosPorDono[k].filter(x=>x.id!==fid);});cb(true);};
+const delFalha=(fid,cb)=>{fDel23.push(fid);cb(false);};
+setg('fotoAdd',addVivo); setg('fotoDel',delVivo);
+setg('fotoList',(id,cb)=>{cb(fotosPorDono[id]===null?null:(fotosPorDono[id]||[]).slice());});   /* copia: a leitura real devolve lista nova, nao a viva */
+const d23=n=>new Date(Date.now()-n*864e5).toISOString().slice(0,10); const hoje23=d23(0);
+reset(); setg('excluidos',{});
+setg('movs',[{id:'i1',tipo:'COMPRA',data:hoje23,cat:'ETB',qtd:1,valor:10,notaId:'n1',notaNum:'77',nFotos:2,fotoThumb:'T'},{id:'i2',tipo:'COMPRA',data:hoje23,cat:'Box',qtd:1,valor:20,notaId:'n1',notaNum:'77'},{id:'s1',tipo:'VENDA',data:hoje23,cat:'ETB',qtd:1,valor:30,contraparte:'C'},{id:'v60',tipo:'COMPRA',data:d23(60),cat:'Meio',qtd:1,valor:6},{id:'v0',tipo:'COMPRA',data:'2020-01-01',cat:'Antigo',qtd:1,valor:5},{id:'d1',tipo:'DESPESA',data:hoje23,valor:9},{id:'r1',tipo:'COMPRA',data:hoje23,cat:'R1',valor:1},{id:'r2',tipo:'COMPRA',data:hoje23,cat:'R2',valor:1},{id:'r3',tipo:'COMPRA',data:hoje23,cat:'R3',valor:1}]);
+/* candidatos: irmao do grupo, depois o comprovante da nota, depois os lancamentos de 90 dias; origem, despesa e o velho de fora; NADA truncado */
+const c1=A('candidatosMoverFoto')('i1'); const ids1=c1.map(x=>x.id);
+t('F3 candidatos (item de nota): irmao primeiro, comprovante da nota depois, lancamentos recentes em seguida; origem, despesa e velho de fora', ids1[0]==='i2' && ids1[1]==='n1' && ids1.includes('s1') && ids1.includes('v60') && !ids1.includes('i1') && !ids1.includes('v0') && !ids1.includes('d1'), JSON.stringify(ids1));
+t('F3 candidatos: a lista nao e truncada (todos os 7 recentes aparecem) e o de 60 dias entra', ['i2','n1','s1','v60','r1','r2','r3'].every(x=>ids1.includes(x)), JSON.stringify(ids1));
+t('F3 candidatos: rotulos dizem o que sao', /mesma nota/.test(c1[0].rot) && /comprovante da nota 77/.test(c1[1].rot), JSON.stringify(c1.slice(0,2)));
+t('F3 candidatos: "incluir antigos" traz o de 2020', A('candidatosMoverFoto')('i1',true).map(x=>x.id).includes('v0'));
+const c2=A('candidatosMoverFoto')('n1'); const ids2=c2.map(x=>x.id);
+t('F3 candidatos (origem = a NOTA): os itens dela primeiro', ids2[0]==='i1' && ids2[1]==='i2' && /item deste grupo/.test(c2[0].rot) && !ids2.includes('n1'), JSON.stringify(c2));
+/* abrir o painel: precisa de foto na lista e do visor aberto; o fundo do visor DEIXA de fechar com qualquer toque */
+let htmlFv='';
+const fv23={ get value(){return '';}, set value(v){}, remove(){fv23.removido=(fv23.removido||0)+1;}, set innerHTML(h){htmlFv=h;}, get innerHTML(){return htmlFv;}, removido:0, style:{}, disabled:false, textContent:'', onclick:function(){} };
+ctx.document.getElementById=(id)=>id==='fotoview'?fv23:_elCampo(id);
+setg('_fotosCache',[{id:'fA',b64:'A',movId:'i1'},{id:'fB',b64:'B',movId:'i1'}]);
+A('abrirMoverFoto')('fB','i1');
+t('F3 painel: abre dentro do visor com busca de destino, botao "mover pra ca", "cancelar" e o atalho "incluir antigos"', /Mover esta foto para/.test(htmlFv) && /mvf_dest/.test(htmlFv) && /moverFotoPara\('fB','i1'\)/.test(htmlFv) && /cancelar/.test(htmlFv) && /incluir lançamentos com mais de 90 dias/.test(htmlFv), htmlFv.slice(0,160));
+t('F3 painel (G2): enquanto o painel esta aberto o fundo do visor NAO fecha ao toque', fv23.onclick===null);
+t('F3 painel: o botao "mover" do visor e o painel seguram o toque (stopPropagation) — senao o fundo fechava antes', /onclick="event\.stopPropagation\(\);abrirMoverFoto\(/.test(src) && /<div onclick="event\.stopPropagation\(\)" style="background:var\(--card\);width:94%/.test(src));
+/* mover: sem destino recusa; destino = origem recusa; nada gravado/apagado */
+let alertas23=[]; const _alOrig23=ctx.alert; ctx.alert=(m)=>{alertas23.push(String(m));};
+_campos.mvf_dest=''; A('moverFotoPara')('fB','i1');
+t('F3 mover: sem destino escolhido -> avisa e nao encosta em nada', alertas23.length===1 && /Escolha o destino/.test(alertas23[0]) && fotoLog23.length===0 && fDel23.length===0, JSON.stringify(alertas23));
+alertas23=[]; _campos.mvf_dest='i1'; A('moverFotoPara')('fB','i1');
+t('F3 mover: destino = origem -> "ja esta ai"', alertas23.length===1 && /já está aí/.test(alertas23[0]) && fotoLog23.length===0, JSON.stringify(alertas23));
+/* fotos na nuvem (_db ligado, o mesmo sinal do fotoAdd/fotoDel) + sem internet = recusa antes de encostar; idem com salvamento pendente */
+const _dbOrig23=g('_db'); setg('_db',{}); alertas23=[]; _campos.mvf_dest='i2'; ctx.navigator.onLine=false; A('moverFotoPara')('fB','i1'); ctx.navigator.onLine=true;
+t('F3 mover (G1): fotos na nuvem e modo aviao -> recusa antes de gravar ou apagar', alertas23.length===1 && /Sem internet/.test(alertas23[0]) && fotoLog23.length===0 && fDel23.length===0, JSON.stringify(alertas23));
+const _seqOrig23=g('_pendSeq'), _okOrig23=g('_pendOk'), _desdeOrig23=g('_pendDesde'); setg('_pendSeq',5); setg('_pendOk',4); setg('_pendDesde',Date.now()-20000); alertas23=[]; A('moverFotoPara')('fB','i1');
+t('F3 mover (G1): fotos na nuvem com salvamento sem confirmacao ha mais de 10 s (wifi sem internet) -> tambem recusa', alertas23.length===1 && /Sem internet/.test(alertas23[0]) && fotoLog23.length===0, JSON.stringify(alertas23));
+/* pendencia FRESCA (o commit normal em voo, o dono online) NAO recusa — re-checagem F3, medio 1 */
+setg('_pendDesde',Date.now()); alertas23=[]; let perg0=0; ctx.confirm=()=>{perg0++;return false;}; A('moverFotoPara')('fB','i1'); ctx.confirm=()=>true;
+t('F3 mover (re-checagem): pendencia fresca (salvou ha 1 s, nuvem boa) NAO recusa — chega ate a pergunta', alertas23.length===0 && perg0===1 && fotoLog23.length===0, JSON.stringify(alertas23)+' perg='+perg0);
+setg('_pendSeq',_seqOrig23); setg('_pendOk',_okOrig23); setg('_pendDesde',_desdeOrig23);
+t('F3: marcar pendencia registra DESDE quando; limpar zera', (function(){const s=g('_pendSeq'),o=g('_pendOk'),d=g('_pendDesde');setg('_pendSeq',0);setg('_pendOk',0);setg('_pendDesde',0);A('marcaPendNuvem')();const d1=g('_pendDesde');A('marcaPendNuvem')();const d2=g('_pendDesde');A('limpaPendNuvem')(2);const d3=g('_pendDesde');setg('_pendSeq',s);setg('_pendOk',o);setg('_pendDesde',d);return d1>0&&d2===d1&&d3===0;})());
+/* daqui em diante o gesto roda no modo LOCAL (sem _db): no arquivo de deploy o _db nasce ligado e herdaria pendencia de secoes anteriores */
+setg('_db',null);
+/* a pergunta antes de mover (M5): "nao" = nada acontece */
+let perguntou23=''; ctx.confirm=(m)=>{perguntou23=String(m);return false;}; alertas23=[]; _campos.mvf_dest='i2'; A('moverFotoPara')('fB','i1');
+t('F3 mover (M5): pergunta "Mover esta foto para: <destino>?" e, no nao, nao encosta em nada', /Mover esta foto para/.test(perguntou23) && /mesma nota/.test(perguntou23) && fotoLog23.length===0 && fDel23.length===0, perguntou23.slice(0,100));
+ctx.confirm=()=>true;
+/* mover de verdade (a SEGUNDA foto da lista, nao a primeira): grava no destino, apaga a certa, contadores por RELEITURA, reabre a grade da origem */
+let reabriu23=[]; const _abrirFotosOrig23=g('abrirFotos'); setg('abrirFotos',(id)=>{reabriu23.push(id);});
+let toasts23=[]; const _toastOrig23=g('toast'); setg('toast',(m)=>{toasts23.push(String(m));});
+fotosPorDono={i1:[{id:'fA',b64:'A'},{id:'fB',b64:'B'}],i2:[]};   /* estado da "nuvem" ANTES do mover; o dube vivo atualiza */
+alertas23=[]; _campos.mvf_dest='i2'; A('moverFotoPara')('fB','i1');
+const i1=M().find(m=>m.id==='i1'), i2=M().find(m=>m.id==='i2');
+t('F3 mover: gravou a foto CERTA (a segunda, B) no destino e apagou a certa da origem (ordem grava->apaga provada na F2)', fotoLog23.length===1 && fotoLog23[0].movId==='i2' && fotoLog23[0].b64==='B' && fDel23.length===1 && fDel23[0]==='fB', JSON.stringify(fotoLog23)+' dels='+JSON.stringify(fDel23));
+t('F3 mover (M2/M3): contadores vem da RELEITURA da lista — origem 1 (sobrou A), destino 1 — e a miniatura da origem nao e apagada com foto viva', +i1.nFotos===1 && !!i1.fotoThumb && +i2.nFotos===1, JSON.stringify([i1.nFotos,i1.fotoThumb,i2.nFotos]));
+t('F3 mover: fechou o visor, avisou "Foto movida" e reabriu a grade de onde a foto saiu', fv23.removido>=1 && toasts23.some(x=>/Foto movida/.test(x)) && reabriu23[0]==='i1' && alertas23.length===0, JSON.stringify(reabriu23)+' '+JSON.stringify(toasts23));
+/* contador do destino errado (card dizia 1, nuvem tem 6): a releitura corrige — nao e ±1 cego */
+fotosPorDono={i1:[{id:'fA',b64:'A'}],i2:[{id:'x1',b64:'1'},{id:'x2',b64:'2'},{id:'x3',b64:'3'},{id:'x4',b64:'4'},{id:'x5',b64:'5'}]}; fotoLog23.length=0; fDel23.length=0; reabriu23=[];
+setg('_fotosCache',[{id:'fA',b64:'A',movId:'i1'}]); _campos.mvf_dest='i2'; A('moverFotoPara')('fA','i1');
+t('F3 mover (M2): destino que dizia 1 e tem 6 na nuvem passa a dizer 6 (releitura), origem 0 e sem miniatura', +M().find(m=>m.id==='i2').nFotos===6 && +M().find(m=>m.id==='i1').nFotos===0 && !M().find(m=>m.id==='i1').fotoThumb, JSON.stringify([M().find(m=>m.id==='i2').nFotos,M().find(m=>m.id==='i1').nFotos]));
+/* leitura da origem FALHOU depois do mover: contador errado nao vira zero salvo nem apaga miniatura (M3 = classe P0-1) */
+setg('movs',[{id:'i1',tipo:'COMPRA',data:hoje23,cat:'ETB',qtd:1,valor:10,nFotos:1,fotoThumb:'T'},{id:'i2',tipo:'COMPRA',data:hoje23,cat:'Box',qtd:1,valor:20}]);
+fotosPorDono={i1:null,i2:[]}; fotoLog23.length=0; fDel23.length=0; setg('_fotosCache',[{id:'fA',b64:'A',movId:'i1'},{id:'fB',b64:'B',movId:'i1'}]); _campos.mvf_dest='i2'; A('moverFotoPara')('fA','i1');
+t('F3 mover (M3): com a releitura da origem falhando, o contador so cai 1 (1->0) e a miniatura NAO e apagada as cegas', +M().find(m=>m.id==='i1').nFotos===0 && !!M().find(m=>m.id==='i1').fotoThumb, JSON.stringify(M().find(m=>m.id==='i1')));
+/* destino = comprovante da nota (grupo): nao ha contador a mexer no destino */
+setg('movs',[{id:'i1',tipo:'COMPRA',data:hoje23,cat:'ETB',qtd:1,valor:10,notaId:'n1',notaNum:'77',nFotos:1,fotoThumb:'T'},{id:'i2',tipo:'COMPRA',data:hoje23,cat:'Box',qtd:1,valor:20,notaId:'n1',notaNum:'77'}]);
+fotosPorDono={i1:[{id:'fB',b64:'B'}],n1:[]}; reabriu23=[]; fotoLog23.length=0; fDel23.length=0; setg('_fotosCache',[{id:'fB',b64:'B',movId:'i1'}]); _campos.mvf_dest='n1'; A('moverFotoPara')('fB','i1');
+t('F3 mover para o comprovante da nota: grava no grupo, apaga da origem, origem 1->0 sem miniatura', fotoLog23.length===1 && fotoLog23[0].movId==='n1' && fDel23[0]==='fB' && +M().find(m=>m.id==='i1').nFotos===0 && !M().find(m=>m.id==='i1').fotoThumb, JSON.stringify(fotoLog23));
+/* falha ao GRAVAR: nada apagado, avisa, reabre */
+reabriu23=[]; alertas23=[]; fotoLog23.length=0; fDel23.length=0; fotosPorDono={i1:[],i2:[{id:'fC',b64:'C'}]}; setg('fotoAdd',(movId,b64,cb)=>{cb(false);}); setg('_fotosCache',[{id:'fC',b64:'C',movId:'i2'}]); _campos.mvf_dest='i1'; A('moverFotoPara')('fC','i2');
+t('F3 mover: gravar no destino falhou -> nada apagado, avisa que a foto nao se perdeu e reabre a grade', fDel23.length===0 && alertas23.length===1 && /NÃO se perdeu/.test(alertas23[0]) && reabriu23[0]==='i2', JSON.stringify(alertas23));
+/* falha ao APAGAR depois de gravar (M1): avisa "nos dois lugares"; repetir NAO grava de novo — so apaga da origem */
+setg('fotoAdd',addVivo); setg('fotoDel',delFalha);
+reabriu23=[]; alertas23=[]; fotoLog23.length=0; fDel23.length=0; fotosPorDono={i2:[{id:'fC',b64:'C'}],i1:[]}; setg('_fotosCache',[{id:'fC',b64:'C',movId:'i2'}]); _campos.mvf_dest='i1'; A('moverFotoPara')('fC','i2');
+t('F3 mover (M1): apagar da origem falhou depois de gravar -> avisa (pode estar nos dois lugares) e nao conta', fotoLog23.length===1 && fDel23.length===1 && alertas23.length===1 && /dois lugares/.test(alertas23[0]) && !(+M().find(m=>m.id==='i1').nFotos), JSON.stringify(alertas23));
+setg('fotoDel',delVivo); fotoLog23.length=0; fDel23.length=0; alertas23=[]; reabriu23=[]; toasts23=[];
+A('moverFotoPara')('fC','i2');   /* a "nuvem" ja tem C nos dois donos (ficou da tentativa anterior) */
+t('F3 mover (M1): repetir o gesto com a foto JA no destino -> nao grava de novo, so apaga da origem, e conclui', fotoLog23.length===0 && fDel23.length===1 && fDel23[0]==='fC' && toasts23.some(x=>/Foto movida/.test(x)) && +M().find(m=>m.id==='i1').nFotos===1, JSON.stringify(fDel23)+' '+JSON.stringify(toasts23));
+/* prazo de socorro (G1): destino mudo -> 8 s -> avisa, fecha o visor e reabre a grade; resposta atrasada e ignorada (nao puxa o dono de volta) */
+const _stOrig23=ctx.setTimeout; const timers23=[]; ctx.setTimeout=(fn,ms)=>{timers23.push({fn,ms});return 0;};
+let cbPend23=null; setg('fotoAdd',(movId,b64,cb)=>{cbPend23=cb;}); fotosPorDono={i1:[],i2:[]}; fotoLog23.length=0; fDel23.length=0; alertas23=[]; reabriu23=[]; toasts23=[]; fv23.removido=0;
+setg('_fotosCache',[{id:'fA',b64:'A',movId:'i1'}]); _campos.mvf_dest='i2'; A('moverFotoPara')('fA','i1');
+t('F3 mover (G1): com o destino mudo o gesto fica pendurado e arma o prazo de 8 s — antes da leitura previa E de novo depois dela (lista grande nao come o prazo)', reabriu23.length===0 && timers23.filter(x=>x.ms===8000).length===2 && typeof cbPend23==='function', JSON.stringify(timers23.map(x=>x.ms)));
+timers23.filter(x=>x.ms===8000).forEach(x=>x.fn());
+t('F3 mover (G1): passados 8 s -> avisa que a nuvem nao respondeu, fecha o visor e reabre a grade', alertas23.length===1 && /8 segundos/.test(alertas23[0]) && fv23.removido>=1 && reabriu23[0]==='i1', JSON.stringify(alertas23));
+cbPend23(true);
+t('F3 mover (G1): a resposta atrasada da nuvem e ignorada — nao reabre a grade de novo nem avisa "movida"', reabriu23.length===1 && !toasts23.some(x=>/Foto movida/.test(x)), JSON.stringify(reabriu23)+' '+JSON.stringify(toasts23));
+ctx.setTimeout=_stOrig23; setg('fotoAdd',addVivo);
+/* origem = GRUPO: reabre o visor do comprovante com o mesmo titulo/retorno — e o _gradeMeta e gravado pelo proprio abrirFotosGrupo */
+let htmlG23=''; const _insG23=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlG23=h;};
+fotosPorDono={n1:[]}; A('abrirFotosGrupo')('n1','📷 Fotos da venda (comprovante)','verVenda("n1")'); ctx.document.body.insertAdjacentHTML=_insG23;
+t('F3: abrir o visor do comprovante grava titulo e retorno para a reabertura', !!g('_gradeMeta') && /venda/.test(g('_gradeMeta').titulo) && /verVenda/.test(g('_gradeMeta').voltaJs), JSON.stringify(g('_gradeMeta')));
+let grupoReaberto=null; const _abrirGrupoOrig23=g('abrirFotosGrupo'); setg('abrirFotosGrupo',(gid,tit,vj)=>{grupoReaberto=[gid,tit,vj];});
+fotosPorDono={n1:[{id:'fD',b64:'D'}],i2:[]}; fotoLog23.length=0; fDel23.length=0; setg('_fotosCache',[{id:'fD',b64:'D',movId:'n1'}]); _campos.mvf_dest='i2'; A('moverFotoPara')('fD','n1');
+t('F3 mover saindo do comprovante: vai pro item (conta nele pela releitura) e reabre o visor do grupo com titulo e retorno', !!fotoLog23[0] && fotoLog23[0].movId==='i2' && +M().find(m=>m.id==='i2').nFotos===1 && !!grupoReaberto && grupoReaberto[0]==='n1' && /venda/.test(grupoReaberto[1]) && /verVenda/.test(grupoReaberto[2]), JSON.stringify(grupoReaberto)+' '+JSON.stringify(fotoLog23));
+t('F3: o botao "mover" existe no visor da foto e a gravacao esta na lista de toques protegidos (anti toque dobrado)', /abrirMoverFoto\(/.test(src) && /🔀 mover</.test(src) && g('RE_GRAVA').test("moverFotoPara('a','b')"));
+/* [re-checagem F3] origem SEM contador e com leitura falhada: o provisorio nao pode virar NaN (undefined-1) */
+setg('abrirFotosGrupo',_abrirGrupoOrig23); setg('movs',[{id:'i1',tipo:'COMPRA',data:hoje23,cat:'ETB',qtd:1,valor:10},{id:'i2',tipo:'COMPRA',data:hoje23,cat:'Box',qtd:1,valor:20}]);
+fotosPorDono={i1:null,i2:[]}; fotoLog23.length=0; fDel23.length=0; reabriu23=[]; setg('_fotosCache',[{id:'fA',b64:'A',movId:'i1'}]); _campos.mvf_dest='i2'; A('moverFotoPara')('fA','i1');
+const nf23=M().find(m=>m.id==='i1').nFotos;
+t('re-checagem F3: origem sem contador + leitura falhada -> o contador nao vira NaN (fica vazio ou numero)', fotoLog23.length===1 && (nf23===undefined || (typeof nf23==='number' && !Number.isNaN(nf23))), 'nFotos='+String(nf23));
+/* [re-checagem F3] sem nenhum destino possivel o painel diz isso (e aponta o "incluir antigos"), em vez de uma busca vazia */
+setg('movs',[{id:'i1',tipo:'COMPRA',data:'2020-01-01',cat:'ETB',qtd:1,valor:10}]); htmlFv=''; setg('_fotosCache',[{id:'fA',b64:'A',movId:'i1'}]); A('abrirMoverFoto')('fA','i1');
+t('re-checagem F3: sem destino recente o painel avisa e aponta o atalho "incluir antigos"', /Nenhum lançamento recente para receber a foto/.test(htmlFv) && /incluir lançamentos com mais de 90 dias/.test(htmlFv), htmlFv.slice(0,200));
+setg('fotoAdd',_fotoAddOrig23); setg('fotoDel',_fotoDelOrig23); setg('fotoList',_fotoListOrig23); setg('abrirFotos',_abrirFotosOrig23); setg('abrirFotosGrupo',_abrirGrupoOrig23); setg('toast',_toastOrig23); ctx.alert=_alOrig23; ctx.navigator.onLine=true; ctx.confirm=()=>true; setg('_db',_dbOrig23);
+ctx.document.getElementById = () => elStub(); reset(); setg('tela','painel'); setg('consMenu',true); setg('excluidos',{}); setg('_fotosCache',[]); setg('_gradeMeta',null);
+
 console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
 /* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
    transacao exige servidor) -> a Laura salva em casa -> quando o sinal volta, o snapshot dela
