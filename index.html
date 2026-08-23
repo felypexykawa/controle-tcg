@@ -1993,6 +1993,7 @@ function vConsultar(){
   const vdN={};movs.forEach(x=>{if(x.tipo==='VENDA'&&x.vendaId)vdN[x.vendaId]=(vdN[x.vendaId]||0)+1;});
   const temPed=new Set(movs.filter(x=>x.loteOrigem).map(x=>x.loteOrigem));                 /* lotes que já soltaram pedaço */
   const vOrig=new Set(movs.filter(v=>v.tipo==='VENDA'&&v.origemId).map(v=>v.origemId));    /* compras que têm venda ligada */
+  const vIds=new Set(movs.filter(v=>v.tipo==='VENDA').map(v=>v.id));                      /* ids de venda (pedaço aponta por vendaRef) */
   const lista=ord.length?ord.map(m=>{const venda=m.tipo==='VENDA',total=+m.valor||0;
     const multi=venda&&m.vendaId&&vdN[m.vendaId]>1;
     const gk=gKey(m);let head='';
@@ -2019,7 +2020,10 @@ function vConsultar(){
     const pedacoTag=(m.tipo==='COMPRA'&&(m.loteOrigem||temPed.has(m.id)))?' <span style="color:var(--mut);font-size:10px">🧩 parte de lote</span>':'';
     /* [revisão C 23/08, M3] só a venda que aponta para ESTE registro conta — etiquetar o irmão de lote pela venda
        do pai prometia um vínculo que o expandido não mostrava (e escondia justamente o pedaço vendido sem venda) */
-    const vincCompra=(m.tipo==='COMPRA'&&sitDe(m)==='Vendido'&&vOrig.has(m.id))?' <span class="tag v">🔗 vinculada</span>':'';
+    /* [re-checagem C, A-1] a venda que o PRÓPRIO app cria aponta para o lote-PAI e deixa `vendaRef` no pedaço
+       vendido — o lastro existe e é determinístico, então o pedaço também diz "vinculada" (sem reabrir o falso
+       positivo do irmão sem venda, que não tem vendaRef) */
+    const vincCompra=(m.tipo==='COMPRA'&&sitDe(m)==='Vendido'&&(vOrig.has(m.id)||(m.vendaRef&&vIds.has(m.vendaRef))))?' <span class="tag v">🔗 vinculada</span>':'';
     const loteTag=(m.tipo==='COMPRA'&&m.codigoNA==='lote')?' <span class="tag c">📚 lote</span>':'';
     let pg;if(m.tipo==='DESPESA')pg=m.status==='apagar'?'a pagar':'pago';
     else if(venda)pg=m.canal==='App'?`app · ${m.recDias||0}d${m.taxa?' −'+m.taxa+'%':''}`:'Pix · na hora';
@@ -2045,7 +2049,7 @@ function vConsultar(){
         ${venda&&m.semOrigem==='historico'?`<span class="meta" style="flex-basis:100%">📜 Venda histórica — material vendido antes do controle no app; sem custo rastreado, por decisão sua. Não conta como pendência. Dá pra desfazer a marca a qualquer momento.</span>`:''}
         ${multi?(function(){const its=movs.filter(x=>x.tipo==='VENDA'&&x.vendaId===m.vendaId),tv=its.reduce((s,x)=>s+(+x.valor||0),0);
           return `<span class="meta" style="flex-basis:100%">🧾 Esta é 1 de <b>${its.length} itens da mesma venda</b>${m.contraparte?' pra <b>'+m.contraparte+'</b>':''} · total <b>${fmt(tv)}</b> · <span class="lnk" onclick="verVenda('${m.vendaId}')">ver a venda completa</span></span>`;})():''}
-        ${m.tipo==='COMPRA'?(function(){const vds=movs.filter(v=>v.tipo==='VENDA'&&v.origemId===m.id);
+        ${m.tipo==='COMPRA'?(function(){const vds=movs.filter(v=>v.tipo==='VENDA'&&(v.origemId===m.id||(m.vendaRef&&v.id===m.vendaRef)));
           if(!vds.length)return '';
           /* cada venda com o SEU custo/lucro — sem isso o leitor soma as vendas contra o custo
              do RESTANTE do lote e conclui margem absurda (caso real: 986 vs 240,70 = "400%") */
@@ -2117,7 +2121,8 @@ function vConsultar(){
     ord.forEach(m=>{if(m.notaId){if(!vistos[m.notaId]){vistos[m.notaId]=1;nidsVis.push(m.notaId);}}else soltos.push(m);});
     const cardsN=nidsVis.map(nid=>{
       const todos=movs.filter(x=>x.tipo==='COMPRA'&&x.notaId===nid);
-      const origs=todos.filter(x=>!x.loteOrigem);
+      /* [re-checagem C, A-4] nota que só tem PEDAÇOS (raiz fora dela) não pode sair como "0 produto" */
+      const origs0=todos.filter(x=>!x.loteOrigem),origs=origs0.length?origs0:todos;
       const h=origs[0]||todos[0];
       const tot=todos.reduce((s,x)=>s+(+x.valor||0),0);
       const frete=origs.reduce((s,x)=>s+(+x.freteRateio||0),0);
@@ -2145,7 +2150,7 @@ function vConsultar(){
     const famIdx={},famOrd=[];soltos.forEach(m=>{const rid=(raizDe(m)||m).id;if(!famIdx[rid]){famIdx[rid]=[];famOrd.push(rid);}famIdx[rid].push(m);});
     const cardSolto=m=>{const dataBR2=m.data?m.data.split('-').reverse().join('/'):'—';const s=sitDe(m);
       return `<div class="item" style="display:block;cursor:pointer" onclick="verFicha('${m.id}')">
-        <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${m.contraparte||'—'} <span style="color:var(--mut);font-size:10px">avulso, sem nota</span></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${m.contraparte||'—'} <span style="color:var(--mut);font-size:10px">${(m.loteOrigem||temPed.has(m.id))?'🧩 parte de lote · ':''}avulso, sem nota</span></div>
         <div class="meta">${((m.colecao?m.colecao+' · ':'')+(m.cat||''))||'(sem produto)'}${m.qtd>1?' ×'+m.qtd:''} · ${(EMO[s]||'')+' '+s.toLowerCase()}</div></div>
         <div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+m.valor||0)}</div></div></div>`;};
     const cardLote=(rid,fam,noFiltro)=>{const raiz=movs.find(x=>x.id===rid)||fam[0];
@@ -2156,7 +2161,9 @@ function vConsultar(){
       const catR=raiz.cat||'';const mesmaUn=fam.filter(x=>(x.cat||'')===catR),outras=fam.filter(x=>(x.cat||'')!==catR);
       const qt=mesmaUn.reduce((s,x)=>s+(+x.qtd||1),0);
       const sits={};mesmaUn.forEach(x=>{const s=sitDe(x);sits[s]=(sits[s]||0)+(+x.qtd||1);});
-      const outrasTxt=outras.length?` · +${outras.reduce((s,x)=>s+(+x.qtd||1),0)} ${[...new Set(outras.map(x=>x.cat||'item'))].join('/')} (aberto)`:'';
+      /* [re-checagem C, A-2] uma contagem POR unidade — nunca somar booster com carta avulsa */
+      const porCat={};outras.forEach(x=>{const c=x.cat||'item';porCat[c]=(porCat[c]||0)+(+x.qtd||1);});
+      const outrasTxt=outras.length?' · '+Object.entries(porCat).map(([c,n])=>`+${n} ${c}`).join(' · ')+' (aberto)':'';
       const ids={};fam.forEach(x=>ids[x.id]=1);const vds=movs.filter(v=>v.tipo==='VENDA'&&ids[v.origemId]);const totV=vds.reduce((s,v)=>s+(+v.valor||0),0);
       const sitTxt=Object.entries(sits).map(([s,n])=>(EMO[s]||'')+' '+n+' '+s.toLowerCase()).join(' · ');
       const dataBR2=raiz.data?raiz.data.split('-').reverse().join('/'):'—';
@@ -3913,11 +3920,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='23/08 01h36';
+const BUILD_TAG='23/08 01h49';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787459770853;
+const BUILD_TS=1787460549607;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

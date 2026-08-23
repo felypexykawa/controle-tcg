@@ -505,6 +505,17 @@ setg('movs',[{id:'L1',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',q
   {id:'V1',tipo:'VENDA',data:'2026-08-10',cat:'ETB',colecao:'Caos',qtd:1,valor:180,origemId:'L1',custoOrigem:100,contraparte:'x',canal:'Pix'}]);
 hC=A('vConsultar')();
 t('M3: quando a venda aponta para o item vendido, os DOIS lados dizem 🔗 vinculada', (hC.match(/🔗 vinculada/g)||[]).length===2, 'ocorrencias='+(hC.match(/🔗 vinculada/g)||[]).length);
+/* A-1 (re-checagem C): a venda que o PROPRIO app cria aponta pro PAI e deixa vendaRef no pedaco vendido — o pedaco
+   tem de dizer vinculada (e mostrar a venda ao abrir); o irmao vendido SEM vendaRef nao ganha selo */
+setg('movs',[{id:'L1',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE'},
+  {id:'L1a',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'L1',vendaRef:'V1'},
+  {id:'L1b',tipo:'COMPRA',data:'2026-07-04',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Vendido',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'L1'},
+  {id:'V1',tipo:'VENDA',data:'2026-08-10',cat:'ETB',colecao:'Caos',qtd:1,valor:180,origemId:'L1',custoOrigem:100,contraparte:'x',canal:'Pix'}]);
+hC=A('vConsultar')();
+t('A-1: venda criada pelo app (aponta pro pai + vendaRef no pedaco): a venda E o pedaco dizem 🔗 vinculada; o irmao sem vendaRef nao (2 ocorrencias)', (hC.match(/🔗 vinculada/g)||[]).length===2, 'ocorrencias='+(hC.match(/🔗 vinculada/g)||[]).length);
+setg('expandId','L1a'); hC=A('vConsultar')();
+t('A-1: o pedaco vendido expandido MOSTRA a venda (vendido em 10/08 por R$180)', /vendido em <b>10\/08\/2026<\/b> por <b>R\$\s?180/.test(hC), hC.slice(hC.indexOf('vendido em'), hC.indexOf('vendido em')+80));
+setg('expandId',null);
 /* A3: "Todos" so com despesas/transferencias nao afirma "comprado R$0 · vendido R$0" */
 setg('movs',[{id:'D1',tipo:'DESPESA',data:'2026-08-11',valor:37,status:'pago',natureza:'ordinaria',cat:'Luz'},{id:'D2',tipo:'DESPESA',data:'2026-08-12',valor:120,status:'pago',natureza:'ordinaria',cat:'Net'},{id:'T1',tipo:'TRANSF',data:'2026-08-13',valor:500,contaDe:'Nubank',contaPara:'Itau'}]);
 hC=A('vConsultar')();
