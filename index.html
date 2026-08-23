@@ -1128,7 +1128,10 @@ let _fotosItem=[];
    da carta abandonada grudava na proxima carta salva — silencioso, e pior que o bug original.
    Curar porta por porta e caca a rato. Regra unica: se a identidade do formulario mudou desde
    a ultima pintura, o balde do item vai embora. Porta nova nasce coberta. */
-function _idForm(){return tela+'|'+tipoSel+'|'+compraModo+'|'+(editId||'');}
+/* [fotos F1, P0-4] vendaModo entra na identidade: alternar "1 item" ↔ "vários" na venda troca o formulário
+   visível, e o balde da carta em digitação tem de ir embora com aviso (a foto por carta na venda, D2,
+   precisa disto). vvOrig/deiModo NÃO entram: são submodo do MESMO item em digitação. */
+function _idForm(){return tela+'|'+tipoSel+'|'+compraModo+'|'+(typeof vendaModo==='undefined'?'':vendaModo)+'|'+(editId||'');}
 let _fotosItemForm=null;
 function guardaBaldeItem(){const at=_idForm();
   if(_fotosItemForm!==null&&at!==_fotosItemForm&&_fotosItem.length){
@@ -1168,10 +1171,31 @@ function aplicarFotosDoItem(fotos,movId){if(!fotos||!fotos.length||!movId)return
   const L=fotos.slice();const antes=_fotosPend;_fotosPend=L;aplicarFotosPend(movId);_fotosPend=antes;}
 function fotoThumbDe(b64,cb){const img=new Image();img.onload=()=>{let w=img.width,h=img.height;const MX=56;if(w>=h&&w>MX){h=Math.round(h*MX/w);w=MX;}else if(h>w&&h>MX){w=Math.round(w*MX/h);h=MX;}
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);cb(cv.toDataURL('image/jpeg',0.55));};img.onerror=()=>cb(null);img.src=b64;}
+/* [fotos F1, P0-2 — revisão 22/08] a foto só CONTA depois que o armazenamento confirmou. Antes, o balde era
+   esvaziado e nFotos incrementado ANTES do fotoAdd responder: se a nuvem recusasse (ou ficasse pendurada sem
+   rede), o lançamento saía com "1 foto" de uma foto que não existia, e a foto sumia do balde — com o
+   comprovante da nota isso vira perder a nota fiscal. Agora: o balde esvazia na hora (a tela não fica
+   mostrando foto "pendente" de um lançamento já salvo), mas cada foto viaja em `_fotosEmVoo`; no sucesso
+   conta e gera miniatura; na recusa VOLTA ao balde com aviso; se nada responder em 8 s (sem rede o envio fica
+   pendurado), avisa para não sair do app. */
+let _fotosEmVoo=[],_fotosFalhadas=[];   /* _fotosFalhadas: {movId,b64,ts} — fila POR LANÇAMENTO, nunca o balde da tela */
+/* [revisão F1, F1-A/F1-B] a foto recusada NÃO volta ao balde da tela: o balde é de quem está digitando agora, e a
+   foto é de um lançamento já salvo — devolver ao balde colava a foto no lançamento SEGUINTE (ou, na nota, o
+   item perdia a foto). Vai para a fila por lançamento e é reenviada: sozinha, no próximo commit bem-sucedido
+   da nuvem (a rede voltou), e por um toque no visor "📷 fotos" do lançamento. */
+function contarFotoGravada(m,b64){if(!m)return;m.nFotos=(+m.nFotos||0)+1;if(!m.fotoThumb){fotoThumbDe(b64,t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}else save();}
+function reenviarFotosFalhadas(movId){const fila=_fotosFalhadas.filter(f=>!movId||f.movId===movId);if(!fila.length)return 0;
+  fila.forEach(f=>{const i=_fotosFalhadas.indexOf(f);if(i>=0)_fotosFalhadas.splice(i,1);
+    fotoAdd(f.movId,f.b64,ok=>{if(ok){contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid'))fotoRefresh(f.movId);}
+      else{_fotosFalhadas.push(f);}});});
+  return fila.length;}
 function aplicarFotosPend(movId){if(!_fotosPend.length||!movId)return;const L=_fotosPend.slice();_fotosPend=[];
-  const m=movs.find(x=>x.id===movId);
-  L.forEach(b64=>fotoAdd(movId,b64,()=>{}));
-  if(m){m.nFotos=(+m.nFotos||0)+L.length;fotoThumbDe(L[0],t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}}
+  const m=movs.find(x=>x.id===movId);let avisouPendurado=false,respondidas=0;
+  L.forEach(b64=>{_fotosEmVoo.push(b64);
+    fotoAdd(movId,b64,ok=>{respondidas++;const i=_fotosEmVoo.indexOf(b64);if(i>=0)_fotosEmVoo.splice(i,1);
+      if(ok)contarFotoGravada(m,b64);
+      else{_fotosFalhadas.push({movId,b64,ts:Date.now()});toast('⚠ Não consegui gravar 1 foto deste lançamento — ficou na fila: quando a nuvem voltar eu reenvio sozinho, ou abra "📷 fotos" dele e toque em reenviar.');}});});
+  setTimeout(()=>{if(respondidas<L.length&&!avisouPendurado){avisouPendurado=true;toast('📷 foto ainda enviando — fique com o app aberto até o contador aparecer (sem internet o envio fica esperando).');}},8000);}
 function abrirFotosPend(){const old=document.getElementById('modal');if(old)old.remove();
   const thumbs=_fotosPend.length?_fotosPend.map((b,i)=>`<div style="position:relative"><img src="${b}" style="width:100%;height:92px;object-fit:cover;border-radius:8px"><button class="x" style="position:absolute;top:2px;right:4px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 7px" onclick="_fotosPend.splice(${i},1);abrirFotosPend()">✕</button></div>`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda — adicione abaixo.</div>';
   const hh=`<div id="modal" onclick="if(event.target.id==='modal'){fecharModal();atualizarBadgeFotos()}" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
@@ -1198,9 +1222,13 @@ function fotoAdd(movId,b64,cb){const fid=novoId('f');
   else idbOpen(db=>{if(!db){alert('Não consegui abrir o armazenamento de fotos deste aparelho.');cb(false);return;}
     const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId,b64,ts:Date.now()});tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
 function fotoList(movId,cb){
-  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').where('movId','==',movId).get().then(q=>{const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));L.sort((a,b)=>(a.ts||0)-(b.ts||0));cb(L);}).catch(()=>cb([]));}
-  else idbOpen(db=>{if(!db){cb([]);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();
-    cur.onsuccess=e=>{const c=e.target.result;if(c){if(c.value.movId===movId)L.push(c.value);c.continue();}else{L.sort((a,b)=>(a.ts||0)-(b.ts||0));cb(L);}};cur.onerror=()=>cb(L);});}
+  /* [fotos F1, P0-1 — revisão 22/08] "não consegui ler" NÃO é "não tem foto": erro (ou leitura vazia servida do
+     cache, que é o que o SDK devolve sem rede) devolve null — e quem chama trata null como "não sei", nunca
+     como autorização para zerar contador e miniatura (era perda de dado calada: abrir o visor sem internet
+     zerava nFotos/fotoThumb e gravava, e a foto virava órfã). */
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').where('movId','==',movId).get().then(q=>{if(q&&q.metadata&&q.metadata.fromCache&&q.empty){cb(null);return;}const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));L.sort((a,b)=>(a.ts||0)-(b.ts||0));cb(L);}).catch(()=>cb(null));}
+  else idbOpen(db=>{if(!db){cb(null);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();
+    cur.onsuccess=e=>{const c=e.target.result;if(c){if(c.value.movId===movId)L.push(c.value);c.continue();}else{L.sort((a,b)=>(a.ts||0)-(b.ts||0));cb(L);}};cur.onerror=()=>cb(null);});}
 function fotoDel(fid,cb){
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).delete().then(()=>cb(true)).catch(()=>cb(false));}
   else idbOpen(db=>{if(!db){cb(false);return;}const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').delete(fid);tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
@@ -1213,6 +1241,7 @@ function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="sec" style="margin-top:0">📷 Fotos do lançamento</div>
     <div class="ctx">Nota, boleto, comprovante ou a própria carta — fica guardado junto do lançamento${USAR_NUVEM?' na nuvem (você e a Laura veem em qualquer aparelho)':' neste aparelho'}.</div>
+    ${(function(){const n=_fotosFalhadas.filter(f=>f.movId===movId).length;return n?`<div class="soon" style="background:var(--nobg);color:var(--red);cursor:pointer" onclick="this.textContent='reenviando…';reenviarFotosFalhadas('${movId}')">⚠ ${n} foto${n>1?'s':''} deste lançamento não ${n>1?'foram gravadas':'foi gravada'} — toque para reenviar</div>`:'';})()}
     <div id="fotoGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0"><div class="meta" style="grid-column:1/-1">carregando…</div></div>
     <input type="file" id="fotoFileCam" accept="image/*" capture="environment" style="display:none" onchange="fotoEscolhida('${movId}',this)">
     <input type="file" id="fotoFile" accept="image/*" style="display:none" onchange="fotoEscolhida('${movId}',this)">
@@ -1220,10 +1249,14 @@ function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
     <button class="btn g" style="margin-top:8px" onclick="fecharModal();atualizarBadgeFotos()">fechar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);
   fotoRefresh(movId);}
-function fotoRefresh(movId){fotoList(movId,L=>{_fotosCache=L;const g=document.getElementById('fotoGrid');
+function fotoRefresh(movId){fotoList(movId,L=>{const g=document.getElementById('fotoGrid');
+  /* [fotos F1, P0-1] leitura que falhou: diz na tela e NÃO toca em contador nem miniatura */
+  if(L===null){_fotosCache=[];if(g)g.innerHTML='<div class="meta" style="grid-column:1/-1;color:var(--amber)">⚠ Não consegui carregar as fotos agora (sem conexão?). As fotos continuam guardadas — tente de novo em instantes.</div>';return;}
+  _fotosCache=L;
   if(g)g.innerHTML=L.length?L.map(f=>`<img src="${f.b64}" style="width:100%;height:92px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="verFoto('${f.id}','${movId}')">`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda.</div>';
   const m=movs.find(x=>x.id===movId);if(!m)return;
-  if(L.length){if((+m.nFotos||0)!==L.length)m.nFotos=L.length;fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;}save();});}
+  /* [fotos F1, P0-3] só grava (e sobe pra nuvem) se algo MUDOU — abrir o visor não é escrita */
+  if(L.length){let mudou=false;if((+m.nFotos||0)!==L.length){m.nFotos=L.length;mudou=true;}fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;}if(mudou)save();});}
   else{let mudou=false;if(+m.nFotos){m.nFotos=0;mudou=true;}if(m.fotoThumb){delete m.fotoThumb;mudou=true;}if(mudou)save();}});}
 function fotoEscolhida(movId,inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
   const g=document.getElementById('fotoGrid');if(g)g.innerHTML='<div class="meta" style="grid-column:1/-1">guardando foto…</div>';
@@ -3741,7 +3774,8 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     }
     /* [F0 22/08] commit confirmado: limpa a pendência ATÉ o seq capturado na montagem do
        payload — um save mais novo que entrou em voo continua pendente. */
-    publicaBase(baseCap);setSync('ok');limpaPendNuvem(seqCap);})
+    publicaBase(baseCap);setSync('ok');limpaPendNuvem(seqCap);
+    if(_fotosFalhadas.length)reenviarFotosFalhadas();   /* a nuvem respondeu: tenta de novo as fotos que ela tinha recusado */})
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
 /* Rascunho aberto no Lançar (editando um existente OU digitando um novo, ainda sem salvar)
@@ -3920,11 +3954,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='23/08 01h49';
+const BUILD_TAG='23/08 02h10';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787460549607;
+const BUILD_TS=1787461805451;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

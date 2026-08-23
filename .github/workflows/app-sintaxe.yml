@@ -65,7 +65,13 @@ jobs:
 
       - name: as regras de negocio rodam de ponta a ponta?
         run: |
-          if [ -f testes-nucleo.js ]; then node testes-nucleo.js index.html; else echo "sem testes-nucleo.js neste commit"; fi
+          # [fotos F1 23/08, P0-5] fail-closed: arquivo obrigatorio e contagem minima (testes-nucleo.minimo)
+          [ -f testes-nucleo.js ] || { echo "testes-nucleo.js nao existe neste commit — prova obrigatoria"; exit 1; }
+          MIN=$(cat testes-nucleo.minimo 2>/dev/null | tr -d '[:space:]'); [ -n "$MIN" ] || { echo "testes-nucleo.minimo ausente ou vazio"; exit 1; }
+          SAIDA=$(node testes-nucleo.js index.html 2>&1); RC=$?; echo "$SAIDA" | tail -4
+          [ $RC -eq 0 ] || exit 1
+          N=$(echo "$SAIDA" | grep -o '[0-9][0-9]* passaram' | tail -1 | grep -o '^[0-9]*')
+          [ "${N:-0}" -ge "$MIN" ] || { echo "testes-nucleo passou $N, minimo $MIN"; exit 1; }
 
       - name: a propria vacina esta provada? (mutacoes conhecidas + refatoracoes legitimas)
         run: python checks-suite.py

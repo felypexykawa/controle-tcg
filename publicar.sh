@@ -99,9 +99,20 @@ rm -f "$NOAR"
 # devolucao, merge entre aparelhos) contra o arquivo que VAI ao ar — nao contra a copia de dev.
 # Vivia num scratchpad temporario ate 21/08, sendo a prova mais forte da entrega sem rodar em
 # porta nenhuma. Fail-OPEN de ambiente (sem node ja abortou la em cima), fail-CLOSED de achado.
-if [ -f testes-nucleo.js ]; then
-  node testes-nucleo.js index.html || { echo "ABORTADO: os testes do nucleo falharam"; exit 1; }
-fi
+# [fotos F1 23/08, P0-5 — achado dos 2 revisores do desenho das fotos] este portao era `if [ -f ]`: se o
+# arquivo de testes sumisse ou fosse renomeado, a publicacao seguia VERDE sem prova nenhuma (e a foto por
+# item e protegida SO por estes testes). Agora: arquivo obrigatorio, e a contagem de testes que passaram
+# tem de ser >= ao minimo declarado em testes-nucleo.minimo — secao que explode ou some baixa a contagem e
+# reprova. Subir o minimo e passo consciente (editar o arquivo), nunca automatico.
+[ -f testes-nucleo.js ] || { echo "ABORTADO: testes-nucleo.js nao existe — a prova da foto por item e das regras de negocio nao rodou"; exit 1; }
+MIN_TESTES=$(cat testes-nucleo.minimo 2>/dev/null | tr -d '[:space:]')
+# [revisao F1, F1-C] arquivo rastreado ausente = anomalia, nao estado legitimo: sem ele a trava virava 1 em silencio
+[ -n "$MIN_TESTES" ] || { echo "ABORTADO: testes-nucleo.minimo ausente ou vazio — a trava de contagem de testes nao pode ficar muda"; exit 1; }
+SAIDA_TESTES=$(node testes-nucleo.js index.html 2>&1); RC_TESTES=$?
+echo "$SAIDA_TESTES" | tail -4
+[ $RC_TESTES -eq 0 ] || { echo "ABORTADO: os testes do nucleo falharam"; exit 1; }
+N_TESTES=$(echo "$SAIDA_TESTES" | grep -o '[0-9][0-9]* passaram' | tail -1 | grep -o '^[0-9]*')
+[ "${N_TESTES:-0}" -ge "$MIN_TESTES" ] || { echo "ABORTADO: testes-nucleo passou $N_TESTES testes, minimo declarado $MIN_TESTES (secao sumiu ou explodiu?)"; exit 1; }
 
 # a vacina so vale se ela propria estiver provada: a suite roda as mutacoes conhecidas (29 hoje) e as
 # 6 refatoracoes legitimas. Sem python na maquina, segue sem ela (fail-open do ambiente).

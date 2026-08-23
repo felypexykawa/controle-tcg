@@ -287,8 +287,13 @@ t('corrigir item da NOTA com foto em digitacao tambem pergunta antes', _perg2);
 t('respondeu "nao": o item da nota continua na lista', g('notaItens').length === 1);
 ctx.confirm = () => true;
 
+/* [fotos F1, P0-2] a foto passou a CONTAR so no callback de sucesso do fotoAdd. Nestas secoes o armazenamento
+   vira um dube que confirma NA HORA e registra para QUEM cada foto foi — e essa e a prova de verdade do destino
+   (o revisor do desenho pediu: "capturar o movId passado ao fotoAdd", nao so o contador). */
+const _fotoAddOrig=g('fotoAdd'); const fotoLog=[];
+setg('fotoAdd',(movId,b64,cb)=>{fotoLog.push({movId,b64});cb(true);});
 console.log('\n=== 15. cada carta leva a SUA foto (nao todas pro primeiro item) ===');
-reset();
+reset(); fotoLog.length=0;
 M().push({id:'a1', tipo:'COMPRA', data:'2026-08-01', valor:10, qtd:1});
 M().push({id:'a2', tipo:'COMPRA', data:'2026-08-01', valor:20, qtd:1});
 setg('_fotosPend', []);
@@ -296,6 +301,7 @@ A('aplicarFotosDoItem')(['P1','P2'], 'a1');
 A('aplicarFotosDoItem')(['P3'], 'a2');
 t('a carta 1 ficou com 2 fotos', (M().find(m=>m.id==='a1').nFotos|0) === 2);
 t('a carta 2 ficou com 1 foto', (M().find(m=>m.id==='a2').nFotos|0) === 1);
+t('o armazenamento recebeu 2 fotos PARA a1 e 1 PARA a2 (destino real, nao so contador)', fotoLog.filter(f=>f.movId==='a1').length===2 && fotoLog.filter(f=>f.movId==='a2').length===1 && fotoLog.length===3, JSON.stringify(fotoLog));
 t('o balde da NOTA nao foi consumido pelo item', g('_fotosPend').length === 0);
 setg('_fotosPend', ['NOTA']);
 A('aplicarFotosDoItem')(['P4'], 'a1');
@@ -444,6 +450,7 @@ setg('toast', _toastOrig); ctx.setTimeout = _stOrig;
 
 ctx.document.getElementById = () => elStub();   /* devolve o dube padrao pras secoes seguintes */
 
+setg('fotoAdd',_fotoAddOrig);   /* devolve o fotoAdd real (secao 21 testa a recusa e o sucesso de verdade) */
 console.log('\n=== 20. Consultar sem confusao (Felype 22/08 23h: aba visivel, chip de tipo, Todos nao soma, lote = 1 card, voltar no lugar, book = lote) ===');
 reset(); setg('tela','consultar'); setg('consMenu',false); setg('consQ',''); setg('perSel','tudo'); setg('perDe',''); setg('perAte','');
 setg('consJogo','todos'); setg('consCol',''); setg('consPess',''); setg('consConta',''); setg('consCat',''); setg('consOrd','emissao'); setg('consGrupoFech',{}); setg('expandId',null); setg('selMode',false); setg('editId',null);
@@ -805,8 +812,68 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   t('M2: precos carregados com sucesso -> a marca de "precos tentados" liga', R4.g('_precosTentado')===true && !!R4.g('_precosLiga'), 'tentado='+R4.g('_precosTentado')+' liga='+!!R4.g('_precosLiga'));
   R4.set('tela','painel');
   t('M2: e o Painel deixa de dizer "conferindo…"', !/conferindo…/.test(R4.g('vPainel()')));
+  /* ===== 21. fotos F1 — P0-1..P0-4 (revisao adversarial do desenho das fotos, 22/08) ===== */
+  console.log('\n=== 21. fotos F1: ler fotos sem rede nao zera contador; foto so conta depois de gravada; venda 1<->varios troca o balde ===');
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null); setg('_syncReady',true);
+  setg('movs',[{id:'m1',tipo:'COMPRA',valor:10,nFotos:3,fotoThumb:'data:thumb'}]);
+  let gravouMK=0; const _gravaOrig=g('gravaLocal'); setg('gravaLocal',(k,v)=>{if(k==='tcg_movs_v2')gravouMK++;return true;});
+  let modoF='reject', setOk=true;
+  const fotosRef=()=>({where(){return {get(){
+      if(modoF==='reject')return Promise.reject(new Error('Failed to get documents: client is offline'));
+      if(modoF==='vazioCache')return Promise.resolve({metadata:{fromCache:true},empty:true,forEach(){}});
+      if(modoF==='vazioServidor')return Promise.resolve({metadata:{fromCache:false},empty:true,forEach(){}});
+      return Promise.resolve({metadata:{fromCache:false},empty:false,forEach(f){[{id:'f1',data:()=>({movId:'m1',b64:'data:x',ts:1})}].forEach(f);}});}};},
+    doc(){return {set(){return setOk?Promise.resolve():Promise.reject(new Error('permission-denied'));}};}});
+  setg('_db',{collection(){return {doc(){return {collection(){return fotosRef();}};}};},runTransaction(){return Promise.resolve();}});
+  const m1=()=>M().find(m=>m.id==='m1');
+  A('fotoRefresh')('m1'); await tick();
+  t('P0-1: leitura que FALHA (sem rede / sem storage) nao zera contador nem miniatura, nem grava', m1().nFotos===3 && m1().fotoThumb==='data:thumb' && gravouMK===0, JSON.stringify(m1())+' gravouMK='+gravouMK);
+  if(g('USAR_NUVEM')){
+    modoF='vazioCache'; A('fotoRefresh')('m1'); await tick();
+    t('P0-1 (nuvem): vazio servido do CACHE e "nao sei" — nao zera', m1().nFotos===3 && m1().fotoThumb==='data:thumb', JSON.stringify(m1()));
+    modoF='vazioServidor'; A('fotoRefresh')('m1'); await tick();
+    t('P0-1 (nuvem): vazio confirmado pelo SERVIDOR zera (comportamento legitimo mantido) e grava 1x', m1().nFotos===0 && !m1().fotoThumb && gravouMK===1, JSON.stringify(m1())+' gravouMK='+gravouMK);
+    /* P0-3: visor aberto com o contador ja certo nao grava (a miniatura depende de Image.onload, que o dube nao dispara) */
+    setg('movs',[{id:'m1',tipo:'COMPRA',valor:10,nFotos:1,fotoThumb:'data:thumb'}]); gravouMK=0; modoF='umaFoto';
+    A('fotoRefresh')('m1'); await tick();
+    t('P0-3 (nuvem): abrir o visor com tudo igual nao grava', gravouMK===0, 'gravouMK='+gravouMK);
+  }
+  /* P0-2: a foto so conta depois de gravada; recusa devolve ao balde */
+  setg('movs',[{id:'m2',tipo:'COMPRA',valor:10}]); setg('_fotosPend',['data:a','data:b']);
+  const m2=()=>M().find(m=>m.id==='m2');
+  setg('_fotosFalhadas',[]);
+  if(g('USAR_NUVEM')){
+    setOk=false; A('aplicarFotosPend')('m2'); await tick();
+    t('P0-2 (nuvem): nuvem RECUSOU -> as fotos vao para a fila DO LANCAMENTO (nao pro balde da tela) e o contador NAO sobe',
+      g('_fotosPend').length===0 && g('_fotosFalhadas').length===2 && g('_fotosFalhadas').every(f=>f.movId==='m2') && !(+m2().nFotos),
+      'balde='+g('_fotosPend').length+' fila='+JSON.stringify(g('_fotosFalhadas').map(f=>f.movId))+' nFotos='+m2().nFotos);
+    /* o dono saiu da tela e lancou outra coisa: a foto recusada NAO cola no lancamento seguinte */
+    setg('_fotosPend',['OUTRA']); M().push({id:'m3',tipo:'COMPRA',valor:1}); A('aplicarFotosPend')('m3'); await tick();
+    t('P0-2 (nuvem): recusa antiga nao contamina o lancamento seguinte (fila continua do m2; m3 recebeu so a dele)',
+      g('_fotosFalhadas').filter(f=>f.movId==='m2').length===2 && g('_fotosFalhadas').filter(f=>f.movId==='m3').length===1, JSON.stringify(g('_fotosFalhadas').map(f=>f.movId)));
+    /* modoF='reject': o dube de LISTAGEM nao sabe das fotos recem-gravadas; com a listagem indisponivel o
+       fotoRefresh nao toca no contador (P0-1), e o contador vem so do sucesso da gravacao — que e o que se testa */
+    modoF='reject'; setOk=true; const nRe=A('reenviarFotosFalhadas')('m2'); await tick();
+    t('P0-2 (nuvem): reenviar para o m2 grava as 2 e o contador vira 2; a do m3 continua na fila', nRe===2 && +m2().nFotos===2 && g('_fotosFalhadas').length===1 && g('_fotosFalhadas')[0].movId==='m3', 'nFotos='+m2().nFotos+' fila='+JSON.stringify(g('_fotosFalhadas').map(f=>f.movId)));
+    A('reenviarFotosFalhadas')(); await tick();
+    t('P0-2 (nuvem): reenvio geral (commit bem-sucedido) esvazia a fila e conta no m3', g('_fotosFalhadas').length===0 && +(M().find(m=>m.id==='m3').nFotos)===1);
+  }else{
+    A('aplicarFotosPend')('m2'); await tick();
+    t('P0-2 (local sem storage): recusa vai para a fila DO LANCAMENTO (nao pro balde) e NAO conta', g('_fotosPend').length===0 && g('_fotosFalhadas').length===2 && g('_fotosFalhadas').every(f=>f.movId==='m2') && !(+m2().nFotos), 'balde='+g('_fotosPend').length+' fila='+g('_fotosFalhadas').length+' nFotos='+m2().nFotos);
+  }
+  /* o visor do lancamento com fila mostra o aviso de reenvio */
+  setg('_fotosFalhadas',[{movId:'m2',b64:'x',ts:1}]); let htmlVisor=''; const _insOrig=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlVisor=h;};
+  A('abrirFotos')('m2'); ctx.document.body.insertAdjacentHTML=_insOrig;
+  t('P0-2: o visor do lancamento com foto na fila mostra "nao foi gravada — toque para reenviar"', /não foi gravada — toque para reenviar/.test(htmlVisor) && /reenviarFotosFalhadas\('m2'\)/.test(htmlVisor), htmlVisor.slice(0,0));
+  setg('_fotosPend',[]); setg('_fotosEmVoo',[]); setg('_fotosFalhadas',[]);
+  /* P0-4: alternar 1 item <-> varios na VENDA troca a identidade do balde (a foto da carta em digitacao vai embora, com aviso) */
+  setg('tela','lancar'); setg('tipoSel','VENDA'); setg('compraModo','item'); setg('editId',null); setg('vendaModo','item'); setg('_fotosItem',[]);
+  A('render')(); setg('_fotosItem',['UMA']); setg('vendaModo','varios'); A('render')();
+  t('P0-4: alternar 1 item <-> varios na venda descarta o balde da carta (identidade mudou)', g('_fotosItem').length===0, 'balde='+g('_fotosItem').length);
+  setg('vendaModo','item'); setg('tela','painel');
+  setg('gravaLocal',_gravaOrig);
   setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();
-})().catch(e=>{fail++;console.log('  FALHOU  secao 18/19 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
+})().catch(e=>{fail++;console.log('  FALHOU  secao 18/19/21 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');
   console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
   process.exit(fail ? 1 : 0);

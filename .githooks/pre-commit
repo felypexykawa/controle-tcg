@@ -69,7 +69,13 @@ else
 fi
 rm -f "$BASE"
 # regras de negocio de ponta a ponta, sobre a MESMA versao do indice que a vacina acabou de ver
-if [ -f testes-nucleo.js ]; then
-  node testes-nucleo.js "$TMP" || { rm -f "$TMP"; exit 1; }
-fi
+# [fotos F1 23/08, P0-5] portao fail-closed: arquivo obrigatorio e contagem minima (testes-nucleo.minimo)
+[ -f testes-nucleo.js ] || { echo "COMMIT BARRADO: testes-nucleo.js nao existe"; rm -f "$TMP"; exit 1; }
+MIN_TESTES=$(cat testes-nucleo.minimo 2>/dev/null | tr -d '[:space:]')
+[ -n "$MIN_TESTES" ] || { echo "COMMIT BARRADO: testes-nucleo.minimo ausente ou vazio"; rm -f "$TMP"; exit 1; }
+SAIDA_TESTES=$(node testes-nucleo.js "$TMP" 2>&1); RC_TESTES=$?
+echo "$SAIDA_TESTES" | tail -3
+[ $RC_TESTES -eq 0 ] || { rm -f "$TMP"; exit 1; }
+N_TESTES=$(echo "$SAIDA_TESTES" | grep -o '[0-9][0-9]* passaram' | tail -1 | grep -o '^[0-9]*')
+[ "${N_TESTES:-0}" -ge "$MIN_TESTES" ] || { echo "COMMIT BARRADO: testes-nucleo passou $N_TESTES testes, minimo $MIN_TESTES"; rm -f "$TMP"; exit 1; }
 rm -f "$TMP"
