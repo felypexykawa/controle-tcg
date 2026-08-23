@@ -1184,17 +1184,25 @@ let _fotosEmVoo=[],_fotosFalhadas=[];   /* _fotosFalhadas: {movId,b64,ts} — fi
    item perdia a foto). Vai para a fila por lançamento e é reenviada: sozinha, no próximo commit bem-sucedido
    da nuvem (a rede voltou), e por um toque no visor "📷 fotos" do lançamento. */
 function contarFotoGravada(m,b64){if(!m)return;m.nFotos=(+m.nFotos||0)+1;if(!m.fotoThumb){fotoThumbDe(b64,t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}else save();}
-function reenviarFotosFalhadas(movId){const fila=_fotosFalhadas.filter(f=>!movId||f.movId===movId);if(!fila.length)return 0;
-  fila.forEach(f=>{const i=_fotosFalhadas.indexOf(f);if(i>=0)_fotosFalhadas.splice(i,1);
-    fotoAdd(f.movId,f.b64,ok=>{if(ok){contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid'))fotoRefresh(f.movId);}
-      else{_fotosFalhadas.push(f);}});});
+/* [re-checagem F1, R-1] a foto fica NA FILA (marcada "enviando") até a gravação confirmar: tirar antes fazia a
+   faixa vermelha sumir num reenvio sem rede, como se tivesse gravado. "enviando" é o que barra o envio dobrado
+   (reenvio manual + automático ao mesmo tempo); no sucesso sai da fila; na recusa volta a ficar disponível. */
+function reenviarFotosFalhadas(movId){const fila=_fotosFalhadas.filter(f=>(!movId||f.movId===movId)&&!f.enviando);if(!fila.length)return 0;
+  fila.forEach(f=>{f.enviando=true;
+    fotoAdd(f.movId,f.b64,ok=>{const i=_fotosFalhadas.indexOf(f);
+      if(ok){if(i>=0)_fotosFalhadas.splice(i,1);contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid'))fotoRefresh(f.movId);}
+      else{f.enviando=false;}},true);});
   return fila.length;}
+/* [re-checagem F1, Q2] enquanto a fila viver só na memória, o limite tem de ser visível: sair da página com
+   foto em voo ou na fila avisa (o navegador mostra a pergunta padrão; o que se perde é a cópia comprimida — a
+   original costuma seguir na galeria). Persistir a fila = backlog. */
+try{window.addEventListener('beforeunload',e=>{if(_fotosEmVoo.length||_fotosFalhadas.length){e.preventDefault();e.returnValue='Há foto ainda não gravada na nuvem — se sair agora ela se perde.';return e.returnValue;}});}catch(e){}
 function aplicarFotosPend(movId){if(!_fotosPend.length||!movId)return;const L=_fotosPend.slice();_fotosPend=[];
   const m=movs.find(x=>x.id===movId);let avisouPendurado=false,respondidas=0;
   L.forEach(b64=>{_fotosEmVoo.push(b64);
     fotoAdd(movId,b64,ok=>{respondidas++;const i=_fotosEmVoo.indexOf(b64);if(i>=0)_fotosEmVoo.splice(i,1);
       if(ok)contarFotoGravada(m,b64);
-      else{_fotosFalhadas.push({movId,b64,ts:Date.now()});toast('⚠ Não consegui gravar 1 foto deste lançamento — ficou na fila: quando a nuvem voltar eu reenvio sozinho, ou abra "📷 fotos" dele e toque em reenviar.');}});});
+      else{_fotosFalhadas.push({movId,b64,ts:Date.now()});toast('⚠ Não consegui gravar 1 foto deste lançamento — ficou na fila: quando a nuvem voltar eu reenvio sozinho, ou abra "📷 fotos" dele e toque em reenviar.');}},true);});
   setTimeout(()=>{if(respondidas<L.length&&!avisouPendurado){avisouPendurado=true;toast('📷 foto ainda enviando — fique com o app aberto até o contador aparecer (sem internet o envio fica esperando).');}},8000);}
 function abrirFotosPend(){const old=document.getElementById('modal');if(old)old.remove();
   const thumbs=_fotosPend.length?_fotosPend.map((b,i)=>`<div style="position:relative"><img src="${b}" style="width:100%;height:92px;object-fit:cover;border-radius:8px"><button class="x" style="position:absolute;top:2px;right:4px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 7px" onclick="_fotosPend.splice(${i},1);abrirFotosPend()">✕</button></div>`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda — adicione abaixo.</div>';
@@ -1217,9 +1225,12 @@ function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)retu
 function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',1);
   rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});};
   rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);}catch(e){cb(null);}}
-function fotoAdd(movId,b64,cb){const fid=novoId('f');
-  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId,b64,ts:Date.now()}).then(()=>cb(true)).catch(e=>{alert('A nuvem recusou a foto — quase certo que falta publicar a REGRA de fotos no Firebase — avise o Felype. Detalhe: '+(e&&e.message));cb(false);});}
-  else idbOpen(db=>{if(!db){alert('Não consegui abrir o armazenamento de fotos deste aparelho.');cb(false);return;}
+/* [re-checagem F1, R-2] `silencioso`: o alerta bloqueante é da ação direta do dono (escolher a foto); o caminho
+   automático (salvar com foto no balde, reenvio da fila) NÃO pode abrir pop-up a cada tentativa — a fila e a
+   faixa vermelha já avisam. */
+function fotoAdd(movId,b64,cb,silencioso){const fid=novoId('f');
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId,b64,ts:Date.now()}).then(()=>cb(true)).catch(e=>{if(!silencioso)alert('A nuvem recusou a foto — quase certo que falta publicar a REGRA de fotos no Firebase — avise o Felype. Detalhe: '+(e&&e.message));cb(false);});}
+  else idbOpen(db=>{if(!db){if(!silencioso)alert('Não consegui abrir o armazenamento de fotos deste aparelho.');cb(false);return;}
     const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId,b64,ts:Date.now()});tx.oncomplete=()=>cb(true);tx.onerror=()=>cb(false);});}
 function fotoList(movId,cb){
   /* [fotos F1, P0-1 — revisão 22/08] "não consegui ler" NÃO é "não tem foto": erro (ou leitura vazia servida do
@@ -3954,11 +3965,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='23/08 02h10';
+const BUILD_TAG='23/08 02h16';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787461805451;
+const BUILD_TS=1787462180769;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

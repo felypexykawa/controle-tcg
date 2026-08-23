@@ -865,6 +865,30 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   setg('_fotosFalhadas',[{movId:'m2',b64:'x',ts:1}]); let htmlVisor=''; const _insOrig=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlVisor=h;};
   A('abrirFotos')('m2'); ctx.document.body.insertAdjacentHTML=_insOrig;
   t('P0-2: o visor do lancamento com foto na fila mostra "nao foi gravada — toque para reenviar"', /não foi gravada — toque para reenviar/.test(htmlVisor) && /reenviarFotosFalhadas\('m2'\)/.test(htmlVisor), htmlVisor.slice(0,0));
+  /* R-1 (re-checagem F1): reenviar SEM resposta (pendurado) mantem a foto na fila (marcada "enviando") — a faixa nao some
+     sem ter gravado; chamada dobrada nao reenvia a mesma foto; recusa libera para nova tentativa */
+  setg('movs',[{id:'m5',tipo:'COMPRA',valor:5}]); setg('_fotosFalhadas',[{movId:'m5',b64:'pend',ts:1}]);
+  let envios=0, cbPend=null; const _fotoAddReal=g('fotoAdd');
+  setg('fotoAdd',(movId,b64,cb)=>{envios++;cbPend=cb;});
+  const n1=A('reenviarFotosFalhadas')('m5'), n2=A('reenviarFotosFalhadas')('m5');
+  t('R-1: com o envio pendurado a foto CONTINUA na fila (marcada enviando) e a 2a chamada nao reenvia', n1===1 && n2===0 && envios===1 && g('_fotosFalhadas').length===1 && g('_fotosFalhadas')[0].enviando===true, 'n1='+n1+' n2='+n2+' envios='+envios+' fila='+JSON.stringify(g('_fotosFalhadas')));
+  cbPend(false);
+  t('R-1: recusa libera a foto para nova tentativa (continua na fila, sem "enviando")', g('_fotosFalhadas').length===1 && !g('_fotosFalhadas')[0].enviando);
+  A('reenviarFotosFalhadas')('m5'); cbPend(true);
+  t('R-1: sucesso tira da fila e conta', g('_fotosFalhadas').length===0 && +(M().find(m=>m.id==='m5').nFotos)===1);
+  setg('fotoAdd',_fotoAddReal);
+  /* R-2: o caminho automatico (salvar com foto no balde / reenvio da fila) nao abre alerta bloqueante quando a nuvem
+     recusa — o alerta e so da acao direta (fotoEscolhida) */
+  if(g('USAR_NUVEM')){
+    let alertas=0; const _alertOrig=ctx.alert; ctx.alert=()=>{alertas++;};
+    setg('movs',[{id:'m6',tipo:'COMPRA',valor:6}]); setg('_fotosPend',['fz']); setOk=false;
+    A('aplicarFotosPend')('m6'); await tick();
+    A('reenviarFotosFalhadas')(); await tick();
+    t('R-2 (nuvem): recusa no salvar e no reenvio automatico NAO abre alerta (fila + faixa ja avisam)', alertas===0 && g('_fotosFalhadas').length===1, 'alertas='+alertas+' fila='+g('_fotosFalhadas').length);
+    A('fotoAdd')('m6','direto',()=>{},false); await tick();
+    t('R-2 (nuvem): a acao direta do dono continua alertando', alertas===1, 'alertas='+alertas);
+    ctx.alert=_alertOrig; setOk=true;
+  }
   setg('_fotosPend',[]); setg('_fotosEmVoo',[]); setg('_fotosFalhadas',[]);
   /* P0-4: alternar 1 item <-> varios na VENDA troca a identidade do balde (a foto da carta em digitacao vai embora, com aviso) */
   setg('tela','lancar'); setg('tipoSel','VENDA'); setg('compraModo','item'); setg('editId',null); setg('vendaModo','item'); setg('_fotosItem',[]);
