@@ -304,6 +304,34 @@ function diarioRef(){return _db?_db.collection('controle').doc('dados').collecti
 function diarioReg(acao,alvo,det){try{const reg={id:novoId('d'),ts:Date.now(),quem:(_userEmail||'').split('@')[0]||'',acao:String(acao||''),alvo:String(alvo||'').slice(0,80),det:String(det||'').slice(0,120)};
   if(USAR_NUVEM){const ref=diarioRef();if(ref)ref.doc(reg.id).set(reg).catch(()=>{});return;}
   idbOpen(db=>{if(!db)return;try{db.transaction('diario','readwrite').objectStore('diario').put(reg);}catch(e){}});}catch(e){}}
+/* tela 👣 — o pedido do dono: folhear quem fez o quê, com filtro por pessoa. Leitura falhada devolve null (avisa). */
+let _diaCache=null,_diaFiltro='';
+function diarioLista(cb){
+  if(USAR_NUVEM){const ref=diarioRef();if(!ref){cb(null);return;}
+    ref.orderBy('ts','desc').limit(300).get().then(q=>{if(q&&q.metadata&&q.metadata.fromCache&&q.empty){cb(null);return;}const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb(null));return;}
+  idbOpen(db=>{if(!db){cb(null);return;}try{const L=[];const cur=db.transaction('diario').objectStore('diario').openCursor();
+    cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else{L.sort((a,b)=>(b.ts||0)-(a.ts||0));cb(L.slice(0,300));}};cur.onerror=()=>cb(null);}catch(e){cb(null);}});}
+function filtraDiario(p){_diaFiltro=p;desenhaDiario();}
+function desenhaDiario(){const el=document.getElementById('diaLista'),fEl=document.getElementById('diaFiltros');const L=_diaCache;
+  if(fEl){const quems=(L&&L.length)?[...new Set(L.map(r=>r.quem||'?'))]:[];
+    fEl.innerHTML=quems.length>1?('<button class="'+(_diaFiltro===''?'on':'')+'" onclick="filtraDiario(\'\')">todos</button>'+quems.map(q=>'<button class="'+(_diaFiltro===q?'on':'')+'" onclick="filtraDiario(\''+q+'\')">'+q+'</button>').join('')):'';}
+  if(!el)return;
+  if(L===null){el.innerHTML='<div class="soon" style="color:var(--amber)">Não consegui ler o diário agora — sem conexão, ou a nuvem recusou. Tente de novo; se persistir com internet boa, avise o Felype.</div>';return;}
+  const F=_diaFiltro?L.filter(r=>(r.quem||'?')===_diaFiltro):L;
+  if(!F.length){el.innerHTML='<div class="empty">'+(_diaFiltro?'Nada dessa pessoa entre os '+L.length+' registros mais recentes.':'Nada registrado ainda — os gestos passam a ficar aqui (lançou, editou, excluiu, restaurou…).')+'</div>';return;}
+  let dia='';el.innerHTML=F.map(r=>{const d=new Date(+r.ts||0);const dStr=d.toLocaleDateString('pt-BR');const h=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    const cab=dStr!==dia?('<div class="sec" style="margin-top:10px">'+dStr+'</div>'):'';dia=dStr;
+    return cab+'<div class="item" style="display:block;padding:8px 12px"><div class="meta"><b>'+h+'</b> · <b>'+(r.quem||'?')+'</b> · '+(r.acao||'')+(r.alvo?' — '+r.alvo:'')+(r.det?' <span style="color:var(--mut)">('+r.det+')</span>':'')+'</div></div>';}).join('');}
+function abrirDiario(){const old=document.getElementById('modal');if(old)old.remove();
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">👣 Diário — quem fez o quê</div>
+    <div class="ctx">Os principais gestos (lançou, editou, excluiu, devolveu, restaurou, moveu foto…) ficam registrados com hora e pessoa. Últimos 300 registros.</div>
+    <div id="diaFiltros" class="seg" style="margin:6px 0"></div>
+    <div id="diaLista"><div class="meta">carregando…</div></div>
+    <button class="btn" onclick="fecharModal();abrirBackup()" style="margin-top:12px">← voltar ao Backup</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);
+  _diaFiltro='';_diaCache=undefined;
+  diarioLista(function(L){_diaCache=L;desenhaDiario();});}
 function estaExcluido(id){return !!(id&&excluidos[id]);}
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
@@ -332,7 +360,7 @@ function juntarNotaCore(ids){const its=movs.filter(m=>ids.includes(m.id)&&m.tipo
   if(notasSel.length===1){
     if(!soltas.length){alert('Isso já é uma nota só. Marque também as compras soltas que devem entrar nela.');return false;}
     const nid=notasSel[0],h=movs.find(m=>m.notaId===nid);
-    aplica(nid,h.notaNum||'',h,soltas);return true;}
+    aplica(nid,h.notaNum||'',h,soltas);diarioReg('juntou em nota',soltas.length+' itens');return true;}
   const tots=notasSel.map(nid=>({nid,tot:movs.filter(m=>m.notaId===nid).reduce((s,x)=>s+(+x.valor||0),0)})).sort((a,b)=>b.tot-a.tot);
   if(!confirm('Você marcou '+notasSel.length+' notas'+(soltas.length?' + '+soltas.length+' compra(s) solta(s)':'')+'.\n\nFUNDIR tudo numa nota só? O pagamento e o nº ficam os da nota de maior valor, e o comprovante (fotos) das outras notas passa para ela ('+fmt(tots[0].tot)+').'))return false;
   const nid=tots[0].nid,h=movs.find(m=>m.notaId===nid);
@@ -342,7 +370,7 @@ function juntarNotaCore(ids){const its=movs.filter(m=>ids.includes(m.id)&&m.tipo
   /* [revisão F2, G3] mover PRIMEIRO; o túmulo da nota perdedora só quando o comprovante confirmou a mudança de casa;
      sem rede/parcial fica em _movesPendentes e é retomado no próximo commit da nuvem */
   notasSel.filter(x=>x!==nid).forEach(x=>{moverFotosDe(x,nid,function(n,total){if(n!==null&&n===total)marcaExcluido('nota:'+x);else{_movesPendentes.push({origem:x,destino:nid,tumulo:'nota:'+x});gravaMovesPend();toast('⚠ o comprovante da nota antiga ainda não mudou de lugar (sem internet?) — ficou anotado: eu tento de novo quando a nuvem responder ou na próxima abertura do app');}});});
-  aplica(nid,h.notaNum||'',h,mover);return true;}
+  aplica(nid,h.notaNum||'',h,mover);diarioReg('juntou notas',mover.length+' itens');return true;}
 function juntarNota(){if(juntarNotaCore(Object.keys(selIds))){selMode=false;selIds={};}render();}
 function juntarFx(){if(juntarNotaCore(Object.keys(fxSel))){fxSelMode=false;fxSel={};}render();}
 /* [fotos D1 / revisão F2] grupo (nota/venda/troca) que ficou sem nenhum item ganha túmulo — o comprovante precisa de
@@ -364,7 +392,7 @@ function separarDaNota(id){const m=movs.find(x=>x.id===id);if(!m)return;const ni
       {rot:'Cancelar',cor:'var(--mut)',exp:'Nada muda.',acao:'fecharModal()'}]));});}
 function separarDaNotaFaz(id){const m=movs.find(x=>x.id===id);if(!m)return;const nid=m.notaId;delete m.notaId;delete m.notaNum;
   if(nid&&!movs.some(x=>x.notaId===nid))marcaExcluido('nota:'+nid);   /* saiu o último: a nota (grupo) morre com túmulo */
-  save();toast('Item separado da nota ✓');render();}
+  save();diarioReg('separou da nota',rotDe(m));toast('Item separado da nota ✓');render();}
 function venderDe(id){const m=movs.find(x=>x.id===id);if(!m)return;_preSel=id;vendaJogoF='';tipoSel='VENDA';vendaModo='item';vendaDe=(sitDe(m)==='Coleção')?'colecao':'estoque';editId=null;go('lancar');}
 function guardarDe(id){_preSel=id;tipoSel='CONSUMO';editId=null;go('lancar');}
 /* Vínculo retroativo compra↔venda — pra quando a venda já foi lançada solta (nota antiga,
@@ -1552,7 +1580,7 @@ function moverFotoPara(fid,movId){const f=_fotosCache.find(x=>x.id===fid);const 
     const mDest=movs.find(x=>x.id===destino);if(mDest){if(D)mDest.nFotos=D.length+(jaEstavaLa?0:1);else if(!jaEstavaLa)mDest.nFotos=(+mDest.nFotos||0)+1;
       if(!mDest.fotoThumb)fotoThumbDe(f.b64,t=>{if(t&&!mDest.fotoThumb){mDest.fotoThumb=t;save();}});save();}
     const mOri=movs.find(x=>x.id===movId);if(mOri){if(+mOri.nFotos>0){mOri.nFotos=+mOri.nFotos-1;save();}if(!mOri.nFotos)recontarFotos(movId);}
-    toast('Foto movida ✓');reabrirGrade(movId);};
+    diarioReg('moveu foto',alvo?alvo.rot.slice(0,60):destino);toast('Foto movida ✓');reabrirGrade(movId);};
   armar();
   /* [revisão F3, M1] tentativa anterior que gravou no destino e não apagou da origem: agora só apaga — não duplica */
   fotoList(destino,D=>{if(respondeu)return;armar();
@@ -2100,7 +2128,7 @@ function salvarNota(){
     const _idIt=novoId();
     movs.push({id:_idIt,tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,condicao:it.condicao||'',qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:rF[i],taxaRateio:rT[i],situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:((rF[i]+rT[i])>0?`nota · +${fmt(rF[i]+rT[i])} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});aplicarFotosDoItem(it.fotos,_idIt);});
   aplicarFotosPend(nid);   /* [fotos D1] a foto de cima é da NOTA inteira (comprovante) — vai para o GRUPO, não para o 1º item (a queixa de 21/08) */
-  const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
+  const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();diarioReg('lançou nota de compra',n+(n===1?' item':' itens'));toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
   const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.origemId?'📦 ':''}${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span>${it.origemId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd+(it.un==='boo'?' boosters':''):''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
   const tot=vendaItens.reduce((s,it)=>s+(+it.valor||0),0),app=vendaHead.canal==='App';
@@ -2163,7 +2191,7 @@ function salvarVendaVarios(){
       else alert('⚠ "'+((it.colecao?it.colecao+' · ':'')+(it.cat||'item'))+'" não está mais disponível ('+(src?('situação: '+sitS):'item não existe mais')+') — esse item da venda entra SEM vínculo e sem baixar estoque. Depois dá pra corrigir abrindo a venda e tocando "🔗 de onde saiu?".');}
     movs.push(base);aplicarFotosDoItem(it.fotos,base.id);});   /* [fotos D2] cada carta da venda leva a SUA foto */
   aplicarFotosPend(vid);   /* [fotos D1] comprovante da VENDA inteira (grupo) */
-  const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
+  const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();diarioReg('vendeu (vários)',n+(n===1?' item':' itens'));toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
 function trocaForm(){
   /* [Felype 21/08] "nao consigo trocar nada da colecao — so tenho opcao de trocar estoque".
      A lista usava so `disp` (Em estoque). Trocar carta da colecao e normal: agora as duas
@@ -2254,7 +2282,7 @@ function salvarTroca(){
   /* dinheiro dado na troca sai de uma conta de verdade: gravado no 1º recebido (din/dinConta)
      — o saldo e o extrato da conta passam a ver essa saída */
   if(ft1&&+trocaDin>0){ft1.din=Math.round(trocaDin*100)/100;ft1.dinConta=document.getElementById('t_dinconta')?.value||'';}
-  const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
+  const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();diarioReg('registrou troca',n+(n===1?' carta recebida':' cartas recebidas'));toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
 function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulação',custo:Math.round(v.custoMat*100)/100}];trocaDin=v.din||0;trocaRecebi=[{desc:'carta',valorMercado:v.V,colecao:'',sit:'Em estoque'}];deiModo='avulso';tipoSel='TROCA';go('lancar');toast('Troca pré-preenchida — ajuste e registre');}
 
 function vConsultar(){
@@ -2715,7 +2743,7 @@ function desfazerNota(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.leng
       {rot:'Cancelar',cor:'var(--mut)',exp:'Nada muda.',acao:'fecharModal()'}]));});}
 function desfazerNotaFaz(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;its.forEach(m=>{delete m.notaId;delete m.notaNum;});
   marcaExcluido('nota:'+nid);   /* [fotos D1] o grupo morre com túmulo */
-  save();fecharModal();toast('Nota desfeita — '+its.length+' produtos soltos ✓');render();}
+  save();diarioReg('desfez nota',its.length+' produtos soltos');fecharModal();toast('Nota desfeita — '+its.length+' produtos soltos ✓');render();}
 function vSimular(){
   const real=simMatModo==='real';
   return `<div class="card">
@@ -2993,7 +3021,7 @@ function salvar(){
     let o={id:editId||novoId(),tipo:'COMPRA',origem:'TROCA',data:g('f_data')||e?.data,qtd:1,valor:custou+din,cat:e?.cat||'Single/Carta',colecao:(g('f_col')&&g('f_col')!=='__add__')?g('f_col'):(e?.colecao||''),idioma:e?.idioma||'—',situacao:g('f_sit')||sitDe(e||{})||'Em estoque',destino:(g('f_sit')==='Coleção')?'Coleção':'Vender',destIni:e?.destIni||((g('f_sit')==='Coleção')?'Coleção':'Em estoque'),contraparte:(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):(e?.contraparte||''),deu:deuTx,custou,din,recebi,taxa:0,pgTipo:'À vista',obs:recebi+' (🔄 troca: dei '+(deuTx||'?')+(din>0?' + '+fmt(din):'')+')'};
     if(editId){const i=movs.findIndex(m=>m.id===editId);const old=movs[i];
       movs[i]=(old&&old.tipo===o.tipo)?{...old,...o}:o;}else movs.push(o);
-    if(!editId)aplicarFotosPend(o.id);save();_lancarDirty=false;toast('Troca registrada ✓');editId=null;render();return;}
+    if(!editId)aplicarFotosPend(o.id);save();diarioReg('editou troca',rotDe(o));_lancarDirty=false;toast('Troca registrada ✓');editId=null;render();return;}
   if(tipoSel==='DESPESA'){const val=+g('f_val')||0;const cat=g('f_dcat');if(!cat||cat==='__add__'){alert('Escolha a categoria da despesa.');return;}
     const cp=(g('f_cp')&&g('f_cp')!=='__add__')?g('f_cp'):'',ob=g('f_obs')||'';
     const base={tipo:'DESPESA',natureza:despNat,cat,valor:val,contraparte:cp,obs:ob,conta:(g('f_conta')&&g('f_conta')!=='__add__')?g('f_conta'):''};
@@ -3075,8 +3103,8 @@ function salvar(){
       if(Math.abs(qNova-qAntiga)>0.0001){
         const custoUnit=(+e.custoOrigem||0)/qAntiga;
         movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}
-    save();editId=null;toast('Alteração salva');voltarDaEdicao();return;}
-  movs.push(obj);aplicarFotosPend(obj.id);save();_lancarDirty=false;
+    save();diarioReg('editou',rotDe(movs[i]),movs[i].tipo);editId=null;toast('Alteração salva');voltarDaEdicao();return;}
+  movs.push(obj);aplicarFotosPend(obj.id);save();diarioReg('lançou',rotDe(obj),obj.tipo);_lancarDirty=false;
   /* [revisão C 23/08, M6] venda iniciada numa LINHA da Consultar ("💰 vender" → _preSel) volta para a linha
      de onde saiu, como as edições; só o lançamento avulso fica no Lançar para "lançar o próximo". */
   if(_preSel){_preSel=null;toast('Salvo ✓');voltarDaEdicao();return;}
@@ -3158,6 +3186,7 @@ function salvarPontoNuvem(silencioso,semRotacao){
 function restaurarPontoNuvem(ts){
   const ref=pontosNuvemRef();if(!ref)return;
   if(!confirm('Voltar TODOS os dados para o ponto de '+new Date(ts).toLocaleString('pt-BR')+'? Antes disso eu guardo um ponto com o estado de AGORA, pra dar pra voltar atras.'))return;
+  diarioReg('restaurou ponto da nuvem',new Date(ts).toLocaleString('pt-BR'));
   toast('guardando o estado de agora...');
   /* ESPERA o pre-salvamento e SO continua se ele deu certo. Sem isso a frase do aviso era uma
      promessa que o codigo nao cumpria. semRotacao=true protege o alvo (ver G4 acima). */
@@ -3239,6 +3268,7 @@ function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="exportarCSV()">⬇ Excel (planilha)</button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="salvarPontoNuvem()">☁️ Salvar ponto na nuvem agora</button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="fecharModal();abrirLixeira()">🗑 Lixeira <span style="color:var(--mut);font-size:10px">(excluídos há menos de 120 dias — dá pra restaurar)</span></button></div>
+    <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="fecharModal();abrirDiario()">👣 Diário <span style="color:var(--mut);font-size:10px">(quem fez o quê, com hora e pessoa)</span></button></div>
     ${(function(){const bts=medirDocBytes();const kb=Math.round(bts/1024);const pct=Math.round(bts*100/1048576);const cor=pct<60?'var(--green)':pct<85?'var(--amber)':'var(--red)';
       return `<div class="item" style="display:block;padding:10px 12px"><b>Espaço na nuvem — documento principal</b>
       <div class="meta" style="margin-top:3px">≈${kb} KB do teto técnico de 1 MB (${pct}%). Hoje o salvamento principal NÃO se trava perto do teto — proteger isso é uma decisão em aberto; o ponto de restauração, esse sim, recusa acima de 700 mil bytes. Cada carta com foto acrescenta ~2 KB (a miniatura).</div>
@@ -3508,7 +3538,7 @@ function restaurarBackup(ts){
   esqueceExclusaoDe({movs});   /* senao o que voltou some no primeiro merge */
   save();
   setTimeout(()=>{_restaurando=false;if(USAR_NUVEM&&_syncReady)salvarNuvem();},3000);
-  fecharModal();go('painel');toast('Restaurado ✓');
+  diarioReg('restaurou backup local','');fecharModal();go('painel');toast('Restaurado ✓');
 }
 /* [revisão F5a, M3 — mesma lei do P0-1] "não consegui ler" devolve null, NUNCA lista vazia: vazio é resposta,
    erro é pergunta sem resposta. Quem consome decide o que fazer com o null (medidor avisa; backup completo aborta). */
@@ -3616,7 +3646,7 @@ function imprimirFluxoGo(){['pagar','receber','saldo','pagas','extrato'].forEach
   imprimir();
   setTimeout(()=>{document.body.classList.remove('ptable');document.getElementById('printTable')?.remove();render();},400);}
 function abrir(id){const m=movs.find(x=>x.id===id);if(!m)return;navHist.push(snap());tipoSel=m.tipo;editId=id;tela='lancar';render();}
-function marcarPago(id){const m=movs.find(x=>x.id===id);if(m){m.status='pago';m.dataPagamento=new Date().toISOString().slice(0,10);save();render();}}
+function marcarPago(id){const m=movs.find(x=>x.id===id);if(m){m.status='pago';m.dataPagamento=new Date().toISOString().slice(0,10);save();diarioReg('marcou pago',rotDe(m),fmt(+m.valor||0));render();}}
 function toggleExp(id){expandId=expandId===id?null:id;render();}
 function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;
   const ORD=['Em estoque','Pedido','Vendido','Coleção'];const px=ORD[(ORD.indexOf(sitDe(m))+1)%ORD.length];
@@ -4296,11 +4326,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='25/08 11h13';
+const BUILD_TAG='25/08 16h11';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787667224475;
+const BUILD_TS=1787685099741;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

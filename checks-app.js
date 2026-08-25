@@ -784,6 +784,7 @@ const CAPACIDADES = [
         localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
         toast: t => avisos.push(t), alert: m => avisos.push(m),
         carregarPontosNuvem: cb => { if (cb) cb(); },
+        diarioReg: () => {},   /* [diario 25/08] restaurarPontoNuvem passou a registrar quem restaurou */
         document: { getElementById: () => null }, fecharModal: () => {}, abrirBackup: () => {}
       };
     },

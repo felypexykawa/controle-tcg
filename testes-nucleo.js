@@ -991,6 +991,12 @@ const _llOrig=g('lixeiraLista'); const elLix={innerHTML:''}; ctx.document.getEle
 setg('lixeiraLista',cb=>cb([{id:'w1',ts:Date.now()-10*864e5,quem:'felype',mov:{id:'w1',tipo:'COMPRA',valor:80,cat:'ETB',data:'2026-08-01',nFotos:1}}]));
 setg('abrirLixeira',_abrirLixOrig); A('abrirLixeira')();
 t('L3: a tela lista o excluido com restaurar, fotos e "some em N dias"', /🗑 Lixeira/.test(htmlLx) && /lixeiraRestaura\('w1'\)/.test(elLix.innerHTML) && /some em 110 dias/.test(elLix.innerHTML) && /por felype/.test(elLix.innerHTML) && /📷 fotos \(1\)/.test(elLix.innerHTML), elLix.innerHTML.slice(0,220));
+/* [re-checagem lixeira] o ramo "ja esta de volta" e a peca que sustenta a mitigacao do G1 — provado na tela */
+setg('movs',[{id:'w1',tipo:'COMPRA',valor:80,cat:'ETB'}]);
+setg('lixeiraLista',cb=>cb([{id:'w1',ts:Date.now()-3*864e5,quem:'felype',mov:{id:'w1',tipo:'COMPRA',valor:80,cat:'ETB'}}]));
+A('abrirLixeira')();
+t('L3 (G1): item que ja voltou aparece como "ja esta de volta" com o botao de limpar — sem botao de restaurar duplicando', /já está de volta no app/.test(elLix.innerHTML) && /limpar da lixeira/.test(elLix.innerHTML) && !/lixeiraRestaura\('w1'\)/.test(elLix.innerHTML), elLix.innerHTML.slice(0,200));
+setg('movs',[]);
 setg('lixeiraLista',cb=>cb(null)); A('abrirLixeira')();
 t('L3: leitura falhada avisa (os itens continuam guardados), nao finge vazio', /Não consegui ler a lixeira/.test(elLix.innerHTML), elLix.innerHTML.slice(0,120));
 setg('lixeiraLista',cb=>cb([])); A('abrirLixeira')();
@@ -1011,6 +1017,31 @@ t('L4 (G3): vinculo sao (alvo Vendido) NAO apita o dobro', !(((A('provaReal')()|
 setg('_db',_dbP25); setg('fotoList',_flOrig25); setg('fotoDel',_fdOrig25); setg('lixeiraApaga',_laOrig); setg('diarioReg',_drOrig);
 t('L5: restaurar/limpar da lixeira estao na lista de toques protegidos', g('RE_GRAVA').test("lixeiraRestaura('a')") && g('RE_GRAVA').test("lixeiraApaga('a')"));
 reset(); setg('excluidos',{}); setg('_fotosPurga',[]); setg('_lixCache',null); setg('tela','painel');
+
+console.log('\n=== 26. diario (tela): quem fez o que, filtro por pessoa, erro avisa; gestos de criar registram ===');
+const dia26=[]; const _dr26=g('diarioReg'); setg('diarioReg',(a)=>{dia26.push(a);});
+ctx.confirm=()=>true; setg('excluidos',{});
+setg('movs',[{id:'p1',tipo:'DESPESA',valor:10,status:'aberto',cat:'X'}]); A('marcarPago')('p1');
+setg('movs',[{id:'j1',tipo:'COMPRA',valor:10,notaId:'nJ'},{id:'j2',tipo:'COMPRA',valor:5,notaId:'nJ'}]); A('desfazerNotaFaz')('nJ');
+setg('movs',[{id:'s1',tipo:'COMPRA',valor:10,notaId:'nS'},{id:'s2',tipo:'COMPRA',valor:5,notaId:'nS'}]); A('separarDaNotaFaz')('s1');
+t('D26: pagar parcela, desfazer nota e separar da nota registram no diario', dia26.includes('marcou pago')&&dia26.includes('desfez nota')&&dia26.includes('separou da nota'), JSON.stringify(dia26));
+t('D26: os gestos de CRIAR estao ligados no fonte (lançou/editou/nota/venda-vários/troca/mover/restaurar)', /diarioReg\('lançou',rotDe\(obj\)/.test(src)&&/diarioReg\('editou',rotDe\(movs\[i\]\)/.test(src)&&/diarioReg\('lançou nota de compra'/.test(src)&&/diarioReg\('vendeu \(vários\)'/.test(src)&&/diarioReg\('registrou troca'/.test(src)&&/diarioReg\('moveu foto'/.test(src)&&/diarioReg\('restaurou ponto da nuvem'/.test(src));
+setg('diarioReg',_dr26);
+let htmlDia=''; const _insD=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlDia=h;};
+const elDia={innerHTML:''},elFil={innerHTML:''}; ctx.document.getElementById=(id)=>id==='diaLista'?elDia:(id==='diaFiltros'?elFil:_elCampo(id));
+const _dlOrig=g('diarioLista'); const regs26=[{id:'a',ts:Date.now()-3600000,quem:'felype',acao:'lançou',alvo:'ETB'},{id:'b',ts:Date.now()-60000,quem:'laura',acao:'excluiu',alvo:'Box'},{id:'c',ts:Date.now(),quem:'laura',acao:'vendeu (vários)',alvo:'2 itens'}];
+setg('diarioLista',cb=>cb(regs26.slice()));
+A('abrirDiario')();
+t('D26 tela: abre com os registros (hora · pessoa · acao) e chips de filtro por pessoa', /👣 Diário/.test(htmlDia) && /<b>laura<\/b>/.test(elDia.innerHTML) && /excluiu — Box/.test(elDia.innerHTML) && /felype/.test(elFil.innerHTML) && /todos/.test(elFil.innerHTML), elDia.innerHTML.slice(0,200));
+A('filtraDiario')('laura');
+t('D26 tela: filtrar por pessoa mostra so ela (e o chip dela acende)', !/<b>felype<\/b>/.test(elDia.innerHTML) && /excluiu — Box/.test(elDia.innerHTML) && /class="on" onclick="filtraDiario\('laura'\)/.test(elFil.innerHTML), elFil.innerHTML.slice(0,160));
+setg('diarioLista',cb=>cb(null)); A('abrirDiario')();
+t('D26 tela: leitura falhada AVISA (registros continuam guardados), nao finge vazio', /Não consegui ler o diário/.test(elDia.innerHTML), elDia.innerHTML.slice(0,120));
+setg('diarioLista',cb=>cb([])); A('abrirDiario')();
+t('D26 tela: vazio diz vazio', /Nada registrado ainda/.test(elDia.innerHTML));
+setg('diarioLista',_dlOrig); ctx.document.body.insertAdjacentHTML=_insD; ctx.document.getElementById=()=>elStub();
+t('D26: o Backup tem a porta do Diario', /fecharModal\(\);abrirDiario\(\)/.test(src) && /👣 Diário <span/.test(src));
+reset(); setg('excluidos',{}); setg('tela','painel');
 
 console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
 /* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
@@ -1397,10 +1428,14 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     const colFake=(store)=>({doc:(id)=>({set:(v)=>{store[id]=v;return Promise.resolve();},delete:()=>{delete store[id];return Promise.resolve();}}),
       orderBy:()=>({limit:()=>({get:()=>Promise.resolve({metadata:{fromCache:false},empty:!Object.keys(store).length,forEach:(f)=>{Object.keys(store).map(k=>({id:k,data:()=>store[k]})).sort((a,b)=>((store[b.id]||{}).ts||0)-((store[a.id]||{}).ts||0)).forEach(f);}})})})});
     const _dbLixNu=g('_db'); setg('_db',{collection:()=>({doc:()=>({collection:(nome)=>colFake(nome==='diario'?nuvemDia:nuvemLix)})})});
+    const _emailOrig=g('_userEmail'); setg('_userEmail','laura@gmail.com');
     A('lixeiraGuarda')([{id:'nu1',tipo:'COMPRA',valor:3,cat:'ETB'},{id:'nu2',tipo:'VENDA',valor:9,cat:'ETB'}]); await tick();
-    t('lixeira (nuvem): guardar grava {ts,quem,mov} por doc na subcolecao', !!nuvemLix.nu1 && nuvemLix.nu1.mov.valor===3 && !!nuvemLix.nu2, JSON.stringify(Object.keys(nuvemLix)));
+    t('lixeira (nuvem): guardar grava {ts,quem,mov} por doc — e QUEM e a pessoa logada (o ponto do diario)', !!nuvemLix.nu1 && nuvemLix.nu1.mov.valor===3 && nuvemLix.nu1.quem==='laura' && !!nuvemLix.nu2, JSON.stringify(nuvemLix.nu1&&[nuvemLix.nu1.quem,nuvemLix.nu1.mov.valor]));
     A('diarioReg')('teste-nuvem','x'); await tick();
-    t('diario (nuvem): registro gravado com acao/quem', Object.keys(nuvemDia).length===1 && Object.values(nuvemDia)[0].acao==='teste-nuvem', JSON.stringify(Object.values(nuvemDia)));
+    t('diario (nuvem): registro gravado com acao E quem', Object.keys(nuvemDia).length===1 && Object.values(nuvemDia)[0].acao==='teste-nuvem' && Object.values(nuvemDia)[0].quem==='laura', JSON.stringify(Object.values(nuvemDia)));
+    let diaNu=null; A('diarioLista')(L=>{diaNu=L;}); await tick(); await tick();
+    t('diario (nuvem): a tela le da subcolecao de verdade', !!diaNu && diaNu.length===1 && diaNu[0].acao==='teste-nuvem', JSON.stringify(diaNu));
+    setg('_userEmail',_emailOrig);
     nuvemLix.nu1.ts=5; nuvemLix.nu2.ts=9;
     let lidasNu=null; A('lixeiraLista')(L=>{lidasNu=L;}); await tick(); await tick();
     t('lixeira (nuvem): lista mais novo primeiro', !!lidasNu && lidasNu.length===2 && lidasNu[0].id==='nu2', JSON.stringify((lidasNu||[]).map(x=>x.id)));
