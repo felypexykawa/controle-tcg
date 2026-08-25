@@ -2131,7 +2131,7 @@ function vLancar(){
   const pode=(t==='COMPRA'||t==='VENDA'||t==='TROCA'||t==='DESPESA'||(t==='CONSUMO'&&motor().disp.length>0));const ehNota=(t==='COMPRA'&&compraModo==='nota'&&!editId);const ehVV=(t==='VENDA'&&vendaModo==='varios'&&!editId);
   return `<div class="card"><div class="types">${tipos.map(([k,ic,l])=>`<div class="tbtn ${t===k?'on':''}" onclick="tipoSel='${k}';editId=${editId?`'${editId}'`:'null'};render()"><span style="font-size:16px;margin-right:3px">${ic}</span>${l}</div>`).join('')}</div>
     ${ehNota||ehVV||t==='ABRIR'?'':`<label>Data de emissão</label><input id="f_data" type="date" value="${e?.data||hoje}">`}${campos}
-    ${(pode||ehNota||ehVV)?`<button class="btn g" id="btnFotosLanc" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">${editId?'📷 fotos do lançamento':ehNota?'📷 fotos da nota (comprovante)':ehVV?'📷 fotos da venda (comprovante)':tipoSel==='TROCA'?'📷 fotos da troca (comprovante)':'📷 fotos do lançamento'}<span id="fotosLancTxt">${editId?((e&&+e.nFotos)?' ('+e.nFotos+')':''):( _fotosPend.length?' ('+_fotosPend.length+')':'')}</span> <span style="color:var(--mut);font-size:10px">${(!editId&&(ehNota||ehVV||tipoSel==='TROCA'))?'da operação inteira; cada carta tem o seu "📷 foto DESTA carta"':'nota, boleto, a carta…'}</span></button>`:''}
+    ${(pode||ehNota||ehVV)?`<button class="btn g" id="btnFotosLanc" style="margin-bottom:8px" onclick="${editId?`abrirFotos('${editId}')`:'abrirFotosPend()'}">${editId?'📷 fotos do lançamento':ehNota?'📷 fotos da nota (comprovante)':ehVV?'📷 fotos da venda (comprovante)':tipoSel==='TROCA'?'📷 fotos da troca (comprovante)':'📷 fotos do lançamento'}<span id="fotosLancTxt">${(()=>{const n=(editId?((e&&+e.nFotos)||0):0)+_fotosPend.length;return n?' ('+n+')':'';})()}</span> <span style="color:var(--mut);font-size:10px">${(!editId&&(ehNota||ehVV||tipoSel==='TROCA'))?'da operação inteira; cada carta tem o seu "📷 foto DESTA carta"':'nota, boleto, a carta…'}</span></button>`:''}
     ${(editId&&e&&(e.notaId||e.vendaId||e.trocaId))?`<button class="btn g" style="margin-bottom:8px" onclick="abrirFotosGrupo('${e.notaId||e.vendaId||e.trocaId}','📷 Fotos da ${e.notaId?'nota':e.vendaId?'venda':'troca'} (comprovante)')">📷 fotos da ${e.notaId?'nota':e.vendaId?'venda':'troca'} (comprovante)</button>`:''}
     ${ehNota?`<button class="btn" onclick="salvarNota()">Salvar nota · ${notaItens.length} ${notaItens.length===1?'item':'itens'}</button>`:ehVV?`<button class="btn" onclick="salvarVendaVarios()">Salvar venda · ${vendaItens.length} ${vendaItens.length===1?'item':'itens'}</button>`:t==='TROCA'?`<button class="btn" onclick="salvarTroca()">Registrar troca</button>`:(pode?`<button class="btn" onclick="salvar()">${e?'Salvar alteração':'Salvar e lançar outro'}</button>`:'')}
     ${e?`<button class="btn g" onclick="editId=null;go('consultar')">Cancelar</button>`:''}
@@ -3203,7 +3203,9 @@ function salvar(){
       if(Math.abs(qNova-qAntiga)>0.0001){
         const custoUnit=(+e.custoOrigem||0)/qAntiga;
         movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}
-    save();diarioReg('editou',rotDe(movs[i]),movs[i].tipo);editId=null;toast('Alteração salva');voltarDaEdicao();return;}
+    save();diarioReg('editou',rotDe(movs[i]),movs[i].tipo);
+    if(_fotosPend.length)aplicarFotosPend(movs[i].id);   /* [revisor F2c, G-edicao] a foto do leitor na EDICAO ia pro balde e morria no voltarDaEdicao (que zera _fotosPend) — com toast dizendo "guardada ✓". Agora a edicao consome o balde igual ao lancamento novo */
+    editId=null;toast('Alteração salva');voltarDaEdicao();return;}
   movs.push(obj);aplicarFotosPend(obj.id);save();diarioReg('lançou',rotDe(obj),obj.tipo);limpaRascunho();_lancarDirty=false;
   /* [revisão C 23/08, M6] venda iniciada numa LINHA da Consultar ("💰 vender" → _preSel) volta para a linha
      de onde saiu, como as edições; só o lançamento avulso fica no Lançar para "lançar o próximo". */
@@ -3859,6 +3861,25 @@ function ocrWorker(cb){
   }catch(e){_ocrCarregando=false;alert('Não consegui ligar o leitor de cartas: '+(String((e&&e.message)||e)).slice(0,80));cb(null);}};
   s.onerror=()=>{_ocrCarregando=false;alert('Não consegui baixar o leitor (ocr/). Confere a internet e tenta de novo.');cb(null);};
   document.head.appendChild(s);}
+/* [F2c] a foto que alimentou o leitor pode virar a foto DESTA carta — 1 toque, sem refotografar.
+   O link e AMARRADO ao hint do proprio scan (s.hintId): link velho de outro campo nunca guarda a
+   foto errada (revisor F2c, residual latente — fechado por identidade, nao por acidente). */
+function scanFotoLnk(hintId){const s=window._scanFoto;if(!s||!s.b64||s.usada||s.hintId!==hintId)return '';
+  return ' <span class="lnk" id="scanFotoUse" style="font-weight:800;border:1px solid var(--green);border-radius:8px;padding:2px 9px;display:inline-block;margin:3px 3px 0 0" onclick="usarFotoScan(\''+hintId+'\')">🖼 usar esta foto na carta</span>';}
+/* [revisor F2c, G2] ligaHint/assistCod repintam o hint INTEIRO a cada tecla e no toque do chip
+   "usar codigo" — o link morria exatamente no gesto que o leitor pede. Reanexar e idempotente. */
+function reanexaScanLnk(hintId){try{const lnk=scanFotoLnk(hintId);if(!lnk)return;
+  const h=document.getElementById(hintId);if(h&&!h.querySelector('#scanFotoUse'))h.insertAdjacentHTML('beforeend',lnk);}catch(e){}}
+function usarFotoScan(hintId){const s=window._scanFoto;if(!s||!s.b64||s.usada||s.hintId!==hintId)return;
+  s.usada=true;
+  if(s.form==='f_cod'){_fotosPend.push(s.b64);}else{_fotosItem.push(s.b64);}
+  try{if(s.form==='f_cod'){const b=document.getElementById('fotosLancTxt');
+    if(b){const ed=editId?movs.find(m=>m.id===editId):null;b.textContent=' ('+(((ed&&+ed.nFotos)||0)+_fotosPend.length)+')';}   /* na EDICAO o contador soma as que o lancamento JA tem (revisor: "(3)" caia pra "(1)") */
+  }else atualizarBadgeFotoItem();}catch(e){}
+  try{agendaRascunho();}catch(e){}
+  try{const h=document.getElementById(hintId);if(h){const u=h.querySelector('#scanFotoUse');if(u)u.remove();
+    if(!h.querySelector('#scanFotoOk'))h.insertAdjacentHTML('beforeend',' <span id="scanFotoOk" class="tag" style="font-size:10px">🖼 foto guardada ✓</span>');}}catch(e){}
+  try{toast(s.form==='f_cod'?('Foto guardada no lançamento ✓ — vai junto quando você salvar ('+_fotosPend.length+')'):('Foto guardada com a carta ✓ — vai junto quando você adicionar ('+_fotosItem.length+')'));}catch(e){}}
 function escanearCod(codId,idiSelId,descId,valId,hintId){
   let inp=document.getElementById('scanFile');
   if(!inp){document.body.insertAdjacentHTML('beforeend','<input type="file" id="scanFile" accept="image/*" capture="environment" style="display:none">');inp=document.getElementById('scanFile');}
@@ -3867,12 +3888,22 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
     const rd=new FileReader();rd.onload=e=>{const img=new Image();img.onload=()=>{
       const W=Math.min(1400,img.width),esc=W/img.width,H=Math.round(img.height*esc);
       const cv=document.createElement('canvas');cv.width=W;cv.height=H;cv.getContext('2d').drawImage(img,0,0,W,H);
+      /* [F2c 25/08 — pedido do Felype: a foto tirada pro leitor NAO morre] guarda a imagem no
+         perfil de carta (1280px/0,72 — o MESMO do fotoComprime) pra oferecer "usar esta foto na
+         carta". Cada leitor tem seu balde CERTO (revisor F2c, G1: f_cod e o form de compra 1-ITEM,
+         cujo salvar() consome _fotosPend — empurrar pro _fotosItem deixava a foto orfa e calada):
+         f_cod -> _fotosPend (fotos do lancamento) · r_cod -> _fotosItem (foto da carta em digitacao). */
+      if(codId==='f_cod'||codId==='r_cod'){try{
+        const MXf=1280;let wf=img.width,hf=img.height;if(wf>=hf&&wf>MXf){hf=Math.round(hf*MXf/wf);wf=MXf;}else if(hf>wf&&hf>MXf){wf=Math.round(wf*MXf/hf);hf=MXf;}
+        const cvf=document.createElement('canvas');cvf.width=wf;cvf.height=hf;cvf.getContext('2d').drawImage(img,0,0,wf,hf);
+        window._scanFoto={b64:cvf.toDataURL('image/jpeg',0.72),usada:false,form:codId,hintId:hintId};
+      }catch(e){window._scanFoto=null;}}else window._scanFoto=null;
       const baixo=document.createElement('canvas');const bh=Math.round(H*0.30);
       baixo.width=W;baixo.height=bh;baixo.getContext('2d').drawImage(cv,0,H-bh,W,bh,0,0,W,bh);
       /* [2026-08-17] o recorte do MEIO da carta existia só pra alimentar o w.detect (escrita),
          que se provou morto — removido junto, pra não gastar processamento do celular
          montando uma imagem que ninguém lê. */
-      ocrWorker(async w=>{if(!w){if(hint)hint.innerHTML='';return;}
+      ocrWorker(async w=>{if(!w){if(hint)hint.innerHTML=scanFotoLnk(hintId);return;}   /* [revisor F2c, M2] leitor nao carregou: a foto ja tirada AINDA serve — e a saida em que aproveitar vale mais */
         try{
           /* [MEDIDO 2026-08-17] a lista de caracteres permitidos era '0123456789/JPC∞' — só
              JP e C. Resultado: Trainer Gallery (TG12/TG30) era lido como "C12/C30" e virava
@@ -3948,7 +3979,7 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
              E a versao anterior tambem generalizava "fonte prateada sobre holografico": das 12
              cartas conferidas, so 3 sao assim — ha codigo preto sobre dourado, branco sobre
              roxo, preto sobre azul claro. */
-          if(!m){if(hint)hint.innerHTML='📷 Não consegui ler o código'+(bruto.trim()?' (li: <b>'+bruto.trim().slice(0,24)+'</b>)':'')+'.<div class="meta" style="margin-top:3px">Provavelmente não é a sua foto: com a carta inteira no quadro este leitor quase nunca acerta — foi medido em 16 fotos suas. <b>O que ajuda:</b> aproximar até o número da carta encher a tela, e evitar o brilho em cima dele. Se não sair, <b>digite o código</b> — leva menos tempo que insistir.</div>';return;}
+          if(!m){if(hint)hint.innerHTML='📷 Não consegui ler o código'+(bruto.trim()?' (li: <b>'+bruto.trim().slice(0,24)+'</b>)':'')+'.<div class="meta" style="margin-top:3px">Provavelmente não é a sua foto: com a carta inteira no quadro este leitor quase nunca acerta — foi medido em 16 fotos suas. <b>O que ajuda:</b> aproximar até o número da carta encher a tela, e evitar o brilho em cima dele. Se não sair, <b>digite o código</b> — leva menos tempo que insistir.</div>'+scanFotoLnk(hintId);return;}
           const escrita='latina';
           const sufLido=(m[2]||'').toUpperCase(),num=m[1],tot=m[3];
           /* se a escrita foi cravada (ou o sufixo veio impresso), sugere direto; senão, 3 chips de 1 toque */
@@ -3986,7 +4017,7 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
           if(hint){
             if(!confiavel){
               hint.innerHTML='📷 Li isto: <b style="font-size:16px">'+(soNum?num:(num+'/'+tot))+'</b>'
-                +'<div class="meta" style="margin-top:3px"><b>Confira na carta antes de usar</b> — este leitor acerta pouco (2 em 16, medido nas suas fotos), então ele não aplica sozinho. Se bater, digite; se não bater, aproxime até o número encher a tela e tente de novo.</div>';
+                +'<div class="meta" style="margin-top:3px"><b>Confira na carta antes de usar</b> — este leitor acerta pouco (2 em 16, medido nas suas fotos), então ele não aplica sozinho. Se bater, digite; se não bater, aproxime até o número encher a tela e tente de novo.</div>'+scanFotoLnk(hintId);
             }else if(soNum){
               /* codigo sem barra (promocional): nao existe lugar pra letra de idioma aqui —
                  um chip so, e o aviso de certeza diz o quanto confiar. */
@@ -3994,19 +4025,20 @@ function escanearCod(codId,idiSelId,descId,valId,hintId){
                 ? ' <span class="tag c" style="font-size:9px">⚠ é só um número solto na carta — confira antes de usar</span>'
                 : (certeza==='media' ? ' <span class="tag c" style="font-size:9px">promocional — confira na carta</span>' : '');
               hint.innerHTML='📷 Li: <b>'+num+'</b>'+aviso+' '+chip('','✔ usar '+num,'')
-                +'<div class="meta" style="margin-top:2px">Carta promocional costuma ter só o número (ex.: <b>080</b>, <b>XY116</b>, <b>No. 130</b>), sem o “/total”.</div>';
+                +'<div class="meta" style="margin-top:2px">Carta promocional costuma ter só o número (ex.: <b>080</b>, <b>XY116</b>, <b>No. 130</b>), sem o “/total”.</div>'+scanFotoLnk(hintId);
             }else if(sufLido){
               const cod=num+sufLido+'/'+tot;
-              hint.innerHTML='📷 Li: <b>'+cod+'</b> (sufixo impresso na carta)'+selo+' '+chip(sufLido,'✔ usar '+cod,'')+' <span style="color:var(--mut)">· confira com a carta na mão</span>';
+              hint.innerHTML='📷 Li: <b>'+cod+'</b> (sufixo impresso na carta)'+selo+' '+chip(sufLido,'✔ usar '+cod,'')+' <span style="color:var(--mut)">· confira com a carta na mão</span>'+scanFotoLnk(hintId);
             }else{
-              hint.innerHTML='📷 Li: <b>'+num+'/'+tot+'</b>'+selo+'<div style="margin-top:3px">a carta é: '+chip('','normal','')+chip('JP','🇯🇵 japonesa','Japonês')+chip('JP','🇰🇷 coreana','Coreano')+chip('C','🇨🇳 chinesa','Chinês')+'</div><div class="meta" style="margin-top:2px">1 toque monta o código certo. <b>Exclusiva</b> de japonês/chinês (sem versão EN/PT) = use <b>normal</b>, sem letra.</div>';
+              hint.innerHTML='📷 Li: <b>'+num+'/'+tot+'</b>'+selo+'<div style="margin-top:3px">a carta é: '+chip('','normal','')+chip('JP','🇯🇵 japonesa','Japonês')+chip('JP','🇰🇷 coreana','Coreano')+chip('C','🇨🇳 chinesa','Chinês')+'</div><div class="meta" style="margin-top:2px">1 toque monta o código certo. <b>Exclusiva</b> de japonês/chinês (sem versão EN/PT) = use <b>normal</b>, sem letra.</div>'+scanFotoLnk(hintId);
             }}
-        }catch(e3){if(hint)hint.innerHTML='📷 A leitura falhou ('+(((e3&&e3.message)||'')+'').slice(0,50)+') — tenta outra foto ou digita.';}
+        }catch(e3){if(hint)hint.innerHTML='📷 A leitura falhou ('+(((e3&&e3.message)||'')+'').slice(0,50)+') — tenta outra foto ou digita.'+scanFotoLnk(hintId);}
       });};img.src=e.target.result;};rd.readAsDataURL(f);};
   inp.click();}
 function aplicarScan(codId,cod,idiSelId,idi,hintId){
   const el=document.getElementById(codId);if(el){el.value=cod;el.dispatchEvent(new Event('input',{bubbles:true}));}
   if(idi&&idiSelId){const s=document.getElementById(idiSelId);if(s)s.value=idi;}
+  reanexaScanLnk(hintId);   /* [revisor F2c, G2] o oninput repintou o hint; a foto pendente volta a ser oferecida */
   toast('📷 Código aplicado: '+cod);}
 /* Insere um símbolo que não existe no teclado (∞ dos códigos promocionais, ex. 032/∞)
    na posição do cursor, e dispara o evento de digitação pro assist reagir normal. */
@@ -4442,11 +4474,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='25/08 18h40';
+const BUILD_TAG='25/08 19h30';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787694042054;
+const BUILD_TS=1787697021192;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -4542,7 +4574,8 @@ function ligaHistDe(cod){if(!_precosLiga||!_precosLiga.historico)return null;
   const h=_precosLiga.historico[(''+cod).trim()]||_precosLiga.historico[codLimpo(cod)];if(!h)return null;
   return (typeof h==='object'&&!Array.isArray(h))?h:{'':h};}
 function precosLigaQuando(){if(!_precosLiga||!_precosLiga.atualizadoEm)return '';const d=new Date(_precosLiga.atualizadoEm);const h=Math.round((Date.now()-d.getTime())/36e5);return h<1?'agora há pouco':h<48?('há '+h+'h'):d.toLocaleDateString('pt-BR');}
-function ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return;const pl=precoLigaDe(cod);const vs=ligaVersoes(pl);
+function ligaHint(cod,elId){_ligaHint(cod,elId);reanexaScanLnk(elId);}   /* [revisor F2c, rodada 2] wrapper imune a early-return: o ramo de codigo AMBIGUO saia antes do reanexo e matava o link a cada tecla */
+function _ligaHint(cod,elId){const el=document.getElementById(elId);if(!el)return;const pl=precoLigaDe(cod);const vs=ligaVersoes(pl);
   if(pl&&pl.status==='AMBIGUO'){const codC=codLimpo(cod),resolv=codigosResolvidos[codC];
     el.innerHTML='🔍 Liga: '+(resolv?'código resolvido ✓':'mais de uma carta com esse código')+' <span class="lnk" style="font-size:11px;padding:1px 4px" onclick="abrirEscolhaAmbigua(\''+codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">'+(resolv?'trocar':((pl.opcoes&&pl.opcoes.length)?'escolher qual →':'colar link →'))+'</span>';return;}
   el.innerHTML=pl?(vs.length?'🔍 Liga: <b>'+pl.titulo.split(' (')[0]+'</b> · menor '+fmt(vs[0].mn)+(vs[0].v?' ('+vs[0].v+')':'')+' <span style="color:var(--mut)">('+precosLigaQuando()+')</span>':''):'';}
@@ -4714,7 +4747,8 @@ function abrirPendenciasCodigo(){const P=pendenciasCodigo();
    estiverem vazios (não sobrescreve o que você já digitou); dispara junto de digitar
    o código, sem esperar salvar. Só funciona pra código já coletado (precos.json) —
    código novo segue precisando do "🔎 preço Liga" manual. */
-function assistCod(codId,descId,valId,hintId){const cod=(document.getElementById(codId)?.value||'').trim();
+function assistCod(codId,descId,valId,hintId){_assistCod(codId,descId,valId,hintId);reanexaScanLnk(hintId);}   /* [revisor F2c, G2] as 3 saidas repintam o hint; o wrapper devolve o link da foto em todas */
+function _assistCod(codId,descId,valId,hintId){const cod=(document.getElementById(codId)?.value||'').trim();
   const hintEl=document.getElementById(hintId);const pl=precoLigaDe(cod);
   if(!pl){if(hintEl)hintEl.innerHTML='';return;}
   if(pl.status==='AMBIGUO'){const codC=codLimpo(cod),resolv=codigosResolvidos[codC];

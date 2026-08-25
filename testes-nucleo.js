@@ -1628,9 +1628,99 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     setg('gravaLocal',_gvOrig28);
     A('backfillThumbs')(); for(let i=0;i<4;i++)await tick();
     t('28 (nuvem, memoria cheia): backfill sem espaco NAO grava a marca; com espaco, sobe e marca', semFlag28 && store['tcg_th_bf1']==='1' && !!thStore['th_bq1'] && thStore['th_bq1'].th==='TBQ', JSON.stringify([semFlag28,Object.keys(thStore)]));
+    /* [fila item 5] todasFotos: nuvem que RECUSA devolve null (erro nunca vira "zero fotos") — era so literal */
+    setg('_db',{collection:()=>({doc:()=>({collection:()=>({get:()=>Promise.reject(new Error('regra negou'))})})})});
+    let todasErr29='nao-chamou'; A('todasFotos')(L=>{todasErr29=L;}); for(let i=0;i<4;i++)await tick();
+    t('29 (nuvem): leitura de todas as fotos que FALHA devolve null, nunca lista vazia', todasErr29===null, String(todasErr29));
     setg('_db',null); delete store['tcg_th_pend']; delete store['tcg_th_bf1'];
   }
   setg('movs',[]); setg('excluidos',{}); setg('_baseH',{});
+  /* === 29. provas literal->teste (fila item 5 — divida dos revisores F5a/diario) === */
+  console.log('\n=== 29. provas que eram so literal viram comportamento ===');
+  /* (1) beforeunload FORTE: contexto novo com captura de listener — o aviso de sair só dispara com foto em risco */
+  {
+    const c3=Object.assign({},ctx); const paginaEventos={};
+    c3.addEventListener=(n,f)=>{paginaEventos[n]=f;};
+    c3.window=c3;c3.globalThis=c3;c3.self=c3;
+    const st3={'tcg_seed_v1':'1'};
+    c3.localStorage={getItem:k=>(k in st3?st3[k]:null),setItem:(k,v)=>{st3[k]=String(v);},removeItem:k=>{delete st3[k];},clear:()=>{}};
+    vm.createContext(c3); vm.runInContext(src,c3,{filename:'app-beforeunload.js'});
+    const h=paginaEventos['beforeunload'];
+    let prev1=0; const e1={preventDefault:()=>{prev1++;},returnValue:''};
+    if(h)h(e1);
+    vm.runInContext("_fotosFalhadas=[{qid:'x',salva:false}]",c3);
+    let prev2=0; const e2={preventDefault:()=>{prev2++;},returnValue:''};
+    if(h)h(e2);
+    t('29 (beforeunload): sem foto em risco deixa sair calado; com foto sem cofre SEGURA e avisa de perda', !!h && prev1===0 && e1.returnValue==='' && prev2===1 && /perder/.test(String(e2.returnValue)), JSON.stringify([!!h,prev1,prev2,String(e2.returnValue).slice(0,30)]));
+  }
+  /* (2) f.salva no CAMINHO DE ESCRITA: gravar no cofre confirma a foto (o literal só via o texto do handler) */
+  Object.keys(lojas24.fila).forEach(k=>delete lojas24.fila[k]);
+  const f29={qid:'q29',movId:'m29',b64:'B',ts:1};
+  A('filaFotoGrava')(f29); for(let i=0;i<5;i++)await tick();
+  t('29 (fila): gravar no cofre marca a foto como confirmada (f.salva) e o cofre tem a copia', f29.salva===true && !!lojas24.fila.q29 && lojas24.fila.q29.b64==='B', JSON.stringify([f29.salva,Object.keys(lojas24.fila)]));
+  /* (3) gesto de CRIAR comportamental (revisor-diario M1: a prova era regex no fonte — guarda-na-frente furava) */
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null); setg('_db',null); setg('_syncReady',false);
+  setg('excluidos',{}); setg('_baseH',{}); setg('movs',[]); setg('_fotosItem',[]); setg('_fotosPend',[]);
+  const _dr29=g('diarioReg'); const diarioCap29=[]; setg('diarioReg',(a,alvo)=>{diarioCap29.push([a,String(alvo||'')]);});
+  const _cf29=ctx.confirm; ctx.confirm=()=>true;
+  setg('notaItens',[{jogo:'Pokémon',cat:'ETB',colecao:'151',idioma:'—',qtd:1,valor:100,destino:'Vender',codigo:'',fotos:[]},{jogo:'Pokémon',cat:'Quad',colecao:'Caos',idioma:'—',qtd:2,valor:50,destino:'Vender',codigo:'',fotos:[]}]);
+  setg('notaHead',{frete:0,taxa:0,cp:'Fornecedor29',conta:'',sit:'Em estoque',data:'2026-08-25',num:'77',pg:'A vista',nParc:1,venc1:'',obs:''});
+  A('salvarNota')();
+  t('29 (diario, criar): lancar a NOTA registra no diario de verdade (nao so regex no fonte)', diarioCap29.some(x=>x[0]==='lançou nota de compra'), JSON.stringify(diarioCap29));
+  ctx.confirm=_cf29; setg('diarioReg',_dr29); setg('movs',[]); setg('notaItens',[]);
+  /* === 30. F2c: a foto do leitor vira foto da carta (fila item 6; re-feita apos revisor: balde certo por forma + link sobrevive a repintura) === */
+  console.log('\n=== 30. F2c: foto do scanner aproveitada na carta ===');
+  setg('_fotosItem',[]); setg('_fotosPend',[]); setg('_rascPronto',true);
+  const hint30={innerHTML:'',insertAdjacentHTML(p,h){this.innerHTML+=h;},
+    querySelector(sel){const id=sel.replace('#','id="')+'"';if(this.innerHTML.indexOf(id)<0)return null;
+      const self=this;return {remove(){self.innerHTML=self.innerHTML.replace(/ <span[^>]*id="scanFotoUse"[\s\S]*?<\/span>/,'');}};}};
+  const _geb30=ctx.document.getElementById; ctx.document.getElementById=(id)=>id==='h30'?hint30:_elCampo(id);   /* _elCampo: o stub que le _campos (o ativo aqui devolvia elemento vazio) */
+  /* COMPRA 1-item (f_cod): o balde certo e _fotosPend — o que salvar() consome (revisor G1) */
+  vm.runInContext("window._scanFoto={b64:'data:image/jpeg;FOTO-SCAN',usada:false,form:'f_cod',hintId:'h30'}",ctx);
+  A('ligaHint')('245/198','h30');
+  t('30 (G2): a repintura do hint (ligaHint, mesma do toque no chip) DEVOLVE o link da foto pendente', /usarFotoScan\('h30'\)/.test(hint30.innerHTML), hint30.innerHTML.slice(0,80));
+  A('usarFotoScan')('h30');
+  t('30 (G1): na compra 1-item a foto vai pro balde do LANCAMENTO (_fotosPend), que o salvar() consome', g('_fotosPend').length===1 && g('_fotosPend')[0]==='data:image/jpeg;FOTO-SCAN' && g('_fotosItem').length===0, JSON.stringify([g('_fotosPend').length,g('_fotosItem').length]));
+  t('30 (M1): usar a foto REMOVE o link da tela e deixa o selo', hint30.innerHTML.indexOf('scanFotoUse')<0 && hint30.innerHTML.indexOf('scanFotoOk')>=0, hint30.innerHTML.slice(-90));
+  A('usarFotoScan')('h30');
+  t('30: 2o toque NAO duplica (foto ja usada)', g('_fotosPend').length===1);
+  A('ligaHint')('245/198','h30');
+  t('30: depois de usada, a repintura NAO devolve o link', hint30.innerHTML.indexOf('scanFotoUse')<0);
+  /* TROCA (r_cod): balde da carta em digitacao (_fotosItem) */
+  vm.runInContext("window._scanFoto={b64:'data:image/jpeg;FOTO-TROCA',usada:false,form:'r_cod',hintId:'h30'}",ctx);
+  A('usarFotoScan')('h30');
+  t('30: na troca a foto vai pro balde da carta (_fotosItem)', g('_fotosItem').length===1 && g('_fotosItem')[0]==='data:image/jpeg;FOTO-TROCA' && g('_fotosPend').length===1);
+  /* identidade: link/toque de OUTRO hint nunca usa a foto deste scan (revisor, residual latente) */
+  vm.runInContext("window._scanFoto={b64:'data:image/jpeg;FOTO-X',usada:false,form:'f_cod',hintId:'hOUTRO'}",ctx);
+  A('usarFotoScan')('h30');
+  t('30: toque num link VELHO (hint diferente) nao guarda a foto do scan novo', g('_fotosPend').length===1 && A('scanFotoLnk')('h30')==='', JSON.stringify(g('_fotosPend').length));
+  vm.runInContext("window._scanFoto=null",ctx);
+  A('usarFotoScan')('h30');
+  t('30: sem foto pendente, nada acontece e nada explode', g('_fotosPend').length===1 && A('scanFotoLnk')('h30')==='');
+  /* [rodada 2 do revisor] codigo AMBIGUO: o ramo saia por return ANTES do reanexo — wrapper cobre */
+  const _plAmb=g('precoLigaDe'); setg('precoLigaDe',()=>({status:'AMBIGUO',titulo:'X (1/2)',opcoes:[]}));
+  hint30.innerHTML=''; vm.runInContext("window._scanFoto={b64:'F-AMB',usada:false,form:'f_cod',hintId:'h30'}",ctx);
+  A('ligaHint')('1/2','h30');
+  t('30 (rodada 2): repintura com codigo AMBIGUO tambem devolve o link da foto', /usarFotoScan\('h30'\)/.test(hint30.innerHTML) && /mais de uma carta|escolher qual|colar link/.test(hint30.innerHTML), hint30.innerHTML.slice(0,120));
+  setg('precoLigaDe',_plAmb); vm.runInContext("window._scanFoto=null",ctx);
+  /* [rodada 2 do revisor, G-edicao] EDITAR compra com a foto do leitor no balde: o salvar CONSOME
+     (antes: voltarDaEdicao zerava _fotosPend com o toast ja tendo dito "guardada" — perda com confirmacao falsa) */
+  reset(); setg('_restaurando',false); setg('tela','lancar'); setg('editId','me1'); setg('tipoSel','COMPRA'); setg('compraModo','item');
+  setg('movs',[{id:'me1',tipo:'COMPRA',data:'2026-08-20',jogo:'Pokémon',cat:'ETB',colecao:'151',idioma:'—',qtd:1,valor:50,contraparte:'F',destino:'Vender',situacao:'Em estoque',taxa:0,pgTipo:'À vista',nFotos:2}]);
+  setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); setg('_fotosItem',[]); setg('_fotosEmVoo',[]); setg('_fotosFalhadas',[]);
+  setg('_fotosPend',['data:FOTO-EDIT']);
+  Object.keys(_campos).forEach(k=>delete _campos[k]);
+  _campos.f_val='55'; _campos.f_data='2026-08-21'; _campos.f_jogo='Pokémon'; _campos.f_cat='ETB'; _campos.f_col='151'; _campos.f_idi='—'; _campos.f_qtd='1'; _campos.f_cp='F'; _campos.f_dest='Vender'; _campos.f_sit='Em estoque'; _campos.f_taxa='0'; _campos.f_pg='À vista';
+  const _faEd=g('fotoAdd'); const capEd=[]; setg('fotoAdd',(movId,b64,cb)=>{capEd.push([movId,String(b64)]);cb&&cb(true);});
+  const _cfEd=ctx.confirm; ctx.confirm=()=>true;
+  const _tEd2=g('toast'); const toastsEd=[]; setg('toast',m=>toastsEd.push(String(m)));
+  A('salvar')();
+  t('30 (rodada 2, G-edicao): salvar a EDICAO consome a foto do leitor (fotoAdd no id do lancamento) e o balde esvazia',
+    capEd.some(x=>x[0]==='me1'&&x[1]==='data:FOTO-EDIT') && g('_fotosPend').length===0 && toastsEd.some(x=>/Alteração salva/.test(x)),
+    JSON.stringify([capEd,toastsEd.slice(0,3)]));
+  setg('fotoAdd',_faEd); ctx.confirm=_cfEd; setg('toast',_tEd2); setg('editId',null); setg('movs',[]); setg('_fotosPend',[]);
+  Object.keys(_campos).forEach(k=>delete _campos[k]);
+  ctx.document.getElementById=_geb30; setg('_fotosItem',[]); setg('_fotosPend',[]);
   setg('idbOpen',_idbOrig24); setg('fotoAdd',_faOrig24); setg('_fotosFalhadas',[]); setg('_fotosPend',[]);
   setg('gravaLocal',_gravaOrig);
   setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();
