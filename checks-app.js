@@ -318,7 +318,8 @@ const CAPACIDADES = [
          escrito aqui em vez de virar garantia falsa. */
       let fonte = '';
       try { fonte = require('fs').readFileSync(alvo, 'utf8'); } catch (e) {}
-      return { excluidos: {}, gravaLocal: () => true, _fonte: fonte };
+      /* [F5a 25/08] podaExcluidos passou a alimentar a fila de limpeza de fotos — os dois nomes novos entram como dubles */
+      return { excluidos: {}, gravaLocal: () => true, _fonte: fonte, _fotosPurga: [], gravaFotosPurga: () => {} };
     },
     exercicio: (F, ctx) => {
       F.marcaExcluido('v1');
@@ -340,7 +341,9 @@ const CAPACIDADES = [
         ['falso-positivo: sem prefixo o filtro nao morde (catalogos que nao usam registro)', semPref, ['Fornecedor X']],
         ['registro velho e podado (o registro nao cresce pra sempre)', F.estaExcluido('antigo'), false],
         ['registro recente sobrevive a poda', F.estaExcluido('v1'), true],
-        ['o registro SOBE pra nuvem junto com os dados', /codigosResolvidos,\s*excluidos\s*\}/.test(ctx._fonte), true],
+        /* [F5b 25/08] ancorado ao payload do salvarNuvem (final={...}): o medidor novo tambem contem
+           "codigosResolvidos,excluidos}" e deixava a mutacao X2 passar verde (a suite pegou) */
+        ['o registro SOBE pra nuvem junto com os dados', /final=\{movs,[^}]*codigosResolvidos,\s*excluidos\s*\}/.test(ctx._fonte), true],
         /* [F0 22/08] a fusao saiu do corpo do salvarNuvem e virou fundirComRemoto (uma funcao pras
            duas portas, tumulos ANTES da uniao). Aceita as duas formas — trava que barra
            refatoracao legitima ensina a usar --no-verify, e ai nao protege mais nada. */

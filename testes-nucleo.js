@@ -901,6 +901,58 @@ t('re-checagem F3: sem destino recente o painel avisa e aponta o atalho "incluir
 setg('fotoAdd',_fotoAddOrig23); setg('fotoDel',_fotoDelOrig23); setg('fotoList',_fotoListOrig23); setg('abrirFotos',_abrirFotosOrig23); setg('abrirFotosGrupo',_abrirGrupoOrig23); setg('toast',_toastOrig23); ctx.alert=_alOrig23; ctx.navigator.onLine=true; ctx.confirm=()=>true; setg('_db',_dbOrig23);
 ctx.document.getElementById = () => elStub(); reset(); setg('tela','painel'); setg('consMenu',true); setg('excluidos',{}); setg('_fotosCache',[]); setg('_gradeMeta',null);
 
+console.log('\n=== 24. fotos F5a: foto de excluido morre aos 120 dias (fila de limpeza persistida), medidor de espaco no Backup ===');
+/* purga: tumulo que completa 120 dias poe o DONO na fila (grupo entra SEM o prefixo) e persiste no disco */
+const _fdOrig24=g('fotoDel'), _flOrig24=g('fotoList'), _dbOrig24s=g('_db');
+if(g('USAR_NUVEM'))setg('_db',{});   /* a varredura espera login quando ha nuvem; aqui o "login" e um dube */
+delete store['tcg_fotos_purga']; setg('_fotosPurga',[]);
+setg('excluidos',{velho1:Date.now()-121*864e5,'nota:nV':Date.now()-121*864e5,novo1:Date.now()-3*864e5});
+A('podaExcluidos')();
+t('F5a purga: tumulo de 121 dias poe o dono na fila (item e grupo sem prefixo); o de 3 dias fica como esta', g('_fotosPurga').includes('velho1') && g('_fotosPurga').includes('nV') && !g('_fotosPurga').includes('novo1') && g('excluidos').novo1>0 && !('velho1' in g('excluidos')), JSON.stringify(g('_fotosPurga'))+' exc='+JSON.stringify(Object.keys(g('excluidos'))));
+t('F5a purga: a fila de limpeza foi para o disco', /velho1/.test(store['tcg_fotos_purga']||''), String(store['tcg_fotos_purga']));
+let fotosDe24={velho1:[{id:'pa',b64:'1'},{id:'pb',b64:'2'}],nV:[{id:'pc',b64:'3'}]}; const del24=[];
+setg('fotoList',(id,cb)=>cb(fotosDe24[id]===null?null:(fotosDe24[id]||[]).slice()));
+setg('fotoDel',(fid,cb)=>{del24.push(fid);Object.keys(fotosDe24).forEach(k=>{if(Array.isArray(fotosDe24[k]))fotosDe24[k]=fotosDe24[k].filter(x=>x.id!==fid);});cb(true);});
+A('processarPurgaFotos')();
+t('F5a varredura: apagou as fotos dos donos e tirou-os da fila (memoria e disco)', del24.length===3 && g('_fotosPurga').length===0 && !/velho1/.test(store['tcg_fotos_purga']||''), JSON.stringify(del24)+' fila='+JSON.stringify(g('_fotosPurga')));
+setg('_fotosPurga',['teim1']); fotosDe24={teim1:[{id:'pd',b64:'4'}]}; setg('fotoDel',(fid,cb)=>{del24.push(fid);cb(false);});
+A('processarPurgaFotos')();
+t('F5a varredura: apagar falhou -> o dono FICA na fila para a proxima rodada', g('_fotosPurga').length===1);
+fotosDe24={teim1:null}; A('processarPurgaFotos')();
+t('F5a varredura: leitura falhada -> nao conclui nada, dono fica', g('_fotosPurga').length===1);
+setg('_fotosPurga',['a1','a2','a3','a4']); fotosDe24={}; let lidas24=[]; setg('fotoList',(id,cb)=>{lidas24.push(id);cb([]);});
+A('processarPurgaFotos')();
+t('F5a varredura: no maximo 3 donos por rodada (limpeza de fundo, nao rajada)', lidas24.length===3 && g('_fotosPurga').length===1, JSON.stringify(lidas24));
+/* [revisao F5a, G3] dono que VOLTOU a existir sai da fila sem apagar nada — restauro, import, fusao, id reusado */
+setg('movs',[{id:'volta1',tipo:'COMPRA',valor:9},{id:'filho1',tipo:'COMPRA',valor:9,notaId:'nRest'}]);
+setg('_fotosPurga',['volta1','nRest','morto1']); fotosDe24={morto1:[{id:'pm',b64:'m'}]}; del24.length=0; lidas24=[];
+setg('fotoList',(id,cb)=>{lidas24.push(id);cb(fotosDe24[id]===null?null:(fotosDe24[id]||[]).slice());});
+setg('fotoDel',(fid,cb)=>{del24.push(fid);cb(true);});
+A('processarPurgaFotos')();
+t('F5a purga (G3): dono restaurado (por id) e nota reimportada (por notaId) saem da fila SEM apagar nada; so o morto de verdade e limpo', !g('_fotosPurga').includes('volta1') && !g('_fotosPurga').includes('nRest') && !lidas24.includes('volta1') && !lidas24.includes('nRest') && del24.length===1 && del24[0]==='pm' && g('_fotosPurga').length===0, 'fila='+JSON.stringify(g('_fotosPurga'))+' lidas='+JSON.stringify(lidas24)+' dels='+JSON.stringify(del24));
+setg('_fotosPurga',[]); setg('fotoDel',_fdOrig24); setg('fotoList',_flOrig24); delete store['tcg_fotos_purga'];
+t('F5a: a exclusao simples diz a regra nova (120 dias e depois apagadas de vez)', /ficam guardadas por 120 dias/.test(src) && /depois são apagadas de vez/.test(src));
+/* [revisao F5a, G1/M7] a frase e provada na TELA que o dono ve (modalAviso), nao so no fonte — e sem a promessa falsa */
+let corpoCap24=''; const _maOrig24=g('modalAviso'); setg('modalAviso',(t1,c)=>{corpoCap24=String(c);});
+A('exclSimples')({id:'z1',cat:'ETB',valor:10,data:'2026-08-25'});
+setg('modalAviso',_maOrig24);
+t('F5a (G1): o aviso de excluir diz 120 dias + que restaurar depende de ponto salvo (12 na nuvem), sem prometer "restaura por 120 dias"', /ficam guardadas por 120 dias/.test(corpoCap24) && /12 mais recentes na nuvem/.test(corpoCap24) && !/o prazo em que dá pra restaurar/.test(corpoCap24), corpoCap24.slice(0,180));
+/* medidor no Backup */
+setg('movs',[{id:'x1',tipo:'COMPRA',valor:10}]);
+t('F5a medidor: o documento e medido em bytes e da um numero de verdade', A('medirDocBytes')()>100, 'bytes='+A('medirDocBytes')());
+setg('_pontosNuvem',{erro:'sem conexao'}); let htmlBk=''; const _insBk=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlBk=h;};
+A('abrirBackup')(); ctx.document.body.insertAdjacentHTML=_insBk;
+t('F5a medidor: o Backup mostra o espaco do documento (com %), o atalho de medir as fotos, e diz a VERDADE sobre o teto (salvamento nao se trava; ponto recusa em 700 mil)', /Espaço na nuvem — documento principal/.test(htmlBk) && /%\)/.test(htmlBk) && /medir o espaço das fotos/.test(htmlBk) && /NÃO se trava perto do teto/.test(htmlBk) && !/o app trava o salvamento em 700 mil/.test(htmlBk), htmlBk.slice(0,0));
+t('F5a medidor (G2): a medida inclui os tumulos (payload real do salvamento)', (function(){const a=A('medirDocBytes')();setg('excluidos',{tumbaGrande:Date.now()});const b=A('medirDocBytes')();setg('excluidos',{});return b>a;})(), 'a medida nao mudou com um tumulo novo');
+let spanTxt24={textContent:''}; ctx.document.getElementById=(id)=>id==='fotoMedidaTxt'?spanTxt24:elStub();
+const _todasOrig24=g('todasFotos'); setg('todasFotos',cb=>cb([{b64:'aaaa'},{b64:'bbbb'}]));
+A('medirFotosNuvem')(null);
+t('F5a medidor: medir fotos escreve a contagem e diz que ficam fora do documento', /2 fotos/.test(spanTxt24.textContent) && /fora do documento principal/.test(spanTxt24.textContent), spanTxt24.textContent);
+setg('todasFotos',cb=>cb(null)); spanTxt24.textContent='';
+A('medirFotosNuvem')(null);
+t('F5a medidor (M3): leitura falhada AVISA em vez de dizer "nenhuma foto ainda"', /não consegui ler as fotos agora/.test(spanTxt24.textContent) && !/nenhuma foto/.test(spanTxt24.textContent), spanTxt24.textContent);
+setg('todasFotos',_todasOrig24); ctx.document.getElementById=()=>elStub(); setg('_pontosNuvem',null); setg('_db',_dbOrig24s); reset(); setg('excluidos',{}); setg('tela','painel');
+
 console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
 /* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
    transacao exige servidor) -> a Laura salva em casa -> quando o sinal volta, o snapshot dela
@@ -1230,6 +1282,38 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   A('render')(); setg('_fotosItem',['UMA']); setg('vendaModo','varios'); A('render')();
   t('P0-4: alternar 1 item <-> varios na venda descarta o balde da carta (identidade mudou)', g('_fotosItem').length===0, 'balde='+g('_fotosItem').length);
   setg('vendaModo','item'); setg('tela','painel');
+  /* ===== F5a: a fila de foto recusada tem casa no aparelho — entra no cofre ao ser recusada, sai ao gravar, volta na abertura ===== */
+  console.log('\n=== F5a (dentro da 21): fila de reenvio persistida + guardas de pre-login ===');
+  /* [revisao F5a, M6] o dube EXIGE o store certo: gravar a fila em outro store explode aqui e o teste pega */
+  const loja24={}; const dbFake24={transaction:(nome)=>{if(nome!=='fila')throw new Error('store errado: '+nome);return {objectStore:()=>({
+    put:v=>{loja24[v.qid]=v;}, delete:k=>{delete loja24[k];},
+    openCursor:()=>{const req={};let i=0;const fire=()=>{const ks=Object.keys(loja24);
+      if(i<ks.length){const v=loja24[ks[i]];req.onsuccess&&req.onsuccess({target:{result:{value:v,continue:()=>{i++;Promise.resolve().then(fire);}}}});}
+      else req.onsuccess&&req.onsuccess({target:{result:null}});};Promise.resolve().then(fire);return req;}})};}};
+  const _idbOrig24=g('idbOpen'), _faOrig24=g('fotoAdd'); setg('idbOpen',cb=>cb(dbFake24));
+  setg('movs',[{id:'m7',tipo:'COMPRA',valor:7}]); setg('_fotosPend',['QQ']); setg('_fotosFalhadas',[]);
+  setg('fotoAdd',(mid,b,cb)=>{cb(false);});
+  A('aplicarFotosPend')('m7'); await tick();
+  t('F5a fila: recusa entra na fila COM identidade e vai pro cofre do aparelho na hora', g('_fotosFalhadas').length===1 && !!g('_fotosFalhadas')[0].qid && Object.keys(loja24).length===1, 'fila='+JSON.stringify(g('_fotosFalhadas').map(f=>f.qid))+' cofre='+Object.keys(loja24).length);
+  setg('fotoAdd',(mid,b,cb)=>{cb(true);});
+  A('reenviarFotosFalhadas')('m7'); await tick();
+  t('F5a fila: gravou -> sai da fila E do cofre', g('_fotosFalhadas').length===0 && Object.keys(loja24).length===0, 'cofre='+Object.keys(loja24).length);
+  loja24['qa']={qid:'qa',movId:'m7',b64:'z1',ts:1}; loja24['qb']={qid:'qb',movId:'m7',b64:'z2',ts:2};
+  A('carregarFilaFotos')(); await tick(); await tick(); await tick(); await tick();
+  t('F5a fila: reabrir o app traz as fotos do cofre de volta para a fila, marcadas como confirmadas no cofre', g('_fotosFalhadas').length===2 && g('_fotosFalhadas').some(f=>f.qid==='qa') && g('_fotosFalhadas').some(f=>f.qid==='qb') && g('_fotosFalhadas').every(f=>f.salva===true), JSON.stringify(g('_fotosFalhadas').map(f=>[f.qid,f.salva])));
+  A('carregarFilaFotos')(); await tick(); await tick(); await tick(); await tick();
+  t('F5a fila: carregar de novo nao duplica (mesma identidade)', g('_fotosFalhadas').length===2, 'fila='+g('_fotosFalhadas').length);
+  if(g('USAR_NUVEM')){
+    const _dbSec21=g('_db'); setg('_db',null); let adds24=0; setg('fotoAdd',()=>{adds24++;});
+    const nG=A('reenviarFotosFalhadas')();
+    t('F5a guarda: nuvem ligada e SEM login -> reenvio espera (senao a foto gravaria no armazenamento errado)', nG===0 && adds24===0 && g('_fotosFalhadas').length===2, 'n='+nG+' adds='+adds24);
+    let leu24=0; const _flG=g('fotoList'); setg('fotoList',(id,cb)=>{leu24++;cb([]);});
+    setg('_movesPendentes',[{origem:'gg',destino:'m7',tumulo:'nota:gg'}]);
+    A('retomarMovesPendentes')();
+    t('F5a guarda: retomada de moves tambem espera o login — nada lido, gesto continua na fila', leu24===0 && g('_movesPendentes').length===1, 'leu='+leu24);
+    setg('_movesPendentes',[]); setg('fotoList',_flG); setg('_db',_dbSec21);
+  }
+  setg('idbOpen',_idbOrig24); setg('fotoAdd',_faOrig24); setg('_fotosFalhadas',[]); setg('_fotosPend',[]);
   setg('gravaLocal',_gravaOrig);
   setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();
 })().catch(e=>{fail++;console.log('  FALHOU  secao 18/19/21 explodiu -> '+((e&&e.stack)||e));}).then(()=>{

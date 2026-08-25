@@ -222,7 +222,27 @@ function esqueceExclusaoDe(o){if(!o)return;
   (Array.isArray(o.movs)?o.movs:[]).forEach(m=>{if(!m)return;if(m.notaId)ids.push('nota:'+m.notaId);if(m.vendaId)ids.push('venda:'+m.vendaId);if(m.trocaId)ids.push('troca:'+m.trocaId);});
   desmarcaExcluido(ids);}
 function marcaExcluido(...ids){const t=Date.now();ids.flat().forEach(id=>{if(id)excluidos[id]=t;});podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
-function podaExcluidos(){const lim=Date.now()-120*864e5;Object.keys(excluidos).forEach(k=>{if(!(excluidos[k]>lim))delete excluidos[k];});}
+/* [decisão do Felype, 25/08: "se eu excluí aquele lançamento, então eu excluí a foto também"] Quando um túmulo
+   completa 120 dias (o prazo em que restaurar ainda devolve tudo) e vai ser esquecido, o DONO dele entra na fila
+   de limpeza — as fotos são apagadas de vez (nuvem/aparelho) pela varredura de fundo. A fila fica no disco. */
+let _fotosPurga=[];try{const fp=JSON.parse(localStorage.getItem('tcg_fotos_purga')||'[]');if(Array.isArray(fp))_fotosPurga=fp.filter(x=>typeof x==='string'&&x);}catch(e){}
+function gravaFotosPurga(){try{gravaLocal('tcg_fotos_purga',JSON.stringify(_fotosPurga));}catch(e){}}
+function podaExcluidos(){const lim=Date.now()-120*864e5;let mudou=false;
+  Object.keys(excluidos).forEach(k=>{if(!(excluidos[k]>lim)){
+    const dono=k.replace(/^(nota|venda|troca):/,'');
+    if(dono&&!_fotosPurga.includes(dono)){_fotosPurga.push(dono);mudou=true;}
+    delete excluidos[k];}});
+  if(mudou)gravaFotosPurga();}
+/* varredura de fundo: poucas por vez; leitura falhada deixa pra próxima; com nuvem ligada e sem login, espera */
+function processarPurgaFotos(){if(!_fotosPurga.length)return;if(USAR_NUVEM&&!_db)return;
+  _fotosPurga.slice(0,3).forEach(dono=>{
+    /* [revisão F5a, G3] dono que VOLTOU a existir (restaurado, importado, fusão, id reaproveitado) sai da fila
+       SEM apagar nada — a purga só limpa quem está morto de verdade no momento da varredura */
+    if(movs.some(x=>x.id===dono||x.notaId===dono||x.vendaId===dono||x.trocaId===dono)){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();return;}
+    fotoList(dono,L=>{if(L===null)return;
+    if(!L.length){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();return;}
+    let falta=L.length,todas=true;
+    L.forEach(f=>fotoDel(f.id,ok=>{if(!ok)todas=false;if(--falta===0&&todas){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();}}));});});}
 function estaExcluido(id){return !!(id&&excluidos[id]);}
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
@@ -442,7 +462,7 @@ function exclSerie(m){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=
      exp:'As previsões somem do seu fluxo de caixa. Nada do que já foi pago é tocado.',
      acao:"execExcl('"+m.id+"','serie')"}]);}
 function exclSimples(m){
-  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números. Nada mais é afetado. As fotos dele (se houver) ficam guardadas na nuvem, sem lugar para aparecer.</div>';
+  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números. Nada mais é afetado. As fotos dele (se houver) ficam guardadas por 120 dias e depois são apagadas de vez. Voltar atrás depende de um ponto de restauração salvo — o app guarda os 12 mais recentes na nuvem.</div>';
   modalAviso('🗑 Excluir este lançamento?',corpo,[
     {rot:'🗑 Apagar',cor:'var(--red)',exp:'Some dos números. Não dá pra desfazer depois.',acao:"execExcl('"+m.id+"','so')"}]);}
 function exclVenda(v){const peca=pecaDaVenda(v),val=+v.valor||0;
@@ -1219,25 +1239,38 @@ let _fotosEmVoo=[],_fotosFalhadas=[],_gradeDe=null;   /* _gradeDe: dono (item ou
    item perdia a foto). Vai para a fila por lançamento e é reenviada: sozinha, no próximo commit bem-sucedido
    da nuvem (a rede voltou), e por um toque no visor "📷 fotos" do lançamento. */
 function contarFotoGravada(m,b64){if(!m)return;m.nFotos=(+m.nFotos||0)+1;if(!m.fotoThumb){fotoThumbDe(b64,t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}else save();}
+/* [F5 fatia 1] a fila de foto recusada agora tem CASA no aparelho (IDB 'fila'): entra no cofre na hora em que a
+   nuvem recusa, sai na hora em que grava, e volta pra memória na abertura do app. Sem cofre disponível, segue
+   como antes (só memória) — o aviso de sair da página cobre esse resto. */
+function filaFotoGrava(f){idbOpen(db=>{if(!db)return;try{const tx=db.transaction('fila','readwrite');tx.objectStore('fila').put({qid:f.qid,movId:f.movId,b64:f.b64,ts:f.ts});tx.oncomplete=()=>{f.salva=true;};}catch(e){}});}   /* f.salva = confirmado no cofre; sem cofre, o aviso de sair da página cobre */
+function filaFotoSolta(f){if(!f||!f.qid)return;idbOpen(db=>{if(!db)return;try{db.transaction('fila','readwrite').objectStore('fila').delete(f.qid);}catch(e){}});}
+function carregarFilaFotos(){idbOpen(db=>{if(!db)return;try{const L=[];const cur=db.transaction('fila').objectStore('fila').openCursor();
+  cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}
+    else if(L.length){let novas=0;L.forEach(f=>{if(!_fotosFalhadas.some(x=>x.qid===f.qid)){f.salva=true;_fotosFalhadas.push(f);novas++;}});
+      if(novas)try{toast(novas+' foto'+(novas>1?'s':'')+' esperando reenvio desde a última vez — eu tento sozinho quando a nuvem responder, ou abra o visor delas e toque em reenviar.');}catch(e){}}};
+  cur.onerror=()=>{};}catch(e){}});}
 /* [re-checagem F1, R-1] a foto fica NA FILA (marcada "enviando") até a gravação confirmar: tirar antes fazia a
    faixa vermelha sumir num reenvio sem rede, como se tivesse gravado. "enviando" é o que barra o envio dobrado
-   (reenvio manual + automático ao mesmo tempo); no sucesso sai da fila; na recusa volta a ficar disponível. */
-function reenviarFotosFalhadas(movId){const fila=_fotosFalhadas.filter(f=>(!movId||f.movId===movId)&&!f.enviando);if(!fila.length)return 0;
+   (reenvio manual + automático ao mesmo tempo); no sucesso sai da fila; na recusa volta a ficar disponível.
+   [F5 fatia 1] com nuvem ligada e SEM login ainda, NÃO reenvia: o fotoAdd cairia no armazenamento local e a foto
+   "gravaria" no lugar errado (invisível pro app em modo nuvem) — foi um defeito real achado nesta fatia. */
+function reenviarFotosFalhadas(movId){if(USAR_NUVEM&&!_db)return 0;
+  const fila=_fotosFalhadas.filter(f=>(!movId||f.movId===movId)&&!f.enviando);if(!fila.length)return 0;
   fila.forEach(f=>{f.enviando=true;
     fotoAdd(f.movId,f.b64,ok=>{const i=_fotosFalhadas.indexOf(f);
-      if(ok){if(i>=0)_fotosFalhadas.splice(i,1);contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid')&&_gradeDe===f.movId)fotoRefresh(f.movId);   /* [revisão F2, M5] só redesenha se a grade aberta é a DO dono da foto */}
+      if(ok){if(i>=0)_fotosFalhadas.splice(i,1);filaFotoSolta(f);contarFotoGravada(movs.find(x=>x.id===f.movId),f.b64);if(document.getElementById('fotoGrid')&&_gradeDe===f.movId)fotoRefresh(f.movId);   /* [revisão F2, M5] só redesenha se a grade aberta é a DO dono da foto */}
       else{f.enviando=false;}},true);});
   return fila.length;}
-/* [re-checagem F1, Q2] enquanto a fila viver só na memória, o limite tem de ser visível: sair da página com
-   foto em voo ou na fila avisa (o navegador mostra a pergunta padrão; o que se perde é a cópia comprimida — a
-   original costuma seguir na galeria). Persistir a fila = backlog. */
-try{window.addEventListener('beforeunload',e=>{if(_fotosEmVoo.length||_fotosFalhadas.length){e.preventDefault();e.returnValue='Há foto ainda não gravada na nuvem — se sair agora ela se perde.';return e.returnValue;}});}catch(e){}
+/* [re-checagem F1, Q2 → F5 fatia 1, corrigido na revisão] a fila persistida tirou o "se perde" da foto RECUSADA
+   que já está CONFIRMADA no cofre (f.salva). O aviso de sair da página cobre todo o resto: foto EM VOO, reenvio em
+   andamento, e recusada que o cofre NÃO confirmou (aparelho sem armazenamento) — essas ainda são só memória. */
+try{window.addEventListener('beforeunload',e=>{if(_fotosEmVoo.length||_fotosFalhadas.some(f=>f.enviando||!f.salva)){e.preventDefault();e.returnValue='Há foto ainda não guardada em lugar nenhum — se sair agora ela pode se perder.';return e.returnValue;}});}catch(e){}
 function aplicarFotosPend(movId){if(!_fotosPend.length||!movId)return;const L=_fotosPend.slice();_fotosPend=[];
   const m=movs.find(x=>x.id===movId);let avisouPendurado=false,respondidas=0;
   L.forEach(b64=>{_fotosEmVoo.push(b64);
     fotoAdd(movId,b64,ok=>{respondidas++;const i=_fotosEmVoo.indexOf(b64);if(i>=0)_fotosEmVoo.splice(i,1);
       if(ok)contarFotoGravada(m,b64);
-      else{_fotosFalhadas.push({movId,b64,ts:Date.now()});
+      else{const fq={movId,b64,ts:Date.now(),qid:novoId('q')};_fotosFalhadas.push(fq);filaFotoGrava(fq);   /* [F5 fatia 1] a fila vai pro cofre local na hora — fechar o app não perde mais */
         /* [revisão F2, M4] se o dono da foto é um GRUPO, a faixa de reenvio mora no visor do comprovante, não no do item */
         const onde=m?'abra "📷 fotos" dele':(movs.some(x=>x.notaId===movId)?'abra a nota e toque em "📷 fotos da nota (comprovante)"':movs.some(x=>x.vendaId===movId)?'abra a venda e toque em "📷 fotos da venda (comprovante)"':'abra um item da troca e toque em "📷 fotos da troca (comprovante)"');
         toast('⚠ Não consegui gravar 1 foto — ficou na fila: quando a nuvem voltar eu reenvio sozinho, ou '+onde+' e toque em reenviar.');}},true);});
@@ -1272,9 +1305,13 @@ function guardaBaldePend(){const gp=(tela==='lancar'?(tipoSel+':'+(grupoPend()||
   _gpAnt=gp;}
 function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
   fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');return;}_fotosPend.push(b64);abrirFotosPend();},grupoPend()?'doc':'');}
-function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',1);
-  rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});};
-  rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);}catch(e){cb(null);}}
+function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',2);
+  /* [F4/F5 fatia 1] v2: 'fila' = foto recusada pela nuvem esperando reenvio (sobrevive a fechar o app);
+     'rascunho' = o Lançar em digitação (fatia 4). O upgrade só CRIA o que falta — nunca mexe no store 'fotos'. */
+  rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});
+    if(!db.objectStoreNames.contains('fila'))db.createObjectStore('fila',{keyPath:'qid'});
+    if(!db.objectStoreNames.contains('rascunho'))db.createObjectStore('rascunho',{keyPath:'id'});};
+  rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);rq.onblocked=()=>cb(null);}catch(e){cb(null);}}
 /* [re-checagem F1, R-2] `silencioso`: o alerta bloqueante é da ação direta do dono (escolher a foto); o caminho
    automático (salvar com foto no balde, reenvio da fila) NÃO pode abrir pop-up a cada tentativa — a fila e a
    faixa vermelha já avisam. */
@@ -1334,7 +1371,7 @@ function fotoMove(f,destinoId,cb){if(!f||!f.id||!f.b64||!destinoId){cb&&cb(false
    não completou (fusão) vai para `_movesPendentes` e é retomado no próximo commit bem-sucedido da nuvem. */
 let _moveEmVoo=new Set(),_movesPendentes=[];
 try{const mp=JSON.parse(localStorage.getItem('tcg_moves_pend')||'[]');if(Array.isArray(mp))_movesPendentes=mp.filter(p=>p&&p.origem&&p.destino);}catch(e){_movesPendentes=[];}
-setTimeout(()=>{try{retomarMovesPendentes();}catch(e){}},4000);   /* retomada na abertura (também no modo local) */
+setTimeout(()=>{try{retomarMovesPendentes();}catch(e){}try{carregarFilaFotos();}catch(e){}try{processarPurgaFotos();}catch(e){}},4000);   /* retomadas na abertura: moves pendentes, fila de reenvio, limpeza de fotos de excluídos */
 function moverFotosDe(origemId,destinoId,cb){if(!origemId||!destinoId||origemId===destinoId){cb&&cb(0,0);return;}
   fotoList(origemId,L=>{if(L===null){cb&&cb(null,0);return;}const fila=L.filter(f=>!_moveEmVoo.has(f.id));if(!fila.length){cb&&cb(0,L.length);return;}
     /* [re-checagem F2, menor 1] repetir o gesto depois de uma falha parcial (gravou no destino, não apagou da origem)
@@ -1351,7 +1388,12 @@ function moverFotosDe(origemId,destinoId,cb){if(!origemId||!destinoId||origemId=
 /* [re-checagem F2, medio 3] a fila de retomada vai para o disco (tcg_moves_pend) — fechar o app não cancela a promessa
    "tento de novo"; e a retomada também roda na abertura (modo local não tem commit de nuvem para acordá-la). */
 function gravaMovesPend(){try{gravaLocal('tcg_moves_pend',JSON.stringify(_movesPendentes));}catch(e){}}
-function retomarMovesPendentes(){if(!_movesPendentes.length)return;const fila=_movesPendentes.slice();_movesPendentes=[];gravaMovesPend();
+function retomarMovesPendentes(){if(!_movesPendentes.length)return;
+  /* [F5 fatia 1 — defeito real da F2 achado agora] com nuvem ligada e SEM login, o fotoList cai no armazenamento
+     LOCAL (vazio), devolve "0 de 0" e o gesto concluía sem mover nada — túmulo marcado com o comprovante parado.
+     Sem login, a retomada espera o commit (que só existe logado). */
+  if(USAR_NUVEM&&!_db)return;
+  const fila=_movesPendentes.slice();_movesPendentes=[];gravaMovesPend();
   fila.forEach(p=>moverFotosDe(p.origem,p.destino,(n,total)=>{if(n!==null&&n===total){if(p.tumulo)marcaExcluido(p.tumulo);}else _movesPendentes.push(p);gravaMovesPend();}));}
 function abrirFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
   const old=document.getElementById('modal');if(old)old.remove();
@@ -3095,6 +3137,18 @@ function pontoNuvemDiario(){
       salvarPontoNuvem(true);};
     if(_pontosNuvem===null)carregarPontosNuvem(decide);else decide();
   }catch(e){}}
+/* [F5 fatia 1 — sustenta a decisão do limite de 1 MB; corrigido na revisão: mede o payload REAL] mede em BYTES
+   (TextEncoder) o que o salvamento principal de fato grava — INCLUINDO os túmulos (excluidos), que viajam junto.
+   As FOTOS moram fora do documento (subcoleção); o que pesa dentro dele é a miniatura de cada carta (~2 KB).
+   Honestidade do teto: quem recusa acima de 700.000 bytes é o PONTO de restauração; o salvamento principal hoje
+   NÃO trava sozinho — proteger isso é exatamente a decisão 2 do painel do dono. */
+function medirDocBytes(){const dados=JSON.stringify({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,excluidos});try{return new TextEncoder().encode(dados).length;}catch(e){return dados.length;}}
+function medirFotosNuvem(el){if(el)el.textContent='medindo…';todasFotos(L=>{
+  const s=document.getElementById('fotoMedidaTxt');
+  if(L===null){if(s)s.textContent=' → não consegui ler as fotos agora (sem conexão?) — tente de novo';if(el)el.textContent='🔎 medir o espaço das fotos';return;}
+  let b=0;L.forEach(f=>{b+=(f.b64||'').length;});
+  const txt=L.length?(L.length+' foto'+(L.length>1?'s':'')+' · ~'+(b>1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB')+' — fora do documento principal, não conta no limite acima'):'nenhuma foto ainda';
+  if(s)s.textContent=' → '+txt;if(el)el.textContent='🔎 medir o espaço das fotos';});}
 function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.ts);const dt=ts=>new Date(ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
   if(_pontosNuvem===null){carregarPontosNuvem(()=>{if(document.getElementById('modal')){fecharModal();abrirBackup();}});}
   const nuv=(_pontosNuvem===null)
@@ -3114,6 +3168,11 @@ function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="importarBackup()">⬆ Importar backup <span style="color:var(--mut);font-size:10px">(restaura fotos junto)</span></button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="exportarCSV()">⬇ Excel (planilha)</button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="salvarPontoNuvem()">☁️ Salvar ponto na nuvem agora</button></div>
+    ${(function(){const bts=medirDocBytes();const kb=Math.round(bts/1024);const pct=Math.round(bts*100/1048576);const cor=pct<60?'var(--green)':pct<85?'var(--amber)':'var(--red)';
+      return `<div class="item" style="display:block;padding:10px 12px"><b>Espaço na nuvem — documento principal</b>
+      <div class="meta" style="margin-top:3px">≈${kb} KB do teto técnico de 1 MB (${pct}%). Hoje o salvamento principal NÃO se trava perto do teto — proteger isso é uma decisão em aberto; o ponto de restauração, esse sim, recusa acima de 700 mil bytes. Cada carta com foto acrescenta ~2 KB (a miniatura).</div>
+      <div style="height:6px;border-radius:4px;background:var(--line);margin-top:6px"><div style="height:6px;border-radius:4px;width:${Math.min(100,pct)}%;background:${cor}"></div></div>
+      <div class="meta" style="margin-top:6px"><a href="#" style="color:var(--blue)" onclick="event.preventDefault();medirFotosNuvem(this)">🔎 medir o espaço das fotos</a> <span style="color:var(--mut);font-size:10px">(baixa as fotos uma vez pra somar — prefira no wifi)</span><span id="fotoMedidaTxt"></span></div></div>`;})()}
     <div class="sec">Pontos na nuvem <span style="text-transform:none;font-weight:400;color:var(--mut)">— de qualquer aparelho · guarda os ${PONTOS_NUVEM_MAX} mais recentes · 1 automático por dia</span></div>
     ${nuv}
     <div class="sec">Voltar a um ponto <span style="text-transform:none;font-weight:400;color:var(--mut)">— só deste navegador</span></div>
@@ -3380,15 +3439,20 @@ function restaurarBackup(ts){
   setTimeout(()=>{_restaurando=false;if(USAR_NUVEM&&_syncReady)salvarNuvem();},3000);
   fecharModal();go('painel');toast('Restaurado ✓');
 }
+/* [revisão F5a, M3 — mesma lei do P0-1] "não consegui ler" devolve null, NUNCA lista vazia: vazio é resposta,
+   erro é pergunta sem resposta. Quem consome decide o que fazer com o null (medidor avisa; backup completo aborta). */
 function todasFotos(cb){
-  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb([]));}
-  else idbOpen(db=>{if(!db){cb([]);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else cb(L);};cur.onerror=()=>cb(L);});}
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{if(q&&q.metadata&&q.metadata.fromCache&&q.empty){cb(null);return;}const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb(null));}
+  else idbOpen(db=>{if(!db){cb(null);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else cb(L);};cur.onerror=()=>cb(null);});}
 function restaurarFotos(L,done){let i=0,ok=0;const next=()=>{if(i>=L.length){done(ok);return;}const f=L[i++];const fid=f.id||novoId('f');
   if(!f||!f.b64){next();return;}
   if(USAR_NUVEM&&_db)_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId:f.movId||'',b64:f.b64,ts:f.ts||Date.now()}).then(()=>{ok++;next();}).catch(()=>next());
   else idbOpen(db=>{if(!db){next();return;}const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').put({id:fid,movId:f.movId||'',b64:f.b64,ts:f.ts||Date.now()});tx.oncomplete=()=>{ok++;next();};tx.onerror=()=>next();});};next();}
 function montarBackup(comFotos,cb){const base={v:2,geradoEm:new Date().toISOString(),movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos};
-  if(!comFotos){cb(base);return;}todasFotos(L=>{base.fotos=L;cb(base);});}
+  if(!comFotos){cb(base);return;}todasFotos(L=>{
+    /* [revisão F5a, M3] leitura falhada NÃO vira backup "completo" sem fotos — isso é perda calada na cópia de segurança */
+    if(L===null){alert('Não consegui ler as fotos agora (sem conexão?). O backup completo sairia SEM elas, então não gerei. Tente de novo em instantes — ou use "Backup (dados)" que não leva fotos.');return;}
+    base.fotos=L;cb(base);});}
 function descargaJson(obj,nome){const blob=new Blob([JSON.stringify(obj)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();a.remove();}
 function baixarBackup(){montarBackup(false,d=>{descargaJson(d,'controle-tcg-'+new Date().toISOString().slice(0,10)+'.json');toast('Backup baixado ✓ (dados, sem fotos)');});}
 function baixarBackupCompleto(){toast('juntando as fotos…');montarBackup(true,d=>{const n=d.fotos?d.fotos.length:0;descargaJson(d,'controle-tcg-COMPLETO-'+new Date().toISOString().slice(0,10)+'.json');toast('Backup COMPLETO baixado ✓ — '+n+' foto'+(n===1?'':'s'));});}
@@ -3979,7 +4043,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
        payload — um save mais novo que entrou em voo continua pendente. */
     publicaBase(baseCap);setSync('ok');limpaPendNuvem(seqCap);
     if(_fotosFalhadas.length)reenviarFotosFalhadas();   /* a nuvem respondeu: tenta de novo as fotos que ela tinha recusado */
-    retomarMovesPendentes();})
+    retomarMovesPendentes();processarPurgaFotos();})
     .catch(e=>{const msg=(e&&e.message)||'erro desconhecido';setSync('erro',msg);console.warn('nuvem:',msg);
       if(Date.now()-_syncErrAt>60000){_syncErrAt=Date.now();toast('⚠ NÃO salvou na nuvem: '+msg.slice(0,80)+' — o lançamento está só neste aparelho até reconectar.');}});}
 /* Rascunho aberto no Lançar (editando um existente OU digitando um novo, ainda sem salvar)
@@ -4140,6 +4204,9 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
             setSync('ok');}catch(e){}
           /* dados ja aplicados e menu no ar: e o momento seguro pro ponto automatico do dia */
           try{setTimeout(pontoNuvemDiario,4000);}catch(e){}
+          /* [revisão F5a, M4] porta de saída da fila no LOGIN: a foto que esperou no cofre reenvia agora, sem depender
+             de um próximo salvamento; os moves pendentes e a limpeza de excluídos aproveitam o mesmo momento */
+          try{setTimeout(()=>{try{reenviarFotosFalhadas();}catch(e){}try{retomarMovesPendentes();}catch(e){}try{processarPurgaFotos();}catch(e){}},2500);}catch(e){}
           try{go(papelAtual()==='lancamento'?'lancar':'painel');}
           catch(e){falha=falha||('ao desenhar a tela: '+((e&&e.message)||e));try{console.error('render',e);}catch(_){}}
           if(falha)telaFalhaApp(falha);
@@ -4158,11 +4225,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='23/08 04h53';
+const BUILD_TAG='25/08 01h45';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787471621213;
+const BUILD_TS=1787633128045;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

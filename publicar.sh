@@ -94,7 +94,32 @@ else
   echo "[publicar] nao consegui baixar o app do ar — seguindo sem a conferencia de linha paralela"
   node checks-app.js index.html || exit 1
 fi
-rm -f "$NOAR" 
+rm -f "$NOAR"
+
+# 2.5) CAMINHOS DO USUARIO — o app ABERTO num navegador de verdade.
+#
+# POR QUE ESTE PASSO EXISTE (Felype, 24/08): "o sistema pouco faz a verificacao pelo caminho do
+# usuario. e no caso de apps, eu soh vou perceber na hr em que estou precisando usar."
+# As checagens acima e os testes do nucleo sao fortes, mas NENHUMA delas abre tela: em
+# testes-nucleo.js o DOM e dublê (getElementById devolve stub pra qualquer id, setTimeout nunca
+# dispara, clipboard e FileReader sao no-op). Foi por isso que 12 defeitos da semana passaram
+# por 289 testes verdes. Aqui o Chrome abre o index.html que VAI AO AR, clica nos botoes de
+# verdade e confere o que apareceu na tela.
+#
+# NAO fica no pre-commit de proposito: encarecer o commit empurra pra rota que contorna
+# (medido: 10 de 17 commits da janela ja foram por fora do trilho). A porta e a publicacao.
+#
+# Fail-OPEN de AMBIENTE (sem playwright/Chrome, ou sem o runner nesta maquina, o proprio runner
+# avisa e sai 0). Fail-CLOSED de ACHADO (caminho vermelho aborta a publicacao).
+RUNNER_CAMINHOS=${RUNNER_CAMINHOS:-"C:/Users/USER/.claude/health/provar-caminhos.js"}
+if [ -f caminhos.js ] && [ -f "$RUNNER_CAMINHOS" ]; then
+  node "$RUNNER_CAMINHOS" caminhos.js || { echo "ABORTADO: um caminho do usuario reprovou (detalhe acima). Nada foi publicado."; exit 1; }
+elif [ -f caminhos.js ]; then
+  echo "[publicar] o runner de caminhos nao existe nesta maquina ($RUNNER_CAMINHOS) — publicando SEM a prova pelo caminho do usuario"
+else
+  echo "[publicar] este repo nao tem caminhos.js — publicando SEM a prova pelo caminho do usuario"
+fi
+
 # TESTES DO NUCLEO: executam as regras de negocio de ponta a ponta (exclusao com lastro,
 # devolucao, merge entre aparelhos) contra o arquivo que VAI ao ar — nao contra a copia de dev.
 # Vivia num scratchpad temporario ate 21/08, sendo a prova mais forte da entrega sem rodar em
