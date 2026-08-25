@@ -904,6 +904,7 @@ ctx.document.getElementById = () => elStub(); reset(); setg('tela','painel'); se
 console.log('\n=== 24. fotos F5a: foto de excluido morre aos 120 dias (fila de limpeza persistida), medidor de espaco no Backup ===');
 /* purga: tumulo que completa 120 dias poe o DONO na fila (grupo entra SEM o prefixo) e persiste no disco */
 const _fdOrig24=g('fotoDel'), _flOrig24=g('fotoList'), _dbOrig24s=g('_db');
+const _laOrig24=g('lixeiraApaga'); setg('lixeiraApaga',(id,cb)=>{cb&&cb(true);});   /* a varredura tambem limpa a lixeira; aqui e dube */
 if(g('USAR_NUVEM'))setg('_db',{});   /* a varredura espera login quando ha nuvem; aqui o "login" e um dube */
 delete store['tcg_fotos_purga']; setg('_fotosPurga',[]);
 setg('excluidos',{velho1:Date.now()-121*864e5,'nota:nV':Date.now()-121*864e5,novo1:Date.now()-3*864e5});
@@ -931,12 +932,12 @@ setg('fotoDel',(fid,cb)=>{del24.push(fid);cb(true);});
 A('processarPurgaFotos')();
 t('F5a purga (G3): dono restaurado (por id) e nota reimportada (por notaId) saem da fila SEM apagar nada; so o morto de verdade e limpo', !g('_fotosPurga').includes('volta1') && !g('_fotosPurga').includes('nRest') && !lidas24.includes('volta1') && !lidas24.includes('nRest') && del24.length===1 && del24[0]==='pm' && g('_fotosPurga').length===0, 'fila='+JSON.stringify(g('_fotosPurga'))+' lidas='+JSON.stringify(lidas24)+' dels='+JSON.stringify(del24));
 setg('_fotosPurga',[]); setg('fotoDel',_fdOrig24); setg('fotoList',_flOrig24); delete store['tcg_fotos_purga'];
-t('F5a: a exclusao simples diz a regra nova (120 dias e depois apagadas de vez)', /ficam guardadas por 120 dias/.test(src) && /depois são apagadas de vez/.test(src));
+t('F5a: a exclusao simples diz a regra nova (Lixeira por 120 dias e depois apagado de vez)', /vai para a 🗑 Lixeira/.test(src) && /são apagados de vez/.test(src));
 /* [revisao F5a, G1/M7] a frase e provada na TELA que o dono ve (modalAviso), nao so no fonte — e sem a promessa falsa */
 let corpoCap24=''; const _maOrig24=g('modalAviso'); setg('modalAviso',(t1,c)=>{corpoCap24=String(c);});
 A('exclSimples')({id:'z1',cat:'ETB',valor:10,data:'2026-08-25'});
 setg('modalAviso',_maOrig24);
-t('F5a (G1): o aviso de excluir diz 120 dias + que restaurar depende de ponto salvo (12 na nuvem), sem prometer "restaura por 120 dias"', /ficam guardadas por 120 dias/.test(corpoCap24) && /12 mais recentes na nuvem/.test(corpoCap24) && !/o prazo em que dá pra restaurar/.test(corpoCap24), corpoCap24.slice(0,180));
+t('F5a (G1): o aviso de excluir aponta a Lixeira (120 dias, restauravel), sem a promessa falsa antiga', /🗑 Lixeira/.test(corpoCap24) && /120 dias/.test(corpoCap24) && /restaurar por lá/.test(corpoCap24) && !/o prazo em que dá pra restaurar/.test(corpoCap24), corpoCap24.slice(0,180));
 /* medidor no Backup */
 setg('movs',[{id:'x1',tipo:'COMPRA',valor:10}]);
 t('F5a medidor: o documento e medido em bytes e da um numero de verdade', A('medirDocBytes')()>100, 'bytes='+A('medirDocBytes')());
@@ -951,7 +952,65 @@ t('F5a medidor: medir fotos escreve a contagem e diz que ficam fora do documento
 setg('todasFotos',cb=>cb(null)); spanTxt24.textContent='';
 A('medirFotosNuvem')(null);
 t('F5a medidor (M3): leitura falhada AVISA em vez de dizer "nenhuma foto ainda"', /não consegui ler as fotos agora/.test(spanTxt24.textContent) && !/nenhuma foto/.test(spanTxt24.textContent), spanTxt24.textContent);
-setg('todasFotos',_todasOrig24); ctx.document.getElementById=()=>elStub(); setg('_pontosNuvem',null); setg('_db',_dbOrig24s); reset(); setg('excluidos',{}); setg('tela','painel');
+setg('todasFotos',_todasOrig24); ctx.document.getElementById=()=>elStub(); setg('_pontosNuvem',null); setg('_db',_dbOrig24s); setg('lixeiraApaga',_laOrig24); reset(); setg('excluidos',{}); setg('tela','painel');
+
+console.log('\n=== 25. lixeira: excluido guardado por 120 dias, restauravel com fotos; diario registra quem fez ===');
+const guardou25=[]; const _lgOrig=g('lixeiraGuarda'); setg('lixeiraGuarda',arr=>{(arr||[]).forEach(m=>guardou25.push(m.id));});
+const diario25=[]; const _drOrig=g('diarioReg'); setg('diarioReg',(a)=>{diario25.push(a);});
+ctx.confirm=()=>true; setg('excluidos',{});
+setg('movs',[{id:'e1',tipo:'COMPRA',valor:10,cat:'ETB'},{id:'e2',tipo:'VENDA',valor:30,vendaId:'vL',cat:'ETB'}]);
+A('execExcl')('e1','so');
+t('L1: excluir (so este) guarda o lancamento na lixeira e registra no diario', guardou25.includes('e1') && diario25.includes('excluiu'), JSON.stringify(guardou25)+' '+JSON.stringify(diario25));
+setg('movs',[{id:'n1',tipo:'COMPRA',valor:10,notaId:'nX',cat:'A'},{id:'n2',tipo:'COMPRA',valor:20,notaId:'nX',cat:'B'}]); guardou25.length=0;
+A('excluirNotaInteira')('nX');
+t('L1: excluir a nota inteira guarda os 2 itens', guardou25.includes('n1')&&guardou25.includes('n2'), JSON.stringify(guardou25));
+guardou25.length=0; setg('movs',[{id:'g1',tipo:'COMPRA',valor:5},{id:'g2',tipo:'DESPESA',valor:7}]);
+A('limparTudo')();
+t('L1: apagar tudo guarda TODOS na lixeira antes de limpar', guardou25.includes('g1')&&guardou25.includes('g2')&&M().length===0 && diario25.includes('apagou tudo'), JSON.stringify(guardou25));
+guardou25.length=0; setg('excluidos',{}); ctx.prompt=()=>'motivo';
+setg('movs',[{id:'og',tipo:'COMPRA',valor:100,situacao:'Vendido',destino:'Vender',destIni:'Em estoque',vendaRef:'s1',cat:'ETB'},{id:'s1',tipo:'VENDA',valor:200,origemId:'og',vendaId:'vX',cat:'ETB'}]);
+A('execDev')('s1');
+t('L1: devolver venda tambem guarda a venda na lixeira', guardou25.includes('s1') && diario25.includes('devolveu venda'), JSON.stringify(guardou25)+' '+JSON.stringify(diario25));
+setg('lixeiraGuarda',_lgOrig);
+const apagou25=[]; const _laOrig=g('lixeiraApaga'); setg('lixeiraApaga',(id,cb)=>{apagou25.push(id);cb&&cb(true);});
+let reabriu25=0; const _abrirLixOrig=g('abrirLixeira'); setg('abrirLixeira',()=>{reabriu25++;});
+setg('excluidos',{r1:Date.now(),'nota:nR':Date.now()}); setg('_fotosPurga',['r1','nR']); setg('movs',[]);
+setg('_lixCache',[{id:'r1',ts:Date.now()-5*864e5,quem:'laura',mov:{id:'r1',tipo:'COMPRA',valor:50,cat:'Box',notaId:'nR',nFotos:2}}]);
+A('lixeiraRestaura')('r1');
+t('L2: restaurar devolve o lancamento, desmarca os tumulos (dele e do grupo) e tira da fila de limpeza', M().some(m=>m.id==='r1') && !A('estaExcluido')('r1') && !A('estaExcluido')('nota:nR') && !g('_fotosPurga').includes('r1') && !g('_fotosPurga').includes('nR') && reabriu25===1 && diario25.includes('restaurou da lixeira'), 'exc='+JSON.stringify(Object.keys(g('excluidos')))+' purga='+JSON.stringify(g('_fotosPurga')));
+t('L2 (G1): a entrada da lixeira FICA depois de restaurar — se a fusao entre aparelhos devorar o item, da pra restaurar DE NOVO', apagou25.length===0, JSON.stringify(apagou25));
+apagou25.length=0; setg('_lixCache',[{id:'r1',ts:1,mov:{id:'r1',tipo:'COMPRA'}}]);
+A('lixeiraRestaura')('r1');
+t('L2: restaurar um que JA voltou so limpa a entrada (nao duplica)', M().filter(m=>m.id==='r1').length===1 && apagou25.includes('r1'));
+let perg25=''; ctx.confirm=(m)=>{perg25=String(m);return false;};
+setg('_lixCache',[{id:'sv1',ts:1,mov:{id:'sv1',tipo:'VENDA',origemId:'og2',valor:9,cat:'C'}}]); const antes25=M().length;
+A('lixeiraRestaura')('sv1'); ctx.confirm=()=>true;
+t('L2: venda com produto vinculado pergunta antes (estoque nao baixa de novo); no nao, nada muda', /NÃO baixa o estoque/.test(perg25) && M().length===antes25 && !M().some(m=>m.id==='sv1'), perg25.slice(0,80));
+let htmlLx=''; const _insLx=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlLx=h;};
+const _llOrig=g('lixeiraLista'); const elLix={innerHTML:''}; ctx.document.getElementById=(id)=>id==='lixLista'?elLix:_elCampo(id);
+setg('lixeiraLista',cb=>cb([{id:'w1',ts:Date.now()-10*864e5,quem:'felype',mov:{id:'w1',tipo:'COMPRA',valor:80,cat:'ETB',data:'2026-08-01',nFotos:1}}]));
+setg('abrirLixeira',_abrirLixOrig); A('abrirLixeira')();
+t('L3: a tela lista o excluido com restaurar, fotos e "some em N dias"', /🗑 Lixeira/.test(htmlLx) && /lixeiraRestaura\('w1'\)/.test(elLix.innerHTML) && /some em 110 dias/.test(elLix.innerHTML) && /por felype/.test(elLix.innerHTML) && /📷 fotos \(1\)/.test(elLix.innerHTML), elLix.innerHTML.slice(0,220));
+setg('lixeiraLista',cb=>cb(null)); A('abrirLixeira')();
+t('L3: leitura falhada avisa (os itens continuam guardados), nao finge vazio', /Não consegui ler a lixeira/.test(elLix.innerHTML), elLix.innerHTML.slice(0,120));
+setg('lixeiraLista',cb=>cb([])); A('abrirLixeira')();
+t('L3: vazio diz vazio', /Nada na lixeira/.test(elLix.innerHTML));
+setg('lixeiraLista',_llOrig); ctx.document.body.insertAdjacentHTML=_insLx; ctx.document.getElementById=()=>elStub();
+t('L4: o Backup tem a porta da Lixeira', /fecharModal\(\);abrirLixeira\(\)/.test(src) && /🗑 Lixeira <span/.test(src));
+const lixApagadas25=[]; setg('lixeiraApaga',(id,cb)=>{lixApagadas25.push(id);cb&&cb(true);});
+setg('_fotosPurga',['pz','pv']); setg('movs',[]); const _flOrig25=g('fotoList'), _fdOrig25=g('fotoDel');
+setg('fotoList',(id,cb)=>cb(id==='pz'?[{id:'fpz',b64:'z'}]:[])); setg('fotoDel',(fid,cb)=>cb(true)); const _dbP25=g('_db'); if(g('USAR_NUVEM'))setg('_db',{});
+A('processarPurgaFotos')();
+t('L4: a limpeza dos 120 dias apaga a ENTRADA da lixeira junto com as fotos — inclusive do dono SEM foto (G2)', lixApagadas25.includes('pz') && lixApagadas25.includes('pv'), JSON.stringify(lixApagadas25));
+/* [revisao lixeira, G3] venda restaurada depois da devolucao: prova real apita o dobro (estoque E lucro) */
+setg('movs',[{id:'al1',tipo:'COMPRA',valor:100,qtd:1,situacao:'Em estoque',destino:'Vender'},{id:'vd1',tipo:'VENDA',valor:200,qtd:1,origemId:'al1',custoOrigem:100}]);
+setg('_provaCache',null); const achados25=(A('provaReal')()||{}).A||[];
+t('L4 (G3): venda vinculada a item que voltou pro estoque vira VERMELHO na prova real (valor contando duas vezes)', achados25.some(a=>a.sev==='vermelho'&&/DUAS vezes/.test(a.detalhe)), JSON.stringify(achados25.map(a=>[a.sev,a.titulo]).slice(0,4)));
+setg('movs',[{id:'al2',tipo:'COMPRA',valor:100,qtd:1,situacao:'Vendido',destino:'Vender'},{id:'vd2',tipo:'VENDA',valor:200,qtd:1,origemId:'al2',custoOrigem:100}]); setg('_provaCache',null);
+t('L4 (G3): vinculo sao (alvo Vendido) NAO apita o dobro', !(((A('provaReal')()||{}).A)||[]).some(a=>/DUAS vezes/.test(a.detalhe)));
+setg('_db',_dbP25); setg('fotoList',_flOrig25); setg('fotoDel',_fdOrig25); setg('lixeiraApaga',_laOrig); setg('diarioReg',_drOrig);
+t('L5: restaurar/limpar da lixeira estao na lista de toques protegidos', g('RE_GRAVA').test("lixeiraRestaura('a')") && g('RE_GRAVA').test("lixeiraApaga('a')"));
+reset(); setg('excluidos',{}); setg('_fotosPurga',[]); setg('_lixCache',null); setg('tela','painel');
 
 console.log('\n=== 18. sem internet: lancamento local sobrevive ao snapshot do outro aparelho (F0 22/08) ===');
 /* Cenario real (revisor do mundo real, 22/08): Felype lanca sem sinal -> salvarNuvem falha (a
@@ -1284,12 +1343,18 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   setg('vendaModo','item'); setg('tela','painel');
   /* ===== F5a: a fila de foto recusada tem casa no aparelho — entra no cofre ao ser recusada, sai ao gravar, volta na abertura ===== */
   console.log('\n=== F5a (dentro da 21): fila de reenvio persistida + guardas de pre-login ===');
-  /* [revisao F5a, M6] o dube EXIGE o store certo: gravar a fila em outro store explode aqui e o teste pega */
-  const loja24={}; const dbFake24={transaction:(nome)=>{if(nome!=='fila')throw new Error('store errado: '+nome);return {objectStore:()=>({
-    put:v=>{loja24[v.qid]=v;}, delete:k=>{delete loja24[k];},
-    openCursor:()=>{const req={};let i=0;const fire=()=>{const ks=Object.keys(loja24);
-      if(i<ks.length){const v=loja24[ks[i]];req.onsuccess&&req.onsuccess({target:{result:{value:v,continue:()=>{i++;Promise.resolve().then(fire);}}}});}
-      else req.onsuccess&&req.onsuccess({target:{result:null}});};Promise.resolve().then(fire);return req;}})};}};
+  /* [revisao F5a, M6 + lixeira] dube ROTEADO por store: nome errado explode e o teste pega; put/delete disparam
+     oncomplete por microtarefa (o app confirma cofre/exclusao por ele) */
+  const lojas24={fila:{},lixeira:{},diario:{}};
+  const dbFake24={transaction:(nome)=>{const L=lojas24[nome];if(!L)throw new Error('store errado: '+nome);
+    const tx={objectStore:()=>({
+      put:v=>{L[v.qid||v.id]=v;Promise.resolve().then(()=>tx.oncomplete&&tx.oncomplete());},
+      delete:k=>{delete L[k];Promise.resolve().then(()=>tx.oncomplete&&tx.oncomplete());},
+      openCursor:()=>{const req={};let i=0;const fire=()=>{const ks=Object.keys(L);
+        if(i<ks.length){const v=L[ks[i]];req.onsuccess&&req.onsuccess({target:{result:{value:v,continue:()=>{i++;Promise.resolve().then(fire);}}}});}
+        else req.onsuccess&&req.onsuccess({target:{result:null}});};Promise.resolve().then(fire);return req;}})};
+    return tx;}};
+  const loja24=lojas24.fila;   /* apelido usado pelos testes da fila */
   const _idbOrig24=g('idbOpen'), _faOrig24=g('fotoAdd'); setg('idbOpen',cb=>cb(dbFake24));
   setg('movs',[{id:'m7',tipo:'COMPRA',valor:7}]); setg('_fotosPend',['QQ']); setg('_fotosFalhadas',[]);
   setg('fotoAdd',(mid,b,cb)=>{cb(false);});
@@ -1312,6 +1377,39 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     A('retomarMovesPendentes')();
     t('F5a guarda: retomada de moves tambem espera o login — nada lido, gesto continua na fila', leu24===0 && g('_movesPendentes').length===1, 'leu='+leu24);
     setg('_movesPendentes',[]); setg('fotoList',_flG); setg('_db',_dbSec21);
+  }
+  /* lixeira/diario no modo LOCAL: guarda -> lista (mais novo primeiro) -> apaga; diario grava (no arquivo com nuvem, o caminho local nao roda) */
+  if(!g('USAR_NUVEM')){
+    Object.keys(lojas24.lixeira).forEach(k=>delete lojas24.lixeira[k]);
+    A('lixeiraGuarda')([{id:'la1',tipo:'COMPRA',valor:1},{id:'la2',tipo:'VENDA',valor:2}]); await tick();
+    t('lixeira (local): guardou os 2 no cofre com o lancamento inteiro', Object.keys(lojas24.lixeira).length===2 && lojas24.lixeira.la1.mov.tipo==='COMPRA', JSON.stringify(Object.keys(lojas24.lixeira)));
+    lojas24.lixeira.la1.ts=1; lojas24.lixeira.la2.ts=2;
+    let lidas25b=null; A('lixeiraLista')(L=>{lidas25b=L;}); for(let i=0;i<5;i++)await tick();
+    t('lixeira (local): lista vem do cofre, mais novo primeiro', !!lidas25b && lidas25b.length===2 && lidas25b[0].id==='la2', JSON.stringify((lidas25b||[]).map(x=>x.id)));
+    let apagouOk25=null; A('lixeiraApaga')('la1',ok=>{apagouOk25=ok;}); for(let i=0;i<3;i++)await tick();
+    t('lixeira (local): apagar tira do cofre e confirma', apagouOk25===true && !lojas24.lixeira.la1, 'ok='+apagouOk25);
+    A('diarioReg')('teste','alvo X'); await tick();
+    t('diario (local): registro gravado com acao e quem', Object.keys(lojas24.diario).length===1 && Object.values(lojas24.diario)[0].acao==='teste', JSON.stringify(Object.values(lojas24.diario)));
+  } else {
+    /* [revisao lixeira, M1] o caminho da NUVEM exercitado de verdade: dube do Firestore por subcolecao — sem isto,
+       lixeiraGuarda/diarioReg no-op passavam VERDES nas 4 portas do arquivo publicado */
+    const nuvemLix={}, nuvemDia={};
+    const colFake=(store)=>({doc:(id)=>({set:(v)=>{store[id]=v;return Promise.resolve();},delete:()=>{delete store[id];return Promise.resolve();}}),
+      orderBy:()=>({limit:()=>({get:()=>Promise.resolve({metadata:{fromCache:false},empty:!Object.keys(store).length,forEach:(f)=>{Object.keys(store).map(k=>({id:k,data:()=>store[k]})).sort((a,b)=>((store[b.id]||{}).ts||0)-((store[a.id]||{}).ts||0)).forEach(f);}})})})});
+    const _dbLixNu=g('_db'); setg('_db',{collection:()=>({doc:()=>({collection:(nome)=>colFake(nome==='diario'?nuvemDia:nuvemLix)})})});
+    A('lixeiraGuarda')([{id:'nu1',tipo:'COMPRA',valor:3,cat:'ETB'},{id:'nu2',tipo:'VENDA',valor:9,cat:'ETB'}]); await tick();
+    t('lixeira (nuvem): guardar grava {ts,quem,mov} por doc na subcolecao', !!nuvemLix.nu1 && nuvemLix.nu1.mov.valor===3 && !!nuvemLix.nu2, JSON.stringify(Object.keys(nuvemLix)));
+    A('diarioReg')('teste-nuvem','x'); await tick();
+    t('diario (nuvem): registro gravado com acao/quem', Object.keys(nuvemDia).length===1 && Object.values(nuvemDia)[0].acao==='teste-nuvem', JSON.stringify(Object.values(nuvemDia)));
+    nuvemLix.nu1.ts=5; nuvemLix.nu2.ts=9;
+    let lidasNu=null; A('lixeiraLista')(L=>{lidasNu=L;}); await tick(); await tick();
+    t('lixeira (nuvem): lista mais novo primeiro', !!lidasNu && lidasNu.length===2 && lidasNu[0].id==='nu2', JSON.stringify((lidasNu||[]).map(x=>x.id)));
+    let apagouNu=null; A('lixeiraApaga')('nu1',ok=>{apagouNu=ok;}); await tick(); await tick();
+    t('lixeira (nuvem): apagar tira o doc e confirma', apagouNu===true && !nuvemLix.nu1, 'ok='+apagouNu);
+    setg('_db',{collection:()=>({doc:()=>({collection:()=>({doc:()=>({set:()=>Promise.reject(new Error('regra negou')),delete:()=>Promise.reject(new Error('x'))}),orderBy:()=>({limit:()=>({get:()=>Promise.reject(new Error('offline'))})})})})})});
+    let lidasErr=0; A('lixeiraLista')(L=>{lidasErr=L;}); await tick(); await tick();
+    t('lixeira (nuvem): leitura que FALHA devolve null (erro nunca vira vazio)', lidasErr===null, String(lidasErr));
+    setg('_db',_dbLixNu);
   }
   setg('idbOpen',_idbOrig24); setg('fotoAdd',_faOrig24); setg('_fotosFalhadas',[]); setg('_fotosPend',[]);
   setg('gravaLocal',_gravaOrig);

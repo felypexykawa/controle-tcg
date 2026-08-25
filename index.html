@@ -240,9 +240,70 @@ function processarPurgaFotos(){if(!_fotosPurga.length)return;if(USAR_NUVEM&&!_db
        SEM apagar nada — a purga só limpa quem está morto de verdade no momento da varredura */
     if(movs.some(x=>x.id===dono||x.notaId===dono||x.vendaId===dono||x.trocaId===dono)){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();return;}
     fotoList(dono,L=>{if(L===null)return;
-    if(!L.length){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();return;}
+    if(!L.length){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();lixeiraApaga(dono,function(){});return;}   /* [revisão lixeira, G2] dono SEM foto também tem a entrada apagada aos 120 dias */
     let falta=L.length,todas=true;
-    L.forEach(f=>fotoDel(f.id,ok=>{if(!ok)todas=false;if(--falta===0&&todas){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();}}));});});}
+    L.forEach(f=>fotoDel(f.id,ok=>{if(!ok)todas=false;if(--falta===0&&todas){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();lixeiraApaga(dono,function(){});}}));});});}
+/* ===== 🗑 LIXEIRA — decisão do Felype 25/08: o campo de USO da janela de 120 dias =====
+   Guarda o LANÇAMENTO COMPLETO fora do documento principal (subcoleção `lixeira` na nuvem; cofre local no modo
+   local) no momento da exclusão. A tela 🗑 Lixeira (em Backup) lista, mostra fotos e RESTAURA item a item; a
+   limpeza dos 120 dias apaga a entrada junto com as fotos. Falha ao guardar NUNCA trava a exclusão (o dono já
+   confirmou no aviso) — vira toast, e os pontos de restauração continuam cobrindo. */
+function lixeiraRef(){return _db?_db.collection('controle').doc('dados').collection('lixeira'):null;}
+function lixeiraGuarda(removidos){try{const L=(removidos||[]).filter(m=>m&&m.id);if(!L.length)return;
+  const quem=(_userEmail||'').split('@')[0]||'';const ts=Date.now();
+  if(USAR_NUVEM){const ref=lixeiraRef();if(!ref)return;
+    L.forEach(m=>{ref.doc(m.id).set({ts,quem,mov:m}).catch(()=>{try{toast('⚠ não consegui guardar "'+rotDe(m)+'" na lixeira (sem internet?) — se precisar, restaure por um ponto');}catch(e){}});});return;}
+  idbOpen(db=>{if(!db)return;try{const tx=db.transaction('lixeira','readwrite');L.forEach(m=>tx.objectStore('lixeira').put({id:m.id,ts,quem,mov:m}));}catch(e){}});
+  }catch(e){try{toast('⚠ não consegui guardar na lixeira — se precisar, restaure por um ponto');}catch(_){}}}   /* [revisão lixeira, M3] throw síncrono nunca trava a exclusão */
+function lixeiraLista(cb){
+  if(USAR_NUVEM){const ref=lixeiraRef();if(!ref){cb(null);return;}
+    ref.orderBy('ts','desc').limit(200).get().then(q=>{if(q&&q.metadata&&q.metadata.fromCache&&q.empty){cb(null);return;}const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb(null));return;}
+  idbOpen(db=>{if(!db){cb(null);return;}try{const L=[];const cur=db.transaction('lixeira').objectStore('lixeira').openCursor();
+    cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else{L.sort((a,b)=>(b.ts||0)-(a.ts||0));cb(L);}};cur.onerror=()=>cb(null);}catch(e){cb(null);}});}
+function lixeiraApaga(id,cb){
+  if(USAR_NUVEM){const ref=lixeiraRef();if(!ref){cb&&cb(false);return;}ref.doc(id).delete().then(()=>cb&&cb(true)).catch(()=>cb&&cb(false));return;}
+  idbOpen(db=>{if(!db){cb&&cb(false);return;}try{const tx=db.transaction('lixeira','readwrite');tx.objectStore('lixeira').delete(id);tx.oncomplete=()=>cb&&cb(true);tx.onerror=()=>cb&&cb(false);}catch(e){cb&&cb(false);}});}
+let _lixCache=null;
+function lixeiraRestaura(id){const e=(_lixCache||[]).find(x=>x.id===id);
+  if(!e||!e.mov){alert('Não achei esse item na lixeira agora — feche e abra a Lixeira de novo.');return;}
+  if(movs.some(x=>x.id===id)){lixeiraApaga(id,function(){});toast('Esse lançamento já está de volta no app — limpei a entrada da lixeira.');abrirLixeira();return;}
+  const m=e.mov;
+  /* venda cuja exclusão devolveu produto ao estoque: restaurar a venda NÃO baixa o estoque de novo — avisar antes */
+  if(m.tipo==='VENDA'&&m.origemId&&!confirm('Esta é uma VENDA que tinha produto vinculado. Se na exclusão o produto voltou pro estoque, restaurar a venda NÃO baixa o estoque de novo — confira o item depois.\n\nRestaurar mesmo assim?'))return;
+  movs.push(m);
+  desmarcaExcluido([m.id,m.notaId?'nota:'+m.notaId:null,m.vendaId?'venda:'+m.vendaId:null,m.trocaId?'troca:'+m.trocaId:null].filter(Boolean));
+  _fotosPurga=_fotosPurga.filter(x=>x!==m.id&&x!==m.notaId&&x!==m.vendaId&&x!==m.trocaId);gravaFotosPurga();
+  /* [revisão lixeira, G1] a ENTRADA FICA: a restauração viaja como ausência de túmulo e a fusão com um aparelho
+     que ainda carrega o túmulo antigo pode devorar o item de volta — enquanto a cura de classe (túmulo com sinal)
+     não entra, a entrada preservada garante que dá pra restaurar DE NOVO. A tela mostra "já está de volta" e a
+     limpeza dos 120 dias apaga a entrada no fim. */
+  save();diarioReg('restaurou da lixeira',rotDe(m));toast('↩ Restaurado — '+rotDe(m)+' voltou pros seus números');abrirLixeira();}
+function abrirLixeira(){const old=document.getElementById('modal');if(old)old.remove();
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="sec" style="margin-top:0">🗑 Lixeira</div>
+    <div class="ctx">Lançamento excluído fica aqui por <b>120 dias</b>, com as fotos guardadas. Restaurar devolve o lançamento e as fotos voltam a aparecer. Depois dos 120 dias, a limpeza apaga os dois de vez.</div>
+    <div id="lixLista"><div class="meta">carregando…</div></div>
+    <button class="btn" onclick="fecharModal();abrirBackup()" style="margin-top:12px">← voltar ao Backup</button></div></div>`;
+  document.body.insertAdjacentHTML('beforeend',hh);
+  lixeiraLista(function(L){_lixCache=L;const el=document.getElementById('lixLista');if(!el)return;
+    if(L===null){el.innerHTML='<div class="soon" style="color:var(--amber)">Não consegui ler a lixeira agora (sem conexão?). Os itens continuam guardados — tente de novo em instantes.</div>';return;}
+    if(!L.length){el.innerHTML='<div class="empty">Nada na lixeira — nenhum lançamento excluído nos últimos 120 dias.</div>';return;}
+    el.innerHTML=L.map(function(e){const m=e.mov||{};const vivo=movs.some(x=>x.id===e.id);
+      const dias=Math.max(0,120-Math.floor((Date.now()-(+e.ts||0))/864e5));
+      const acoes=vivo
+        ?'<span class="meta">já está de volta no app</span><button class="x" onclick="lixeiraApaga(\''+e.id+'\',function(){abrirLixeira()})">limpar da lixeira</button>'
+        :'<button class="x" style="color:var(--blue)" onclick="lixeiraRestaura(\''+e.id+'\')">↩ restaurar</button>'+(+m.nFotos?'<button class="x" style="color:var(--purple)" onclick="abrirFotosGrupo(\''+e.id+'\',\'📷 Fotos (na lixeira)\',\'abrirLixeira()\')">📷 fotos ('+m.nFotos+')</button>':'');
+      return '<div class="item" style="display:block;padding:10px 12px">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>'+rotDe(m)+'</b><span class="meta">'+(m.valor?fmt(+m.valor||0):'')+'</span></div>'
+        +'<div class="meta">'+(m.tipo||'')+(m.data?' · '+dataBRde(m):'')+' · excluído'+(e.ts?' em '+new Date(+e.ts).toLocaleDateString('pt-BR'):'')+(e.quem?' por '+e.quem:'')+(+m.nFotos?' · 📷 '+m.nFotos:'')+' · some em '+dias+' dia'+(dias===1?'':'s')+'</div>'
+        +'<div style="display:flex;gap:14px;margin-top:6px">'+acoes+'</div></div>';}).join('');});}
+/* ===== 👣 DIÁRIO — pedido do Felype 25/08: "preciso verificar quem está fazendo o quê" =====
+   Registro leve de cada gesto que grava (quem, quando, o quê) — subcoleção `diario` na nuvem, cofre local no modo
+   local. Nunca bloqueia nada; a tela 👣 chega na fatia seguinte, o REGISTRO começa a acumular desde já. */
+function diarioRef(){return _db?_db.collection('controle').doc('dados').collection('diario'):null;}
+function diarioReg(acao,alvo,det){try{const reg={id:novoId('d'),ts:Date.now(),quem:(_userEmail||'').split('@')[0]||'',acao:String(acao||''),alvo:String(alvo||'').slice(0,80),det:String(det||'').slice(0,120)};
+  if(USAR_NUVEM){const ref=diarioRef();if(ref)ref.doc(reg.id).set(reg).catch(()=>{});return;}
+  idbOpen(db=>{if(!db)return;try{db.transaction('diario','readwrite').objectStore('diario').put(reg);}catch(e){}});}catch(e){}}
 function estaExcluido(id){return !!(id&&excluidos[id]);}
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
@@ -462,7 +523,7 @@ function exclSerie(m){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=
      exp:'As previsões somem do seu fluxo de caixa. Nada do que já foi pago é tocado.',
      acao:"execExcl('"+m.id+"','serie')"}]);}
 function exclSimples(m){
-  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números. Nada mais é afetado. As fotos dele (se houver) ficam guardadas por 120 dias e depois são apagadas de vez. Voltar atrás depende de um ponto de restauração salvo — o app guarda os 12 mais recentes na nuvem.</div>';
+  const corpo='<div class="meta" style="line-height:1.5"><b>'+rotDe(m)+'</b>'+(m.valor?' — '+fmt(+m.valor||0):'')+' em '+dataBRde(m)+'.<br><br><b>O que vai acontecer:</b> este lançamento some dos seus números e vai para a 🗑 Lixeira (em Backup) por 120 dias — dá pra restaurar por lá, com as fotos. Nada mais é afetado. Depois dos 120 dias, lançamento e fotos são apagados de vez.</div>';
   modalAviso('🗑 Excluir este lançamento?',corpo,[
     {rot:'🗑 Apagar',cor:'var(--red)',exp:'Some dos números. Não dá pra desfazer depois.',acao:"execExcl('"+m.id+"','so')"}]);}
 function exclVenda(v){const peca=pecaDaVenda(v),val=+v.valor||0;
@@ -511,7 +572,8 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
   const some=lista=>{const st={};[].concat(lista).forEach(x=>{if(x)st[x]=1;});
     const removidos=movs.filter(x=>st[x.id]);
     marcaExcluido(Object.keys(st));movs=movs.filter(x=>!st[x.id]);
-    enterraGruposVazios(removidos);   /* [fotos D1 / revisão F2] venda/nota/troca que ficou sem item ganha túmulo (comprovante com rastro) */};
+    enterraGruposVazios(removidos);   /* [fotos D1 / revisão F2] venda/nota/troca que ficou sem item ganha túmulo (comprovante com rastro) */
+    lixeiraGuarda(removidos);removidos.forEach(m=>diarioReg('excluiu',rotDe(m),m.tipo||''));   /* [lixeira 25/08] o excluído fica restaurável por 120 dias */};
   if(modo==='serie'){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar');
     some(alvos.map(x=>x.id));save();render();toast(alvos.length+' previsão(ões) apagada(s)');return;}
   if(modo==='so'){some([m.id]);save();render();toast('Lançamento apagado');return;}
@@ -558,7 +620,7 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
    Por captura no document: nenhum botao precisa ser alterado e botao NOVO ja nasce protegido.
    Fora da lista de proposito: os "+ adicionar" e a navegacao — la tocar duas vezes rapido e
    uso legitimo. */
-const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|desfazerNotaFaz|separarDaNotaFaz|moverFotosDe|moverFotoPara|reenviarFotosFalhadas|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
+const RE_GRAVA=/\b(salvar|salvarNota|salvarVendaVarios|salvarTroca|salvarTransferencia|salvarCadastro|salvarConta|salvarEdicaoNota|salvarPontoNuvem|excluir|excluirPess|excluirCadastro|excluirConta|excluirCol|excluirJogo|excluirNotaInteira|desfazerNotaFaz|separarDaNotaFaz|moverFotosDe|moverFotoPara|lixeiraRestaura|lixeiraApaga|reenviarFotosFalhadas|execExcl|execDev|devolver|limparTudo|aplicarScan|aplicarOrigem|aplicarMesmaCompra|aplicarHistoricasMassa|confirmarPagarParcela|marcarPago|chegouPedido|restaurarBackup|restaurarPontoNuvem|desfazerNota|desvincular|baixarLote)\s*\(/;
 /* a chave e o ATRIBUTO inteiro (funcao + argumentos), nao o elemento. Se a tela repintar
    entre um toque e outro, o botao novo e outro ELEMENTO mas tem o mesmo atributo — pela
    identidade do elemento o segundo toque passaria e a venda entraria 2x assim mesmo. Usar os
@@ -583,10 +645,11 @@ let _ultToque={chave:null,ts:0};
 }catch(e){}})();
 function limparTudo(){
   if(!movs.length){toast('Não há lançamentos pra apagar');return;}
-  if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura. As FOTOS não são apagadas (ficam guardadas na nuvem, sem lançamento para aparecer; voltam se você restaurar um ponto anterior).\n\nNão dá pra desfazer depois. Tem certeza?'))return;
+  if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura. Tudo vai para a 🗑 Lixeira (em Backup) por 120 dias — dá pra restaurar por lá, item a item, com as fotos.\n\nTem certeza?'))return;
   /* [fotos D1] os grupos (nota/venda/troca) também ganham túmulo, para a foto do comprovante ter rastro */
   const gids=[...new Set(movs.flatMap(x=>[x.notaId?'nota:'+x.notaId:null,x.vendaId?'venda:'+x.vendaId:null,x.trocaId?'troca:'+x.trocaId:null].filter(Boolean)))];
-  marcaExcluido(movs.map(x=>x.id).concat(gids));movs=[];save();render();toast('Tudo apagado');}
+  lixeiraGuarda(movs);diarioReg('apagou tudo','',movs.length+' lançamentos');   /* [lixeira 25/08] ANTES de limpar — restaurável item a item por 120 dias */
+  marcaExcluido(movs.map(x=>x.id).concat(gids));movs=[];save();render();toast('Tudo apagado — está na 🗑 Lixeira por 120 dias');}
 function devolver(id){const v=movs.find(x=>x.id===id);
   if(!v||v.tipo!=='VENDA'){toast('Devolução só vale pra venda');return;}
   const peca=pecaDaVenda(v),val=+v.valor||0,quem=v.contraparte?' de <b>'+v.contraparte+'</b>':'';
@@ -606,14 +669,14 @@ function devolver(id){const v=movs.find(x=>x.id===id);
     {rot:'↩ Confirmar devolução',cor:'var(--green)',exp:'Vou pedir o motivo (produto devolvido, pessoa errada, produto errado…) e devolver o produto '+praRot(volta)+'.',acao:"execDev('"+v.id+"')"}]);}
 function execDev(id){fecharModal();const v=movs.find(x=>x.id===id);if(!v)return;
   const peca=pecaDaVenda(v);
-  if(!peca){marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);enterraGruposVazios([v]);   /* [re-checagem F2, medio 1] devolução era a 4ª porta sem túmulo de grupo */save();render();toast('Venda removida dos números');return;}
+  if(!peca){marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);enterraGruposVazios([v]);lixeiraGuarda([v]);diarioReg('devolveu venda',rotDe(v));   /* [re-checagem F2, medio 1 + lixeira 25/08] */save();render();toast('Venda removida dos números');return;}
   const resp=prompt('Motivo da devolução (fica gravado no item):','produto devolvido');
   if(resp===null){toast('Devolução cancelada — nada mudou');return;}   /* Cancelar CANCELA */
   const motivo=resp.trim()||'produto devolvido';
   const volta=voltarPeca(peca,v);
   const hj=new Date().toISOString().slice(0,10);
   peca.devObs='↩ devolvido em '+dBR(new Date(hj+'T00:00:00'))+' — '+motivo+(v.contraparte?' ('+v.contraparte+')':'')+' · a venda era '+fmt(+v.valor||0);
-  marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);enterraGruposVazios([v]);   /* [re-checagem F2, medio 1] devolução era a 4ª porta sem túmulo de grupo */
+  marcaExcluido(v.id);movs=movs.filter(x=>x.id!==v.id);enterraGruposVazios([v]);lixeiraGuarda([v]);diarioReg('devolveu venda',rotDe(v));   /* [re-checagem F2, medio 1 + lixeira 25/08] */
   save();render();toast('↩ Devolvido — voltou '+praRot(volta)+' ✓');}
 function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)return;
   const alvo=movs.find(x=>x.id===v.origemId);
@@ -996,6 +1059,9 @@ function provaReal(){
     if(!alvo){add('amarelo','Venda vinculada a item que não existe mais: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O item de origem foi excluído — o lucro mostrado perdeu o lastro. Abrir e ✂ desvincular limpa a referência.','abrir a venda',`verMov('${v.id}')`);return;}
     if(v.semOrigem)add('amarelo','Venda ao mesmo tempo "histórica" e vinculada: '+fmt(+v.valor||0),'Estados contraditórios — abra e desfaça um dos dois.','abrir a venda',`verMov('${v.id}')`);
     const alvoTemFilhos=movs.some(x=>x.tipo==='COMPRA'&&x.loteOrigem===alvo.id);
+    /* [revisão lixeira, G3] venda restaurada DEPOIS de uma devolução: o item voltou pro estoque e a venda voltou a
+       contar — patrimônio e lucro dobrados, em silêncio. Vínculo são = alvo Vendido/Trocado. */
+    if(!alvoTemFilhos&&sitDe(alvo)!=='Vendido'&&sitDe(alvo)!=='Trocado')add('vermelho','Venda vinculada a item que está "'+sitDe(alvo)+'": '+fmt(+v.valor||0),'O item desta venda voltou pro estoque (devolução?) e a venda continua nos números — o valor conta DUAS vezes (no estoque E no lucro). Ou exclua/devolva a venda de novo, ou dê baixa no item.','abrir a venda',`verMov('${v.id}')`);
     /* vínculo apontando pro PAI fracionado: o custo da venda vive num pedaço-irmão — comparar
        com o valor RESTANTE do pai é falso alarme; a família é conferida pela conservação */
     /* compara por UNIDADE, não pelo total — editar a quantidade da venda vinculada (fix
@@ -1305,12 +1371,15 @@ function guardaBaldePend(){const gp=(tela==='lancar'?(tipoSel+':'+(grupoPend()||
   _gpAnt=gp;}
 function fotoPendEscolhida(inp){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
   fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');return;}_fotosPend.push(b64);abrirFotosPend();},grupoPend()?'doc':'');}
-function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',2);
-  /* [F4/F5 fatia 1] v2: 'fila' = foto recusada pela nuvem esperando reenvio (sobrevive a fechar o app);
-     'rascunho' = o Lançar em digitação (fatia 4). O upgrade só CRIA o que falta — nunca mexe no store 'fotos'. */
+function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_fotos',3);
+  /* [F4/F5] v2: 'fila' = foto recusada esperando reenvio; 'rascunho' = o Lançar em digitação (fatia 4).
+     v3 (25/08, decisão do Felype): 'lixeira' = lançamento excluído guardado por 120 dias (modo local) e
+     'diario' = registro de quem-fez-o-quê (modo local). O upgrade só CRIA o que falta — nunca mexe em 'fotos'. */
   rq.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'id'});
     if(!db.objectStoreNames.contains('fila'))db.createObjectStore('fila',{keyPath:'qid'});
-    if(!db.objectStoreNames.contains('rascunho'))db.createObjectStore('rascunho',{keyPath:'id'});};
+    if(!db.objectStoreNames.contains('rascunho'))db.createObjectStore('rascunho',{keyPath:'id'});
+    if(!db.objectStoreNames.contains('lixeira'))db.createObjectStore('lixeira',{keyPath:'id'});
+    if(!db.objectStoreNames.contains('diario'))db.createObjectStore('diario',{keyPath:'id'});};
   rq.onsuccess=e=>{_idb=e.target.result;cb(_idb);};rq.onerror=()=>cb(null);rq.onblocked=()=>cb(null);}catch(e){cb(null);}}
 /* [re-checagem F1, R-2] `silencioso`: o alerta bloqueante é da ação direta do dono (escolher a foto); o caminho
    automático (salvar com foto no balde, reenvio da fila) NÃO pode abrir pop-up a cada tentativa — a fila e a
@@ -2627,9 +2696,10 @@ function salvarEdicaoNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!to
   save();toast('Nota corrigida ✓');fecharModal();abrirNota(nid);render();}
 function excluirNotaInteira(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   const tot=its.reduce((s,x)=>s+(+x.valor||0),0);
-  if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números. As fotos (dos itens e o comprovante da nota) NÃO são apagadas: ficam guardadas e voltam se você restaurar um ponto anterior.\n\nUse pra relançar do zero. Excluir?'))return;
+  if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números. Eles vão para a 🗑 Lixeira (em Backup) por 120 dias — dá pra restaurar por lá, com as fotos e o comprovante.\n\nUse pra relançar do zero. Excluir?'))return;
   /* [fotos D1] a nota (grupo) também ganha túmulo — sem ele a foto do comprovante ficava sem rastro nenhum */
-  marcaExcluido(its.map(x=>x.id).concat(['nota:'+nid]));movs=movs.filter(m=>m.notaId!==nid);enterraGruposVazios(its);   /* [re-checagem F2, menor 2] item que também era de uma troca: a troca vazia ganha túmulo */save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos apagados');render();}
+  marcaExcluido(its.map(x=>x.id).concat(['nota:'+nid]));movs=movs.filter(m=>m.notaId!==nid);enterraGruposVazios(its);   /* [re-checagem F2, menor 2] item que também era de uma troca: a troca vazia ganha túmulo */
+  lixeiraGuarda(its);its.forEach(m=>diarioReg('excluiu (nota inteira)',rotDe(m)));save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos foram pra 🗑 Lixeira');render();}
 /* [fotos D1] desfazer a nota com comprovante: o grupo morre e as fotos ficariam sem lugar para aparecer — ele
    ESCOLHE (mover para o 1º produto / deixar guardadas / cancelar), nunca automático. Sem fotos, o confirm de
    sempre. Leitura das fotos falhou (sem rede) → avisa e trata como "não sei", oferecendo só deixar guardadas. */
@@ -3168,6 +3238,7 @@ function abrirBackup(){const b=get('tcg_backups',[]).slice().sort((x,y)=>y.ts-x.
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="importarBackup()">⬆ Importar backup <span style="color:var(--mut);font-size:10px">(restaura fotos junto)</span></button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="exportarCSV()">⬇ Excel (planilha)</button></div>
     <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="salvarPontoNuvem()">☁️ Salvar ponto na nuvem agora</button></div>
+    <div class="acoes" style="margin-top:8px"><button class="btn g" onclick="fecharModal();abrirLixeira()">🗑 Lixeira <span style="color:var(--mut);font-size:10px">(excluídos há menos de 120 dias — dá pra restaurar)</span></button></div>
     ${(function(){const bts=medirDocBytes();const kb=Math.round(bts/1024);const pct=Math.round(bts*100/1048576);const cor=pct<60?'var(--green)':pct<85?'var(--amber)':'var(--red)';
       return `<div class="item" style="display:block;padding:10px 12px"><b>Espaço na nuvem — documento principal</b>
       <div class="meta" style="margin-top:3px">≈${kb} KB do teto técnico de 1 MB (${pct}%). Hoje o salvamento principal NÃO se trava perto do teto — proteger isso é uma decisão em aberto; o ponto de restauração, esse sim, recusa acima de 700 mil bytes. Cada carta com foto acrescenta ~2 KB (a miniatura).</div>
@@ -4225,11 +4296,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='25/08 01h45';
+const BUILD_TAG='25/08 11h13';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787633128045;
+const BUILD_TS=1787667224475;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
