@@ -319,7 +319,8 @@ const CAPACIDADES = [
       let fonte = '';
       try { fonte = require('fs').readFileSync(alvo, 'utf8'); } catch (e) {}
       /* [F5a 25/08] podaExcluidos passou a alimentar a fila de limpeza de fotos — os dois nomes novos entram como dubles */
-      return { excluidos: {}, gravaLocal: () => true, _fonte: fonte, _fotosPurga: [], gravaFotosPurga: () => {} };
+      return { excluidos: {}, gravaLocal: () => true, _fonte: fonte, _fotosPurga: [], gravaFotosPurga: () => {},
+        agoraExcl: () => Date.now() };   /* [G1-classe 25/08] marcaExcluido carimba pelo relogio monotonico */
     },
     exercicio: (F, ctx) => {
       F.marcaExcluido('v1');
@@ -347,9 +348,11 @@ const CAPACIDADES = [
         /* [F0 22/08] a fusao saiu do corpo do salvarNuvem e virou fundirComRemoto (uma funcao pras
            duas portas, tumulos ANTES da uniao). Aceita as duas formas — trava que barra
            refatoracao legitima ensina a usar --no-verify, e ai nao protege mais nada. */
+        /* [G1-classe 25/08] a fusao do dicionario deixou de ser uniao: mergeExcl (evento mais recente por |ts|,
+           restauracao = negativo). Aceita a forma antiga (historico) e a nova; exigir SO a antiga barraria a cura. */
         ['o registro se funde quando os dois aparelhos gravam juntos',
           ctx._fonte.indexOf('excluidos:mergeDictRaso(excluidos,remoto.excluidos)') >= 0
-          || (/final=fundirComRemoto\(remoto\)/.test(ctx._fonte) && /mergeDictRaso\(excluidos,r\.excluidos\)/.test(ctx._fonte)), true],
+          || (/final=fundirComRemoto\(remoto\)/.test(ctx._fonte) && /merge(DictRaso|Excl)\(excluidos,r\.excluidos\)/.test(ctx._fonte)), true],
         ['o registro VOLTA da nuvem e poda o que ja foi apagado', /if\(d\.excluidos&&typeof d\.excluidos===.object.\)/.test(ctx._fonte), true],
         /* o filtro TEM de rodar fora do if: aparelho que ainda nao recarregou grava snapshot
            sem o campo, e ai o filtro nunca rodava e tudo ressuscitava (revisao adversarial 21/08) */
@@ -784,6 +787,7 @@ const CAPACIDADES = [
         localStorage: { setItem: (k, v) => { store[k] = v; }, getItem: k => store[k] },
         toast: t => avisos.push(t), alert: m => avisos.push(m),
         carregarPontosNuvem: cb => { if (cb) cb(); },
+        agoraExcl: () => Date.now(),   /* [G1-classe 25/08] desmarcaExcluido carimba pelo relogio monotonico */
         diarioReg: () => {},   /* [diario 25/08] restaurarPontoNuvem passou a registrar quem restaurou */
         document: { getElementById: () => null }, fecharModal: () => {}, abrirBackup: () => {}
       };

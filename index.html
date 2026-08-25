@@ -117,6 +117,8 @@ const PAPEL_POR_EMAIL = {'felypexykawa@gmail.com':'admin','pokecentertcgoficial@
 function papelAtual(){if(!_userEmail)return 'admin';return PAPEL_POR_EMAIL[_userEmail.toLowerCase()]||'lancamento';}
 const USAR_NUVEM = !!(firebaseConfig && firebaseConfig.apiKey);
 let _db=null,_auth=null,_syncReady=false,_userEmail='',_restaurando=false;
+let _localCheio=false;   /* [revisor G1-classe, G-5] içado: o 1º gravaLocal do boot rodava ANTES da declaração (TDZ) e memória cheia matava o app na abertura */
+let _avisoVersaoVelha=false;   /* aviso "recarregue" 1x quando um snapshot vier de app mais novo */
 /* _upd do último snapshot remoto que ESTE aparelho realmente aplicou — usado por salvarNuvem()
    pra saber se alguém salvou por cima entre a última leitura e agora (corrida de 2 saves,
    mapeado 2026-08-11: ver comentário completo em salvarNuvem). */
@@ -206,8 +208,11 @@ let excluidos=get('tcg_excluidos',{});
 /* restaurar um ponto e dizer "quero isto de volta" — se o registro de exclusao continuar
    valendo, o item reaparece na tela e some no primeiro merge (a rede de seguranca vira
    armadilha). Achado da revisao adversarial de 21/08. */
-function desmarcaExcluido(...ids){let mexeu=false;
-  ids.flat().forEach(id=>{if(id&&excluidos[id]){delete excluidos[id];mexeu=true;}});
+/* [cura de classe 25/08 — revisor-lixeira G1] a RESTAURAÇÃO deixou de viajar como ausência: desmarcar grava uma
+   marca NEGATIVA (-agora) no lugar de apagar a chave. Na fusão entre aparelhos vence o evento de |ts| maior
+   (mergeExcl) — o aparelho atrasado que ainda carrega o túmulo velho não devora mais o item restaurado. */
+function desmarcaExcluido(...ids){let mexeu=false;const t=agoraExcl();
+  ids.flat().forEach(id=>{if(id&&excluidos[id]&&+excluidos[id]>0){excluidos[id]=-t;mexeu=true;}});
   if(mexeu)gravaLocal('tcg_excluidos',JSON.stringify(excluidos));return mexeu;}
 function esqueceExclusaoDe(o){if(!o)return;
   const ids=[];
@@ -221,16 +226,25 @@ function esqueceExclusaoDe(o){if(!o)return;
   /* [fotos D1] restaurar traz os grupos de volta: desmarca os túmulos de nota/venda/troca dos lançamentos que voltam */
   (Array.isArray(o.movs)?o.movs:[]).forEach(m=>{if(!m)return;if(m.notaId)ids.push('nota:'+m.notaId);if(m.vendaId)ids.push('venda:'+m.vendaId);if(m.trocaId)ids.push('troca:'+m.trocaId);});
   desmarcaExcluido(ids);}
-function marcaExcluido(...ids){const t=Date.now();ids.flat().forEach(id=>{if(id)excluidos[id]=t;});podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+/* [revisor G1-classe, G-4] carimbo MONOTÔNICO: um evento novo sempre vence todo evento já conhecido neste
+   aparelho, mesmo com relógio atrasado (senão excluir DEPOIS de uma restauração perdia por hora de relógio). */
+function agoraExcl(){let m=0;for(const k in excluidos){const a=Math.abs(+excluidos[k]||0);if(a>m)m=a;}return Math.max(Date.now(),m+1);}
+function marcaExcluido(...ids){const t=agoraExcl();ids.flat().forEach(id=>{if(id)excluidos[id]=t;});podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
 /* [decisão do Felype, 25/08: "se eu excluí aquele lançamento, então eu excluí a foto também"] Quando um túmulo
    completa 120 dias (o prazo em que restaurar ainda devolve tudo) e vai ser esquecido, o DONO dele entra na fila
    de limpeza — as fotos são apagadas de vez (nuvem/aparelho) pela varredura de fundo. A fila fica no disco. */
 let _fotosPurga=[];try{const fp=JSON.parse(localStorage.getItem('tcg_fotos_purga')||'[]');if(Array.isArray(fp))_fotosPurga=fp.filter(x=>typeof x==='string'&&x);}catch(e){}
 function gravaFotosPurga(){try{gravaLocal('tcg_fotos_purga',JSON.stringify(_fotosPurga));}catch(e){}}
-function podaExcluidos(){const lim=Date.now()-120*864e5;let mudou=false;
-  Object.keys(excluidos).forEach(k=>{if(!(excluidos[k]>lim)){
-    const dono=k.replace(/^(nota|venda|troca):/,'');
-    if(dono&&!_fotosPurga.includes(dono)){_fotosPurga.push(dono);mudou=true;}
+function podaExcluidos(){
+  /* [revisor G1-classe, M-A] idade contada a partir do MAIOR carimbo conhecido (não só do relógio local):
+     um aparelho com data adiantada carimbava o futuro, o futuro nunca "envelhecia" e a poda parava —
+     túmulo imortal e foto de lançamento excluído nunca entrava na fila de limpeza */
+  let ref=Date.now();for(const k in excluidos){const a=Math.abs(+excluidos[k]||0);if(a>ref)ref=a;}
+  const lim=ref-120*864e5;let mudou=false;
+  Object.keys(excluidos).forEach(k=>{const v=+excluidos[k]||0;if(!(Math.abs(v)>lim)){
+    /* só EXCLUSÃO velha (positiva) alimenta a limpeza de fotos; marca de restauração velha só sai do mapa */
+    if(v>0){const dono=k.replace(/^(nota|venda|troca):/,'');
+      if(dono&&!_fotosPurga.includes(dono)){_fotosPurga.push(dono);mudou=true;}}
     delete excluidos[k];}});
   if(mudou)gravaFotosPurga();}
 /* varredura de fundo: poucas por vez; leitura falhada deixa pra próxima; com nuvem ligada e sem login, espera */
@@ -359,7 +373,7 @@ function restauraRascunho(){idbOpen(db=>{if(!db){_rascPronto=true;return;}try{co
     _rascPronto=true;};
   rq.onerror=()=>{_rascPronto=true;};}catch(e){_rascPronto=true;}});}
 setTimeout(()=>{try{restauraRascunho();}catch(e){_rascPronto=true;}},800);   /* restaura cedo, antes de o dono chegar ao Lançar */
-function estaExcluido(id){return !!(id&&excluidos[id]);}
+function estaExcluido(id){return !!(id&&+excluidos[id]>0);}   /* positivo = excluído; negativo = restaurado (marca viaja) */
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
@@ -1234,7 +1248,7 @@ const dBR=d=>d.toLocaleDateString('pt-BR');
    Regra nova: a NUVEM é a fonte de verdade, a cópia local é só conveniência — falhar a
    cópia NUNCA pode impedir de salvar de verdade. E quando faltar espaço, o app poda as
    cópias de segurança antigas sozinho e avisa em linguagem clara. */
-let _localCheio=false,_avisouPoda=false;
+let _avisouPoda=false;   /* _localCheio içado pro topo (revisor G1-classe, G-5: TDZ no boot com memória cheia) */
 function avisaPoda(oQue){if(_avisouPoda)return;_avisouPoda=true;
   try{toast('⚠ A memória deste aparelho encheu — '+oQue+'.');}catch(_){}}
 function gravaLocal(chave,valor){
@@ -3747,8 +3761,15 @@ function nomeDasLigas(){return LIGAS_BASE.join(', ');}
 function ligaDoJogo(jogo){
   const k=(''+(jogo||'Pokémon')).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   /* tira acento: Pokémon -> pokemon */
-    .replace(/[^a-z]/g,'');                            /* tira espaco e hifen: Yu-Gi-Oh -> yugioh */
-  return LIGAS[k]||null;}
+    .replace(/[^a-z0-9]/g,'');                         /* tira espaco e hifen: Yu-Gi-Oh -> yugioh */
+  if(LIGAS[k])return LIGAS[k];                          /* 1) chave exata */
+  /* [D5 25/08 — apelidos de jogo] 2) apelido consagrado; 3) variante com site próprio; 4) containment: o nome
+     digitado CONTÉM uma chave conhecida ("Magic the Gathering" ⊃ magic, "Pokemon TCG" ⊃ pokemon). Desconhecido
+     continua devolvendo null — quem chama avisa com a lista, nunca chuta site. */
+  if(k==='mtg')return LIGAS.magic;
+  if(k.includes('dragonball')&&k.includes('masters'))return 'masters.ligadragonball.com.br';
+  const chave=Object.keys(LIGAS).find(c=>c.length>=5&&k.includes(c));
+  return chave?LIGAS[chave]:null;}
 function ligaJogoAtual(jogoSelId){
   const el=jogoSelId?document.getElementById(jogoSelId):null;
   return (el&&el.value)||'Pokémon';}
@@ -4048,6 +4069,10 @@ function mergeArrUniao(local,remoto,pref){
 /* União rasa de 2 dicionários chave->valor (codigosResolvidos) — local vence empate de chave,
    mesma convenção do mergePorId. */
 function mergeDictRaso(local,remoto){return {...(remoto||{}),...(local||{})};}
+/* [cura de classe 25/08 — revisor-lixeira G1] o dicionário de exclusão funde por EVENTO MAIS RECENTE (|ts| maior),
+   não por união: exclusão = ts positivo, restauração = ts negativo. União devorava o restaurado. */
+function mergeExcl(a,b){const out={...(a||{})};Object.keys(b||{}).forEach(k=>{const va=out[k],vb=b[k];
+  if(va===undefined||Math.abs(+vb||0)>Math.abs(+va||0))out[k]=vb;});return out;}
 /* colsJ = {jogo:[colecao,...]} — merge por jogo, e dentro de cada jogo une o array de coleções. */
 function mergeColsJ(local,remoto){
   const out={};
@@ -4096,7 +4121,7 @@ function fundirComRemoto(r,remotoVence){r=r||{};
      feita sem internet de item já existente continua se perdendo, como hoje: zero regressão, e
      a cura completa (fusão em 3 pontas com a última base confirmada) fica registrada no backlog.
      A porta do salvarNuvem (base fresca, janela de uma ida-e-volta) mantém "local vence". */
-  const exc=mergeDictRaso(excluidos,r.excluidos);const excAntes=excluidos;excluidos=exc;
+  const exc=mergeExcl(excluidos,r.excluidos);const excAntes=excluidos;excluidos=exc;   /* [G1-classe] evento mais recente vence, união devorava restaurado */
   try{podaExcluidos();
     const M=(a,b)=>remotoVence?mergePorIdBase(a,b):mergePorId(a,b);  /* a=local, b=remoto; remotoVence = por registro, pela base confirmada */
     const D=(a,b)=>remotoVence?mergeDictRaso(b,a):mergeDictRaso(a,b);
@@ -4139,7 +4164,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
          apagado (ausente lá, presente aqui) ressuscitava no payload. */
       final=fundirComRemoto(remoto);
     }
-    const payload={...final,_upd:Date.now(),_by:_userEmail};
+    const payload={...final,_upd:Date.now(),_by:_userEmail,_v:(typeof BUILD_TS!=='undefined'?BUILD_TS:0)};   /* _v: a aba velha descobre que existe app mais novo (revisor G1-classe, G-3) */
     /* [re-checagem 2, N2] a base é calculada AQUI, no mesmo instante síncrono em que o payload vai
        pro tx.set — não no .then, que roda uma ida-e-volta depois e relia os objetos VIVOS (uma
        correção feita no meio do commit ficava "confirmada" e a fusão seguinte a apagava). Mesma
@@ -4221,7 +4246,8 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
     if(!lancarTemRascunho())toast('☁️ outro aparelho salvou enquanto você estava sem internet — juntei os dois lados');
     if(_syncReady)salvarNuvem();
   }
-  if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeDictRaso(excluidos,d.excluidos);podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+  if(Array.isArray(d.movs))movs=d.movs;if(Array.isArray(d.jogos))jogos=d.jogos;if(Array.isArray(d.cats))cats=d.cats;if(Array.isArray(d.cols))cols=d.cols;if(d.colsJ&&typeof d.colsJ==='object')colsJ=d.colsJ;if(d.colsG&&typeof d.colsG==='object')colsG=d.colsG;if(Array.isArray(d.pess))pess=d.pess;if(Array.isArray(d.pgs))pgs=d.pgs;if(Array.isArray(d.despCats))despCats=d.despCats;if(Array.isArray(d.cadastros))cadastros=d.cadastros;if(Array.isArray(d.contasBanc))contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object')codigosResolvidos=d.codigosResolvidos;if(d.excluidos&&typeof d.excluidos==='object'){excluidos=mergeExcl(excluidos,d.excluidos);/* [revisor G1-classe, G-1: a PORTA PRINCIPAL fundia por união e devorava o restaurado] */
+    if(d._v&&typeof BUILD_TS!=='undefined'&&BUILD_TS&&+d._v>BUILD_TS&&!_avisoVersaoVelha){_avisoVersaoVelha=true;try{toast('⬆ Há uma versão mais nova do app — recarregue esta aba (F5) pra atualizar. Aba antiga pode desfazer restaurações.');}catch(e){}}podaExcluidos();gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
   /* FORA do if de proposito: aparelho que ainda nao recarregou grava snapshot SEM este campo,
      e ai o filtro nunca rodava — tudo ressuscitava. O registro que manda e o DESTE aparelho. */
   if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));
@@ -4354,11 +4380,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='25/08 16h46';
+const BUILD_TAG='25/08 17h46';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787687185783;
+const BUILD_TS=1787690815372;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

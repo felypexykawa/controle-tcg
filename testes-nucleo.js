@@ -1035,6 +1035,50 @@ setg('movs',[{id:'nb1',tipo:'COMPRA',valor:1,notaId:'nB',notaNum:'9'},{id:'nb2',
 dia26.length=0; A('excluirNotaInteira')('nB');
 t('D26 (lote): nota inteira de 5 = UM registro agregado (nao 5)', dia26.length===1 && dia26[0]==='excluiu (nota inteira)', JSON.stringify(dia26));
 setg('lixeiraGuarda',_lgD);
+
+console.log('\n=== 27. cura de classe G1: restauracao viaja com SINAL e vence tumulo mais velho na fusao ===');
+setg('excluidos',{}); setg('movs',[{id:'rx',tipo:'COMPRA',valor:10}]); setg('_fotosPurga',[]);
+A('marcaExcluido')('rx');
+t('G1c: excluir marca positivo (excluido)', A('estaExcluido')('rx') && +g('excluidos').rx>0);
+A('desmarcaExcluido')('rx');
+t('G1c: restaurar NAO apaga o registro — vira marca NEGATIVA e o item deixa de estar excluido', !A('estaExcluido')('rx') && +g('excluidos').rx<0, JSON.stringify(g('excluidos')));
+const antigoPos27=Date.now()-3600000;
+const fus1=A('mergeExcl')({rx:g('excluidos').rx},{rx:antigoPos27});
+t('G1c (o ciclo que matava): a restauracao NOVA vence o tumulo VELHO do aparelho atrasado — o item sobrevive a fusao', +fus1.rx<0 && !( +fus1.rx>0 ), JSON.stringify(fus1));
+const fus2=A('mergeExcl')({rx:-antigoPos27},{rx:Date.now()});
+t('G1c: re-excluido DEPOIS da restauracao (no outro aparelho): o tumulo mais novo vence — o item morre, como deve', +fus2.rx>0, JSON.stringify(fus2));
+setg('excluidos',{velhoNeg:-(Date.now()-121*864e5),velhoPos:Date.now()-121*864e5,novoPos:Date.now()}); setg('_fotosPurga',[]);
+A('podaExcluidos')();
+t('G1c: poda por |idade| — restauracao velha sai SEM alimentar a limpeza de fotos; exclusao velha sai ALIMENTANDO; novo fica', !('velhoNeg' in g('excluidos')) && !('velhoPos' in g('excluidos')) && ('novoPos' in g('excluidos')) && g('_fotosPurga').includes('velhoPos') && !g('_fotosPurga').includes('velhoNeg'), JSON.stringify(g('_fotosPurga')));
+/* [red-team M-A] aparelho com relogio ADIANTADO carimbou o futuro: a idade conta a partir do MAIOR
+   carimbo conhecido, senao a poda para pra sempre (tumulo imortal) e a foto do lancamento excluido
+   nunca entra na fila de limpeza — a decisao de 25/08 morria em silencio */
+const fut27=Date.now()+200*864e5;
+setg('excluidos',{'nota:podreF':fut27-130*864e5,vivoF:fut27}); setg('_fotosPurga',[]);
+A('podaExcluidos')();
+t('G1c (relogio adiantado): a poda continua rodando — o velho-relativo sai e alimenta a fila, o novo fica', !('nota:podreF' in g('excluidos')) && ('vivoF' in g('excluidos')) && g('_fotosPurga').includes('podreF'), JSON.stringify(g('excluidos'))+' fila='+JSON.stringify(g('_fotosPurga')));
+/* fiacao real, do lado do APARELHO ATRASADO (o ciclo que matava): o local ainda carrega o tumulo VELHO positivo;
+   o snapshot chega com a restauracao NOVA (negativa) e o proprio item — com uniao, o positivo local vencia e o
+   aparelho atrasado devorava o restaurado e subia a morte de volta */
+setg('excluidos',{gz:Date.now()-7200000}); setg('movs',[]); setg('_baseH',{});
+const r27={movs:[{id:'gz',tipo:'COMPRA',valor:5}],excluidos:{gz:-Date.now()},jogos:[],cats:[],cols:[],colsJ:{},colsG:{},pess:[],pgs:[],despCats:[],cadastros:[],contasBanc:[],codigosResolvidos:{}};
+const f27=A('fundirComRemoto')(r27);
+t('G1c (fiacao real): no aparelho ATRASADO, a restauracao nova do snapshot vence o tumulo velho local — o item entra e fica vivo', f27.movs.some(m=>m.id==='gz') && +f27.excluidos.gz<0, JSON.stringify(f27.excluidos)+' ids='+JSON.stringify(f27.movs.map(m=>m.id)));
+/* [red-team G-1/M-4] a PORTA PRINCIPAL (aplicarNuvem, sem pendencia local) preserva o restaurado e roda a poda */
+setg('_restaurando',false); setg('_syncReady',true); setg('_db',null); setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem'];
+setg('tela','painel'); setg('editId',null);
+setg('excluidos',{x1:Date.now()-3600000,fossil:Date.now()-121*864e5}); setg('movs',[]); setg('_fotosPurga',[]);
+A('aplicarNuvem')({_upd:9999,movs:[{id:'x1',tipo:'COMPRA',valor:7}],excluidos:{x1:-Date.now()}});
+t('G1c (PORTA PRINCIPAL): snapshot com restauracao nova vence o tumulo velho local — item vivo, marca negativa, poda rodou', M().some(m=>m.id==='x1') && +g('excluidos').x1<0 && !('fossil' in g('excluidos')), JSON.stringify(g('excluidos'))+' ids='+JSON.stringify(M().map(m=>m.id)));
+/* [red-team G-4] relogio atrasado: excluir DEPOIS de uma restauracao com carimbo "do futuro" ainda vence */
+setg('excluidos',{sk:-(Date.now()+3600000)}); setg('movs',[{id:'sk',tipo:'COMPRA',valor:3}]);
+A('marcaExcluido')('sk');
+t('G1c (relogio): exclusao de agora vence marca do futuro (carimbo monotonico, independe do relogio)', A('estaExcluido')('sk') && +g('excluidos').sk>Date.now()+3600000-5, String(g('excluidos').sk));
+setg('excluidos',{}); setg('_fotosPurga',[]); setg('movs',[]);
+/* D5: apelidos de jogo no ligaDoJogo — exato, mtg, dragonball masters, containment; desconhecido = null */
+t('D5: apelidos de jogo acham a Liga certa (mtg, Magic the Gathering, Pokemon TCG, DB Masters) e desconhecido segue null',
+  A('ligaDoJogo')('mtg')===A('ligaDoJogo')('Magic') && /ligamagic/.test(A('ligaDoJogo')('Magic the Gathering')||'') && /ligapokemon/.test(A('ligaDoJogo')('Pokémon TCG')||'') && A('ligaDoJogo')('Dragon Ball Masters')==='masters.ligadragonball.com.br' && /fusion\.ligadragonball/.test(A('ligaDoJogo')('Dragon Ball Super')||'') && A('ligaDoJogo')('Lorcana')===null,
+  JSON.stringify([A('ligaDoJogo')('Magic the Gathering'),A('ligaDoJogo')('Dragon Ball Masters'),A('ligaDoJogo')('Lorcana')]));
 t('D26: os gestos de CRIAR estao ligados no fonte (lançou/editou/nota/venda-vários/troca/mover/restaurar)', /diarioReg\('lançou',rotDe\(obj\)/.test(src)&&/diarioReg\('editou',rotDe\(movs\[i\]\)/.test(src)&&/diarioReg\('lançou nota de compra'/.test(src)&&/diarioReg\('vendeu \(vários\)'/.test(src)&&/diarioReg\('registrou troca'/.test(src)&&/diarioReg\('moveu foto'/.test(src)&&/diarioReg\('restaurou ponto da nuvem'/.test(src));
 setg('diarioReg',_dr26);
 let htmlDia=''; const _insD=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlDia=h;};
