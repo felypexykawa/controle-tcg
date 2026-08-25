@@ -159,7 +159,26 @@ let _baseH={};try{_baseH=JSON.parse(localStorage.getItem('tcg_base_h')||'{}')||{
 /* [re-checagem 2, N3] o replacer é FUNÇÃO que ordena as chaves em QUALQUER profundidade. A 1ª versão
    passava um array de chaves, que o JSON.stringify trata como lista de PERMITIDAS em todos os níveis:
    objeto aninhado (pgParcelas — parcela paga) virava {} e a base não via a mudança. */
-function hashReg(o){const s=JSON.stringify(o,(k,v)=>(v&&typeof v==='object'&&!Array.isArray(v))?Object.keys(v).sort().reduce((r,x)=>(r[x]=v[x],r),{}):v);let h=5381;for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36);}
+function hashReg(o){if(o&&o.fotoThumb){const c={...o};delete c.fotoThumb;o=c;}   /* [1MB fase 1] miniatura é derivada e não viaja mais no documento — se entrasse no hash, todo lançamento com foto pareceria "editado aqui" pra sempre e a base viraria a doença dos 40/40 de novo */
+  const s=JSON.stringify(o,(k,v)=>(v&&typeof v==='object'&&!Array.isArray(v))?Object.keys(v).sort().reduce((r,x)=>(r[x]=v[x],r),{}):v);let h=5381;for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36);}
+/* [1MB fase 1, 25/08] a miniatura (fotoThumb, ~2KB por lançamento com foto) era o único campo que
+   crescia POR FOTO dentro do documento de 1MB. Agora: (a) o payload sobe enxuto (semThumbs);
+   (b) o snapshot que chega sem thumb NÃO apaga a miniatura local (reidrataThumbs, só quando o
+   lançamento ainda tem foto); (c) a miniatura viaja em doc próprio `th_{movId}` DENTRO da
+   subcoleção `fotos` — a regra já publicada cobre, id de foto começa com 'f', sem colisão. */
+/* [revisor 1MB, G1] o payload NAO apaga a chave: sobe um MARCADOR de 1 pixel (75 bytes). Apagar fazia o
+   aparelho DESATUALIZADO ver hash(local com thumb) != base(doc sem thumb) e concluir "editei aqui" em todo
+   lancamento com foto — vencendo merges com copia velha e SUBINDO reversao de edicao (provado: 777 virava 20).
+   Com o marcador, o valor que o velho recebe e estavel dos dois lados e o hash dele fecha. */
+const TH_MARCA='data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+function semThumbs(arr){return (arr||[]).map(m=>{if(m&&m.fotoThumb&&m.fotoThumb!==TH_MARCA){const c={...m};c.fotoThumb=TH_MARCA;return c;}return m;});}
+function reidrataThumbs(antes,depois){if(!Array.isArray(antes)||!Array.isArray(depois))return depois;
+  const t={};antes.forEach(m=>{if(m&&m.id&&m.fotoThumb&&m.fotoThumb!==TH_MARCA)t[m.id]=m.fotoThumb;});
+  depois.forEach(m=>{if(!m||!m.id)return;
+    if(m.fotoThumb===TH_MARCA){if(t[m.id]&&(+m.nFotos||0)>0)m.fotoThumb=t[m.id];else if(!((+m.nFotos||0)>0))delete m.fotoThumb;}   /* [revisor G1, rodada 2] com foto e sem par local o marcador FICA (invisivel na tela): apagar fazia o campo oscilar real->marcador->ausente no doc, e cada troca era transicao nova pro aparelho velho. Sem foto nenhuma (nFotos=0), marcador e lixo e sai */
+    else if(!m.fotoThumb&&t[m.id]&&(+m.nFotos||0)>0)m.fotoThumb=t[m.id];});
+  return depois;}
+function thumbReal(x){return (x&&x!==TH_MARCA)?x:'';}   /* a tela so mostra miniatura DE VERDADE; marcador = sem miniatura */
 function calcBase(p){const b={};[p&&p.movs,p&&p.cadastros,p&&p.contasBanc].forEach(L=>{(L||[]).forEach(r=>{if(r&&r.id)b[r.id]=hashReg(r);});});return b;}
 function publicaBase(b){if(!b)return;_baseH=b;gravaLocal('tcg_base_h',JSON.stringify(b));}
 function gravaBaseConfirmada(p){publicaBase(calcBase(p));}
@@ -254,9 +273,9 @@ function processarPurgaFotos(){if(!_fotosPurga.length)return;if(USAR_NUVEM&&!_db
        SEM apagar nada — a purga só limpa quem está morto de verdade no momento da varredura */
     if(movs.some(x=>x.id===dono||x.notaId===dono||x.vendaId===dono||x.trocaId===dono)){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();return;}
     fotoList(dono,L=>{if(L===null)return;
-    if(!L.length){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();lixeiraApaga(dono,function(){});return;}   /* [revisão lixeira, G2] dono SEM foto também tem a entrada apagada aos 120 dias */
+    if(!L.length){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();lixeiraApaga(dono,function(){});thumbNuvem(dono,null);return;}   /* [revisão lixeira, G2] dono SEM foto também tem a entrada apagada aos 120 dias */
     let falta=L.length,todas=true;
-    L.forEach(f=>fotoDel(f.id,ok=>{if(!ok)todas=false;if(--falta===0&&todas){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();lixeiraApaga(dono,function(){});}}));});});}
+    L.forEach(f=>fotoDel(f.id,ok=>{if(!ok)todas=false;if(--falta===0&&todas){_fotosPurga=_fotosPurga.filter(x=>x!==dono);gravaFotosPurga();lixeiraApaga(dono,function(){});thumbNuvem(dono,null);}}));});});}   /* o doc th_ do dono morre junto (grupo sem th_ = delete inofensivo) */
 /* ===== 🗑 LIXEIRA — decisão do Felype 25/08: o campo de USO da janela de 120 dias =====
    Guarda o LANÇAMENTO COMPLETO fora do documento principal (subcoleção `lixeira` na nuvem; cofre local no modo
    local) no momento da exclusão. A tela 🗑 Lixeira (em Backup) lista, mostra fotos e RESTAURA item a item; a
@@ -1374,7 +1393,7 @@ let _fotosEmVoo=[],_fotosFalhadas=[],_gradeDe=null;   /* _gradeDe: dono (item ou
    foto é de um lançamento já salvo — devolver ao balde colava a foto no lançamento SEGUINTE (ou, na nota, o
    item perdia a foto). Vai para a fila por lançamento e é reenviada: sozinha, no próximo commit bem-sucedido
    da nuvem (a rede voltou), e por um toque no visor "📷 fotos" do lançamento. */
-function contarFotoGravada(m,b64){if(!m)return;m.nFotos=(+m.nFotos||0)+1;if(!m.fotoThumb){fotoThumbDe(b64,t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}else save();}
+function contarFotoGravada(m,b64){if(!m)return;m.nFotos=(+m.nFotos||0)+1;if(!thumbReal(m.fotoThumb)){fotoThumbDe(b64,t=>{if(t&&!thumbReal(m.fotoThumb)){m.fotoThumb=t;thumbNuvem(m.id,t);}save();});}else save();}
 /* [F5 fatia 1] a fila de foto recusada agora tem CASA no aparelho (IDB 'fila'): entra no cofre na hora em que a
    nuvem recusa, sai na hora em que grava, e volta pra memória na abertura do app. Sem cofre disponível, segue
    como antes (só memória) — o aviso de sair da página cobre esse resto. */
@@ -1454,6 +1473,45 @@ function idbOpen(cb){if(_idb){cb(_idb);return;}try{const rq=indexedDB.open('tcg_
 /* [re-checagem F1, R-2] `silencioso`: o alerta bloqueante é da ação direta do dono (escolher a foto); o caminho
    automático (salvar com foto no balde, reenvio da fila) NÃO pode abrir pop-up a cada tentativa — a fila e a
    faixa vermelha já avisam. */
+/* ===== [1MB fase 1] miniaturas na nuvem, FORA do documento =====
+   Doc `th_{movId}` na subcoleção `fotos`: {t:1,th,ts}. Sem campo movId e sem b64 de propósito —
+   lerFotos filtra por movId real (nunca acha o doc de thumb) e a busca de thumbs filtra por t==1
+   (nunca traz foto inteira). Falha NUNCA trava nada: pendência fica em tcg_th_pend e tenta de novo
+   no próximo despacho (login, salvamento, próxima escrita de thumb). */
+function thumbsRefNuvem(){try{return (_db&&typeof _db.collection==='function')?_db.collection('controle').doc('dados').collection('fotos'):null;}catch(e){return null;}}   /* _db meio-inicializado nao explode: pendencia espera */
+function thumbPend(){try{return JSON.parse(localStorage.getItem('tcg_th_pend')||'{}')||{};}catch(e){return {};}}
+function thumbPendGrava(p){try{return gravaLocal('tcg_th_pend',JSON.stringify(p))!==false;}catch(e){return false;}}   /* [revisor 1MB, M4] passa pela escada de poda/aviso do gravaLocal — memoria cheia nunca e calada */
+function thumbNuvem(movId,th){if(!movId||!USAR_NUVEM)return;const p=thumbPend();p[movId]=th||null;thumbPendGrava(p);despachaThumbs();}
+let _thDespachando=false;
+function despachaThumbs(){if(_thDespachando||!USAR_NUVEM)return;const ref=thumbsRefNuvem();if(!ref)return;
+  const p=thumbPend(),ks=Object.keys(p);if(!ks.length)return;_thDespachando=true;
+  const um=i=>{if(i>=ks.length){_thDespachando=false;return;}
+    const id=ks[i],th=p[id];
+    const fim=()=>{const q=thumbPend();
+      if(q[id]===th)delete q[id];   /* [revisor 1MB, M1] a pendência mudou DURANTE o voo (ex.: apagar entrou no meio)? fica — o próximo despacho envia o valor novo, nada é engolido */
+      if(!thumbPendGrava(q)){_thDespachando=false;return;}   /* [M3] memória cheia: para a rodada em 1 escrita — sem re-envio infinito por salvamento */
+      um(i+1);};
+    const deuRuim=()=>{_thDespachando=false;};   /* pendência fica; próximo despacho retenta */
+    try{
+      if(th)ref.doc('th_'+id).set({t:1,th,ts:Date.now()}).then(fim).catch(deuRuim);
+      else ref.doc('th_'+id).delete().then(fim).catch(deuRuim);
+    }catch(e){deuRuim();}};   /* throw síncrono (conexão meio-morta) NUNCA derruba quem chamou — a gravação principal vem antes da miniatura */
+  um(0);}
+let _thBuscou=false;
+function carregarThumbsNuvem(){if(_thBuscou||!USAR_NUVEM)return;const ref=thumbsRefNuvem();if(!ref)return;
+  const falta=(movs||[]).some(m=>m&&m.id&&(+m.nFotos||0)>0&&(!m.fotoThumb||m.fotoThumb===TH_MARCA));if(!falta)return;_thBuscou=true;
+  try{
+  ref.where('t','==',1).get().then(q=>{
+    const t={};q.forEach(d=>{const x=d.data();if(x&&x.th&&d.id.indexOf('th_')===0)t[d.id.slice(3)]=x.th;});
+    let mudou=false;(movs||[]).forEach(m=>{if(m&&m.id&&(!m.fotoThumb||m.fotoThumb===TH_MARCA)&&(+m.nFotos||0)>0&&t[m.id]){m.fotoThumb=t[m.id];mudou=true;}});
+    if(mudou){gravaLocal(MK,JSON.stringify(movs));try{render();}catch(e){}}
+  }).catch(()=>{_thBuscou=false;});
+  }catch(e){_thBuscou=false;}}
+/* 1x por aparelho: as miniaturas que já existiam aqui sobem pros docs th_ (o outro aparelho passa a vê-las) */
+function backfillThumbs(){try{if(localStorage.getItem('tcg_th_bf1'))return;const p=thumbPend();let n=0;
+  (movs||[]).forEach(m=>{if(m&&m.id&&m.fotoThumb&&m.fotoThumb!==TH_MARCA&&(+m.nFotos||0)>0&&!(m.id in p)){p[m.id]=m.fotoThumb;n++;}});
+  if(n&&!thumbPendGrava(p))return;   /* [revisor 1MB, M2] pendência não coube no disco → SEM flag: o próximo boot tenta de novo (antes: flag gravada com pendência perdida = miniaturas nunca subiam, calado) */
+  gravaLocal('tcg_th_bf1','1');if(n)despachaThumbs();}catch(e){}}
 function fotoAdd(movId,b64,cb,silencioso){const fid=novoId('f');
   if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').doc(fid).set({movId,b64,ts:Date.now()}).then(()=>cb(true)).catch(e=>{if(!silencioso)alert('A nuvem recusou a foto — quase certo que falta publicar a REGRA de fotos no Firebase — avise o Felype. Detalhe: '+(e&&e.message));cb(false);});}
   else idbOpen(db=>{if(!db){if(!silencioso)alert('Não consegui abrir o armazenamento de fotos deste aparelho.');cb(false);return;}
@@ -1518,7 +1576,7 @@ function moverFotosDe(origemId,destinoId,cb){if(!origemId||!destinoId||origemId=
     fotoList(destinoId,D=>{const jaLa=new Set((D||[]).map(x=>x.b64));
       let n=0,falta=fila.length,respondeu=false;const total=L.length;
       const fim=()=>{if(respondeu)return;respondeu=true;const m=movs.find(x=>x.id===destinoId);
-        if(m&&n){m.nFotos=(+m.nFotos||0)+n;if(!m.fotoThumb&&fila[0]&&fila[0].b64){fotoThumbDe(fila[0].b64,t=>{if(t&&!m.fotoThumb){m.fotoThumb=t;}save();});}else save();}
+        if(m&&n){m.nFotos=(+m.nFotos||0)+n;if(!thumbReal(m.fotoThumb)&&fila[0]&&fila[0].b64){fotoThumbDe(fila[0].b64,t=>{if(t&&!thumbReal(m.fotoThumb)){m.fotoThumb=t;thumbNuvem(m.id,t);}save();});}else save();}
         cb&&cb(n,total);};
       fila.forEach(f=>{_moveEmVoo.add(f.id);
         if(jaLa.has(f.b64)){fotoDel(f.id,ok2=>{_moveEmVoo.delete(f.id);if(ok2)n++;if(--falta===0)fim();});return;}
@@ -1554,8 +1612,8 @@ function fotoRefresh(movId){fotoList(movId,L=>{const g=document.getElementById('
   if(g)g.innerHTML=L.length?L.map(f=>`<img src="${f.b64}" style="width:100%;height:92px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="verFoto('${f.id}','${movId}')">`).join(''):'<div class="meta" style="grid-column:1/-1">Nenhuma foto ainda.</div>';
   const m=movs.find(x=>x.id===movId);if(!m)return;
   /* [fotos F1, P0-3] só grava (e sobe pra nuvem) se algo MUDOU — abrir o visor não é escrita */
-  if(L.length){let mudou=false;if((+m.nFotos||0)!==L.length){m.nFotos=L.length;mudou=true;}fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;}if(mudou)save();});}
-  else{let mudou=false;if(+m.nFotos){m.nFotos=0;mudou=true;}if(m.fotoThumb){delete m.fotoThumb;mudou=true;}if(mudou)save();}});}
+  if(L.length){let mudou=false;if((+m.nFotos||0)!==L.length){m.nFotos=L.length;mudou=true;}fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;thumbNuvem(m.id,t);}if(mudou)save();});}
+  else{let mudou=false;if(+m.nFotos){m.nFotos=0;mudou=true;}if(m.fotoThumb){delete m.fotoThumb;mudou=true;thumbNuvem(m.id,null);}if(mudou)save();}});}
 function fotoEscolhida(movId,inp,perfil){const file=inp.files&&inp.files[0];if(!file)return;inp.value='';
   const g=document.getElementById('fotoGrid');if(g)g.innerHTML='<div class="meta" style="grid-column:1/-1">guardando foto…</div>';
   fotoComprime(file,b64=>{if(!b64){alert('Não consegui ler essa imagem.');fotoRefresh(movId);return;}
@@ -1596,8 +1654,8 @@ function abrirMoverFoto(fid,movId,tudo){const f=_fotosCache.find(x=>x.id===fid);
    leitura falhada não toca em nada). */
 function recontarFotos(movId){const m=movs.find(x=>x.id===movId);if(!m)return;
   fotoList(movId,L=>{if(L===null)return;let mudou=false;if((+m.nFotos||0)!==L.length){m.nFotos=L.length;mudou=true;}
-    if(L.length){fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;}if(mudou)save();});}
-    else{if(m.fotoThumb){delete m.fotoThumb;mudou=true;}if(mudou)save();}});}
+    if(L.length){fotoThumbDe(L[0].b64,t=>{if(t&&m.fotoThumb!==t){m.fotoThumb=t;mudou=true;thumbNuvem(m.id,t);}if(mudou)save();});}
+    else{if(m.fotoThumb){delete m.fotoThumb;mudou=true;thumbNuvem(m.id,null);}if(mudou)save();}});}
 function moverFotoPara(fid,movId){const f=_fotosCache.find(x=>x.id===fid);const destino=(document.getElementById('mvf_dest')||{}).value||'';
   if(!f){alert('Não achei essa foto na lista — feche e abra o visor de novo.');return;}
   if(!destino){alert('Escolha o destino na lista (toque numa das opções).');return;}
@@ -1620,7 +1678,7 @@ function moverFotoPara(fid,movId){const f=_fotosCache.find(x=>x.id===fid);const 
   const fim=(ok,jaEstavaLa,D)=>{if(respondeu)return;respondeu=true;fecharVisor();
     if(!ok){alert('Não consegui concluir o mover (sem internet?). A foto NÃO se perdeu: ou continua na origem, ou ficou nos dois lugares — mova de novo quando a conexão voltar (eu não duplico).');reabrirGrade(movId);return;}
     const mDest=movs.find(x=>x.id===destino);if(mDest){if(D)mDest.nFotos=D.length+(jaEstavaLa?0:1);else if(!jaEstavaLa)mDest.nFotos=(+mDest.nFotos||0)+1;
-      if(!mDest.fotoThumb)fotoThumbDe(f.b64,t=>{if(t&&!mDest.fotoThumb){mDest.fotoThumb=t;save();}});save();}
+      if(!thumbReal(mDest.fotoThumb))fotoThumbDe(f.b64,t=>{if(t&&!thumbReal(mDest.fotoThumb)){mDest.fotoThumb=t;thumbNuvem(mDest.id,t);save();}});save();}
     const mOri=movs.find(x=>x.id===movId);if(mOri){if(+mOri.nFotos>0){mOri.nFotos=+mOri.nFotos-1;save();}if(!mOri.nFotos)recontarFotos(movId);}
     diarioReg('moveu foto',alvo?alvo.rot.slice(0,60):destino);toast('Foto movida ✓');reabrirGrade(movId);};
   armar();
@@ -2430,8 +2488,8 @@ function vConsultar(){
     else if(venda)pg=m.canal==='App'?`app · ${m.recDias||0}d${m.taxa?' −'+m.taxa+'%':''}`:'Pix · na hora';
     else pg=(m.pgTipo==='Parcelado'&&+m.nParc>1)?`${m.nParc}× ${fmt(total/m.nParc)}`:'à vista';
     const st=venda?null:m.tipo==='DESPESA'?['c',m.natureza==='material'?'🧰 material':'🧾 ordinária']:ST[sitDe(m)];
-    const orig=(venda&&m.origemId&&!m.fotoThumb)?movs.find(z=>z.id===m.origemId):null;
-    const th=m.fotoThumb||(orig&&orig.fotoThumb)||'',thId=m.fotoThumb?m.id:(orig?orig.id:m.id);
+    const orig=(venda&&m.origemId&&!thumbReal(m.fotoThumb))?movs.find(z=>z.id===m.origemId):null;
+    const th=thumbReal(m.fotoThumb)||(orig&&thumbReal(orig.fotoThumb))||'',thId=thumbReal(m.fotoThumb)?m.id:(orig?orig.id:m.id);
     return head+`<div class="item" style="display:block" id="mv-${m.id}">
       <div style="display:flex;justify-content:space-between;gap:10px;cursor:pointer" onclick="${selMode&&m.tipo==='COMPRA'?`togSel('${m.id}')`:`toggleExp('${m.id}')`}">
         ${selMode&&m.tipo==='COMPRA'?`<div style="flex:none;align-self:center;font-size:19px;color:${selIds[m.id]?'var(--blue)':'var(--mut)'}">${selIds[m.id]?'☑':'☐'}</div>`:''}${th?`<img src="${th}" style="width:36px;height:36px;object-fit:cover;border-radius:7px;flex:none;align-self:center" onclick="event.stopPropagation();abrirFotos('${thId}')">`:''}<div style="flex:1">
@@ -3283,7 +3341,7 @@ function pontoNuvemDiario(){
    As FOTOS moram fora do documento (subcoleção); o que pesa dentro dele é a miniatura de cada carta (~2 KB).
    Honestidade do teto: quem recusa acima de 700.000 bytes é o PONTO de restauração; o salvamento principal hoje
    NÃO trava sozinho — proteger isso é exatamente a decisão 2 do painel do dono. */
-function medirDocBytes(){const dados=JSON.stringify({movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,excluidos});try{return new TextEncoder().encode(dados).length;}catch(e){return dados.length;}}
+function medirDocBytes(){const dados=JSON.stringify({movs:semThumbs(movs),jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,excluidos});try{return new TextEncoder().encode(dados).length;}catch(e){return dados.length;}}   /* mede o que SOBE de verdade: sem miniatura (1MB fase 1) */
 function medirFotosNuvem(el){if(el)el.textContent='medindo…';todasFotos(L=>{
   const s=document.getElementById('fotoMedidaTxt');
   if(L===null){if(s)s.textContent=' → não consegui ler as fotos agora (sem conexão?) — tente de novo';if(el)el.textContent='🔎 medir o espaço das fotos';return;}
@@ -3585,7 +3643,7 @@ function restaurarBackup(ts){
 /* [revisão F5a, M3 — mesma lei do P0-1] "não consegui ler" devolve null, NUNCA lista vazia: vazio é resposta,
    erro é pergunta sem resposta. Quem consome decide o que fazer com o null (medidor avisa; backup completo aborta). */
 function todasFotos(cb){
-  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{if(q&&q.metadata&&q.metadata.fromCache&&q.empty){cb(null);return;}const L=[];q.forEach(d=>L.push(Object.assign({id:d.id},d.data())));cb(L);}).catch(()=>cb(null));}
+  if(USAR_NUVEM&&_db){_db.collection('controle').doc('dados').collection('fotos').get().then(q=>{if(q&&q.metadata&&q.metadata.fromCache&&q.empty){cb(null);return;}const L=[];q.forEach(d=>{const x=d.data();if(x&&x.b64)L.push(Object.assign({id:d.id},x));});cb(L);}).catch(()=>cb(null));}   /* filtra docs th_ (miniatura não é foto — sem b64, não entra no backup nem re-sobe) */
   else idbOpen(db=>{if(!db){cb(null);return;}const L=[];const cur=db.transaction('fotos').objectStore('fotos').openCursor();cur.onsuccess=e=>{const c=e.target.result;if(c){L.push(c.value);c.continue();}else cb(L);};cur.onerror=()=>cb(null);});}
 function restaurarFotos(L,done){let i=0,ok=0;const next=()=>{if(i>=L.length){done(ok);return;}const f=L[i++];const fid=f.id||novoId('f');
   if(!f||!f.b64){next();return;}
@@ -4127,7 +4185,7 @@ function fundirComRemoto(r,remotoVence){r=r||{};
     const D=(a,b)=>remotoVence?mergeDictRaso(b,a):mergeDictRaso(a,b);
     const G=(a,b)=>remotoVence?mergeColsG(b,a):mergeColsG(a,b);
     return {
-      movs:M(movs,r.movs),
+      movs:reidrataThumbs(movs,M(movs,r.movs)),   /* [1MB fase 1] snapshot vem sem thumb; a local não morre no merge */
       jogos:mergeArrUniao(jogos,r.jogos,'jogos:'),
       cats:mergeArrUniao(cats,r.cats),
       cols:mergeArrUniao(cols,r.cols,'cols:'),
@@ -4164,7 +4222,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
          apagado (ausente lá, presente aqui) ressuscitava no payload. */
       final=fundirComRemoto(remoto);
     }
-    const payload={...final,_upd:Date.now(),_by:_userEmail,_v:(typeof BUILD_TS!=='undefined'?BUILD_TS:0)};   /* _v: a aba velha descobre que existe app mais novo (revisor G1-classe, G-3) */
+    const payload={...final,movs:semThumbs(final.movs),_upd:Date.now(),_by:_userEmail,_v:(typeof BUILD_TS!=='undefined'?BUILD_TS:0)};   /* _v: a aba velha descobre que existe app mais novo (revisor G1-classe, G-3) · movs sobem SEM miniatura (1MB fase 1) */
     /* [re-checagem 2, N2] a base é calculada AQUI, no mesmo instante síncrono em que o payload vai
        pro tx.set — não no .then, que roda uma ida-e-volta depois e relia os objetos VIVOS (uma
        correção feita no meio do commit ficava "confirmada" e a fusão seguinte a apagava). Mesma
@@ -4182,6 +4240,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
     tx.set(ref,payload);
     return payload;
   })).then(payload=>{
+    try{despachaThumbs();}catch(e){}   /* [1MB fase 1] todo salvamento ok é chance de drenar thumb pendente */
     if(fundiu&&!_restaurando){   /* _restaurando: quem restaurou um ponto durante o commit manda; não refundir por cima (re-checagem 23/08, T5) */
       /* [revisão 23/08, G3 — pré-existente] atribuir `final.*` por cima apagava o lançamento feito
          DURANTE a ida-e-volta do commit (memória E disco), e a marca de pendência ficava apontando
@@ -4226,6 +4285,7 @@ function lancarTemRascunho(){
   return ids.some(id=>{const el=document.getElementById(id);return el&&(''+el.value).trim()!=='';});
 }
 function aplicarNuvem(d){if(!d||_restaurando)return;
+  const _movsAntesTh=movs;   /* [1MB fase 1] guarda as thumbs locais pra reidratar depois da troca pelo snapshot enxuto */
   /* [R1 2026-08-17] eco da própria escrita: o estado local JÁ É este payload (registrado
      dentro da transação em salvarNuvem) — reprocessar e repintar era o que apagava o
      formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
@@ -4251,6 +4311,7 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
   /* FORA do if de proposito: aparelho que ainda nao recarregou grava snapshot SEM este campo,
      e ai o filtro nunca rodava — tudo ressuscitava. O registro que manda e o DESTE aparelho. */
   if(Array.isArray(movs))movs=movs.filter(m=>!estaExcluido(m&&m.id));
+  reidrataThumbs(_movsAntesTh,movs);   /* [1MB fase 1] a PORTA PRINCIPAL troca movs inteiro pelo snapshot (enxuto); a miniatura local volta aqui */
   if(Array.isArray(cadastros))cadastros=cadastros.filter(c=>!estaExcluido(c&&c.id));
   if(Array.isArray(contasBanc))contasBanc=contasBanc.filter(c=>!estaExcluido(c&&c.id));gravaLocal(MK,JSON.stringify(movs));
   if(!fundiuPend)gravaBaseConfirmada(d);   /* snapshot aplicado sem pendência = a nuvem confirmou este estado (base do N1) */
@@ -4361,7 +4422,8 @@ function bootNuvem(){try{firebase.initializeApp(firebaseConfig);}catch(e){}_auth
           try{setTimeout(pontoNuvemDiario,4000);}catch(e){}
           /* [revisão F5a, M4] porta de saída da fila no LOGIN: a foto que esperou no cofre reenvia agora, sem depender
              de um próximo salvamento; os moves pendentes e a limpeza de excluídos aproveitam o mesmo momento */
-          try{setTimeout(()=>{try{reenviarFotosFalhadas();}catch(e){}try{retomarMovesPendentes();}catch(e){}try{processarPurgaFotos();}catch(e){}},2500);}catch(e){}
+          try{setTimeout(()=>{try{reenviarFotosFalhadas();}catch(e){}try{retomarMovesPendentes();}catch(e){}try{processarPurgaFotos();}catch(e){}
+            try{backfillThumbs();}catch(e){}try{despachaThumbs();}catch(e){}try{carregarThumbsNuvem();}catch(e){}},2500);}catch(e){}   /* [1MB fase 1] sobe thumbs pendentes/legadas e busca as que faltam aqui */
           try{go(papelAtual()==='lancamento'?'lancar':'painel');}
           catch(e){falha=falha||('ao desenhar a tela: '+((e&&e.message)||e));try{console.error('render',e);}catch(_){}}
           if(falha)telaFalhaApp(falha);
@@ -4380,11 +4442,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='25/08 17h46';
+const BUILD_TAG='25/08 18h40';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787690815372;
+const BUILD_TS=1787694042054;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

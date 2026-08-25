@@ -1543,6 +1543,94 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   t('F4 (re-checagem): com EDICAO aberta, o rascunho nao entra', g('vendaItens').length===0 && toastsA.length===0, JSON.stringify(toastsA));
   setg('editId',null); setg('toast',_tA); delete lojas24.rascunho.atual;
   setg('notaItens',[]); setg('_fotosPend',[]); setg('tela','painel');
+  /* === 28. 1MB fase 1: miniatura fora do documento === */
+  console.log('\n=== 28. 1MB fase 1: miniatura fora do documento ===');
+  reset(); setg('_restaurando',false); setg('tela','painel'); setg('editId',null); setg('_syncReady',true); setg('_db',null);
+  setg('_pendSeq',0); setg('_pendOk',0); delete store['tcg_pend_nuvem']; setg('excluidos',{}); setg('_baseH',{});
+  setg('gravaLocal',_gravaOrig);   /* secoes anteriores trocam o gravaLocal; aqui a pendencia de thumb depende do REAL */
+  t('28: hashReg ignora a miniatura (senao todo lancamento com foto pareceria "editado aqui" pra sempre)',
+    A('hashReg')({id:'a',valor:5,fotoThumb:'data:x'})===A('hashReg')({id:'a',valor:5}) && A('hashReg')({id:'a',valor:5})!==A('hashReg')({id:'a',valor:6}));
+  const mSem={id:'m1',valor:2,fotoThumb:'T',nFotos:1};
+  const arrSem=A('semThumbs')([mSem]);
+  t('28: semThumbs troca a miniatura pelo MARCADOR de 1px na COPIA (revisor G1: apagar a chave fazia o app velho reverter edicao) e nao encosta no original',
+    arrSem[0].fotoThumb===g('TH_MARCA') && mSem.fotoThumb==='T' && arrSem[0].valor===2 && g('TH_MARCA').length<100);
+  /* porta principal: snapshot com marcador NAO apaga a miniatura local; foto zerada no outro lado NAO ressuscita;
+     marcador sem par local SOME do estado (nunca vira lixo na tela nem no disco) */
+  setg('movs',[{id:'t1',tipo:'COMPRA',valor:3,fotoThumb:'TH1',nFotos:1},{id:'t2',tipo:'COMPRA',valor:4,fotoThumb:'TH2',nFotos:1}]);
+  A('aplicarNuvem')({_upd:8881,movs:[{id:'t1',tipo:'COMPRA',valor:3,fotoThumb:g('TH_MARCA'),nFotos:1},{id:'t2',tipo:'COMPRA',valor:4,fotoThumb:g('TH_MARCA'),nFotos:0},{id:'t3',tipo:'COMPRA',valor:5,fotoThumb:g('TH_MARCA'),nFotos:1}],excluidos:{}});
+  t('28 (porta principal): marcador vira a miniatura local de volta; zerado nao ressuscita; marcador orfao FICA marcador (estavel — revisor G1 rodada 2: apagar fazia o campo oscilar no doc e cada troca era transicao nova pro app velho)',
+    (g('movs').find(m=>m.id==='t1')||{}).fotoThumb==='TH1' && !(g('movs').find(m=>m.id==='t2')||{}).fotoThumb && (g('movs').find(m=>m.id==='t3')||{}).fotoThumb===g('TH_MARCA'), JSON.stringify(g('movs').map(m=>[m.id,(m.fotoThumb||'').slice(0,8)])));
+  t('28: a tela e cega ao marcador (thumbReal devolve vazio) e enxerga a miniatura real', A('thumbReal')(g('TH_MARCA'))==='' && A('thumbReal')('TH1')==='TH1' && A('thumbReal')(undefined)==='');
+  /* o marcador orfao que ficou re-sobe estavel: outro save nao alterna real->marcador->ausente */
+  const mvT3=g('movs').find(m=>m.id==='t3');
+  t('28: marcador orfao re-sobe ESTAVEL no payload (sem oscilar pra ausente)', A('semThumbs')([mvT3])[0].fotoThumb===g('TH_MARCA'));
+  /* porta da pendencia — no ramo em que o REMOTO vence o empate (boot com base confirmada e registro
+     NAO editado aqui): sem a reidratacao, o lancamento enxuto do outro lado apagaria a miniatura local */
+  setg('movs',[{id:'p1',tipo:'COMPRA',valor:9,fotoThumb:'THP',nFotos:2}]);
+  setg('_baseH',{p1:A('hashReg')({id:'p1',tipo:'COMPRA',valor:9,nFotos:2})});
+  const fx28=A('fundirComRemoto')({movs:[{id:'p1',tipo:'COMPRA',valor:9,nFotos:2}],excluidos:{},jogos:[],cats:[],cols:[],colsJ:{},colsG:{},pess:[],pgs:[],despCats:[],cadastros:[],contasBanc:[],codigosResolvidos:{}},true);
+  t('28 (porta da pendencia): mesmo quando o REMOTO vence o empate (boot), a miniatura local volta', (fx28.movs.find(m=>m.id==='p1')||{}).fotoThumb==='THP' && (fx28.movs.find(m=>m.id==='p1')||{}).valor===9, JSON.stringify(fx28.movs.map(m=>[m.id,m.fotoThumb||''])));
+  setg('_baseH',{});
+  /* payload sobe enxuto; local mantem */
+  let payCap28=null;
+  setg('movs',[{id:'s1',tipo:'COMPRA',valor:7,fotoThumb:'TS',nFotos:1}]);
+  setg('_db',{collection:()=>({doc:()=>({})}),runTransaction(fn){const tx={get(){return Promise.resolve({exists:false,data:()=>null});},set(r,p){payCap28=p;}};return fn(tx);}});
+  A('salvarNuvem')(); for(let i=0;i<6;i++)await tick();
+  t('28: o payload sobe com o MARCADOR no lugar da miniatura e o lancamento local mantem a real', !!payCap28 && payCap28.movs[0].fotoThumb===g('TH_MARCA') && g('movs')[0].fotoThumb==='TS' && payCap28.movs[0].valor===7, JSON.stringify(payCap28&&payCap28.movs.map(m=>(m.fotoThumb||'').slice(0,8))));
+  t('28: o medidor de 1MB independe do TAMANHO da miniatura real (2KB ou 20KB da o MESMO numero)', (function(){const a=A('medirDocBytes')();const mm=g('movs');mm[0]=Object.assign({},mm[0],{fotoThumb:'X'.repeat(20000)});setg('movs',mm);return a===A('medirDocBytes')();})());
+  setg('_db',null);
+  if(g('USAR_NUVEM')){
+    const thStore={};
+    const thCol={doc:(id)=>({set:(v)=>{thStore[id]=v;return Promise.resolve();},delete:()=>{delete thStore[id];return Promise.resolve();}}),
+      where:(k,op,v)=>({get:()=>Promise.resolve({forEach:(f)=>{Object.keys(thStore).filter(id=>thStore[id]&&thStore[id][k]===v).forEach(id=>f({id,data:()=>thStore[id]}));}})}),
+      get:()=>Promise.resolve({metadata:{fromCache:false},empty:!Object.keys(thStore).length,forEach:(f)=>{Object.keys(thStore).forEach(id=>f({id,data:()=>thStore[id]}));}})};
+    const dbTh={collection:()=>({doc:()=>({collection:()=>thCol})})};
+    setg('_db',dbTh); delete store['tcg_th_pend']; delete store['tcg_th_bf1']; setg('_thDespachando',false); setg('_thBuscou',false);
+    A('thumbNuvem')('mv9','TT9'); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem): a miniatura vira doc th_ na subcolecao de fotos e a pendencia esvazia', !!thStore['th_mv9'] && thStore['th_mv9'].th==='TT9' && thStore['th_mv9'].t===1 && Object.keys(A('thumbPend')()).length===0, JSON.stringify(thStore));
+    A('thumbNuvem')('mv9',null); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem): apagar a miniatura apaga o doc th_', !thStore['th_mv9']);
+    setg('_db',null);
+    A('thumbNuvem')('mv7','TT7');
+    t('28 (nuvem): sem conexao a pendencia fica no disco e nada explode', (A('thumbPend')()||{}).mv7==='TT7', store['tcg_th_pend']);
+    setg('_db',dbTh);
+    A('despachaThumbs')(); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem): quando a conexao volta, a pendencia drena', !!thStore['th_mv7'] && thStore['th_mv7'].th==='TT7' && Object.keys(A('thumbPend')()).length===0, JSON.stringify(thStore));
+    thStore['th_q1']={t:1,th:'TQ1',ts:1};
+    setg('movs',[{id:'q1',tipo:'COMPRA',valor:1,nFotos:2,fotoThumb:g('TH_MARCA')},{id:'q2',tipo:'COMPRA',valor:1,nFotos:0}]);
+    setg('_thBuscou',false);
+    A('carregarThumbsNuvem')(); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem): o aparelho com o MARCADOR busca o doc th_ e troca pelo real; quem nao tem foto fica quieto', (g('movs')[0]||{}).fotoThumb==='TQ1' && !(g('movs')[1]||{}).fotoThumb, JSON.stringify(g('movs').map(m=>[m.id,(m.fotoThumb||'').slice(0,8)])));
+    delete store['tcg_th_bf1']; Object.keys(thStore).forEach(k=>delete thStore[k]); delete store['tcg_th_pend'];
+    setg('movs',[{id:'b1',tipo:'COMPRA',valor:1,nFotos:1,fotoThumb:'TB1'}]);
+    A('backfillThumbs')(); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem): as miniaturas legadas deste aparelho sobem 1x (e a marca impede repetir)', !!thStore['th_b1'] && thStore['th_b1'].th==='TB1' && store['tcg_th_bf1']==='1', JSON.stringify(Object.keys(thStore)));
+    /* galeria/backup nunca confundem doc th_ com foto */
+    const q28={metadata:{fromCache:false},empty:false,forEach:(f)=>{[{id:'th_b1',data:()=>({t:1,th:'x',ts:1})},{id:'f77',data:()=>({movId:'b1',b64:'B64',ts:1})}].forEach(f);}};
+    setg('_db',{collection:()=>({doc:()=>({collection:()=>({get:()=>Promise.resolve(q28)})})})});
+    let todas28=null; A('todasFotos')(L=>{todas28=L;}); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem): o backup completo traz so FOTOS — o doc th_ (sem b64) fica de fora', Array.isArray(todas28) && todas28.length===1 && todas28[0].id==='f77', JSON.stringify(todas28&&todas28.map(x=>x.id)));
+    /* [revisor 1MB, M1] apagar que entra DURANTE o voo do envio nao e engolido pelo fim do envio */
+    delete store['tcg_th_pend']; setg('_thDespachando',false);
+    const thStore2={}; let capDel28=0;
+    const thCol2={doc:(id)=>({set:(v)=>{const q=A('thumbPend')();q[id.slice(3)]=null;A('thumbPendGrava')(q);thStore2[id]=v;return Promise.resolve();},delete:()=>{capDel28++;delete thStore2[id];return Promise.resolve();}})};
+    setg('_db',{collection:()=>({doc:()=>({collection:()=>thCol2})})});
+    A('thumbNuvem')('r1','AA'); for(let i=0;i<5;i++)await tick();
+    const pendMeio28=A('thumbPend')();
+    A('despachaThumbs')(); for(let i=0;i<5;i++)await tick();
+    t('28 (nuvem, corrida): o apagar que entrou no meio do voo sobrevive na pendencia e o proximo despacho apaga o doc', pendMeio28.r1===null && capDel28===1 && !thStore2['th_r1'] && Object.keys(A('thumbPend')()).length===0, JSON.stringify([pendMeio28,capDel28,Object.keys(thStore2)]));
+    /* [revisor 1MB, M2] memoria cheia no backfill: SEM flag — o proximo boot tenta de novo (antes: flag + pendencia perdida = nunca sobe, calado) */
+    delete store['tcg_th_bf1']; delete store['tcg_th_pend']; setg('_db',dbTh); Object.keys(thStore).forEach(k=>delete thStore[k]);
+    setg('movs',[{id:'bq1',tipo:'COMPRA',valor:1,nFotos:1,fotoThumb:'TBQ'}]);
+    const _gvOrig28=g('gravaLocal'); setg('gravaLocal',(k,v)=>k==='tcg_th_pend'?false:_gvOrig28(k,v));
+    A('backfillThumbs')(); for(let i=0;i<4;i++)await tick();
+    const semFlag28=!store['tcg_th_bf1'];
+    setg('gravaLocal',_gvOrig28);
+    A('backfillThumbs')(); for(let i=0;i<4;i++)await tick();
+    t('28 (nuvem, memoria cheia): backfill sem espaco NAO grava a marca; com espaco, sobe e marca', semFlag28 && store['tcg_th_bf1']==='1' && !!thStore['th_bq1'] && thStore['th_bq1'].th==='TBQ', JSON.stringify([semFlag28,Object.keys(thStore)]));
+    setg('_db',null); delete store['tcg_th_pend']; delete store['tcg_th_bf1'];
+  }
+  setg('movs',[]); setg('excluidos',{}); setg('_baseH',{});
   setg('idbOpen',_idbOrig24); setg('fotoAdd',_faOrig24); setg('_fotosFalhadas',[]); setg('_fotosPend',[]);
   setg('gravaLocal',_gravaOrig);
   setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();
