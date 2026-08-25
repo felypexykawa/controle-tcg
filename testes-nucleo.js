@@ -1024,7 +1024,17 @@ ctx.confirm=()=>true; setg('excluidos',{});
 setg('movs',[{id:'p1',tipo:'DESPESA',valor:10,status:'aberto',cat:'X'}]); A('marcarPago')('p1');
 setg('movs',[{id:'j1',tipo:'COMPRA',valor:10,notaId:'nJ'},{id:'j2',tipo:'COMPRA',valor:5,notaId:'nJ'}]); A('desfazerNotaFaz')('nJ');
 setg('movs',[{id:'s1',tipo:'COMPRA',valor:10,notaId:'nS'},{id:'s2',tipo:'COMPRA',valor:5,notaId:'nS'}]); A('separarDaNotaFaz')('s1');
-t('D26: pagar parcela, desfazer nota e separar da nota registram no diario', dia26.includes('marcou pago')&&dia26.includes('desfez nota')&&dia26.includes('separou da nota'), JSON.stringify(dia26));
+setg('movs',[{id:'pd1',tipo:'COMPRA',valor:10,cat:'ETB',situacao:'Pedido',destino:'Vender'}]); A('chegouPedido')('pd1');
+t('D26: pagar parcela, desfazer/separar nota e pedido-chegou registram no diario', dia26.includes('marcou pago')&&dia26.includes('desfez nota')&&dia26.includes('separou da nota')&&dia26.includes('marcou pedido chegado'), JSON.stringify(dia26));
+/* [revisor-diario G1] gesto de LOTE = UM registro, nao um por item */
+dia26.length=0; setg('excluidos',{}); setg('movs',Array.from({length:6},(_,i)=>({id:'lt'+i,tipo:'COMPRA',valor:1,cat:'C'+i})));
+const _lgD=g('lixeiraGuarda'); setg('lixeiraGuarda',()=>{});
+A('execExcl')('lt0','so');
+t('D26 (lote): excluir 1 registra 1', dia26.filter(x=>x==='excluiu').length===1, JSON.stringify(dia26));
+setg('movs',[{id:'nb1',tipo:'COMPRA',valor:1,notaId:'nB',notaNum:'9'},{id:'nb2',tipo:'COMPRA',valor:1,notaId:'nB'},{id:'nb3',tipo:'COMPRA',valor:1,notaId:'nB'},{id:'nb4',tipo:'COMPRA',valor:1,notaId:'nB'},{id:'nb5',tipo:'COMPRA',valor:1,notaId:'nB'}]);
+dia26.length=0; A('excluirNotaInteira')('nB');
+t('D26 (lote): nota inteira de 5 = UM registro agregado (nao 5)', dia26.length===1 && dia26[0]==='excluiu (nota inteira)', JSON.stringify(dia26));
+setg('lixeiraGuarda',_lgD);
 t('D26: os gestos de CRIAR estao ligados no fonte (lançou/editou/nota/venda-vários/troca/mover/restaurar)', /diarioReg\('lançou',rotDe\(obj\)/.test(src)&&/diarioReg\('editou',rotDe\(movs\[i\]\)/.test(src)&&/diarioReg\('lançou nota de compra'/.test(src)&&/diarioReg\('vendeu \(vários\)'/.test(src)&&/diarioReg\('registrou troca'/.test(src)&&/diarioReg\('moveu foto'/.test(src)&&/diarioReg\('restaurou ponto da nuvem'/.test(src));
 setg('diarioReg',_dr26);
 let htmlDia=''; const _insD=ctx.document.body.insertAdjacentHTML; ctx.document.body.insertAdjacentHTML=(p,h)=>{htmlDia=h;};
@@ -1376,11 +1386,12 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   console.log('\n=== F5a (dentro da 21): fila de reenvio persistida + guardas de pre-login ===');
   /* [revisao F5a, M6 + lixeira] dube ROTEADO por store: nome errado explode e o teste pega; put/delete disparam
      oncomplete por microtarefa (o app confirma cofre/exclusao por ele) */
-  const lojas24={fila:{},lixeira:{},diario:{}};
+  const lojas24={fila:{},lixeira:{},diario:{},rascunho:{}};
   const dbFake24={transaction:(nome)=>{const L=lojas24[nome];if(!L)throw new Error('store errado: '+nome);
     const tx={objectStore:()=>({
       put:v=>{L[v.qid||v.id]=v;Promise.resolve().then(()=>tx.oncomplete&&tx.oncomplete());},
       delete:k=>{delete L[k];Promise.resolve().then(()=>tx.oncomplete&&tx.oncomplete());},
+      get:k=>{const req={};Promise.resolve().then(()=>{req.result=L[k];req.onsuccess&&req.onsuccess();});return req;},
       openCursor:()=>{const req={};let i=0;const fire=()=>{const ks=Object.keys(L);
         if(i<ks.length){const v=L[ks[i]];req.onsuccess&&req.onsuccess({target:{result:{value:v,continue:()=>{i++;Promise.resolve().then(fire);}}}});}
         else req.onsuccess&&req.onsuccess({target:{result:null}});};Promise.resolve().then(fire);return req;}})};
@@ -1446,6 +1457,48 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('lixeira (nuvem): leitura que FALHA devolve null (erro nunca vira vazio)', lidasErr===null, String(lidasErr));
     setg('_db',_dbLixNu);
   }
+  /* ===== F4: rascunho do Lancar persiste, restaura (sem mexer na tela) e limpa ===== */
+  console.log('\n=== F4 (dentro da 21): rascunho persistente do Lancar ===');
+  Object.keys(lojas24.rascunho).forEach(k=>delete lojas24.rascunho[k]);
+  setg('_rascPronto',true); setg('tela','lancar'); setg('editId',null);
+  setg('tipoSel','COMPRA'); setg('compraModo','nota'); setg('notaItens',[{cat:'ETB',valor:10}]); setg('_fotosPend',['NF']); setg('vendaItens',[]); setg('trocaDei',[]); setg('trocaRecebi',[]); setg('trocaDin',0); setg('_fotosItem',[]);
+  const _stR=ctx.setTimeout; const timersR=[]; ctx.setTimeout=(fn,ms)=>{timersR.push({fn,ms});return timersR.length;};
+  A('agendaRascunho')(); A('agendaRascunho')();
+  const tR=timersR.filter(x=>x.ms===400);
+  t('F4: mexer no Lancar agenda a gravacao (debounce de 400 ms)', tR.length>=1, 'timers='+JSON.stringify(timersR.map(x=>x.ms)));
+  tR[tR.length-1].fn(); await tick();
+  t('F4: o rascunho foi pro cofre com listas, baldes e modos', !!lojas24.rascunho.atual && lojas24.rascunho.atual.dados.notaItens.length===1 && lojas24.rascunho.atual.dados._fotosPend.length===1 && lojas24.rascunho.atual.dados.compraModo==='nota', JSON.stringify(lojas24.rascunho.atual&&lojas24.rascunho.atual.dados.compraModo));
+  ctx.setTimeout=_stR;
+  setg('notaItens',[]); setg('_fotosPend',[]); setg('tipoSel','VENDA'); setg('tela','painel'); setg('_rascPronto',false);
+  let toastsR=[]; const _tR=g('toast'); setg('toast',m=>toastsR.push(String(m)));
+  A('restauraRascunho')(); for(let i=0;i<5;i++)await tick();
+  t('F4: reabrir recupera listas/baldes/modos, avisa, e NUNCA mexe na tela', g('notaItens').length===1 && g('_fotosPend').length===1 && g('tipoSel')==='COMPRA' && g('tela')==='painel' && toastsR.some(x=>/Rascunho recuperado/.test(x)) && g('_rascPronto')===true, JSON.stringify([g('tipoSel'),g('tela'),toastsR.slice(0,1)]));
+  A('limpaRascunho')(); for(let i=0;i<3;i++)await tick();
+  t('F4: salvar/limpar apaga o rascunho do cofre', !lojas24.rascunho.atual, JSON.stringify(Object.keys(lojas24.rascunho)));
+  toastsR=[]; setg('_rascPronto',false); A('restauraRascunho')(); for(let i=0;i<5;i++)await tick();
+  t('F4: sem rascunho real, nada acontece (e o gate libera as gravacoes)', toastsR.length===0 && g('_rascPronto')===true && g('notaItens').length===1, 'toasts='+toastsR.length);
+  /* gate anti-sobrescrita: sem a restauracao concluida, o render do boot NAO agenda gravacao */
+  setg('_rascPronto',false); const timersG=[]; ctx.setTimeout=(fn,ms)=>{timersG.push(ms);return 1;};
+  A('agendaRascunho')();
+  t('F4 (gate): antes de a restauracao terminar, o render nao grava rascunho nenhum (vazio nao sobrescreve o real)', timersG.filter(m=>m===400).length===0, JSON.stringify(timersG));
+  ctx.setTimeout=_stR; setg('_rascPronto',true);
+  /* rascunho GRAVADO porem VAZIO (tudo zerado): reabrir nao restaura nem avisa */
+  lojas24.rascunho.atual={id:'atual',dados:{tipoSel:'TROCA',compraModo:'item',vendaModo:'item',notaItens:[],vendaItens:[],trocaDei:[],trocaRecebi:[],trocaDin:0,_fotosItem:[],_fotosPend:[],ts:1}};
+  const _tV=g('toast'); let toastsV=[]; setg('toast',m=>toastsV.push(String(m))); setg('_rascPronto',false); setg('tipoSel','COMPRA');
+  A('restauraRascunho')(); for(let i=0;i<5;i++)await tick();
+  t('F4: rascunho vazio gravado nao restaura nada (nem muda o tipo, nem avisa)', toastsV.length===0 && g('tipoSel')==='COMPRA' && g('_rascPronto')===true, JSON.stringify([toastsV.length,g('tipoSel')]));
+  setg('toast',_tV); delete lojas24.rascunho.atual;
+  /* [re-checagem F4] restaurar NUNCA atropela digitacao em curso nem edicao aberta */
+  lojas24.rascunho.atual={id:'atual',dados:{tipoSel:'VENDA',compraModo:'item',vendaModo:'varios',notaItens:[],vendaItens:[{cat:'VELHO',valor:1}],trocaDei:[],trocaRecebi:[],trocaDin:0,_fotosItem:[],_fotosPend:[],ts:1}};
+  setg('tipoSel','COMPRA'); setg('notaItens',[{cat:'DIGITADO AGORA',valor:300}]); setg('vendaItens',[]); setg('_rascPronto',false);
+  let toastsA=[]; const _tA=g('toast'); setg('toast',m=>toastsA.push(String(m)));
+  A('restauraRascunho')(); for(let i=0;i<5;i++)await tick();
+  t('F4 (re-checagem): com digitacao em curso, o rascunho velho NAO atropela (nada muda, nada avisa)', g('notaItens').length===1 && g('notaItens')[0].cat==='DIGITADO AGORA' && g('tipoSel')==='COMPRA' && g('vendaItens').length===0 && toastsA.length===0 && g('_rascPronto')===true, JSON.stringify([g('tipoSel'),g('notaItens').length,toastsA.length]));
+  setg('notaItens',[]); setg('editId','m77'); setg('_rascPronto',false); toastsA=[];
+  A('restauraRascunho')(); for(let i=0;i<5;i++)await tick();
+  t('F4 (re-checagem): com EDICAO aberta, o rascunho nao entra', g('vendaItens').length===0 && toastsA.length===0, JSON.stringify(toastsA));
+  setg('editId',null); setg('toast',_tA); delete lojas24.rascunho.atual;
+  setg('notaItens',[]); setg('_fotosPend',[]); setg('tela','painel');
   setg('idbOpen',_idbOrig24); setg('fotoAdd',_faOrig24); setg('_fotosFalhadas',[]); setg('_fotosPend',[]);
   setg('gravaLocal',_gravaOrig);
   setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();

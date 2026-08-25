@@ -332,6 +332,33 @@ function abrirDiario(){const old=document.getElementById('modal');if(old)old.rem
   document.body.insertAdjacentHTML('beforeend',hh);
   _diaFiltro='';_diaCache=undefined;
   diarioLista(function(L){_diaCache=L;desenhaDiario();});}
+/* ===== F4 — RASCUNHO PERSISTENTE do Lançar (25/08; cura da queixa de 21/08 "fechei a aba e perdi o que digitava") =====
+   Guarda no APARELHO (IDB 'rascunho', doc 'atual') as listas e os baldes do Lançar a cada mudança (debounce ~400 ms,
+   disparado pelo render — todo gesto de lista/balde passa por ele). Restaura na abertura se houver conteúdo real;
+   NUNCA restaura a tela. Limpa nos salvamentos e no apagar tudo. Por aparelho de propósito (rascunho é de quem digita);
+   iOS pode descartar IDB por inatividade — limite declarado. O gate _rascPronto impede o render do boot de gravar um
+   rascunho VAZIO por cima do real antes de a restauração terminar. */
+let _rascTimer=null,_rascPronto=false;
+function dadosRascunho(){return {tipoSel,compraModo,vendaModo,notaItens,vendaItens,trocaDei,trocaRecebi,trocaDin,_fotosItem,_fotosPend,ts:Date.now()};}
+function temRascunho(d){if(!d)return false;return !!((d.notaItens&&d.notaItens.length)||(d.vendaItens&&d.vendaItens.length)||(d.trocaDei&&d.trocaDei.length)||(d.trocaRecebi&&d.trocaRecebi.length)||(d._fotosItem&&d._fotosItem.length)||(d._fotosPend&&d._fotosPend.length)||(+d.trocaDin));}
+function gravaRascunho(){idbOpen(db=>{if(!db)return;try{db.transaction('rascunho','readwrite').objectStore('rascunho').put({id:'atual',dados:dadosRascunho()});}catch(e){}});}
+function agendaRascunho(){if(!_rascPronto)return;if(_rascTimer!==null&&typeof clearTimeout==='function')clearTimeout(_rascTimer);_rascTimer=setTimeout(gravaRascunho,400);}
+function limpaRascunho(){if(_rascTimer!==null&&typeof clearTimeout==='function'){clearTimeout(_rascTimer);_rascTimer=null;}
+  idbOpen(db=>{if(!db)return;try{db.transaction('rascunho','readwrite').objectStore('rascunho').delete('atual');}catch(e){}});}
+function restauraRascunho(){idbOpen(db=>{if(!db){_rascPronto=true;return;}try{const rq=db.transaction('rascunho').objectStore('rascunho').get('atual');
+  rq.onsuccess=()=>{const d=rq.result&&rq.result.dados;
+    /* [re-checagem F4] o rascunho NUNCA atropela o presente: só restaura se o Lançar de AGORA está vazio e
+       não há edição em curso — senão o dono que abriu o app e já começou a digitar perderia o que digitou */
+    if(temRascunho(d)&&!temRascunho(dadosRascunho())&&!editId){
+      tipoSel=d.tipoSel||tipoSel;compraModo=d.compraModo||compraModo;if(typeof d.vendaModo!=='undefined')vendaModo=d.vendaModo;
+      notaItens=d.notaItens||[];vendaItens=d.vendaItens||[];trocaDei=d.trocaDei||[];trocaRecebi=d.trocaRecebi||[];trocaDin=+d.trocaDin||0;
+      _fotosItem=d._fotosItem||[];_fotosPend=d._fotosPend||[];
+      const n=notaItens.length+vendaItens.length+trocaDei.length+trocaRecebi.length,nf=_fotosItem.length+_fotosPend.length;
+      try{toast('📝 Rascunho recuperado — '+(n?n+' item'+(n>1?'s':''):'')+(n&&nf?' e ':'')+(nf?nf+' foto'+(nf>1?'s':''):'')+' do Lançar te esperando');}catch(e){}
+      try{if(tela==='lancar')render();}catch(e){}}
+    _rascPronto=true;};
+  rq.onerror=()=>{_rascPronto=true;};}catch(e){_rascPronto=true;}});}
+setTimeout(()=>{try{restauraRascunho();}catch(e){_rascPronto=true;}},800);   /* restaura cedo, antes de o dono chegar ao Lançar */
 function estaExcluido(id){return !!(id&&excluidos[id]);}
 let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
@@ -601,7 +628,8 @@ function execExcl(id,modo){fecharModal();const m=movs.find(x=>x.id===id);if(!m)r
     const removidos=movs.filter(x=>st[x.id]);
     marcaExcluido(Object.keys(st));movs=movs.filter(x=>!st[x.id]);
     enterraGruposVazios(removidos);   /* [fotos D1 / revisão F2] venda/nota/troca que ficou sem item ganha túmulo (comprovante com rastro) */
-    lixeiraGuarda(removidos);removidos.forEach(m=>diarioReg('excluiu',rotDe(m),m.tipo||''));   /* [lixeira 25/08] o excluído fica restaurável por 120 dias */};
+    lixeiraGuarda(removidos);
+    if(removidos.length>3)diarioReg('excluiu (lote)',removidos.length+' lançamentos');else removidos.forEach(m=>diarioReg('excluiu',rotDe(m),m.tipo||''));   /* [lixeira 25/08 + revisor-diario G1] restaurável 120 dias; lote = UM registro */};
   if(modo==='serie'){const alvos=movs.filter(x=>x.serieId===m.serieId&&x.data>=m.data&&x.status==='apagar');
     some(alvos.map(x=>x.id));save();render();toast(alvos.length+' previsão(ões) apagada(s)');return;}
   if(modo==='so'){some([m.id]);save();render();toast('Lançamento apagado');return;}
@@ -676,7 +704,7 @@ function limparTudo(){
   if(!confirm('Apagar TODOS os '+movs.length+' lançamentos?\n\nIsto apaga TUDO: compras, vendas, estoque, pedido, coleção e despesas — neste aparelho E na nuvem, pra você e pra Laura. Tudo vai para a 🗑 Lixeira (em Backup) por 120 dias — dá pra restaurar por lá, item a item, com as fotos.\n\nTem certeza?'))return;
   /* [fotos D1] os grupos (nota/venda/troca) também ganham túmulo, para a foto do comprovante ter rastro */
   const gids=[...new Set(movs.flatMap(x=>[x.notaId?'nota:'+x.notaId:null,x.vendaId?'venda:'+x.vendaId:null,x.trocaId?'troca:'+x.trocaId:null].filter(Boolean)))];
-  lixeiraGuarda(movs);diarioReg('apagou tudo','',movs.length+' lançamentos');   /* [lixeira 25/08] ANTES de limpar — restaurável item a item por 120 dias */
+  lixeiraGuarda(movs);diarioReg('apagou tudo','',movs.length+' lançamentos');limpaRascunho();   /* [lixeira 25/08] ANTES de limpar — restaurável item a item por 120 dias */
   marcaExcluido(movs.map(x=>x.id).concat(gids));movs=[];save();render();toast('Tudo apagado — está na 🗑 Lixeira por 120 dias');}
 function devolver(id){const v=movs.find(x=>x.id===id);
   if(!v||v.tipo!=='VENDA'){toast('Devolução só vale pra venda');return;}
@@ -708,7 +736,7 @@ function execDev(id){fecharModal();const v=movs.find(x=>x.id===id);if(!v)return;
   save();render();toast('↩ Devolvido — voltou '+praRot(volta)+' ✓');}
 function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)return;
   const alvo=movs.find(x=>x.id===v.origemId);
-  const limpa=()=>{delete v.origemId;delete v.custoOrigem;delete v.vendaDe;delete v.semOrigem;if(alvo&&alvo.vendaRef===v.id)delete alvo.vendaRef;save();toast('✂ Vínculo desfeito ✓');render();};
+  const limpa=()=>{delete v.origemId;delete v.custoOrigem;delete v.vendaDe;delete v.semOrigem;if(alvo&&alvo.vendaRef===v.id)delete alvo.vendaRef;save();diarioReg('desvinculou venda',rotDe(v));toast('✂ Vínculo desfeito ✓');render();};
   if(!alvo){if(confirm('O item de origem não existe mais. Limpar só a referência desta venda? (nada mais muda)'))limpa();return;}
   /* dois formatos de vínculo convivem: retroativo aponta pro pedaço Vendido; venda criada
      já vinculada aponta pro lote-PAI (o pedaço é um irmão com loteOrigem) — achar o certo */
@@ -760,12 +788,12 @@ function aplicarOrigem(vendaId,fragId){const v=movs.find(x=>x.id===vendaId),f=mo
   if(!confirm('Ligar a venda de '+fmt(+v.valor||0)+' ('+vQ+' un) ao material "'+((f.colecao?f.colecao+' · ':'')+(f.cat||'item'))+'" ('+fQ+' un · custou '+fmt(+f.valor||0)+')?'+avisoQ+'\n\nSó reconecta os dois registros — nenhuma baixa nova, nada apagado.'))return;
   v.origemId=f.id;v.custoOrigem=custo;v.condicao=f.condicao||'';
   v.vendaTipo=f.destIni==='Coleção'?'colecao':'material';v.vendaDe=f.destIni==='Coleção'?'colecao':'estoque';
-  delete v.semOrigem;f.vendaRef=v.id;save();fecharModal();toast('🔗 Reconectado — custo '+fmt(custo)+' ✓');render();}
+  delete v.semOrigem;f.vendaRef=v.id;save();diarioReg('reconectou venda ao estoque',rotDe(v));fecharModal();toast('🔗 Reconectado — custo '+fmt(custo)+' ✓');render();}
 /* Venda histórica: material vendido antes do app — sem origem rastreável. Sai das pendências
    com honestidade (decisão explícita do dono, reversível), sem inventar compra. */
 function marcarHistorica(id){const v=movs.find(x=>x.id===id);if(!v||v.origemId)return;
   if(!confirm('Marcar como venda HISTÓRICA?\n\nUse só se esse material nunca entrou no app (venda de antes do controle). A venda continua valendo na receita; ela só deixa de aparecer como pendência de vínculo. Dá pra desfazer.'))return;
-  v.semOrigem='historico';save();toast('📜 Marcada como histórica ✓');render();}
+  v.semOrigem='historico';save();diarioReg('marcou venda histórica',rotDe(v));toast('📜 Marcada como histórica ✓');render();}
 function desmarcarHistorica(id){const v=movs.find(x=>x.id===id);if(!v)return;
   delete v.semOrigem;save();toast('↩ Voltou pra pendente de vínculo');render();}
 /* Marcar históricas EM MASSA — com conferência de verdade, não um "ok" de reflexo:
@@ -799,7 +827,7 @@ function aplicarHistoricasMassa(){
   const alvo=movs.filter(v=>v.tipo==='VENDA'&&!v.origemId&&v.semOrigem!=='historico'&&_hmSel[v.id]);
   if(!alvo.length)return;
   alvo.forEach(v=>v.semOrigem='historico');
-  _hmSel={};save();fecharModal();toast('📜 '+alvo.length+' venda'+(alvo.length>1?'s':'')+' marcada'+(alvo.length>1?'s':'')+' como histórica'+(alvo.length>1?'s':'')+' ✓ (desfazível por venda)');render();}
+  _hmSel={};save();diarioReg('marcou históricas em massa',alvo.length+' vendas');fecharModal();toast('📜 '+alvo.length+' venda'+(alvo.length>1?'s':'')+' marcada'+(alvo.length>1?'s':'')+' como histórica'+(alvo.length>1?'s':'')+' ✓ (desfazível por venda)');render();}
 /* FICHA de um lançamento único (modal) — clicar num card do modo agrupado abre SÓ ele,
    sem trocar a vista inteira ("eu só cliquei pra visualizar uma venda; mudar tudo ao redor
    me faz perder onde eu estava" — Felype). Dali dá pra ir pra lista detalhada COM scroll. */
@@ -973,7 +1001,7 @@ function aplicarMesmaCompra(raizId){
   c.raiz.valorOrig=c.refNova;
   c.x.situacao='Aberto';c.x.destino='Aberto';delete c.x.dataTroca;delete c.x.trocaId;delete c.x.dataSaida;
   c.x.obs=((c.x.obs||'')+' [corrigido '+hoje+': era parte da MESMA compra, lançada errada — aberta nos pedaços, sem troca]').trim();
-  save();fecharModal();
+  save();diarioReg('uniu em mesma compra',fmt(c.refNova));fecharModal();
   toast('🔗 Corrigido — a compra agora é uma só: '+fmt(c.refNova)+' ✓');
   verLote(c.raiz.id);}
 function verLote(id){const m=movs.find(x=>x.id===id);if(!m)return;
@@ -1718,10 +1746,10 @@ function pagarParcela(id,pi,pn,valor){const m=movs.find(x=>x.id===id);if(!m)retu
 function confirmarPagarParcela(id,pi,pn,valor){const m=movs.find(x=>x.id===id);if(!m)return;
   const conta=document.getElementById('pp_conta')?.value||'';
   m.pgParcelas=m.pgParcelas||{};m.pgParcelas[pi]={d:new Date().toISOString().slice(0,10),v:Math.round((+valor||0)*100)/100,conta};
-  save();fecharModal();toast('Parcela '+pi+'/'+pn+' paga'+(conta?' — saiu de '+conta:'')+' ✓');render();}
+  save();diarioReg('pagou parcela',pi+'/'+pn+' — '+rotDe(m));fecharModal();toast('Parcela '+pi+'/'+pn+' paga'+(conta?' — saiu de '+conta:'')+' ✓');render();}
 function desmarcarParcela(id,pi){const m=movs.find(x=>x.id===id);if(!m||!m.pgParcelas)return;
   if(!confirm('Desmarcar o pagamento da parcela '+pi+'? Ela volta pro "a pagar".'))return;
-  delete m.pgParcelas[pi];save();toast('Parcela '+pi+' desmarcada — voltou pro a pagar');render();}
+  delete m.pgParcelas[pi];save();diarioReg('desmarcou parcela',pi+' — '+rotDe(m));toast('Parcela '+pi+' desmarcada — voltou pro a pagar');render();}
 function aReceber(){const hoje=new Date();hoje.setHours(0,0,0,0);let L=[];
   movs.filter(m=>m.tipo==='VENDA'&&m.canal==='App'&&+m.recDias>0).forEach(m=>{const d=new Date((m.data||'')+'T00:00:00');d.setDate(d.getDate()+(+m.recDias||0));const liq=(+m.valor||0)*(1-(+m.taxa||0)/100);if(d>=hoje)L.push({data:d,valor:liq,m});});
   return L.sort((a,b)=>a.data-b.data);}
@@ -1846,7 +1874,7 @@ function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;
    do login resolver, não só o dos preços — por isso a trava mora aqui dentro, e não no
    fetch: enquanto a tela de login estiver no ar, render() não pinta por cima dela. */
 let _telaLoginNoAr=false;
-function render(){guardaBaldeItem();guardaBaldePend();if(_telaLoginNoAr)return;
+function render(){guardaBaldeItem();guardaBaldePend();if(_telaLoginNoAr)return;agendaRascunho();
   if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
   const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
@@ -2128,7 +2156,7 @@ function salvarNota(){
     const _idIt=novoId();
     movs.push({id:_idIt,tipo:'COMPRA',data,jogo:it.jogo,cat:it.cat,colecao:it.colecao,idioma:it.idioma,condicao:it.condicao||'',qtd:it.qtd,valor:custo,vUnit:Math.round((custo/(it.qtd||1))*100)/100,codigo:it.codigo||'',boosters:+it.boosters||0,valorProduto:it.valor,freteRateio:rF[i],taxaRateio:rT[i],situacao:sit,destino:sit==='Coleção'?'Coleção':'Vender',destIni:sit==='Coleção'?'Coleção':'Em estoque',contraparte:cp,conta:(notaHead.conta&&notaHead.conta!=='__add__')?notaHead.conta:'',pgTipo:notaHead.pg||'À vista',nParc:notaHead.pg==='Parcelado'?(+notaHead.nParc||1):0,venc1:notaHead.pg==='Parcelado'?(notaHead.venc1||data):'',notaNum:notaHead.num||'',taxa:0,notaId:nid,obs:((rF[i]+rT[i])>0?`nota · +${fmt(rF[i]+rT[i])} frete/taxa`:'nota')+(notaHead.obs?' · '+notaHead.obs:'')});aplicarFotosDoItem(it.fotos,_idIt);});
   aplicarFotosPend(nid);   /* [fotos D1] a foto de cima é da NOTA inteira (comprovante) — vai para o GRUPO, não para o 1º item (a queixa de 21/08) */
-  const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();diarioReg('lançou nota de compra',n+(n===1?' item':' itens'));toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
+  const n=notaItens.length;notaItens=[];notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};save();diarioReg('lançou nota de compra',n+(n===1?' item':' itens'));limpaRascunho();toast(`Nota salva — ${n} ${n===1?'item':'itens'} ✓`);compraModo='item';go('consultar');}
 function vendaForm(){
   const itens=vendaItens.length?vendaItens.map((it,i)=>`<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px"><div><b>${it.origemId?'📦 ':''}${it.cat||'item'}</b>${it.colecao?' · '+it.colecao:''} <span style="color:var(--mut);font-size:11px">${it.jogo}</span>${it.origemId?' <span style="color:var(--blue);font-size:10px">↓ baixa do estoque</span>':''}<div class="meta">${fmt(it.valor)}${it.qtd>1?' · ×'+it.qtd+(it.un==='boo'?' boosters':''):''}</div></div><button class="x" onclick="removeItemVenda(${i})">remover</button></div>`).join(''):`<div class="empty" style="padding:12px">Nenhum item ainda — adicione abaixo.</div>`;
   const tot=vendaItens.reduce((s,it)=>s+(+it.valor||0),0),app=vendaHead.canal==='App';
@@ -2191,7 +2219,7 @@ function salvarVendaVarios(){
       else alert('⚠ "'+((it.colecao?it.colecao+' · ':'')+(it.cat||'item'))+'" não está mais disponível ('+(src?('situação: '+sitS):'item não existe mais')+') — esse item da venda entra SEM vínculo e sem baixar estoque. Depois dá pra corrigir abrindo a venda e tocando "🔗 de onde saiu?".');}
     movs.push(base);aplicarFotosDoItem(it.fotos,base.id);});   /* [fotos D2] cada carta da venda leva a SUA foto */
   aplicarFotosPend(vid);   /* [fotos D1] comprovante da VENDA inteira (grupo) */
-  const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();diarioReg('vendeu (vários)',n+(n===1?' item':' itens'));toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
+  const n=vendaItens.length;vendaItens=[];vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''};save();diarioReg('vendeu (vários)',n+(n===1?' item':' itens'));limpaRascunho();toast(`Venda salva — ${n} ${n===1?'item':'itens'} ✓`);vendaModo='item';go('consultar');}
 function trocaForm(){
   /* [Felype 21/08] "nao consigo trocar nada da colecao — so tenho opcao de trocar estoque".
      A lista usava so `disp` (Em estoque). Trocar carta da colecao e normal: agora as duas
@@ -2282,7 +2310,7 @@ function salvarTroca(){
   /* dinheiro dado na troca sai de uma conta de verdade: gravado no 1º recebido (din/dinConta)
      — o saldo e o extrato da conta passam a ver essa saída */
   if(ft1&&+trocaDin>0){ft1.din=Math.round(trocaDin*100)/100;ft1.dinConta=document.getElementById('t_dinconta')?.value||'';}
-  const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();diarioReg('registrou troca',n+(n===1?' carta recebida':' cartas recebidas'));toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
+  const n=trocaRecebi.length;trocaDei=[];trocaRecebi=[];trocaDin=0;save();diarioReg('registrou troca',n+(n===1?' carta recebida':' cartas recebidas'));limpaRascunho();toast(`Troca registrada — ${n} ${n===1?'carta':'cartas'} ✓`);go('consultar');}
 function simParaTroca(){const v=simVals();trocaDei=[{desc:'material da simulação',custo:Math.round(v.custoMat*100)/100}];trocaDin=v.din||0;trocaRecebi=[{desc:'carta',valorMercado:v.V,colecao:'',sit:'Em estoque'}];deiModo='avulso';tipoSel='TROCA';go('lancar');toast('Troca pré-preenchida — ajuste e registre');}
 
 function vConsultar(){
@@ -2721,13 +2749,13 @@ function salvarEdicaoNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!to
       m.obs=pref+resto;});
   }
   todos.forEach(m=>{m.data=dataN;m.notaNum=numN;if(venc1N&&(+m.nParc||0)>1)m.venc1=venc1N;});
-  save();toast('Nota corrigida ✓');fecharModal();abrirNota(nid);render();}
+  save();diarioReg('corrigiu a nota',todos.length+' itens');toast('Nota corrigida ✓');fecharModal();abrirNota(nid);render();}
 function excluirNotaInteira(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   const tot=its.reduce((s,x)=>s+(+x.valor||0),0);
   if(!confirm('⚠️ Excluir a nota'+(its[0].notaNum?' '+its[0].notaNum:'')+' INTEIRA?\n\nApaga os '+its.length+' lançamentos (total '+fmt(tot)+') — o custo e o estoque deles somem dos números. Eles vão para a 🗑 Lixeira (em Backup) por 120 dias — dá pra restaurar por lá, com as fotos e o comprovante.\n\nUse pra relançar do zero. Excluir?'))return;
   /* [fotos D1] a nota (grupo) também ganha túmulo — sem ele a foto do comprovante ficava sem rastro nenhum */
   marcaExcluido(its.map(x=>x.id).concat(['nota:'+nid]));movs=movs.filter(m=>m.notaId!==nid);enterraGruposVazios(its);   /* [re-checagem F2, menor 2] item que também era de uma troca: a troca vazia ganha túmulo */
-  lixeiraGuarda(its);its.forEach(m=>diarioReg('excluiu (nota inteira)',rotDe(m)));save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos foram pra 🗑 Lixeira');render();}
+  lixeiraGuarda(its);diarioReg('excluiu (nota inteira)',its.length+' lançamentos'+(its[0].notaNum?' — nota '+its[0].notaNum:''));save();fecharModal();toast('Nota excluída — '+its.length+' lançamentos foram pra 🗑 Lixeira');render();}   /* [revisor-diario G1] UM registro por gesto de lote, não um por item */
 /* [fotos D1] desfazer a nota com comprovante: o grupo morre e as fotos ficariam sem lugar para aparecer — ele
    ESCOLHE (mover para o 1º produto / deixar guardadas / cancelar), nunca automático. Sem fotos, o confirm de
    sempre. Leitura das fotos falhou (sem rede) → avisa e trata como "não sei", oferecendo só deixar guardadas. */
@@ -3104,7 +3132,7 @@ function salvar(){
         const custoUnit=(+e.custoOrigem||0)/qAntiga;
         movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}
     save();diarioReg('editou',rotDe(movs[i]),movs[i].tipo);editId=null;toast('Alteração salva');voltarDaEdicao();return;}
-  movs.push(obj);aplicarFotosPend(obj.id);save();diarioReg('lançou',rotDe(obj),obj.tipo);_lancarDirty=false;
+  movs.push(obj);aplicarFotosPend(obj.id);save();diarioReg('lançou',rotDe(obj),obj.tipo);limpaRascunho();_lancarDirty=false;
   /* [revisão C 23/08, M6] venda iniciada numa LINHA da Consultar ("💰 vender" → _preSel) volta para a linha
      de onde saiu, como as edições; só o lançamento avulso fica no Lançar para "lançar o próximo". */
   if(_preSel){_preSel=null;toast('Salvo ✓');voltarDaEdicao();return;}
@@ -3483,7 +3511,7 @@ function salvarTransferencia(){const g=id=>document.getElementById(id)?.value;
   if(de&&de===para){alert('Origem e destino são a MESMA conta — escolha contas diferentes.');return;}
   if(_transfEdit){const t=movs.find(x=>x.id===_transfEdit);if(t){t.contaDe=de;t.contaPara=para;t.valor=val;t.data=data;t.obs=obs;}}
   else movs.push({id:novoId(),tipo:'TRANSF',data,valor:val,contaDe:de,contaPara:para,obs});
-  _transfEdit=null;save();fecharModal();
+  _transfEdit=null;save();diarioReg('registrou transferência',fmt(val));fecharModal();
   toast('↔ '+(de&&para?'Transferência':de?'Retirada':'Aporte')+' de '+fmt(val)+' registrada ✓');render();}
 function excluirConta(id){const c=contasBanc.find(x=>x.id===id);if(!c)return;
   const uso=movs.filter(m=>m.conta===c.nome||m.contaDe===c.nome||m.contaPara===c.nome||m.dinConta===c.nome
@@ -3523,7 +3551,7 @@ function excluirPess(nome){const n=movs.filter(m=>(m.contraparte||'')===nome).le
      senao o cadastro volta pelo merge por id (achado da revisao adversarial de 21/08). */
   marcaExcluido('pess:'+nome, cadastros.filter(c=>c.nome===nome).map(c=>c.id));
   pess=pess.filter(p=>p!==nome);cadastros=cadastros.filter(c=>c.nome!==nome);
-  salvarCad();save();saveL();toast('"'+nome+'" excluído ✓');render();}
+  salvarCad();save();saveL();diarioReg('excluiu pessoa do catálogo',nome);toast('"'+nome+'" excluído ✓');render();}
 const pessOrd=()=>pess.slice().sort((a,b)=>a.localeCompare(b,'pt',{sensitivity:'base'}));
 function restaurarBackup(ts){
   const x=get('tcg_backups',[]).find(y=>y.ts===ts);
@@ -3657,7 +3685,7 @@ function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')r
 function chegouPedido(id){const m=movs.find(x=>x.id===id);if(!m)return;
   if(!confirm('Confirmar que o pedido chegou? Ele entra no estoque disponível hoje.'))return;
   m.situacao='Em estoque';m.destino='Vender';m.dataChegada=new Date().toISOString().slice(0,10);
-  save();toast('Chegou — está no estoque ✓');render();}
+  save();diarioReg('marcou pedido chegado',rotDe(m));toast('Chegou — está no estoque ✓');render();}
 let _abrirId=null,abertoItens=[],_abQtdA='',_abUnA='un',abItemSit='vender';
 function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;_abrirId=id;abertoItens=[];_abQtdA='';_abUnA='un';abItemSit=sitDe(m)==='Coleção'?'colecao':'vender';renderAbrir();}
 function togAbItemSit(v){abItemSit=v;document.querySelectorAll('#abitog .o').forEach(o=>o.classList.toggle('on',o.dataset.v===v));}
@@ -4326,11 +4354,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='25/08 16h11';
+const BUILD_TAG='25/08 16h46';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1787685099741;
+const BUILD_TS=1787687185783;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
