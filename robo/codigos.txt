@@ -2,7 +2,7 @@
 # Alimentado pela leitura do estoque real (tcg_movs_v2, COMPRA ativa) + fallback manual.
 # Uniao ADITIVA: o estoque ADICIONA codigos, nunca remove (anti-regressao, CLAUDE.md Regra 13).
 # Formato aceito: "NUM/TOTAL" puro OU "Nome (NUM/TOTAL)" OU "Nome NUM/TOTAL".
-# Atualizado 2026-08-21 pela leitura do estoque (99 itens ativos + 10 mantidos por
+# Atualizado 2026-08-30 pela leitura do estoque (126 itens ativos + mantidos por
 # anti-regressao que nao aparecem mais no estoque atual).
 122/086
 Kingdra (tg03/tg30)
@@ -108,8 +108,35 @@ Charizard (211/172)
 Jolteon-v (swsh183/71)
 Vaporeon-v (swsh181-71)
 Vaporeon (tg02-tg30)
-Xy116/♾️
 135/108
 015/081
 188/172
 245/198
+Mew (052/172)
+Rampardos ex (100/084)
+Bastiodon (093/084)
+Mega darkrai ex (048/084)
+Mega zeraora ex (098/084)
+Lurantis ex (004/084)
+Mega chadelure (038/084)
+Raticate da equipe rocket (202/182)
+Bulbasaur (133/132)
+Gloom (130/129)
+Dragonite-V (105/131)
+Skuntank-V (181/195)
+Vulpix (067/063)
+Fezandipiti (108/101)
+Braixen (069/068)
+Venusaur ex (174C/151)
+Evolucao woopper - Base7 - Pokedex
+Alakazam ex (065JP/165)
+Parasect (072/071)
+Jynx (071/068)
+Wigglytuff (091/080)
+Misty's Cheerfulness (108/081)
+Mega Gardevoir ex (032/∞)
+Stufful (075/063)
+Inteleon (069/063)
+Blastoise ex (186JP/165)
+Dewgong (084/080)
+Caterpie (172JP/165)
