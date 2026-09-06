@@ -2192,7 +2192,7 @@
   "Xy116/∞": {
    "codigo": "Xy116/∞",
    "status": "AMBIGUO",
-   "titulo": "Xy116/∞ — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
+   "titulo": "Xy116/∞ — a Liga não devolveu nenhuma carta com esse código (nem com XY116 puro) — conferir cadastro (diagnóstico de 2026-08-30, reconfirmado em 2026-09-06)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Xy116%2F%E2%88%9E",
    "verificadoEm": "2026-09-06",
    "versoes": []
@@ -2876,7 +2876,7 @@
   "174C/151": {
    "codigo": "174C/151",
    "status": "AMBIGUO",
-   "titulo": "174C/151 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
+   "titulo": "174C/151 — a Liga não devolveu nenhuma carta com esse código (nem com 174/151 puro, sem o sufixo C) — conferir cadastro (Venusaur ex) (diagnóstico de 2026-08-30, reconfirmado em 2026-09-06)",
    "versoes": [],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=174C%2F151",
    "verificadoEm": "2026-09-06"
@@ -2884,7 +2884,7 @@
   "186JP/165": {
    "codigo": "186JP/165",
    "status": "AMBIGUO",
-   "titulo": "186JP/165 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
+   "titulo": "186JP/165 — busca vazia; sem o sufixo JP (186/165) a Liga devolve Ninetales ex, que NÃO é a carta do cadastro (Blastoise ex) — preço não gravado para não trocar a carta; conferir cadastro (diagnóstico de 2026-08-30, reconfirmado em 2026-09-06)",
    "versoes": [],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=186JP%2F165",
    "verificadoEm": "2026-09-06"
