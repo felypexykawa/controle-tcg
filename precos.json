@@ -1,5 +1,5 @@
 {
- "atualizadoEm": "2026-09-13T16:27:53Z",
+ "atualizadoEm": "2026-09-13T16:43:19Z",
  "fonte": "Chrome local — extrator v2",
  "cartas": {
   "135/108": {
@@ -1461,9 +1461,9 @@
   },
   "094/081": {
    "codigo": "094/081",
-   "status": "AMBIGUO",
-   "titulo": "094/081 — 2 cartas com esse número (escolher qual é a sua)",
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=094%2F081",
+   "status": "OK",
+   "titulo": "Lurantis ex (094/081)",
+   "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Lurantis ex (094/081)&ed=M5&num=094",
    "verificadoEm": "2026-09-13",
    "opcoes": [
     {
@@ -1476,7 +1476,22 @@
      "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Lurantis ex (094/081)&ed=M5&num=094",
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/777/6a0f67e23cd9b-dbsf7-kd916-77067a765ee97faeadd302dceea8b33b.jpg"
     }
-   ]
+   ],
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 29.95,
+     "md": 29.99,
+     "mx": 30
+    }
+   ],
+   "menor": 29.95,
+   "medio": 29.99,
+   "maior": 30,
+   "idiomaConferido": {
+    "pten": 1,
+    "jp": 9
+   }
   },
   "015/081": {
    "codigo": "015/081",
@@ -2527,10 +2542,21 @@
   },
   "Xy116/∞": {
    "codigo": "Xy116/∞",
-   "status": "AMBIGUO",
-   "titulo": "Xy116/∞ — a Liga não devolveu nenhuma carta com esse código (nem com XY116 puro) — conferir cadastro (diagnóstico de 2026-08-30, reconfirmado em 2026-09-13)",
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Xy116%2F%E2%88%9E",
-   "verificadoEm": "2026-09-13"
+   "status": "OK",
+   "titulo": "Arceus (XY116/∞)",
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Arceus%20(Xy116%2F%E2%88%9E)",
+   "verificadoEm": "2026-09-13",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 40.41,
+     "md": 82.24,
+     "mx": 109.9
+    }
+   ],
+   "menor": 40.41,
+   "medio": 82.24,
+   "maior": 109.9
   },
   "Op13-051": {
    "codigo": "Op13-051",
@@ -9534,6 +9560,26 @@
      "mn": 49.9,
      "md": 95.77,
      "mx": 169.99
+    }
+   ]
+  },
+  "094/081": {
+   "Normal": [
+    {
+     "d": "2026-09-13",
+     "mn": 29.95,
+     "md": 29.99,
+     "mx": 30
+    }
+   ]
+  },
+  "Xy116/∞": {
+   "Normal": [
+    {
+     "d": "2026-09-13",
+     "mn": 40.41,
+     "md": 82.24,
+     "mx": 109.9
     }
    ]
   }
