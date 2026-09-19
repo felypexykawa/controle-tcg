@@ -12,6 +12,9 @@
  * Uso:  node testes-nucleo.js [caminho/do/index.html]     (padrao: ./index.html)
  */
 const fs = require('fs'), vm = require('vm'), path = require('path');
+/* fuso fixo de Sao Paulo (o da Laura e do Felype): o "hoje" do app em UTC muda de dia as 21h daqui, e os testes com relogio fixo
+   (31c/31e) tem de dar o mesmo resultado no PC e no CI, que roda em UTC (v2.5, revisor numero r4 L3) */
+process.env.TZ = 'America/Sao_Paulo';
 const ALVO = process.argv[2] || path.join(__dirname, 'index.html');
 const html = fs.readFileSync(ALVO, 'utf8');
 const src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -484,7 +487,7 @@ const boosters=Array.from({length:36},(_,i)=>({id:'bst'+i,tipo:'COMPRA',data:'20
 setg('movs',[{id:'BX',tipo:'COMPRA',data:'2026-08-01',cat:'Booster Box',colecao:'Caos',qtd:5,valor:500,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',boosters:36},
   {id:'BXa',tipo:'COMPRA',data:'2026-08-01',cat:'Booster Box',colecao:'Caos',qtd:1,valor:100,situacao:'Aberto',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'BX'}].concat(boosters));
 hC=A('vConsultar')();
-t('A2: 6 caixas compradas = "compra de 6 Booster Box" (nao 41 un), boosters abertos a parte', /compra de 6 Booster Box/.test(hC) && /\+36 Booster \(aberto\)/.test(hC) && !/compra de 41/.test(hC), hC.slice(hC.indexOf('compra de')-10, hC.indexOf('compra de')+60));
+t('A2: 6 caixas compradas = "compra de 6 Booster Box" (nao 41 un), boosters abertos a parte', /compra de 6 Booster Box/.test(hC) && /🔓 1 aberto · saíram 36 Booster/.test(hC) && !/\(aberto\)/.test(hC) && !/compra de 41/.test(hC), hC.slice(hC.indexOf('compra de')-10, hC.indexOf('compra de')+60));
 /* M4: raiz dentro de uma NOTA + pedaco solto: o pedaco e card avulso, sem somar o dinheiro da nota de novo */
 setg('movs',[{id:'R1',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',colecao:'Caos',qtd:2,valor:200,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',notaId:'N1',notaNum:'77'},
   {id:'R1p',tipo:'COMPRA',data:'2026-08-01',cat:'ETB',colecao:'Caos',qtd:1,valor:100,situacao:'Em estoque',destino:'Vender',contraparte:'ASMODEE',loteOrigem:'R1'}]);
@@ -1724,7 +1727,2486 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   setg('idbOpen',_idbOrig24); setg('fotoAdd',_faOrig24); setg('_fotosFalhadas',[]); setg('_fotosPend',[]);
   setg('gravaLocal',_gravaOrig);
   setg('_db',null); setg('_syncReady',false); setg('excluidos',{}); setg('_baseH',{}); reset();
-})().catch(e=>{fail++;console.log('  FALHOU  secao 18/19/21 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
+})().catch(e=>{fail++;console.log('  FALHOU  secao 18/19/21 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
+  /* ===== 31. PLANILHA EXPORTADA (13/09/2026) =====
+     A exportacao nao pode inventar conta: o Resumo e o do Painel com periodo TUDO mesmo com a tela filtrada, a aba Compras fecha
+     ate o "comprei" pela ponte (troca, caixa aberta sem pedaco), o lucro real e o do Relatorios, e gerar a planilha nao muda
+     nenhum lancamento. Fixture com uma familia de cada caso dificil que os revisores acharam no dado real.
+     Rodada 2 dos revisores: a secao ficava verde com 8 de 17 regras quebradas de proposito. Rodada 3: com 42 de 60 (disco) e
+     cega a 6a conferencia, a frase do Resultado bruto, ao "(N de M)" e a tolerancia (numero); o rodape, o cabecalho do mes, o
+     card da nota e o Relatorio somavam compra cada um de um jeito. Por isso: telas lidas de verdade (card, faixa, verLote,
+     rodape, cabecalho, Trocas, aba vazia, Relatorio), 31c/31b/31d/31e com relogio fixo, parcela, nota, Liga, repasse, centavo
+     quebrado, conta do Resultado bruto quebrada e "hoje" perto da meia-noite, e o XML de dentro do arquivo. A prova de que cada
+     regra deixa esta secao vermelha mora em checks-suite.py (mutacoes da planilha). */
+  console.log('');
+  console.log('=== 31. planilha exportada: numeros do Painel, ponte das compras, nada gravado ===');
+  reset();
+  ctx.TextEncoder = TextEncoder;
+  const fmt31 = g('fmt'), pct31 = g('pct');
+  const aba31 = (P, nome) => P.abas.find(a => a.nome === nome);
+  const col31 = (aba, rot) => aba.colunas.findIndex(c => c.t === rot);
+  const linha31 = (aba, idm) => aba.linhas.find(l => l[l.length - 1] === idm) || [];
+  const cel31 = (aba, idm, rot) => linha31(aba, idm)[col31(aba, rot)];
+  const res31 = (P, rot) => { const l = aba31(P, 'Resumo').linhas.find(x => x && x.celulas && x.celulas[0] && x.celulas[0].v === rot);
+    return l ? { v: l.celulas[1] ? l.celulas[1].v : null, t: l.celulas[2] ? String(l.celulas[2].v) : '' } : { v: undefined, t: '' }; };
+  const zip31 = u => { const B = Buffer.from(Array.prototype.slice.call(u)), out = {}; let i = 0;
+    while (i + 30 <= B.length && B.readUInt32LE(i) === 0x04034b50) {
+      const tam = B.readUInt32LE(i + 18), nl = B.readUInt16LE(i + 26), xl = B.readUInt16LE(i + 28), ini = i + 30 + nl + xl;
+      out[B.slice(i + 30, i + 30 + nl).toString('utf8')] = B.slice(ini, ini + tam).toString('utf8'); i = ini + tam; }
+    return out; };
+  const ctrlEm31 = s => { for (let i = 0; i < s.length; i++) { const k = s.charCodeAt(i); if (k < 32 && k !== 9 && k !== 10 && k !== 13) return true; } return false; };
+  const relogio31 = (ano, mes, dia, hora, min) => vm.runInContext('(function(){const R=globalThis.__DataReal31||Date;globalThis.__DataReal31=R;const T=new R(' + [ano, mes - 1, dia, hora, min, 0].join(',') + ').getTime();function F(...a){if(!new.target)return new R(T).toString();return a.length?new R(...a):new R(T);}F.prototype=R.prototype;F.now=()=>T;F.UTC=R.UTC;F.parse=R.parse;globalThis.Date=F;})()', ctx);
+  const semRelogio31 = () => vm.runInContext('if(globalThis.__DataReal31)globalThis.Date=globalThis.__DataReal31;', ctx);
+  const telaCons31 = (f, ver, q, expand) => { setg('tela', 'consultar'); setg('consMenu', false); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', '');
+    setg('consJogo', 'todos'); setg('consCol', ''); setg('consPess', ''); setg('consConta', ''); setg('consCat', ''); setg('expandId', expand || null);
+    setg('consF', f); setg('consVer', ver); setg('consQ', q || ''); return A('vConsultar')(); };
+  const rodape31 = h => { const m = h.match(/(\d+) lançamentos? · ([^<]+)<\/span><span style="text-align:right"><b style="font-size:15px">([^<]*)<\/b>(?:<span[^>]*>([^<]*)<\/span>)?/);
+    return m ? { n: +m[1], rot: m[2], v: m[3], nota: m[4] || '' } : {}; };
+  const C31 = (id, x) => Object.assign({ id, tipo:'COMPRA', data:'2026-08-01', jogo:'Pokémon', idioma:'—', qtd:1, taxa:0, pgTipo:'À vista', destino:'Vender', contraparte:'F1' }, x);
+  const fx31 = [
+    C31('pA', { cat:'ETB', colecao:'151', valor:100, situacao:'Em estoque', obs:'caixa amassada' }),
+    C31('pB', { cat:'Booster Box', colecao:'Caos', qtd:2, valor:150, situacao:'Em estoque' }),
+    C31('pB1', { cat:'Booster Box', colecao:'Caos', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'pB' }),
+    C31('pC', { cat:'Mini BB', colecao:'Pitch', valor:100, valorOrig:200, situacao:'Coleção' }),
+    C31('pC1', { cat:'Mini BB', colecao:'Pitch', valor:150, situacao:'Vendido', loteOrigem:'pC' }),
+    C31('pD', { cat:'ETB', colecao:'Fagulhas', valor:300, valorOrig:300, situacao:'Aberto' }),
+    C31('pD1', { cat:'Single/Carta', colecao:'Fagulhas', codigo:'Pikachu (160/159)', valor:120, situacao:'Em estoque', loteOrigem:'pD', origem:'ABERTURA' }),
+    C31('pD2', { cat:'Single/Carta', colecao:'Fagulhas', codigo:'Mew (151/165)', valor:180, situacao:'Coleção', loteOrigem:'pD', origem:'ABERTURA' }),
+    C31('pE', { cat:'Sleeved', colecao:'Caos', valor:23.09, situacao:'Aberto' }),
+    C31('pF', { cat:'Booster Box', colecao:'151', qtd:2, valor:400, situacao:'Em estoque' }),
+    C31('pF1', { cat:'Booster Box', colecao:'151', qtd:1, valor:200, situacao:'Trocado', loteOrigem:'pF' }),
+    C31('pG', { cat:'Single/Carta', codigo:'Charizard (199/165)', valor:180, situacao:'Em estoque', origem:'TROCA', obs:'Charizard (🔄 troca: dei 151 · Booster Box (1 un))' }),
+    C31('pH', { cat:'Booster', colecao:'Ninja', valor:50, situacao:'Vendido', loteOrigem:'naoExisteMais' }),
+    C31('pH2', { cat:'Booster', colecao:'Ninja', valor:30, situacao:'Em estoque', loteOrigem:'naoExisteMais' }),
+    C31('pN', { cat:'Booster Box', colecao:'Abbys', valor:400, situacao:'Aberto', notaId:'N30', notaNum:'30' }),
+    C31('pN2', { cat:'ETB', colecao:'Abbys', valor:100, situacao:'Em estoque', notaId:'N30', notaNum:'30' }),
+    C31('pN1', { cat:'Booster', colecao:'Abbys', qtd:9, valor:200, situacao:'Em estoque', loteOrigem:'pN', origem:'ABERTURA' }),
+    C31('pN3', { cat:'Booster', colecao:'Abbys', qtd:9, valor:200, situacao:'Coleção', loteOrigem:'pN', origem:'ABERTURA' }),
+    { id:'v1', tipo:'VENDA', data:'2026-08-05', jogo:'Pokémon', cat:'Booster Box', qtd:2, valor:200, canal:'App', taxa:10, recDias:14, origemId:'pB1', custoOrigem:150, contraparte:'Cli' },
+    { id:'v2', tipo:'VENDA', data:'2026-09-02', jogo:'Pokémon', cat:'Outro', qtd:1, valor:1000, canal:'Pix', taxa:0, contraparte:'Cli' },
+    { id:'v3', tipo:'VENDA', data:'2026-08-07', jogo:'Pokémon', cat:'Booster', qtd:1, valor:80, canal:'Pix', taxa:0, origemId:'pH', contraparte:'Cli' },
+    { id:'d1', tipo:'DESPESA', data:'2026-08-02', cat:'Embalagens', valor:30, status:'pago', natureza:'material' },
+    { id:'d2', tipo:'DESPESA', data:'2099-01-01', cat:'Aluguel', valor:70, status:'apagar', natureza:'ordinaria' }
+  ];
+  setg('movs', JSON.parse(JSON.stringify(fx31)));
+  setg('contasBanc', []);
+  setg('perDe', '2026-08-14'); setg('perAte', '2026-08-31');
+  const antes31 = JSON.stringify(g('movs'));
+  /* save e const no app (nao da pra trocar por um espiao): a prova de "nada gravado" e a memoria local (store)
+     e os lancamentos identicos antes e depois — que e o que o save mudaria */
+  const loja31 = JSON.stringify(store);
+  const P31 = A('montarPlanilhaTCG')(), R31 = P31.resumo;
+  t('31: o Resumo e TUDO mesmo com a tela filtrada de 14/08 a 31/08 (comprei 2110, nao o do periodo)', R31.comprei === 2110, JSON.stringify({ comprei:R31.comprei }));
+  t('31: o periodo da tela (de e ate) volta como estava depois de gerar', g('perDe') === '2026-08-14' && g('perAte') === '2026-08-31', g('perDe') + ' ' + g('perAte'));
+  t('31: gerar a planilha nao muda nenhum lancamento nem grava nada na memoria local', JSON.stringify(g('movs')) === antes31 && JSON.stringify(store) === loja31, 'memoria local mudou: ' + (JSON.stringify(store) !== loja31));
+  t('31: a ponte da aba Compras fecha no comprei (dinheiro + troca - saiu em troca - aberta sem pedaco)',
+    R31.ponte.resultado === 2110 && R31.ponte.dinheiro === 2153.09 && R31.ponte.saiuTroca === 200 && R31.ponte.abertoFora === 23.09 && R31.ponte.troca === 180, JSON.stringify(R31.ponte));
+  t('31: aba Compras com 1 linha por compra (caixa da nota com os pedacos numa linha; 2 pedacos de compra apagada numa linha): 10, somando 2333,09',
+    R31.linhas.find(x => x.aba === 'Compras').n === 10 && R31.somaCompras === 2333.09, JSON.stringify([R31.linhas, R31.somaCompras]));
+  t('31: so a compra com valor registrado diferente da soma das partes vai para conferir', R31.nConferir === 1, String(R31.nConferir));
+  t('31: lucro real = o do Relatorios (receita de todas - custo das ligadas), com o das ligadas separado',
+    R31.lucroReal === 1110 && R31.lucroVinculadas === 30 && R31.vendasSemVinculo === 2, JSON.stringify([R31.lucroReal, R31.lucroVinculadas, R31.vendasSemVinculo]));
+  t('31: despesa a pagar com data futura nao entra no Resumo', R31.despesas === 30, String(R31.despesas));
+  t('31: todas as conferencias que a planilha escreve no Resumo fecham', R31.conferencia.every(c => c.ok), JSON.stringify(R31.conferencia.filter(c => !c.ok)));
+  const u31 = P31.dados; let bin31 = ''; for (let i = 0; i < u31.length; i++) bin31 += String.fromCharCode(u31[i]);
+  t('31: o arquivo e um .xlsx (zip) com as 6 abas', bin31.slice(0, 2) === 'PK' && bin31.indexOf('xl/worksheets/sheet6.xml') >= 0 && bin31.indexOf('xl/worksheets/sheet7.xml') < 0, bin31.slice(0, 2));
+  const cmp31 = aba31(P31, 'Compras'), tod31 = aba31(P31, 'Todos os lançamentos'), ven31 = aba31(P31, 'Vendas');
+  const amarelos31 = cmp31.linhas.map((l, i) => cmp31.destacar[i] ? l[l.length - 1] : '').filter(Boolean).sort();
+  t('31: as linhas amarelas da aba Compras sao as 3 que pedem conferencia (valor divergente, aberta sem pedaco, compra apagada)',
+    amarelos31.join() === 'pC,pE,pH' && R31.nAmarelas === 3 && R31.nOrfas === 1 && R31.nAbertoSemPedaco === 1,
+    JSON.stringify([amarelos31, R31.nAmarelas, R31.nOrfas, R31.nAbertoSemPedaco]));
+  t('31: a linha da compra apagada comeca pelo problema e conta os pedacos', cel31(cmp31, 'pH', 'Conferir') === 'Compra não existe mais no app, mas 2 pedaços dela ainda estão lançados', String(cel31(cmp31, 'pH', 'Conferir')));
+  t('31: em Todos os lancamentos, as caixas abertas com pedacos (fora e dentro de nota) e a aberta sem pedaco dizem por que nao entram',
+    cel31(tod31, 'pD', 'Entra no Resumo?') === 'não — o que saiu de dentro entra no lugar' && cel31(tod31, 'pN', 'Entra no Resumo?') === 'não — o que saiu de dentro entra no lugar'
+    && cel31(tod31, 'pE', 'Entra no Resumo?') === 'não — item aberto sem nada lançado dentro (conferir)',
+    JSON.stringify([cel31(tod31, 'pD', 'Entra no Resumo?'), cel31(tod31, 'pN', 'Entra no Resumo?'), cel31(tod31, 'pE', 'Entra no Resumo?')]));
+  t('31: situacao hoje com seta so depois de "aberto"; troca sem Pagamento repetido e com a troca toda na coluna dela',
+    cel31(cmp31, 'pD', 'Situação hoje') === '1 aberto → saíram 2 Single/Carta (1 no estoque · 1 na coleção)' && cel31(cmp31, 'pG', 'Pagamento') === ''
+    && cel31(cmp31, 'pG', 'Na troca você deu (a troca toda)') === '1 151 · Booster Box' && cel31(tod31, 'pF1', 'Situação') === 'Saiu em troca',
+    JSON.stringify([cel31(cmp31, 'pD', 'Situação hoje'), cel31(cmp31, 'pG', 'Pagamento'), cel31(cmp31, 'pG', 'Na troca você deu (a troca toda)'), cel31(tod31, 'pF1', 'Situação')]));
+  t('31: em Todos, pedaco de item aberto e item recebido em troca ficam sem Pagamento (o app grava "À vista" neles); compra normal mantem',
+    cel31(tod31, 'pD1', 'Pagamento') === '' && cel31(tod31, 'pN1', 'Pagamento') === '' && cel31(tod31, 'pG', 'Pagamento') === '' && cel31(tod31, 'pA', 'Pagamento') === 'À vista',
+    JSON.stringify(['pD1', 'pN1', 'pG', 'pA'].map(x => cel31(tod31, x, 'Pagamento'))));
+  t('31: sem codigo divergente nem custo por unidade diferente, o Resumo nao mostra a linha do codigo e nenhuma compra pinta por unidade',
+    res31(P31, 'Código a conferir').v === undefined && R31.nUnidDif === 0,
+    JSON.stringify([res31(P31, 'Código a conferir'), R31.nUnidDif]));
+  t('31: o comprei do Resumo conta os lancamentos pela regra do Painel (14 dos 18: sem as 2 caixas abertas, o item aberto e o que saiu em troca)',
+    res31(P31, 'comprei (mercadoria)').t.indexOf('14 lançamentos de compra (') === 0, res31(P31, 'comprei (mercadoria)').t);
+  /* o comparativo do Relatorio agora e provado pela CONTA, na 31f (revisor fiacao r5, M1: esta busca no texto do fonte era enganada por um
+     comentario com o texto certo e a lista crua na linha) */
+  t('31: carta sai "Nome (código)"; lacrado sem nome sai "Coleção · Tipo — texto" sem repetir a observação',
+    cel31(cmp31, 'pG', 'Item') === 'Charizard (199/165)' && cel31(cmp31, 'pA', 'Item') === '151 · ETB — caixa amassada' && cel31(cmp31, 'pA', 'Observação') === '',
+    JSON.stringify([cel31(cmp31, 'pG', 'Item'), cel31(cmp31, 'pA', 'Item'), cel31(cmp31, 'pA', 'Observação')]));
+  t('31: venda do app: taxa como fracao, recebe na data do repasse; aba Todos sem total',
+    cel31(ven31, 'v1', 'Taxa do app %') === 0.1 && cel31(ven31, 'v1', 'Recebe em') === '2026-08-19' && tod31.total === false,
+    JSON.stringify([cel31(ven31, 'v1', 'Taxa do app %'), cel31(ven31, 'v1', 'Recebe em'), tod31.total]));
+  setg('perDe', ''); setg('perAte', '');
+  const rM31 = A('motor')(false);
+  t('31: textos do Resumo: amarelas com os motivos, vendas sem vinculo, margem do Painel, a conta do Resultado bruto e o Investido total',
+    res31(P31, 'Compras em amarelo').t === '3 na aba Compras: 1 com os pedaços somando diferente do valor registrado na compra · 1 compra que não existe mais no app, mas ainda tem pedaços lançados · 1 item aberto sem nada lançado dentro. A coluna Conferir diz o quê.'
+    && res31(P31, 'Vendas sem vínculo').t.indexOf('2 na aba Vendas') === 0
+    && res31(P31, 'Resultado bruto').t.indexOf('Margem do que já saiu: ' + pct31(rM31.lucro / rM31.cmv) + ' sobre o custo.') >= 0
+    && res31(P31, 'Resultado bruto').t.indexOf('Dá o mesmo que vendi (líquido) − custo do que já vendeu − despesas.') >= 0
+    && res31(P31, 'Investido total').v === 2140,
+    JSON.stringify([res31(P31, 'Compras em amarelo').t, res31(P31, 'Resultado bruto').t, res31(P31, 'Investido total').v]));
+  t('31: o ✓ das compras diz o que NAO confere e conta as compras divididas com valor registrado (2 das 5); os outros ✓ nomeiam so abas',
+    res31(P31, '✓ = comprei (mercadoria)').t.indexOf('quem diz é a coluna Conferir, que soma os pedaços contra o valor registrado (só 2 das 5 compras divididas em pedaços têm esse valor) e compara o custo por unidade entre eles.') >= 0
+    && res31(P31, '✓ Vendas, Estoque e coleção, Despesas').t === 'Fecham com o Painel: o líquido das vendas, o custo e o Vale do que está com você, as despesas e a conta do Resultado bruto.'
+    && /a planilha não volta para o app/.test(String(aba31(P31, 'Resumo').linhas[2].celulas[0].v)),
+    JSON.stringify([res31(P31, '✓ = comprei (mercadoria)').t, res31(P31, '✓ Vendas, Estoque e coleção, Despesas').t]));
+  /* os textos que o PROPRIO app escreve na observacao nao podem virar nome de item — casos tirados do backup real
+     (13/09: "· aberto em boosters" sobrava porque o emoji opcional na regex, sem o flag u, exigia metade dele) */
+  const limpa31 = A('_plObsLimpa');
+  const casos31 = [
+    ['Gem pack 5 (🔄 troca: dei Caos ascendente · Booster Box) · aberto em boosters · 🔓 aberto em 1 item(ns)', 'Gem pack 5'],
+    ['Mega chandelur (🔓 de Booster Box)', 'Mega chandelur'],
+    ['Maioria bulk · 🔓', 'Maioria bulk'],
+    ['nota · +R$ 2.427,32 frete/taxa', ''],
+    ['nota · Starter Deck 01 - One Piece', 'Starter Deck 01 - One Piece'],
+    ['Sar mega greninja ex (🔄 troca: dei Caos ascendente · ETB (1 un) + Caos ascendente · Triple (2 un) + Caos ascendente · Sleeved (6 un))', 'Sar mega greninja ex'],
+    ['aberto em boosters', ''],
+    ['Goldeen (087/084) (🔓 de ETB)', 'Goldeen (087/084)']];
+  const erradas31 = casos31.filter(([e, s]) => limpa31(e) !== s).map(([e]) => e + ' -> ' + limpa31(e));
+  t('31: textos do app saem do nome do item (troca com parenteses dentro, caixa aberta, nota)', erradas31.length === 0, JSON.stringify(erradas31));
+  const cnn31 = A('_plCodigoNoNome'), casosCod31 = [
+    ['Goldeen (087/084)', 'Goldeen|087/084'], ['Kecleon(213/191)', 'Kecleon|213/191'], ['Pikachu (Promo) (160/159)', 'Pikachu (Promo)|160/159'],
+    ['Charmander (168jp/165)', 'Charmander|168jp/165'], ['Gardevoir (TG05/TG30)', 'Gardevoir|TG05/TG30'], ['Lote (12/08)', ''], ['Book (10/2025)', ''],
+    ['Carta (1/3)', ''], ['151 (151/165)', ''], ['Promo (SVP 053)', ''], ['Treecko (055/∞)', 'Treecko|055/∞']];
+  const errCod31 = casosCod31.filter(([e, s]) => { const k = cnn31(e); return (k ? k.nome + '|' + k.cod : '') !== s; }).map(([e]) => e + ' -> ' + JSON.stringify(cnn31(e)));
+  t('31: codigo escrito junto do nome so e lido com formato de codigo de carta (data, ano, 1/3 e nome so de numero ficam de fora)', errCod31.length === 0, JSON.stringify(errCod31));
+  /* controle negativo: sem a exclusao da caixa aberta a ponte TEM de acusar — senao este teste nao mede nada */
+  const _co31 = g('compraOriginalDe');
+  setg('compraOriginalDe', function(id, c){ const r = _co31(id, c); if (r) r.custo = Math.round(r.fam.reduce((s, x) => s + (+x.valor || 0), 0) * 100) / 100; return r; });
+  const Rn31 = A('montarPlanilhaTCG')().resumo;
+  setg('compraOriginalDe', _co31);
+  t('31 (controle negativo): contando a caixa aberta de novo, a conferencia da aba Compras acusa', Rn31.conferencia[0].ok === false, JSON.stringify(Rn31.ponte));
+  /* controle negativo da celula (revisor numero r4, M3): 1 centavo a mais so na celula de Custo total, com a soma sem arredondar certa,
+     passava na folga antiga (o proprio centavo entrava na folga) e a planilha escrevia "✓ Fecha com o Painel" */
+  setg('compraOriginalDe', function(id, c){ const r = _co31(id, c); if (r) r.custo = Math.round((r.custo + 0.01) * 100) / 100; return r; });
+  let Rc1c31; try { Rc1c31 = A('montarPlanilhaTCG')().resumo; } finally { setg('compraOriginalDe', _co31); }
+  t('31 (controle negativo): 1 centavo a mais numa celula de Custo total, com a soma sem arredondar certa, faz a conferencia de Compras acusar',
+    Rc1c31.conferencia[0].ok === false, JSON.stringify(Rc1c31.conferencia[0]));
+  /* controle negativo da folga: sem fracao de centavo nenhuma, 1 centavo de diferenca real TEM de acusar (a folga antiga, 0,005 por
+     linha, aceitava ate R$ 0,62 no backup — revisor numero r3, M1) */
+  const _motF31 = g('motor');
+  setg('motor', function (f) { const r = _motF31(f); r.vendasLiq = r.vendasLiq + 0.01; return r; });
+  let Rv31; try { Rv31 = A('montarPlanilhaTCG')().resumo; } finally { setg('motor', _motF31); }
+  t('31 (controle negativo): 1 centavo a mais no vendi do Painel faz a conferencia de Vendas acusar', Rv31.conferencia[1].ok === false, JSON.stringify(Rv31.conferencia[1]));
+
+  /* ---- as TELAS com a mesma conta: rodape, cabecalho do mes, barra de Todos, card da nota, card dos pedacos, faixa, verLote, aba
+     Trocas, aba vazia e o card Comprei do Relatorio (revisores disco r2 G1, disco r3 G1/M1/M2/L1/L2, numero r3 G1) ---- */
+  const hN31 = telaCons31('COMPRA', 'notas', ''), rN31 = rodape31(hN31);
+  t('31: Compras por nota: o rodape da o comprei do Painel (2110), diz quantas das 18 compras entram nele (14) e o que ficou fora, depois do valor',
+    rN31.n === 18 && rN31.rot === '14 entram no total comprado' && rN31.v === fmt31(2110) && /caixa aberta conta pelo que saiu dela/.test(rN31.nota)
+    && rN31.nota === 'como no Painel: caixa aberta conta pelo que saiu dela, e o que saiu em troca (' + fmt31(200) + ') conta pelo que você recebeu, na data em que cada um foi lançado · item aberto sem nada lançado dentro (' + fmt31(23.09) + ') fica fora', JSON.stringify(rN31));
+  const iNota31 = hN31.indexOf("abrirNota('N30')"), cardNota31 = iNota31 >= 0 ? hN31.slice(iNota31, iNota31 + 2500) : '';
+  t('31: o card da nota tira a caixa aberta (R$ 100 na nota; a caixa de R$ 400 conta pelos pedacos) e o card dos pedacos diz de onde sairam',
+    cardNota31.indexOf('<div style="font-weight:700">' + fmt31(100) + '</div>') >= 0 && cardNota31.indexOf('sem a caixa aberta (' + fmt31(400) + '), que conta pelo que saiu dela') >= 0
+    && hN31.indexOf('o que saiu de Booster Box aberto · 2 partes') >= 0 && hN31.indexOf('compra de 0 ') < 0, cardNota31.slice(0, 300));
+  const hF31 = telaCons31('COMPRA', 'notas', 'Fagulhas'), rF31 = rodape31(hF31);
+  t('31: buscando a compra, o card do lote e o rodape dizem o mesmo total (300) e a caixa nao soma de novo',
+    rF31.n === 3 && rF31.v === fmt31(300) && /caixa aberta conta pelo que saiu dela/.test(rF31.nota) && hF31.indexOf(fmt31(600)) < 0
+    && hF31.indexOf('<div style="font-weight:700">' + fmt31(300) + '</div>') >= 0, JSON.stringify(rF31));
+  const hI31 = telaCons31('COMPRA', 'itens', '', 'pD1');
+  t('31: a faixa do pedaco diz o custo total da compra sem a caixa aberta', hI31.indexOf('custo total ' + fmt31(300) + ' em 3 parte') >= 0,
+    (hI31.match(/custo total[^·<]*/) || ['(faixa nao apareceu)'])[0]);
+  const cap31 = [], _ins31 = ctx.document.body.insertAdjacentHTML;
+  ctx.document.body.insertAdjacentHTML = (pos, h) => { cap31.push(String(h)); };
+  try { A('verLote')('pD1'); } finally { ctx.document.body.insertAdjacentHTML = _ins31; }
+  const hV31 = cap31.join('');
+  t('31: o verLote soma a compra sem a caixa aberta e diz por que', hV31.indexOf('Custo total do lote: <b>' + fmt31(300) + '</b>') >= 0 && /a caixa aberta não soma de novo/.test(hV31),
+    (hV31.match(/Custo total do lote:[^<]*<b>[^<]*/) || ['(verLote nao desenhou nada)'])[0]);
+  const hT31 = telaCons31('TROCA', 'itens', ''), rT31 = rodape31(hT31);
+  t('31: a aba Trocas soma tudo o que se movimentou (380), sem a conta do Painel e sem a frase',
+    rT31.v === fmt31(380) && rT31.rot === 'movimentado em trocas (custo)' && !rT31.nota && hT31.indexOf('como no Painel') < 0, JSON.stringify(rT31));
+  const hA31 = telaCons31('tudo', 'itens', '');
+  t('31: em Todos, a barra e o cabecalho do mes dao o comprei do Painel (2110, nao 3033,09) e a frase aparece',
+    hA31.indexOf('🛒 comprado <b>' + fmt31(2110) + '</b>') >= 0 && hA31.indexOf('🛒 ' + fmt31(2110)) >= 0 && hA31.indexOf(fmt31(3033.09)) < 0
+    && /<span style="display:block;font-size:10px;color:var\(--mut\)">como no Painel: /.test(hA31), (hA31.match(/🛒[^<]*<b>[^<]*/) || [''])[0]);
+  const hE31 = telaCons31('PEDIDO', 'notas', '');
+  t('31: aba vazia na vista por nota diz "Nada nesse filtro." e mantem o botao da planilha', hE31.indexOf('Nada nesse filtro.') >= 0 && hE31.indexOf('onclick="exportarPlanilha()"') >= 0, hE31.slice(-300));
+  setg('tela', 'relatorios'); setg('relDet', true); setg('relCompView', 'lista'); setg('relJogo', ''); setg('relCol', ''); setg('relPess', ''); setg('relCat', '');
+  const hR31 = A('vRelatorios')(), iR31 = hR31.indexOf('📥 Comprei'), fR31 = hR31.indexOf('📤 Vendi', iR31), tR31 = iR31 >= 0 ? hR31.slice(iR31, fR31 > iR31 ? fR31 : undefined) : '';
+  setg('relDet', false);
+  t('31: o card Comprei do Relatorio usa a conta do Painel (sem a caixa aberta, o item aberto e o que saiu em troca)',
+    iR31 >= 0 && ['pD', 'pE', 'pF1', 'pN'].every(x => tR31.indexOf("abrir('" + x + "')") < 0) && ['pD1', 'pN1', 'pG'].every(x => tR31.indexOf("abrir('" + x + "')") >= 0),
+    tR31.slice(0, 240));
+  t('31: o Comprei do Relatorio diz como caixa aberta, troca e item aberto sem nada dentro contam, na data de cada lancamento',
+    hR31.indexOf('no período · como no Painel: caixa aberta conta pelo que saiu dela, e o que saiu em troca pelo que você recebeu, na data em que cada um foi lançado; item aberto sem nada lançado dentro fica fora') >= 0,
+    (hR31.match(/no período · como no Painel:[^<]*/) || [''])[0]);
+  t('31: a faixa da vista por nota diz "menos a caixa aberta" so quando uma nota da tela tem caixa aberta',
+    hN31.indexOf('O valor do card é a nota inteira, menos a caixa aberta, mesmo quando esta aba mostra só parte dela.') >= 0
+    && hF31.indexOf('O valor do card é a nota inteira, mesmo quando esta aba mostra só parte dela.') >= 0 && hF31.indexOf('menos a caixa aberta') < 0,
+    JSON.stringify([(hN31.match(/O valor do card[^<]*/) || [''])[0], (hF31.match(/O valor do card[^<]*/) || [''])[0]]));
+  setg('consQ', ''); setg('expandId', null); setg('consF', 'tudo'); setg('consVer', 'itens');
+  setg('_provaCache', null);
+  const lista31 = (A('provaReal')() || {}).A || [];
+  t('31: diagLote e a prova real nao acusam a caixa aberta com pedacos (registrado 300 = pedacos 120 + 180)',
+    A('diagLote')('pD') === null && !lista31.some(x => x.sev === 'vermelho' && /Fagulhas/.test(x.titulo)) && lista31.some(x => /Pitch/.test(x.titulo)),
+    JSON.stringify(lista31.map(x => x.sev + ': ' + x.titulo)));
+  const _cf31 = ctx.confirm, _apr31 = g('abrirProvaReal');
+  ctx.confirm = () => true; setg('abrirProvaReal', () => {});
+  g('movs').find(x => x.id === 'pD').valorOrig = 1;
+  try { A('aceitarConservacao')('pD'); } finally { ctx.confirm = _cf31; setg('abrirProvaReal', _apr31); }
+  t('31: aceitar a soma como referencia grava 300 (os pedacos), nao 600 (caixa + pedacos)', g('movs').find(x => x.id === 'pD').valorOrig === 300,
+    String(g('movs').find(x => x.id === 'pD').valorOrig));
+  /* nota PARCELADA com caixa aberta (le-como-felype r4): o card da nota diz que a parcela e da nota inteira; o card dos pedacos nao
+     repete a parcela e mostra so o que saiu ("Abbys · 18 Booster", sem "· ·" e sem "(aberto)"); compra avulsa com uma caixa aberta
+     diz "saíram 18 Booster" depois da situacao; nota com item aberto SEM pedacos continua inteira (so a caixa redistribuida sai); e o
+     toque no Relatorio abre a Consulta pela colecao, nao por busca de texto (revisores numero r4 M2 e disco r4 M2) */
+  const PK31 = { pgTipo:'Parcelado', nParc:3, venc1:'2026-09-10' };
+  setg('movs', [
+    C31('kN', Object.assign({ cat:'Booster Box', colecao:'Abbys', valor:300, situacao:'Aberto', notaId:'N40', notaNum:'40' }, PK31)),
+    C31('kN2', Object.assign({ cat:'ETB', colecao:'Abbys', valor:90, situacao:'Em estoque', notaId:'N40', notaNum:'40' }, PK31)),
+    C31('kN1', { cat:'Booster', colecao:'Abbys', qtd:9, valor:150, situacao:'Em estoque', loteOrigem:'kN', origem:'ABERTURA' }),
+    C31('kN3', { cat:'Booster', colecao:'Abbys', qtd:9, valor:150, situacao:'Coleção', loteOrigem:'kN', origem:'ABERTURA' }),
+    C31('kS', { cat:'Booster Box', valor:100, situacao:'Aberto', notaId:'N41', notaNum:'41' }),
+    C31('kS1', { cat:'Booster', qtd:5, valor:50, situacao:'Em estoque', loteOrigem:'kS', origem:'ABERTURA' }),
+    C31('kS2', { cat:'Booster', qtd:5, valor:50, situacao:'Em estoque', loteOrigem:'kS', origem:'ABERTURA' }),
+    C31('kE', { cat:'Sleeved', valor:23, situacao:'Aberto', notaId:'N42', notaNum:'42' }),
+    C31('kE2', { cat:'ETB', valor:77, situacao:'Em estoque', notaId:'N42', notaNum:'42' }),
+    C31('kM', { cat:'Booster Box', colecao:'Caos', valor:100, situacao:'Em estoque' }),
+    C31('kM1', { cat:'Booster Box', colecao:'Caos', valor:100, situacao:'Aberto', loteOrigem:'kM' }),
+    C31('kM2', { cat:'Booster', colecao:'Caos', qtd:18, valor:100, situacao:'Em estoque', loteOrigem:'kM1', origem:'ABERTURA' }),
+    C31('kC', { cat:'ETB', colecao:'Caos ascendente', valor:70, situacao:'Em estoque' }),
+    C31('kP', { cat:'ETB', colecao:'Caos ascendente', valor:30, situacao:'Em estoque', contraparte:'' })]);
+  const hK31 = telaCons31('COMPRA', 'notas', '');
+  const trecho31 = (h, marca) => { const i = h.indexOf(marca); if (i < 0) return ''; const j = h.indexOf('class="item"', i); return h.slice(i, j > i ? j : i + 1600); };
+  const cN40 = trecho31(hK31, "abrirNota('N40')"), cN42 = trecho31(hK31, "abrirNota('N42')"), cLN = trecho31(hK31, "verLote('kN')"), cLS = trecho31(hK31, "verLote('kS')"), cLM = trecho31(hK31, "verLote('kM')");
+  t('31: nota parcelada com caixa aberta: o negrito sai sem a caixa e a parcela diz "nota inteira"; nota com item aberto sem pedacos fica inteira',
+    cN40.indexOf('<div style="font-weight:700">' + fmt31(90) + '</div>') >= 0 && cN40.indexOf('3× ' + fmt31(130) + ' · nota inteira') >= 0
+    && cN42.indexOf('<div style="font-weight:700">' + fmt31(100) + '</div>') >= 0 && cN42.indexOf('sem a caixa aberta') < 0, JSON.stringify([cN40.slice(0, 900), cN42.slice(0, 600)]));
+  t('31: card dos pedacos de caixa numa nota parcelada: "3× — na nota" sem repetir a parcela, e so o que saiu ("Abbys · 18 Booster"; sem colecao, "10 Booster")',
+    cLN.indexOf('3× — na nota') >= 0 && cLN.indexOf('🧩 Abbys · 18 Booster') >= 0 && cLN.indexOf('(aberto)') < 0 && cLN.indexOf('· ·') < 0 && cLN.indexOf('3× ' + fmt31(100)) < 0
+    && cLS.indexOf('🧩 10 Booster') >= 0 && cLS.indexOf('à vista') >= 0, JSON.stringify([cLN.slice(0, 900), cLS.slice(0, 600)]));
+  t('31: compra avulsa com uma caixa aberta: "compra de 2 Booster Box", a situacao e "saíram 18 Booster" (nunca somado, nunca "(aberto)")',
+    cLM.indexOf('compra de 2 Booster Box · 3 partes') >= 0 && cLM.indexOf('🧩 Caos · Booster Box · 📦 1 em estoque · 🔓 1 aberto · saíram 18 Booster') >= 0
+    && cLM.indexOf('<div style="font-weight:700">' + fmt31(200) + '</div>') >= 0, cLM.slice(0, 900));
+  setg('tela', 'relatorios'); setg('relDimAll', 'colecao'); setg('relCompView', 'lista'); setg('relDet', false); setg('relJogo', ''); setg('relCol', ''); setg('relPess', ''); setg('relCat', '');
+  const hRK31 = A('vRelatorios')();
+  const _renderK31 = g('render'); let colK31 = '', qK31 = '?', hCK31 = '', hSK31 = '';
+  setg('render', () => {});
+  try {
+    A('abrirConsultaPorDim')('Caos'); colK31 = g('consCol'); qK31 = g('consQ'); hCK31 = A('vConsultar')();
+    A('abrirConsultaPorDim')('(sem coleção)'); hSK31 = A('vConsultar')();
+  } finally { setg('render', _renderK31); setg('consCol', ''); setg('consQ', ''); setg('consF', 'tudo'); }
+  t('31: toque numa colecao do Relatorio abre a Consulta filtrada por ela (Caos = 200, sem o "Caos ascendente"); o vazio abre o "(sem coleção)"',
+    hRK31.indexOf("abrirConsultaPorDim('Caos','tudo')") >= 0 && hRK31.indexOf("consQ='") < 0 && colK31 === 'Caos' && qK31 === ''
+    && hCK31.indexOf('🛒 comprado <b>' + fmt31(200) + '</b>') >= 0 && hSK31.indexOf('🛒 comprado <b>' + fmt31(177) + '</b>') >= 0,
+    JSON.stringify([colK31, qK31, (hCK31.match(/🛒 comprado <b>[^<]*/) || [''])[0], (hSK31.match(/🛒 comprado <b>[^<]*/) || [''])[0]]));
+  /* o vazio de pessoa tem nome no Relatorio, no campo do filtro e na barra "filtrando" (le-como-felype r5: o campo mostrava "todos" com a
+     lista filtrada, e "—" num filtro se le como nenhum filtro) */
+  setg('relDimAll', 'pessoa'); setg('tela', 'relatorios');
+  const hRP31 = A('vRelatorios')();
+  let hPK31 = '', pessK31 = '?';
+  setg('render', () => {});
+  try { A('abrirConsultaPorDim')('(sem cliente/fornecedor)'); pessK31 = g('consPess'); setg('consFOpen', true); hPK31 = A('vConsultar')(); }
+  finally { setg('render', _renderK31); setg('consFOpen', false); setg('consPess', ''); setg('consQ', ''); setg('consF', 'tudo'); setg('relDimAll', 'colecao'); }
+  t('31: o vazio de pessoa tem nome ("(sem cliente/fornecedor)") no Relatorio, no campo do filtro da Consulta e na barra, e abre com o mesmo valor',
+    hRP31.indexOf("abrirConsultaPorDim('(sem cliente/fornecedor)','tudo')") >= 0 && hRP31.indexOf("abrirConsultaPorDim('—'") < 0 && pessK31 === '(sem cliente/fornecedor)'
+    && hPK31.indexOf('<option selected>(sem cliente/fornecedor)</option>') >= 0 && hPK31.indexOf('filtrando: (sem cliente/fornecedor)') >= 0 && hPK31.indexOf('🛒 comprado <b>' + fmt31(30) + '</b>') >= 0,
+    JSON.stringify([pessK31, (hPK31.match(/filtrando: [^<]*/) || [''])[0], (hPK31.match(/🛒 comprado <b>[^<]*/) || [''])[0]]));
+  const ordAnt31 = g('consOrd'); let hGP31 = '';
+  setg('consOrd', 'pessoa');
+  try { hGP31 = telaCons31('tudo', 'itens', ''); } finally { setg('consOrd', ordAnt31); }
+  t('31: na Consulta agrupada por pessoa, o grupo sem cliente/fornecedor tem o mesmo nome do filtro e do Relatorio',
+    hGP31.indexOf('(sem cliente/fornecedor)') >= 0, (hGP31.match(/.{0,80}sem cliente.{0,40}/) || [hGP31.slice(0, 200)])[0]);
+  /* a regra da caixa aberta pede as 3 coisas: caixa em Aberto, filho que e COMPRA e filho com origem ABERTURA, com e sem o mapa */
+  setg('movs', [C31('zA', { cat:'ETB', valor:50, situacao:'Aberto' }), { id:'zV', tipo:'VENDA', data:'2026-08-02', valor:10, loteOrigem:'zA', origem:'ABERTURA' },
+    C31('zB', { cat:'ETB', valor:50, situacao:'Aberto' }), C31('zB1', { cat:'Booster', valor:50, situacao:'Em estoque', loteOrigem:'zB' }),
+    C31('zC', { cat:'ETB', valor:50, situacao:'Em estoque' }), C31('zC1', { cat:'Booster', valor:50, situacao:'Em estoque', loteOrigem:'zC', origem:'ABERTURA' }),
+    C31('zD', { cat:'ETB', valor:50, situacao:'Aberto' }), C31('zD1', { cat:'Booster', valor:50, situacao:'Em estoque', loteOrigem:'zD', origem:'ABERTURA' })]);
+  const cr31 = A('caixaRedistribuida'), mapa31 = A('mapaFilhosCompra')(), mv31 = idm => g('movs').find(x => x.id === idm);
+  const regra31 = ['zA', 'zB', 'zC', 'zD'].map(idm => [cr31(mv31(idm)), cr31(mv31(idm), mapa31)]);
+  t('31: caixa aberta so conta como redistribuida com filho que e COMPRA, com origem ABERTURA e caixa em Aberto (com e sem o mapa)',
+    JSON.stringify(regra31) === JSON.stringify([[false, false], [false, false], [false, false], [true, true]]), JSON.stringify(regra31));
+  /* 31d: compra fora das situacoes do app quebra a conta do Resultado bruto — a 6a conferencia acusa e a frase some */
+  setg('movs', [C31('zX', { cat:'ETB', valor:10, situacao:'Esquisita' })]);
+  const Pd31 = A('montarPlanilhaTCG')();
+  t('31d: com a conta do Resultado bruto quebrada, a 6a conferencia acusa e a frase "Da o mesmo" some',
+    Pd31.resumo.conferencia[5].ok === false && res31(Pd31, 'Resultado bruto').t.indexOf('Dá o mesmo') < 0, JSON.stringify([Pd31.resumo.conferencia[5], res31(Pd31, 'Resultado bruto').t]));
+
+  /* ---- 31c: parcela, nota parcelada, preco da Liga, repasse, venda ligada sem nome, codigo escrito junto do nome, codigo cadastrado
+     diferente do escrito, carta sem nome, caractere de controle, compra de um pedaco so com valor registrado diferente, referencia
+     com frete e taxa, caixa vendida que virou boosters e venda de R$ 0,00 — com o RELOGIO FIXO em 20/08/2026 12h ---- */
+  relogio31(2026, 8, 20, 12, 0);
+  const _pl31 = g('_precosLiga');
+  try {
+    const Q31 = (id, x) => Object.assign({ id, tipo:'COMPRA', data:'2026-08-10', jogo:'Pokémon', idioma:'—', qtd:1, taxa:0, pgTipo:'À vista', destino:'Vender', contraparte:'Loja' }, x);
+    const PARC31 = { pgTipo:'Parcelado', nParc:3, venc1:'2026-09-10' }, NOTA31 = { notaId:'N31', notaNum:'77', pgTipo:'Parcelado', nParc:2, venc1:'2026-09-05' };
+    const CTRL31 = String.fromCharCode(1) + String.fromCharCode(11) + String.fromCharCode(12);
+    setg('movs', [
+      Q31('qP', Object.assign({ cat:'Booster Box', colecao:'Surto', qtd:2, valor:200, situacao:'Em estoque' }, PARC31)),
+      Q31('qP1', Object.assign({ cat:'Booster Box', colecao:'Surto', qtd:1, valor:100, situacao:'Vendido', loteOrigem:'qP' }, PARC31)),
+      Q31('qN1', Object.assign({ cat:'ETB', colecao:'Rivais', valor:60, situacao:'Em estoque' }, NOTA31)),
+      Q31('qN2', Object.assign({ cat:'Booster', colecao:'Rivais', valor:40, situacao:'Coleção' }, NOTA31)),
+      Q31('qL', { cat:'Single/Carta', codigo:'Umbreon (215/203)', valor:120, situacao:'Em estoque' }),
+      /* a observacao passa por limpeza de espaco (tab vertical e form feed sao espaco para a regex), entao o caractere de controle
+         que so o filtro do XML tira vai tambem no fornecedor, que chega cru a planilha (revisor: mutacao sem VT/FF passava verde) */
+      Q31('qV', { cat:'Single/Carta', codigo:'Espeon (214/203)', valor:90, situacao:'Vendido', obs:'veio com' + CTRL31 + ' marca', contraparte:'Loja' + CTRL31 + 'Centro' }),
+      Q31('qX', { cat:'Single/Carta', valor:30, situacao:'Coleção', obs:'Goldeen (087/084) (🔓 de ETB)' }),
+      Q31('qR', { data:'2026-08-12', cat:'Booster', colecao:'Surto', valor:150, valorOrig:300, situacao:'Em estoque' }),
+      Q31('qB', { data:'2026-08-02', cat:'Booster Box', colecao:'Abbys', valor:300, situacao:'Vendido' }),
+      Q31('qB1', { data:'2026-08-02', cat:'Booster', colecao:'Abbys', qtd:18, valor:150, situacao:'Vendido', loteOrigem:'qB' }),
+      Q31('qF', { cat:'ETB', colecao:'Rivais', valor:110, valorProduto:100, freteRateio:7, taxaRateio:3, situacao:'Em estoque' }),
+      Q31('qM', { cat:'Single/Carta', codigo:'217/217', valor:116.57, situacao:'Coleção', obs:'Mega dragonite ex (271/271)' }),
+      Q31('qS', { data:'2026-08-05', cat:'Single/Carta', valor:5, situacao:'Coleção' }),
+      Q31('qY', { cat:'Single/Carta', codigo:'Psyduck (226/217)', valor:40, situacao:'Coleção', obs:'psyduck  (226/217)' }),
+      Q31('qK', { cat:'Single/Carta', codigo:'Pikachu (025/165)', valor:10, situacao:'Coleção', obs:'Pikachu (026/165)' }),
+      Q31('qS2', { data:'2026-08-05', cat:'Single/Carta', codigo:'123/200', valor:4, situacao:'Coleção' }),
+      Q31('qT', { cat:'Booster', codigo:'Falinks (123/200)', valor:15, situacao:'Coleção' }),
+      Q31('qW', { cat:'Single/Carta', codigo:'Mew (052', valor:8, situacao:'Coleção' }),
+      Q31('qU', { cat:'Single/Carta', codigo:'Jolteon (135/165)', valor:50, situacao:'Coleção' }),
+      Q31('qC', { cat:'Single/Carta', codigo:'Charmander (004/165)', valor:20, situacao:'Vendido' }),
+      Q31('qJ', { cat:'Single/Carta', codigo:'Jolteon', valor:12, situacao:'Coleção' }),
+      Q31('qBk', { cat:'Single/Carta', codigo:'Bulk', qtd:15, valor:30, situacao:'Coleção' }),
+      { id:'w1', tipo:'VENDA', data:'2026-08-18', jogo:'Pokémon', cat:'Single/Carta', qtd:1, valor:130, canal:'App', taxa:10, recDias:14, origemId:'qV', custoOrigem:90, contraparte:'Cli', conta:'Nubank' },
+      { id:'w4', tipo:'VENDA', data:'2026-08-15', jogo:'Pokémon', cat:'Single/Carta', qtd:1, valor:30, canal:'Pix', taxa:0, origemId:'qC', custoOrigem:20, contraparte:'Cli', obs:'Charmander' },
+      { id:'w2', tipo:'VENDA', data:'2026-08-12', jogo:'Pokémon', cat:'Booster Box', qtd:1, valor:150, canal:'Pix', taxa:0, origemId:'qP1', custoOrigem:100, contraparte:'Cli' },
+      { id:'w3', tipo:'VENDA', data:'2026-08-19', jogo:'Pokémon', cat:'Booster', qtd:1, valor:0, canal:'Pix', taxa:0, contraparte:'Brinde' },
+      { id:'e1', tipo:'DESPESA', data:'2026-08-15', cat:'Frete', valor:25, status:'apagar', natureza:'ordinaria' },
+      { id:'e2', tipo:'DESPESA', data:'2026-09-15', cat:'Aluguel', valor:70, status:'apagar', natureza:'ordinaria' },
+      { id:'e3', tipo:'DESPESA', data:'2026-08-20', cat:'Luz', valor:10, status:'apagar', natureza:'ordinaria' }
+    ]);
+    setg('contasBanc', [{ nome:'Nubank', saldoIni:0 }]);
+    /* o 217/217 tem preco na Liga (como o codigo de energia da Mega dragonite ex no backup real): e ele que da o Vale de R$ 1,74.
+       O Jolteon so tem historico: vale o ultimo preco visto */
+    setg('_precosLiga', { atualizadoEm:'2026-08-20T10:00:00Z', cartas:{ 'Umbreon (215/203)':{ codigo:'215/203', status:'OK', titulo:'Umbreon (215/203)', versoes:[{ v:'Normal', mn:150, md:175, mx:250 }] }, '217/217':{ codigo:'217/217', status:'OK', titulo:'Energia (217/217)', versoes:[{ v:'Normal', mn:1, md:1.74, mx:3 }] } },
+      historico:{ 'Jolteon (135/165)':{ 'Normal':[{ d:'2026-08-01', md:60 }] } } });
+    const Pc = A('montarPlanilhaTCG')(), Rc = Pc.resumo;
+    const cmpC = aba31(Pc, 'Compras'), venC = aba31(Pc, 'Vendas'), estC = aba31(Pc, 'Estoque e coleção (hoje)');
+    t('31c: compra parcelada dividida em pedacos: "3× de" o custo da compra inteira (200 + 100) ÷ 3; itens de nota parcelada dizem "nota inteira"',
+      cel31(cmpC, 'qP', 'Pagamento') === '3× de ' + fmt31(100) && cel31(cmpC, 'qN1', 'Pagamento') === '2× — nota inteira' && cel31(cmpC, 'qN2', 'Pagamento') === '2× — nota inteira',
+      JSON.stringify([cel31(cmpC, 'qP', 'Pagamento'), cel31(cmpC, 'qN1', 'Pagamento'), cel31(cmpC, 'qN2', 'Pagamento')]));
+    t('31c: A pagar = parcelas (200 + 100 da compra dividida, 100 da nota) + despesas a pagar (25 com data passada, 10 com a data de hoje, 70 com data futura)',
+      Rc.aPagar === 505 && Rc.despesasFuturasAPagar === 70, JSON.stringify([Rc.aPagar, Rc.despesasFuturasAPagar]));
+    t('31c: a frase do A pagar diz o que ainda vence no mes e quanto de cada parte ja esta no caixa (com o que ja passou dentro) e ainda nao esta',
+      res31(Pc, 'A pagar (parcelas e despesas)').t === fmt31(10) + ' vence até o fim do mês. Já está descontado no caixa acima: as parcelas de compra que ainda vão vencer (' + fmt31(400) + ') e as despesas com data até hoje (' + fmt31(35) + '), inclusive ' + fmt31(25) + ' que já passaram da data e continuam como a pagar. ' + fmt31(70) + ' de despesas com data futura ainda não.',
+      res31(Pc, 'A pagar (parcelas e despesas)').t);
+    t('31c: A receber = repasse do app que ainda vai cair (130 com 10% de taxa = 117), fora deste mes',
+      Rc.aReceber === 117 && res31(Pc, 'A receber (app)').t === 'Nada cai este mês. Já está somado no caixa acima.', JSON.stringify([Rc.aReceber, res31(Pc, 'A receber (app)').t]));
+    t('31c: carta com preco na Liga vale o preco medio da Liga, nao o custo (Vale 175, "Liga, hoje", 55 acima); a pelo custo deixa a diferenca em branco',
+      cel31(estC, 'qL', 'Vale') === 175 && cel31(estC, 'qL', 'De onde veio o valor') === 'Liga, hoje' && cel31(estC, 'qL', 'Vale − custo R$') === 55
+      && cel31(estC, 'qN1', 'Vale − custo R$') === '' && Rc.valeEstoque === 695
+      && res31(Pc, '+ no estoque (a custo)').t === 'Vale ~' + fmt31(695) + ' · 1/5 com preço da Liga, 4 pelo custo.',
+      JSON.stringify([cel31(estC, 'qL', 'Vale'), cel31(estC, 'qL', 'De onde veio o valor'), cel31(estC, 'qN1', 'Vale − custo R$'), Rc.valeEstoque, res31(Pc, '+ no estoque (a custo)').t]));
+    t('31c: venda ligada sem nome proprio leva o nome e o codigo da carta de onde saiu',
+      cel31(venC, 'w1', 'Item') === 'Espeon (214/203)' && cel31(venC, 'w1', 'Código') === '214/203', JSON.stringify([cel31(venC, 'w1', 'Item'), cel31(venC, 'w1', 'Código')]));
+    t('31c: codigo escrito junto do nome vai para a coluna Codigo; a observacao que so repete o nome some, a que traz outro codigo fica',
+      cel31(estC, 'qX', 'Item') === 'Goldeen (087/084)' && cel31(estC, 'qX', 'Código') === '087/084' && cel31(estC, 'qX', 'Observação') === ''
+      && cel31(estC, 'qY', 'Item') === 'Psyduck (226/217)' && cel31(estC, 'qY', 'Observação') === ''
+      && cel31(estC, 'qM', 'Item') === 'Mega dragonite ex (217/217)' && cel31(estC, 'qM', 'Observação') === 'Mega dragonite ex (271/271)'
+      && cel31(estC, 'qS', 'Item') === 'Single/Carta (sem nome)' && cel31(estC, 'qS2', 'Item') === 'Single/Carta (sem nome, 123/200)'
+      && cel31(estC, 'qW', 'Item') === 'Mew' && cel31(estC, 'qT', 'Item') === 'Falinks',
+      JSON.stringify(['qX', 'qY', 'qM', 'qS', 'qS2', 'qW', 'qT'].map(x => [cel31(estC, x, 'Item'), cel31(estC, x, 'Código'), cel31(estC, x, 'Observação')])));
+    t('31c: codigo a conferir ja na 1a tela: pela observacao diferente (Liga ou custo) e pelo nome no campo Codigo (carta de 1 unidade); o lote de cartas fica de fora; o Resumo conta os 4',
+      cel31(estC, 'qM', 'De onde veio o valor') === 'Liga, código a conferir' && cel31(estC, 'qM', 'Vale') === 1.74 && cel31(estC, 'qK', 'De onde veio o valor') === 'custo, código a conferir'
+      && cel31(estC, 'qY', 'De onde veio o valor') === 'custo (sem preço na Liga)' && estC.colunas[col31(estC, 'De onde veio o valor')].larg === 24
+      && cel31(estC, 'qW', 'De onde veio o valor') === 'custo, código a conferir' && cel31(estC, 'qJ', 'De onde veio o valor') === 'custo, código a conferir' && cel31(estC, 'qBk', 'De onde veio o valor') === 'custo (sem preço na Liga)'
+      && res31(Pc, 'Código a conferir').t === '4 na aba Estoque e coleção (coluna De onde veio o valor): 2 com o código da Observação diferente do que está no Item (o Vale sai pelo código do Item) e 2 com o nome da carta no campo Código (o Vale sai pelo custo). Confira o código no app.',
+      JSON.stringify([cel31(estC, 'qM', 'De onde veio o valor'), cel31(estC, 'qM', 'Vale'), cel31(estC, 'qK', 'De onde veio o valor'), cel31(estC, 'qY', 'De onde veio o valor'), cel31(estC, 'qW', 'De onde veio o valor'), cel31(estC, 'qJ', 'De onde veio o valor'), cel31(estC, 'qBk', 'De onde veio o valor'), res31(Pc, 'Código a conferir').t]));
+    t('31c: carta so com historico na Liga vale o ultimo preco visto e diz "Liga, último visto"',
+      cel31(estC, 'qU', 'Vale') === 60 && cel31(estC, 'qU', 'De onde veio o valor') === 'Liga, último visto', JSON.stringify([cel31(estC, 'qU', 'Vale'), cel31(estC, 'qU', 'De onde veio o valor')]));
+    t('31c: carta vendida com nome e sem codigo leva o codigo da carta de onde saiu no Item e na coluna Codigo',
+      cel31(venC, 'w4', 'Item') === 'Charmander (004/165)' && cel31(venC, 'w4', 'Código') === '004/165', JSON.stringify([cel31(venC, 'w4', 'Item'), cel31(venC, 'w4', 'Código')]));
+    const todC31 = aba31(Pc, 'Todos os lançamentos');
+    t('31c: em Todos, a venda sai com o mesmo Item e o mesmo Codigo da aba Vendas (sem nome leva o da origem; com nome e sem codigo leva o codigo da origem)',
+      cel31(todC31, 'w1', 'Item') === cel31(venC, 'w1', 'Item') && cel31(todC31, 'w1', 'Código') === '214/203' && cel31(todC31, 'w4', 'Item') === 'Charmander (004/165)' && cel31(todC31, 'w4', 'Código') === '004/165',
+      JSON.stringify(['w1', 'w4'].map(x => [cel31(todC31, x, 'Item'), cel31(todC31, x, 'Código')])));
+    const cbN31 = g('contasBanc')[0], sC31 = Math.round(g('saldoConta')(cbN31) * 100) / 100, sF31 = Math.round(g('saldoFisicoConta')(cbN31) * 100) / 100;
+    t('31c: Saldo em contas e Nas contas (físico hoje) do Resumo sao os dois do Painel, e aqui sao diferentes (repasse do app que ainda vai cair)',
+      res31(Pc, 'Saldo em contas').v === sC31 && res31(Pc, 'Nas contas (físico hoje)').v === sF31 && sC31 !== sF31,
+      JSON.stringify([res31(Pc, 'Saldo em contas').v, res31(Pc, 'Nas contas (físico hoje)').v, sC31, sF31]));
+    let hP31 = '';
+    try { setg('tela', 'painel'); hP31 = A('vPainel')(); } catch (e) { hP31 = 'ERRO: ' + (e && e.message); }
+    t('31c: o card A pagar do Painel diz o que vence ate o fim do mes e, a parte, o que ja passou da data, como a planilha',
+      hP31.indexOf(fmt31(10) + ' vence até o fim do mês · ' + fmt31(25) + ' já passou da data') >= 0, (hP31.match(/A pagar \(parcelas e despesas\)[\s\S]{0,260}/) || [hP31.slice(0, 200)])[0]);
+    let sN31 = '';
+    try { sN31 = zip31(g('XLSX_MIN').montar([{ nome:'T', colunas:[{ t:'Valor', tipo:'moeda', larg:10, soma:false }], linhas:[[NaN], [Infinity], [5]] }], { quando:'' }))['xl/worksheets/sheet1.xml'] || ''; }
+    catch (e) { sN31 = 'ERRO: ' + (e && e.message); }
+    t('31c: numero que nao e finito vira texto no arquivo, nunca <v>NaN</v> (o Excel pediria reparo)',
+      sN31.indexOf('<sheetData') >= 0 && !/<v>(NaN|-?Infinity)<\/v>/.test(sN31) && sN31.indexOf('<v>5</v>') >= 0, sN31.slice(0, 400));
+    const iR = cmpC.linhas.indexOf(linha31(cmpC, 'qR'));
+    t('31c: so a compra de um pedaco com valor registrado diferente pede conferencia; referencia com frete e taxa confere',
+      cmpC.destacar[iR] === true && String(cel31(cmpC, 'qR', 'Conferir')).indexOf(fmt31(150) + ' a menos') === 0 && Rc.nConferir === 1 && Rc.nAmarelas === 1,
+      JSON.stringify([cmpC.destacar[iR], cel31(cmpC, 'qR', 'Conferir'), Rc.nConferir, Rc.nAmarelas]));
+    t('31c: caixa vendida que virou boosters: situacao sem seta e sem custo por unidade que nao multiplica; mais recente em cima',
+      cel31(cmpC, 'qB', 'Situação hoje') === '1 vendido · saíram 18 Booster (18 vendidos)' && cel31(cmpC, 'qB', 'Custo por unidade') === '' && cel31(cmpC, 'qP', 'Custo por unidade') === 100
+      && cmpC.linhas[0][0] === '2026-08-12' && cmpC.linhas[cmpC.linhas.length - 1][0] === '2026-08-02',
+      JSON.stringify([cel31(cmpC, 'qB', 'Situação hoje'), cel31(cmpC, 'qB', 'Custo por unidade'), cel31(cmpC, 'qP', 'Custo por unidade'), cmpC.linhas[0][0], cmpC.linhas[cmpC.linhas.length - 1][0]]));
+    t('31c: todas as conferencias fecham com parcela, nota, Liga e despesa vencida; venda de R$ 0,00 aparece no topo do Resumo',
+      Rc.conferencia.every(c => c.ok) && res31(Pc, 'Vendas de R$ 0,00').t.indexOf('1 na aba Vendas') === 0, JSON.stringify(Rc.conferencia.filter(c => !c.ok)));
+    const zipC = zip31(Pc.dados), folhasC = Object.keys(zipC).filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n));
+    const nF = folhasC.reduce((s, n) => s + (zipC[n].match(/<\/f>/g) || []).length, 0), nFV = folhasC.reduce((s, n) => s + (zipC[n].match(/<\/f><v>/g) || []).length, 0);
+    t('31c: dentro do arquivo, todo total com formula traz o valor ja calculado', folhasC.length >= 5 && nF > 0 && nF === nFV, JSON.stringify({ folhas:folhasC.length, nF, nFV }));
+    const ctrlC = Object.keys(zipC).filter(n => /\.xml$/.test(n) && ctrlEm31(zipC[n]));
+    t('31c: nenhum caractere de controle dentro do XML (a observacao tinha tres)', Object.keys(zipC).length >= 8 && ctrlC.length === 0, JSON.stringify([Object.keys(zipC).length, ctrlC]));
+    const s2 = zipC['xl/worksheets/sheet2.xml'] || '';
+    t('31c: formato do arquivo: total por SUBTOTAL que segue o filtro, filtro no cabecalho, impressao deitada e moeda com o negativo em vermelho',
+      folhasC.some(n => zipC[n].indexOf('SUBTOTAL(109,') >= 0) && !folhasC.some(n => zipC[n].indexOf('SUM(') >= 0) && s2.indexOf('<autoFilter ref=') >= 0
+      && s2.indexOf('orientation="landscape"') >= 0 && (zipC['xl/styles.xml'] || '').indexOf('numFmtId="164" formatCode="&quot;R$&quot; #,##0.00;[Red]-&quot;R$&quot; #,##0.00"') >= 0,
+      s2.slice(0, 160));
+
+    /* ---- 31b: centavo quebrado. 6 vendas de R$ 11,37 com 12% de taxa e 6 cartas de R$ 1,005 na Liga: somar celulas arredondadas
+       nao da o total arredondado, e a conferencia nao pode acusar diferenca que so existe no arredondamento ---- */
+    const fxB = [], cartasB = {};
+    for (let i = 1; i <= 6; i++) {
+      const cod = 'Carta' + i + ' (00' + i + '/100)';
+      fxB.push(Q31('rC' + i, { cat:'Single/Carta', codigo:cod, valor:1, situacao:'Em estoque' }));
+      fxB.push({ id:'rV' + i, tipo:'VENDA', data:'2026-08-01', jogo:'Pokémon', cat:'Booster', qtd:1, valor:11.37, canal:'App', taxa:12, recDias:0, contraparte:'Cli' });
+      cartasB[cod] = { codigo:'00' + i + '/100', status:'OK', titulo:cod, versoes:[{ v:'Normal', mn:1, md:1.005, mx:2 }] };
+    }
+    setg('movs', fxB); setg('_precosLiga', { atualizadoEm:'2026-08-20T10:00:00Z', cartas:cartasB });
+    const Pb = A('montarPlanilhaTCG')(), Rb = Pb.resumo;
+    t('31b: com centavo quebrado, as conferencias de Vendas e do Vale nao acusam diferenca falsa',
+      Rb.conferencia.every(c => c.ok) && Rb.valeEstoque === 6.03, JSON.stringify(Rb.conferencia.filter(c => !c.ok).concat([{ vale:Rb.valeEstoque }])));
+    /* tres vendas de R$ 1,02 com 12%: a diferenca de arredondamento (0,01) e o erro real somado ficam separados so pelo ponto
+       flutuante (0,010000000000000231 contra 0,010000000000000009) — e para isso que existe a folga de 1e-9 */
+    setg('movs', [1, 2, 3].map(i => ({ id:'fV' + i, tipo:'VENDA', data:'2026-08-01', jogo:'Pokémon', cat:'Booster', qtd:1, valor:1.02, canal:'App', taxa:12, recDias:0, contraparte:'Cli' })));
+    const Rf31 = A('montarPlanilhaTCG')().resumo;
+    setg('movs', fxB);
+    t('31b: no limite do ponto flutuante (3 vendas de R$ 1,02 com 12%), a conferencia de Vendas nao acusa diferenca falsa', Rf31.conferencia[1].ok === true, JSON.stringify(Rf31.conferencia[1]));
+    t('31b: com R$ 0,00 a pagar e a receber, a frase nao fala de desconto no caixa; sem despesa, sem aba Despesas',
+      res31(Pb, 'A pagar (parcelas e despesas)').t === 'Nada vence este mês.' && res31(Pb, 'A receber (app)').t === 'Nada cai este mês.' && !Pb.abas.some(a => a.nome === 'Despesas'),
+      JSON.stringify([res31(Pb, 'A pagar (parcelas e despesas)').t, res31(Pb, 'A receber (app)').t, Pb.abas.map(a => a.nome)]));
+    /* controle negativo: com o Painel dizendo R$ 1,00 a mais de estoque, a conferencia de Estoque TEM de acusar com a diferenca de
+       verdade, e o aviso do download tem de dizer que uma conferencia nao fechou */
+    const _mot31 = g('motor'), toasts31 = [], alertas31 = [], _toast31 = g('toast'), _al31 = ctx.alert, _desc31 = g('descargaBinaria'), _tent31 = g('_precosTentado');
+    setg('motor', function (f) { const r = _mot31(f); r.estoque = r.estoque + 1; return r; });
+    let Rbn;
+    try {
+      Rbn = A('montarPlanilhaTCG')().resumo;
+      setg('toast', m => { toasts31.push(String(m)); }); ctx.alert = m => { alertas31.push(String(m)); }; setg('descargaBinaria', () => {}); setg('_precosTentado', true);
+      await A('exportarPlanilha')();
+    } finally { setg('motor', _mot31); setg('toast', _toast31); ctx.alert = _al31; setg('descargaBinaria', _desc31); setg('_precosTentado', _tent31); }
+    /* v2.6f (le-como-felype r9, L1): o aviso de erro e a janela com OK, sem contagem, e nenhum balao de "baixada ✓" junto */
+    t('31b (controle negativo): Painel com R$ 1,00 a mais de estoque faz a conferencia de Estoque acusar -1,00, e o aviso ao baixar e a janela com OK que manda para a linha com ✗',
+      Rbn.conferencia[2].ok === false && Rbn.conferencia[2].dif === -1 && alertas31.length === 1 && alertas31[0] === 'A planilha foi baixada, mas saiu com erro: veja a linha com ✗ no começo do Resumo.' && !toasts31.some(x => /baixada/.test(x)),
+      JSON.stringify([Rbn.conferencia[2], toasts31, alertas31]));
+
+    /* o ✓ das compras com 0 e com 1 compra dividida em pedacos: nada de "0 das 0" nem "1 das 1" */
+    setg('movs', [Q31('sA', { cat:'Booster Box', colecao:'Surto', qtd:2, valor:100, valorOrig:200, situacao:'Em estoque' }), Q31('sA1', { cat:'Booster Box', colecao:'Surto', qtd:2, valor:100, situacao:'Vendido', loteOrigem:'sA' })]);
+    const Ps31 = A('montarPlanilhaTCG')();
+    setg('movs', fxB);
+    t('31b: o ✓ das compras sem compra dividida nao conta nada; com uma so, diz se ela tem o valor registrado',
+      res31(Pb, '✓ = comprei (mercadoria)').t.endsWith('que soma os pedaços contra o valor registrado e compara o custo por unidade entre eles.')
+      && res31(Ps31, '✓ = comprei (mercadoria)').t.endsWith('que soma os pedaços contra o valor registrado (a única compra dividida em pedaços tem esse valor) e compara o custo por unidade entre eles.'),
+      JSON.stringify([res31(Pb, '✓ = comprei (mercadoria)').t, res31(Ps31, '✓ = comprei (mercadoria)').t]));
+    /* custo por unidade diferente entre os pedacos com os valores fechando (le-como-felype r2, r3 e r4: Parceiro inicial) pinta e diz a faixa;
+       o centavo que a divisao deixa no pai (52,78 contra 52,785) nao pinta, e o Custo por unidade dele aparece (Qtd x unidade erra 1 centavo) */
+    setg('movs', [
+      Q31('uA', { cat:'Box da Coleção', colecao:'Parceiro', qtd:30, valor:1207.69, valorOrig:2415.31, situacao:'Em estoque' }),
+      Q31('uA1', { cat:'Box da Coleção', colecao:'Parceiro', qtd:18, valor:1207.62, situacao:'Vendido', loteOrigem:'uA' }),
+      Q31('uB', { cat:'ETB', colecao:'Surto', qtd:1, valor:52.78, valorOrig:158.35, situacao:'Em estoque' }),
+      Q31('uB1', { cat:'ETB', colecao:'Surto', qtd:2, valor:105.57, situacao:'Vendido', loteOrigem:'uB' }),
+      /* o Maioria bulk do backup: item aberto sem nada dentro E custo por unidade diferente na mesma compra (dois avisos numa linha) */
+      Q31('uC', { cat:'Sleeved', qtd:15, valor:323.26, situacao:'Aberto' }),
+      Q31('uC1', { cat:'Sleeved', qtd:1, valor:23.09, situacao:'Aberto', loteOrigem:'uC' }),
+      Q31('uC2', { cat:'Single/Carta', qtd:15, valor:323.26, situacao:'Coleção', loteOrigem:'uC', origem:'ABERTURA' })]);
+    const Pu31 = A('montarPlanilhaTCG')(), cmpU31 = aba31(Pu31, 'Compras');
+    setg('movs', fxB);
+    const iU31 = cmpU31.linhas.indexOf(linha31(cmpU31, 'uA')), iB31 = cmpU31.linhas.indexOf(linha31(cmpU31, 'uB'));
+    t('31b: valores fechando e custo por unidade diferente entre os pedacos: a linha pinta e diz a faixa; o centavo da divisao nao pinta',
+      cmpU31.destacar[iU31] === true && cel31(cmpU31, 'uA', 'Conferir') === 'Custo por unidade diferente entre os pedaços (' + fmt31(40.26) + ' a ' + fmt31(67.09) + '): a quantidade ou o valor de um deles mudou depois de dividir'
+      && cmpU31.destacar[iB31] === false && cel31(cmpU31, 'uB', 'Custo por unidade') === 52.78 && Pu31.resumo.nUnidDif === 2
+      && String(cel31(cmpU31, 'uC', 'Conferir')).indexOf(fmt31(23.09) + ' fora da conta') === 0 && String(cel31(cmpU31, 'uC', 'Conferir')).indexOf('Custo por unidade diferente entre os pedaços (' + fmt31(21.55) + ' a ' + fmt31(23.09) + ')') > 0
+      && res31(Pu31, 'Compras em amarelo').t === '2 na aba Compras: 1 item aberto sem nada lançado dentro · 2 com o custo por unidade diferente entre os pedaços (1 compra tem dois desses avisos). A coluna Conferir diz o quê.',
+      JSON.stringify([cmpU31.destacar[iU31], cel31(cmpU31, 'uA', 'Conferir'), cmpU31.destacar[iB31], cel31(cmpU31, 'uB', 'Custo por unidade'), Pu31.resumo.nUnidDif, res31(Pu31, 'Compras em amarelo').t]));
+    /* centavo quebrado nas compras e no estoque (6 de R$ 1,005 e 1 de R$ 2,675): celula arredondada + soma sem arredondar = nenhum ✗ falso (revisor disco r4, M1) */
+    setg('movs', [1, 2, 3, 4, 5, 6].map(i => Q31('cQ' + i, { cat:'Booster', valor:1.005, situacao:'Em estoque' })).concat([Q31('cQ7', { cat:'ETB', valor:2.675, situacao:'Coleção' })]));
+    const Rq31 = A('montarPlanilhaTCG')().resumo;
+    t('31b: com centavo quebrado nas compras e no estoque, nenhuma conferencia acusa diferenca falsa', Rq31.conferencia.every(c => c.ok), JSON.stringify(Rq31.conferencia.filter(c => !c.ok)));
+    /* controles negativos com as mesmas 7 linhas de centavo quebrado: 1 centavo a mais no comprei, no estoque, no Vale ou nas despesas do Painel tem de acusar */
+    const _vm31 = g('valorMercadoDe');
+    const neg31 = mexe => { let R; setg('motor', function (f) { const r = _mot31(f); mexe(r); return r; }); try { R = A('montarPlanilhaTCG')().resumo; } finally { setg('motor', _mot31); } return R; };
+    const Rni31 = neg31(r => { r.investido += 0.01; }), Rne31 = neg31(r => { r.estoque += 0.01; }), Rnd31 = neg31(r => { r.despTotal += 0.01; });
+    setg('valorMercadoDe', function (l) { const v = _vm31(l); if (l && l.length > 1) { v.bruto = (v.bruto != null ? v.bruto : v.val) + 0.01; v.val = Math.round(v.bruto * 100) / 100; } return v; });
+    let Rnv31; try { Rnv31 = A('montarPlanilhaTCG')().resumo; } finally { setg('valorMercadoDe', _vm31); }
+    setg('movs', fxB);
+    t('31b (controle negativo): 1 centavo a mais no comprei, no estoque, no Vale ou nas despesas do Painel faz a conferencia certa acusar, mesmo com centavo quebrado',
+      Rni31.conferencia[0].ok === false && Rne31.conferencia[2].ok === false && Rnv31.conferencia[3].ok === false && Rnd31.conferencia[4].ok === false,
+      JSON.stringify([Rni31.conferencia[0], Rne31.conferencia[2], Rnv31.conferencia[3], Rnd31.conferencia[4]]));
+    /* o download espera o catalogo da Liga (ate 6 s) antes de montar: sem isso o Vale saia pelo custo na primeira abertura (revisor disco r4, M1) */
+    const toastsE31 = [], _stE31 = ctx.setTimeout; let voltasE31 = 0, baixouE31 = 0;
+    setg('toast', m => { toastsE31.push(String(m)); }); setg('descargaBinaria', () => { baixouE31++; }); setg('_precosTentado', false);
+    ctx.setTimeout = f => { if (++voltasE31 === 3) setg('_precosTentado', true); f(); return 0; };
+    try { await A('exportarPlanilha')(); } finally { ctx.setTimeout = _stE31; setg('toast', _toast31); setg('descargaBinaria', _desc31); setg('_precosTentado', _tent31); }
+    t('31b: o download espera o catalogo da Liga antes de montar a planilha (avisa, espera e so depois baixa)',
+      toastsE31[0] === 'Buscando os preços da Liga…' && voltasE31 >= 3 && baixouE31 === 1, JSON.stringify([toastsE31, voltasE31, baixouE31]));
+
+    /* ---- 31e: "hoje" perto da meia-noite. A despesa com a data de hoje em UTC entra no Resumo pelo motor; a aba Despesas tem de
+       dizer o mesmo (no fuso de Sao Paulo, 23h30 ja e o dia seguinte em UTC) ---- */
+    relogio31(2026, 8, 20, 23, 30);
+    const hojeUTC31 = vm.runInContext('new Date().toISOString().slice(0,10)', ctx);
+    setg('movs', [{ id:'eT', tipo:'DESPESA', data:hojeUTC31, cat:'Luz', valor:40, status:'apagar', natureza:'ordinaria' }]);
+    const Pe = A('montarPlanilhaTCG')();
+    t('31e: perto da meia-noite, a despesa de hoje (em UTC, como o motor) entra no Resumo e a aba Despesas diz o mesmo',
+      Pe.resumo.despesas === 40 && cel31(aba31(Pe, 'Despesas'), 'eT', 'Entra no Resumo?') === 'sim' && Pe.resumo.conferencia[4].ok,
+      JSON.stringify([hojeUTC31, Pe.resumo.despesas, cel31(aba31(Pe, 'Despesas'), 'eT', 'Entra no Resumo?')]));
+    t('31e: perto da meia-noite o motor ja conta a despesa de amanha, e a frase do A pagar diz "ate amanha", com o valor',
+      res31(Pe, 'A pagar (parcelas e despesas)').t === fmt31(40) + ' vence até o fim do mês. Já está descontado no caixa acima: as despesas com data até amanhã (' + fmt31(40) + '; depois das 21h o app já conta o dia seguinte).',
+      res31(Pe, 'A pagar (parcelas e despesas)').t);
+    setg('movs', [Q31('pP', Object.assign({ cat:'Booster Box', qtd:1, valor:300, situacao:'Em estoque' }, PARC31))]);
+    const Pp31 = A('montarPlanilhaTCG')();
+    t('31e: so parcela de compra a pagar: a frase diz que todas as parcelas ja estao no caixa, com o valor',
+      res31(Pp31, 'A pagar (parcelas e despesas)').t === 'Nada vence este mês. Já está descontado no caixa acima: as parcelas de compra que ainda vão vencer (' + fmt31(300) + ').',
+      res31(Pp31, 'A pagar (parcelas e despesas)').t);
+  } finally {
+    semRelogio31();
+    setg('_precosLiga', _pl31);
+    setg('contasBanc', []);
+  }
+  /* ---- 31f: achados de numero, disco e fiacao da rodada 5 — a conferencia le a celula ja montada (controle negativo DEPOIS da linha
+     montada), teto da tolerancia, Resultado bruto com fracao, toque do Relatorio pela aba do cartao, rodape das vendas com o liquido,
+     bordas do custo por unidade, nota e lote parcelados sem caixa, frase da Consulta, codigo sem digito, 1a parcela no pedaco, A pagar
+     depois das 21h e com parcela vencida, comparativo pela conta, faixa com o valor escondido e aviso de arredondamento ---- */
+  {
+    const _plF31 = g('_precosLiga'), _renderF31 = g('render'), _gcF31 = g('graficoCompSvg'), _tcF31 = g('tabelaComp');
+    const F31f = (id, x) => Object.assign({ id, tipo:'COMPRA', data:'2026-08-10', jogo:'Pokémon', idioma:'—', qtd:1, taxa:0, pgTipo:'À vista', destino:'Vender', contraparte:'Loja' }, x);
+    const copiaF = l => l.map(x => Object.assign({}, x));
+    relogio31(2026, 8, 20, 12, 0);
+    try {
+      setg('render', () => {});
+      setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', '');
+      setg('_precosLiga', { atualizadoEm:'2026-08-20T10:00:00Z', cartas:{ 'Umbreon (215/203)':{ codigo:'215/203', status:'OK', titulo:'Umbreon (215/203)', versoes:[{ v:'Normal', mn:150, md:175, mx:250 }] } } });
+      setg('movs', copiaF([
+        F31f('fU', { cat:'Single/Carta', colecao:'Prisma', codigo:'Umbreon (215/203)', valor:90, situacao:'Em estoque' }),
+        F31f('fB', { cat:'Booster', colecao:'Caos', valor:30, situacao:'Coleção' }),
+        F31f('fV', { cat:'Single/Carta', colecao:'Prisma', codigo:'Latios (100/203)', valor:40, situacao:'Vendido' }),
+        { id:'fW', tipo:'VENDA', data:'2026-08-12', jogo:'Pokémon', cat:'Single/Carta', colecao:'Prisma', qtd:1, valor:130, canal:'App', taxa:10, recDias:14, origemId:'fV', custoOrigem:40, contraparte:'Cli' },
+        { id:'fX', tipo:'VENDA', data:'2026-08-15', jogo:'Pokémon', cat:'Booster', colecao:'Caos', qtd:1, valor:50, canal:'Pix', taxa:0, contraparte:'Cli2' },
+        { id:'fD', tipo:'DESPESA', data:'2026-08-05', cat:'Frete', valor:25, status:'pago', natureza:'ordinaria' }]));
+      const PF0 = A('montarPlanilhaTCG')(), movsPF0 = copiaF(g('movs'));
+      const celF = mexe => { let R; setg('_plDepoisDeMontar', mexe); try { R = A('montarPlanilhaTCG')().resumo; } finally { setg('_plDepoisDeMontar', undefined); } return R; };
+      /* cada negativo mexe numa linha em que so a conferencia dele ve a mudanca: o Liquido na venda sem vinculo (sem a conta do Lucro) e o Vale
+         na linha pelo custo (sem a conta do Vale − custo). Na linha com as duas contas, a outra acusava e escondia a conferencia desligada
+         (a suite pegou 213 de 215 com o negativo na linha errada) */
+      const RcC = celF(ab => { ab.compras[0][4] += 0.01; }), RvL = celF(ab => { ab.vendas.find(l => l[8] === '')[7] += 0.01; }), RvU = celF(ab => { ab.vendas.find(l => l[8] !== '')[9] += 100; });
+      const ReC = celF(ab => { ab.estoque[0][4] += 0.01; }), ReV = celF(ab => { ab.estoque.find(l => l[8] === '')[6] += 0.01; }), RdV = celF(ab => { ab.despesas[0][2] += 0.01; });
+      const ReD = celF(ab => { const l = ab.estoque.find(x => x[8] !== ''); l[8] += 100; });
+      const cf = (R, i) => R.conferencia[i];
+      t('31f: sem mexer, as seis conferencias fecham (preco da Liga, venda do app com vinculo e despesa paga)', PF0.resumo.conferencia.every(c => c.ok), JSON.stringify(PF0.resumo.conferencia.filter(c => !c.ok)));
+      /* o ✗ diz a coluna e a linha do Excel (cabecalho na 3, dados a partir da 4; revisor numero r6, L1). Com a conta do Custo por unidade na
+         mesma linha, e o motivo que separa a celula de Custo desligada (a outra conta tambem acusa) */
+      const lnF = (aba, ach) => aba31(PF0, aba).linhas.findIndex(ach) + 4;
+      t('31f (controle negativo): 1 centavo numa celula JA MONTADA de Compras, Vendas, Estoque, Vale ou Despesas faz a conferencia certa acusar, com a diferenca de 1 centavo e o motivo com a coluna e a linha',
+        cf(RcC, 0).ok === false && cf(RcC, 0).dif === 0.01 && cf(RvL, 1).ok === false && cf(RvL, 1).dif === 0.01 && cf(ReC, 2).ok === false && cf(ReC, 2).dif === 0.01
+        && cf(ReV, 3).ok === false && cf(ReV, 3).dif === 0.01 && cf(RdV, 4).ok === false && cf(RdV, 4).dif === 0.01
+        && cf(RcC, 0).motivo === 'a coluna Custo total da linha 4 da aba Compras não é o custo da compra' && cf(RvL, 1).motivo === 'a coluna Líquido da linha ' + lnF('Vendas', l => l[8] === '') + ' não é o líquido da venda'
+        && cf(ReC, 2).motivo === 'a coluna Custo da linha 4 não é o custo do lançamento' && cf(ReC, 3).motivo === 'a coluna Custo da linha 4 não é o custo do lançamento' && cf(ReV, 3).motivo === 'a coluna Vale da linha ' + lnF('Estoque e coleção (hoje)', l => l[8] === '') + ' não é o Vale que o app dá a esse item'
+        && cf(RdV, 4).motivo === 'a coluna Valor da linha 4 não é o valor da despesa',
+        JSON.stringify([cf(RcC, 0), cf(RvL, 1), cf(ReC, 2), cf(ReC, 3), cf(ReV, 3), cf(RdV, 4)]));
+      t('31f (controle negativo): Lucro da venda e Vale − custo que nao sao a conta das celulas da linha fazem Vendas e Vale acusarem',
+        cf(RvU, 1).ok === false && cf(ReD, 3).ok === false && cf(RvU, 1).dif === 0 && cf(ReD, 3).dif === 0, JSON.stringify([cf(RvU, 1), cf(ReD, 3)]));
+
+      const ms = A('_plMesmaSoma');
+      t('31f: a soma sem arredondar aceita so erro de ponto flutuante, com teto de R$ 0,004: 1 centavo acusa tambem acima de R$ 10 milhoes',
+        ms(10100000, 10100000.01) === false && ms(50000000, 50000000.005) === false && ms(0.1 + 0.2, 0.3) === true && ms(1e9 + 1e-6, 1e9) === true,
+        JSON.stringify([ms(10100000, 10100000.01), ms(50000000, 50000000.005), ms(0.1 + 0.2, 0.3), ms(1e9 + 1e-6, 1e9)]));
+
+      setg('movs', copiaF([F31f('fa', { cat:'Booster', valor:0.1, situacao:'Em estoque' }), F31f('fb', { cat:'Booster', valor:0.2, situacao:'Em estoque' }), F31f('fc', { cat:'Booster', valor:0.3, situacao:'Vendido' })]));
+      const rFr = A('motor')(false), PFr = A('montarPlanilhaTCG')();
+      t('31f: Resultado bruto com fracao que o ponto flutuante nao fecha exato (0,1 + 0,2 + 0,3) nao acusa diferenca falsa',
+        (rFr.investido - rFr.cmv) !== (rFr.estoque + rFr.colCusto + rFr.pedido) && PFr.resumo.conferencia[5].ok === true,
+        JSON.stringify([rFr.investido - rFr.cmv, rFr.estoque + rFr.colCusto + rFr.pedido, PFr.resumo.conferencia[5]]));
+
+      setg('movs', copiaF([
+        F31f('kA', { cat:'ETB', colecao:'Caos', contraparte:'Ana', valor:100, situacao:'Em estoque' }),
+        F31f('kE', { cat:'ETB', colecao:'Caos', contraparte:'Ana', valor:50, situacao:'Em estoque', data:'2026-06-15' }),
+        F31f('kB', { cat:'Booster', colecao:'Caos', contraparte:'Bia', jogo:'Magic', valor:40, situacao:'Coleção', data:'2026-06-01' }),
+        F31f('kC', { cat:'', colecao:'Prisma', contraparte:'', valor:15, situacao:'Em estoque' }),
+        F31f('kD', { cat:'ETB', colecao:'Prisma', contraparte:'Ana', valor:60, situacao:'Vendido' }),
+        { id:'kW', tipo:'VENDA', data:'2026-08-12', jogo:'Pokémon', cat:'ETB', colecao:'Prisma', qtd:1, valor:200, canal:'App', taxa:10, recDias:14, origemId:'kD', custoOrigem:60, contraparte:'Cli' }]));
+      setg('tela', 'relatorios'); setg('relDimAll', 'colecao'); setg('relDet', false); setg('relJogo', ''); setg('relCol', ''); setg('relPess', ''); setg('relCat', '');
+      setg('perSel', 'custom'); setg('perDe', '2026-08-01'); setg('perAte', '2026-08-31');
+      setg('relCompView', 'lista'); const hLK = A('vRelatorios')();
+      setg('relCompView', 'tab'); const hTK = A('vRelatorios')();
+      setg('relCompView', 'graf'); const hGK = A('vRelatorios')();
+      setg('relCompView', 'lista');
+      const conta = (h, s) => h.split(s).length - 1;
+      t('31f: no Relatorio o toque abre a aba do numero do cartao — Estoque parado e Na colecao sem o periodo, Vendi nas vendas, Comprei em Todos (lista e tabela); lista, tabela e grafico nunca voltam para a busca de texto',
+        hLK.indexOf("abrirConsultaPorDim('Caos','ESTOQUE',1)") >= 0 && hLK.indexOf("abrirConsultaPorDim('Caos','COLECAO',1)") >= 0 && hLK.indexOf("abrirConsultaPorDim('Caos','tudo')") >= 0
+        && hLK.indexOf("margin-bottom:9px;cursor:pointer\" onclick=\"abrirConsultaPorDim('Prisma','VENDA')\"") >= 0
+        && hTK.indexOf("abrirConsultaPorDim('Caos','ESTOQUE',1)") >= 0 && hTK.indexOf("abrirConsultaPorDim('Caos','COLECAO',1)") >= 0 && conta(hTK, "abrirConsultaPorDim('Prisma','VENDA')") === 2
+        && hGK.indexOf("abrirConsultaPorDim('Caos')") >= 0 && hGK.indexOf('toque na coluna pra ver os lançamentos dela em Todos, no período') >= 0 && (hLK + hTK + hGK).indexOf("consQ='") < 0,
+        JSON.stringify([conta(hTK, "abrirConsultaPorDim('Prisma','VENDA')"), (hLK.match(/abrirConsultaPorDim\([^)]*\)/g) || []).slice(0, 12), (hTK.match(/abrirConsultaPorDim\([^)]*\)/g) || []).slice(0, 12)]));
+
+      vm.runInContext('navHist.length=0', ctx); setg('consQ', 'busca velha'); setg('consConta', 'Nubank');
+      A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1);
+      const eK = { f:g('consF'), col:g('consCol'), q:g('consQ'), conta:g('consConta'), de:g('perDe'), ate:g('perAte'), tela:g('tela'), hist:g('navHist.length') }, rK = rodape31(A('vConsultar')());
+      A('voltar')();
+      const vK = { tela:g('tela'), de:g('perDe'), ate:g('perAte'), sel:g('perSel') };
+      /* o periodo so e emprestado: sair da Consulta pela barra de baixo (go), pelo Consultar ou pelo voltar devolve o periodo do Relatorio;
+         escolher periodo na propria Consulta fica; o vinculo (verMov) empresta do mesmo jeito (le-como-felype r6, G2) */
+      A('abrirConsultaPorDim')('Caos', 'COLECAO', 1);
+      const bK1 = { de:g('perDe'), sel:g('perSel'), res:(A('vConsultar')().match(/Tudo só nesta tela \(Na coleção é o de hoje\)/) || [''])[0] };
+      A('go')('relatorios'); const bK2 = { tela:g('tela'), de:g('perDe'), ate:g('perAte'), sel:g('perSel') };
+      A('voltar')(); const bK3 = { tela:g('tela'), de:g('perDe'), emp:!!g('_perEmprestado') };
+      A('go')('painel'); const bK4 = { de:g('perDe'), ate:g('perAte') };
+      setg('tela', 'relatorios'); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); A('irConsultar')(); const bK5 = { de:g('perDe') };
+      setg('tela', 'relatorios'); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); A('setPer')('d90'); A('go')('relatorios'); const bK6 = { sel:g('perSel') };
+      setg('perSel', 'custom'); setg('perDe', '2026-08-01'); setg('perAte', '2026-08-31');
+      const _fmK = g('fecharModal'), _stK = ctx.setTimeout; setg('fecharModal', () => {}); ctx.setTimeout = () => 0;
+      try { setg('tela', 'relatorios'); A('verMov')('kA'); } finally { setg('fecharModal', _fmK); ctx.setTimeout = _stK; }
+      const bK7 = { tela:g('tela'), de:g('perDe'), emp:!!g('_perEmprestado') }; A('go')('relatorios'); const bK8 = { de:g('perDe') };
+      setg('relDimAll', 'pessoa'); setg('relCol', 'Caos'); A('abrirConsultaPorDim')('Ana', 'tudo');
+      const eP = [g('consPess'), g('consCol'), g('consCat'), g('consJogo')].join('|');
+      setg('relDimAll', 'cat'); setg('relCol', ''); setg('relPess', 'Ana'); A('abrirConsultaPorDim')('ETB', 'tudo');
+      const eC = [g('consCat'), g('consPess'), g('consCol')].join('|');
+      setg('relDimAll', 'jogo'); setg('relPess', ''); A('abrirConsultaPorDim')('Magic', 'tudo');
+      const eJ = [g('consJogo'), g('consCol'), g('consPess')].join('|');
+      t('31f: o toque filtra pela dimensao do Relatorio (fornecedor, tipo e jogo), leva o filtro que o Relatorio ja tinha, limpa a busca e a conta e abre o estoque de hoje sem o periodo, que so e emprestado: voltar, barra de baixo, Consultar e o vinculo devolvem; escolher outro periodo na Consulta fica',
+        eK.f === 'ESTOQUE' && eK.col === 'Caos' && eK.q === '' && eK.conta === '' && eK.de === '' && eK.ate === '' && eK.tela === 'consultar' && eK.hist === 1 && rK.v === fmt31(150)
+        && vK.tela === 'relatorios' && vK.de === '2026-08-01' && vK.ate === '2026-08-31' && vK.sel === 'custom'
+        && bK1.de === '' && bK1.sel === 'tudo' && bK1.res !== '' && bK2.tela === 'relatorios' && bK2.de === '2026-08-01' && bK2.ate === '2026-08-31' && bK2.sel === 'custom'
+        && bK3.tela === 'consultar' && bK3.de === '' && bK3.emp === true && bK4.de === '2026-08-01' && bK4.ate === '2026-08-31' && bK5.de === '2026-08-01' && bK6.sel === 'd90'
+        && bK7.tela === 'consultar' && bK7.de === '' && bK7.emp === true && bK8.de === '2026-08-01'
+        && eP === 'Ana|Caos||todos' && eC === 'ETB|Ana|' && eJ === 'Magic||',
+        JSON.stringify([eK, rK, vK, bK1, bK2, bK3, bK4, bK5, bK6, bK7, bK8, eP, eC, eJ]));
+      /* o botao diz "Tudo só nesta tela"; o motivo so na aba que o toque abriu (o "ver venda" leva para Vendas); a barra nao repete o
+         parentese (le-como-felype r7, 3) */
+      setg('tela', 'relatorios'); setg('perSel', 'custom'); setg('perDe', '2026-08-01'); setg('perAte', '2026-08-31'); setg('relDimAll', 'colecao'); setg('relCol', ''); setg('relPess', ''); setg('relCat', ''); setg('relJogo', '');
+      A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); setg('consFOpen', true);
+      let hEm = '', hVv = '';
+      let hMn = '';
+      try { hEm = A('vConsultar')(); setg('consMenu', true); hMn = A('vConsultar')(); setg('consMenu', false); setg('consF', 'VENDA'); hVv = A('vConsultar')(); } finally { setg('consMenu', false); setg('consFOpen', false); A('go')('relatorios'); }
+      t('31f: com o periodo emprestado o botao diz "Tudo só nesta tela", o motivo so aparece na aba que o toque abriu, e a barra do filtro diz "período Tudo" sem repetir o parentese',
+        hEm.indexOf('Tudo só nesta tela (Estoque parado é o de hoje)') >= 0 && hEm.indexOf('· período Tudo — limpar ✕') >= 0 && hEm.indexOf('período Tudo (') < 0
+        && hVv.indexOf('Tudo só nesta tela') >= 0 && hVv.indexOf('é o de hoje') < 0 && g('perDe') === '2026-08-01'
+        && hMn.indexOf('O que você quer consultar?') >= 0 && hMn.indexOf('Tudo só nesta tela') >= 0 && hMn.indexOf('é o de hoje') < 0,
+        JSON.stringify([(hEm.match(/Tudo só nesta tela[^<·]*/) || [''])[0], (hEm.match(/filtrando:[^<]*/) || [''])[0], (hVv.match(/Tudo só nesta tela[^<·]*/) || [''])[0], g('perDe')]));
+      /* v2.6f (revisor disco r9, L5): o "‹ voltar" a partir do Fluxo de caixa devolve o menu que a pessoa tinha aberto na Consulta emprestada */
+      setg('tela', 'relatorios'); setg('perSel', 'custom'); setg('perDe', '2026-08-01'); setg('perAte', '2026-08-31'); setg('relDimAll', 'colecao'); setg('relCol', ''); setg('relPess', ''); setg('relCat', ''); setg('relJogo', '');
+      A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1);
+      let vMn = '', vMenu = null, vEmp = null;
+      try { setg('consMenu', true); A('go')('contas'); A('voltar')(); vMenu = g('consMenu'); vEmp = !!g('_perEmprestado'); vMn = A('vConsultar')(); } finally { setg('consMenu', false); A('go')('relatorios'); }
+      t('31f: o "‹ voltar" a partir do Fluxo de caixa devolve o menu da Consulta emprestada, com o botão só "Tudo só nesta tela"',
+        vMenu === true && vEmp === true && vMn.indexOf('O que você quer consultar?') >= 0 && vMn.indexOf('Tudo só nesta tela') >= 0 && vMn.indexOf('é o de hoje') < 0,
+        JSON.stringify([vMenu, vEmp, (vMn.match(/Tudo só nesta tela[^<·]*/) || [''])[0]]));
+      /* saidas do emprestimo que nenhum teste mexia (revisor disco r7, M1), rodando o codigo que a propria tela poe no campo: a data De ou Ate
+         escolhida na Consulta desfaz o emprestimo e fica; o vinculo aberto dentro da Consulta emprestada nao troca o periodo guardado; o
+         "limpar ✕" da barra devolve o periodo */
+      const perRel = () => { setg('tela', 'relatorios'); setg('perSel', 'custom'); setg('perDe', '2026-08-01'); setg('perAte', '2026-08-31'); };
+      const onDe = h => (h.match(/>De<\/label><input type="date" value="[^"]*" onchange="([^"]*)"/) || ['', ''])[1];
+      const onAte = h => (h.match(/>Até<\/label><input type="date" value="[^"]*" onchange="([^"]*)"/) || ['', ''])[1];
+      const onLimpar = h => (h.match(/onclick="([^"]*)">filtrando:/) || ['', ''])[1];
+      const rodaCampo = (codigo, valor) => vm.runInContext('(function(){' + codigo + '}).call({value:' + JSON.stringify(valor) + '})', ctx);
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); setg('consFOpen', true);
+      let cDe = '', cAte = '', cLimpa = '';
+      try { const hS = A('vConsultar')(); cDe = onDe(hS); cAte = onAte(hS); cLimpa = onLimpar(hS); } finally { setg('consFOpen', false); }
+      if (cDe) rodaCampo(cDe, '2026-05-01');
+      A('go')('relatorios'); const sDe = { de:g('perDe'), emp:!!g('_perEmprestado') };
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); if (cAte) rodaCampo(cAte, '2026-05-31');
+      A('go')('relatorios'); const sAte = { ate:g('perAte'), emp:!!g('_perEmprestado') };
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1);
+      const _fmS = g('fecharModal'), _stS = ctx.setTimeout; setg('fecharModal', () => {}); ctx.setTimeout = () => 0;
+      try { A('verMov')('kA'); } finally { setg('fecharModal', _fmS); ctx.setTimeout = _stS; }
+      A('go')('relatorios'); const sVin = { de:g('perDe'), ate:g('perAte') };
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); if (cLimpa) rodaCampo(cLimpa, '');
+      const sLim = { de:g('perDe'), emp:!!g('_perEmprestado'), col:g('consCol') };
+      A('go')('relatorios');
+      t('31f: na Consulta emprestada, a data De ou Até escolhida desfaz o empréstimo e fica; o vínculo aberto ali não troca o período guardado; o "limpar ✕" da barra devolve o período',
+        cDe !== '' && cAte !== '' && cLimpa !== '' && sDe.de === '2026-05-01' && sDe.emp === false && sAte.ate === '2026-05-31' && sAte.emp === false
+        && sVin.de === '2026-08-01' && sVin.ate === '2026-08-31' && sLim.de === '2026-08-01' && sLim.emp === false && sLim.col === '',
+        JSON.stringify([cDe, cAte, cLimpa, sDe, sAte, sVin, sLim]));
+      /* sem emprestimo o botao diz o periodo e a barra nao diz "período Tudo"; o vinculo aberto dentro da Consulta emprestada nao apaga o
+         motivo, que volta com a aba do toque (revisor disco r8, M1: A2, A7 e A8 mudavam a tela com a secao 31 verde) */
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); if (cDe) rodaCampo(cDe, '2026-05-01');
+      setg('consFOpen', true); let hSe = ''; try { hSe = A('vConsultar')(); } finally { setg('consFOpen', false); }
+      A('go')('relatorios');
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1);
+      const _fmA8 = g('fecharModal'), _stA8 = ctx.setTimeout; setg('fecharModal', () => {}); ctx.setTimeout = () => 0;
+      try { A('verMov')('kA'); } finally { setg('fecharModal', _fmA8); ctx.setTimeout = _stA8; }
+      A('verFiltro')('ESTOQUE'); const hA8 = A('vConsultar')(); A('go')('relatorios');
+      t('31f: sem empréstimo o botão diz o período escolhido e a barra do filtro não diz "período Tudo"; depois do vínculo aberto dentro da Consulta emprestada, de volta à aba do toque, o motivo volta',
+        hSe.indexOf('Tudo só nesta tela') < 0 && hSe.indexOf('01/05/2026') >= 0 && hSe.indexOf('filtrando:') >= 0 && hSe.indexOf('período Tudo') < 0
+        && hA8.indexOf('Tudo só nesta tela (Estoque parado é o de hoje)') >= 0,
+        JSON.stringify([(hSe.match(/Filtros[^<]*/) || [''])[0], (hSe.match(/filtrando:[^<]*/) || [''])[0], (hA8.match(/Tudo só nesta tela[^<·]*/) || [''])[0]]));
+      /* gerar a planilha dentro da Consulta emprestada nao desfaz o emprestimo: a planilha so guarda e devolve as datas (revisor fiacao r7, M1:
+         com o finally zerando o emprestimo, sair deixava o app em Tudo) */
+      perRel(); A('abrirConsultaPorDim')('Caos', 'ESTOQUE', 1); A('montarPlanilhaTCG')();
+      const sPl = { emp:!!g('_perEmprestado'), de:g('perDe') };
+      A('go')('relatorios'); const sPl2 = { de:g('perDe'), ate:g('perAte') };
+      t('31f: gerar a planilha dentro da Consulta emprestada mantém o empréstimo, e a saída devolve o período do Relatório',
+        sPl.emp === true && sPl.de === '' && sPl2.de === '2026-08-01' && sPl2.ate === '2026-08-31', JSON.stringify([sPl, sPl2]));
+
+      setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('relJogo', ''); setg('relCol', ''); setg('relPess', ''); setg('relCat', '');
+      setg('relDimAll', 'pessoa'); A('abrirConsultaPorDim')('(sem cliente/fornecedor)', 'tudo'); const hVP = A('vConsultar')();
+      setg('relDimAll', 'cat'); A('abrirConsultaPorDim')('(sem tipo)', 'tudo'); const hVT = A('vConsultar')();
+      setg('relDimAll', 'colecao');
+      t('31f: o vazio de fornecedor e de tipo abre a Consulta com a compra sem fornecedor e sem tipo ("(sem cliente/fornecedor)" e "(sem tipo)")',
+        hVP.indexOf('🛒 comprado <b>' + fmt31(15) + '</b>') >= 0 && hVT.indexOf('🛒 comprado <b>' + fmt31(15) + '</b>') >= 0,
+        JSON.stringify([(hVP.match(/🛒 comprado <b>[^<]*/) || [''])[0], (hVT.match(/🛒 comprado <b>[^<]*/) || [''])[0]]));
+
+      const rVL = rodape31(telaCons31('VENDA', 'itens', ''));
+      t('31f: o rodape das vendas diz tambem o liquido quando ha taxa do app (o cartao Vendi e o Lucro real sao liquidos)',
+        rVL.rot === 'total vendido' && rVL.v === fmt31(200) && rVL.nota === 'líquido ' + fmt31(180) + ', sem a taxa do app', JSON.stringify(rVL));
+
+      setg('movs', copiaF([
+        F31f('uA', { cat:'Booster', colecao:'A', valor:2.00, situacao:'Em estoque' }), F31f('uA1', { cat:'Booster', colecao:'A', valor:2.06, situacao:'Vendido', loteOrigem:'uA' }),
+        F31f('uB', { cat:'Booster', colecao:'B', valor:2.00, situacao:'Em estoque' }), F31f('uB1', { cat:'Booster', colecao:'B', valor:2.04, situacao:'Vendido', loteOrigem:'uB' }),
+        F31f('uC', { cat:'ETB', colecao:'C', valor:10.00, situacao:'Em estoque' }), F31f('uC1', { cat:'ETB', colecao:'C', valor:10.22, situacao:'Vendido', loteOrigem:'uC' }),
+        F31f('uD', { cat:'ETB', colecao:'D', valor:10.00, situacao:'Em estoque' }), F31f('uD1', { cat:'ETB', colecao:'D', valor:10.19, situacao:'Vendido', loteOrigem:'uD' }),
+        F31f('uE', { cat:'Booster', colecao:'E', qtd:10, valor:100, situacao:'Aberto' }), F31f('uE1', { cat:'Booster', colecao:'E', qtd:9, valor:90, situacao:'Em estoque', loteOrigem:'uE' }),
+        F31f('uE2', { cat:'Booster', colecao:'E', qtd:1, valor:7, situacao:'Em estoque', loteOrigem:'uE', origem:'ABERTURA' })]));
+      const PU = A('montarPlanilhaTCG')(), cmpU = aba31(PU, 'Compras'), pinta = idm => cmpU.destacar[cmpU.linhas.findIndex(l => l[l.length - 1] === idm)];
+      t('31f: bordas do custo por unidade: pinta com R$ 0,06 e 2,9% (2,00 × 2,06) e com R$ 0,22 e 2,2% (10,00 × 10,22); nao pinta com R$ 0,04 nem com 1,9%; pedaco que saiu de item aberto fica fora da conta',
+        pinta('uA') === true && pinta('uB') === false && pinta('uC') === true && pinta('uD') === false && pinta('uE') === false && PU.resumo.nUnidDif === 2,
+        JSON.stringify(['uA', 'uB', 'uC', 'uD', 'uE'].map(pinta).concat([PU.resumo.nUnidDif])));
+
+      setg('movs', copiaF([
+        F31f('nA', { cat:'ETB', colecao:'N', valor:90, situacao:'Em estoque', notaId:'N40', notaNum:'40', pgTipo:'Parcelado', nParc:3, venc1:'2026-09-10' }),
+        F31f('nB', { cat:'ETB', colecao:'N', valor:60, situacao:'Em estoque', notaId:'N40', notaNum:'40', pgTipo:'Parcelado', nParc:3, venc1:'2026-09-10' }),
+        F31f('lA', { cat:'Booster Box', colecao:'L', valor:120, situacao:'Em estoque', pgTipo:'Parcelado', nParc:2, venc1:'2026-09-10' }),
+        F31f('lA1', { cat:'Booster Box', colecao:'L', valor:120, situacao:'Vendido', loteOrigem:'lA', pgTipo:'Parcelado', nParc:2, venc1:'2026-09-10' })]));
+      const hNN = telaCons31('COMPRA', 'notas', ''), iN = hNN.indexOf("abrirNota('N40')"), cardN = iN >= 0 ? hNN.slice(iN, iN + 2000) : '';
+      const iL = hNN.indexOf("verLote('lA')"), cardL = iL >= 0 ? hNN.slice(iL, iL + 1500) : '';
+      setg('tela', 'relatorios'); setg('relCompView', 'lista'); const hRN = A('vRelatorios')();
+      t('31f: nota parcelada sem caixa aberta: "3× R$ 50,00" sem "nota inteira"; compra avulsa parcelada dividida: "2× R$ 120,00", nunca "— na nota"; faixa e subtitulo sem caixa nem item aberto que nao existem',
+        cardN.indexOf('3× ' + fmt31(50)) >= 0 && cardN.indexOf('nota inteira') < 0 && cardL.indexOf('2× ' + fmt31(120)) >= 0 && cardL.indexOf('na nota') < 0
+        && hNN.indexOf('menos a caixa aberta') < 0 && hRN.indexOf('item aberto sem nada lançado dentro fica fora') < 0,
+        JSON.stringify([cardN.slice(0, 700), cardL.slice(0, 600)]));
+
+      setg('movs', copiaF([F31f('xC', { cat:'Booster Box', colecao:'X', valor:300, situacao:'Aberto' }), F31f('xC1', { cat:'Booster', colecao:'X', qtd:18, valor:300, situacao:'Em estoque', loteOrigem:'xC', origem:'ABERTURA' })]));
+      const rXN = rodape31(telaCons31('COMPRA', 'notas', '')), rXI = rodape31(telaCons31('COMPRA', 'itens', ''));
+      t('31f: frase da Consulta so com caixa aberta: por nota sem o valor da caixa, no detalhado com o valor, e nas duas "na data em que cada um foi lançado"',
+        rXN.nota === 'como no Painel: caixa aberta conta pelo que saiu dela, na data em que cada um foi lançado'
+        && rXI.nota === 'como no Painel: caixa aberta (' + fmt31(300) + ') conta pelo que saiu dela, na data em que cada um foi lançado', JSON.stringify([rXN, rXI]));
+
+      setg('movs', copiaF([F31f('gM', { cat:'Single/Carta', colecao:'G', codigo:'Mega greninja ex', valor:12, situacao:'Coleção' }),
+        F31f('gP', { cat:'Booster Box', colecao:'G', valor:300, situacao:'Aberto', pgTipo:'Parcelado', nParc:3, venc1:'2026-09-10' }),
+        F31f('gP1', { cat:'Booster', colecao:'G', qtd:18, valor:300, situacao:'Em estoque', loteOrigem:'gP', origem:'ABERTURA', pgTipo:'Parcelado', nParc:3, venc1:'2026-09-10' })]));
+      const PG = A('montarPlanilhaTCG')(), todG = aba31(PG, 'Todos os lançamentos');
+      t('31f: codigo sem digito nao vai para o nome da carta ("Mega greninja ex", nunca repetido entre parenteses); em Todos o pedaco de item aberto fica sem a 1a parcela e a compra de onde saiu mantem',
+        cel31(aba31(PG, 'Compras'), 'gM', 'Item') === 'Mega greninja ex' && cel31(todG, 'gP1', '1ª parcela vence em') === '' && cel31(todG, 'gP', '1ª parcela vence em') === '2026-09-10',
+        JSON.stringify([cel31(aba31(PG, 'Compras'), 'gM', 'Item'), cel31(todG, 'gP1', '1ª parcela vence em'), cel31(todG, 'gP', '1ª parcela vence em')]));
+
+      relogio31(2026, 8, 20, 21, 30);
+      setg('movs', copiaF([{ id:'hD', tipo:'DESPESA', data:'2026-08-20', cat:'Luz', valor:10, status:'apagar', natureza:'ordinaria' },
+        F31f('hP', { cat:'Booster Box', colecao:'H', valor:300, situacao:'Em estoque', pgTipo:'Parcelado', nParc:3, venc1:'2026-07-10', data:'2026-07-01' })]));
+      const tH = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      relogio31(2026, 8, 20, 12, 0);
+      /* lote parcelado em 2 pedacos, com as 3 parcelas de cada um ja vencidas: 6 entradas no aPagar, que a frase conta como 3 parcelas de 1 compra
+         (le-como-felype r6, G1; revisor numero r6, M1: a mesma parcela repetida em cada pedaco do lote nao e outra parcela) */
+      setg('movs', copiaF([F31f('vL', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Em estoque', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('vL1', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'vL', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' })]));
+      const tV = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      t('31f: as 21h30 a despesa de hoje nao "ja passou da data" (a meia-noite e a local); as parcelas vencidas saem contadas por compra e por parcela (6 entradas de 2 pedacos de lote = 3 parcelas de 1 compra) e dizem o que isso muda no dinheiro',
+        tH === fmt31(10) + ' vence até o fim do mês. Já está descontado no caixa acima: as parcelas de compra que ainda vão vencer (' + fmt31(100) + ') e as despesas com data até amanhã (' + fmt31(10) + '; depois das 21h o app já conta o dia seguinte). As 2 parcelas já vencidas de 1 compra (' + fmt31(200) + ') não entram: o app as conta como pagas. Se alguma não foi paga, este A pagar está menor do que devia.'
+        && tV === 'Nada vence este mês. As 3 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.',
+        JSON.stringify([tH, tV]));
+
+      setg('movs', copiaF([F31f('cA', { cat:'ETB', colecao:'Caos', valor:100, situacao:'Em estoque' }), F31f('cT', { cat:'ETB', colecao:'Caos', valor:80, situacao:'Trocado' }),
+        F31f('cR', { cat:'Booster', colecao:'Caos', valor:50, situacao:'Em estoque', origem:'TROCA' }),
+        F31f('cX', { cat:'Booster Box', colecao:'Prisma', valor:300, situacao:'Aberto' }), F31f('cX1', { cat:'Booster', colecao:'Prisma', qtd:18, valor:300, situacao:'Em estoque', loteOrigem:'cX', origem:'ABERTURA' }),
+        F31f('cY', { cat:'Sleeved', colecao:'Prisma', valor:20, situacao:'Aberto' })]));
+      let serC = null; const tabC = [];
+      setg('graficoCompSvg', s => { serC = JSON.parse(JSON.stringify(s)); return _gcF31(s); });
+      setg('tabelaComp', (o, M, f, h) => { tabC.push(JSON.parse(JSON.stringify(o))); return _tcF31(o, M, f, h); });
+      try {
+        setg('tela', 'relatorios'); setg('relDimAll', 'colecao'); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', '');
+        setg('relCompView', 'graf'); A('vRelatorios')(); setg('relCompView', 'tab'); A('vRelatorios')();
+      } finally { setg('graficoCompSvg', _gcF31); setg('tabelaComp', _tcF31); setg('relCompView', 'lista'); }
+      t('31f: o comparativo do Relatorio soma o comprei como o cartao Comprei (caixa aberta pelos pedacos, troca pelo recebido, item aberto sem pedaco fora), provado pela conta',
+        !!serC && JSON.stringify(serC[2].o) === '{"Caos":150,"Prisma":300}' && tabC.length === 4 && JSON.stringify(tabC[2]) === '{"Caos":150,"Prisma":300}',
+        JSON.stringify([serC && serC[2], tabC]));
+
+      setg('movs', copiaF([F31f('zA', { cat:'ETB', colecao:'Caos', valor:90, situacao:'Em estoque', notaId:'N50', notaNum:'50' }), F31f('zB', { cat:'Booster', colecao:'Prisma', valor:60, situacao:'Em estoque', notaId:'N50', notaNum:'50' })]));
+      const hZ = telaCons31('COMPRA', 'notas', 'Caos'), rZ = rodape31(hZ), hZ0 = telaCons31('COMPRA', 'notas', '');
+      t('31f: vista por nota com busca: o card mostra a nota inteira e a faixa diz quanto do valor dos cards ficou fora da lista e do total (150 nos cards − 90 no total = 60)',
+        rZ.v === fmt31(90) && hZ.indexOf('o filtro atual mostra 1 de 2 lançamentos desta nota') >= 0
+        && hZ.indexOf('O valor do card é a nota inteira. Com o filtro atual, ' + fmt31(60) + ' do valor dos cards são de lançamentos escondidos, que o total embaixo não soma.') >= 0 && hZ0.indexOf('Com o filtro atual') < 0 && hZ0.indexOf('O valor do card é a nota inteira, mesmo quando esta aba mostra só parte dela.') >= 0,
+        JSON.stringify([rZ, (hZ.match(/<div class="ctx">🧾[^]*?<\/div>/) || [''])[0].slice(0, 500)]));
+
+      setg('movs', copiaF([1, 2, 3].map(i => ({ id:'rv' + i, tipo:'VENDA', data:'2026-08-1' + i, jogo:'Pokémon', cat:'Booster', colecao:'R', qtd:1, valor:1.02, canal:'App', taxa:12, recDias:14, contraparte:'Cli' }))));
+      const PR = A('montarPlanilhaTCG')(), tR = res31(PR, '✓ Vendas, Estoque e coleção, Despesas').t, tR0 = res31(PF0, '✓ Vendas, Estoque e coleção, Despesas').t;
+      t('31f: quando a soma das celulas arredondadas fica 1 centavo longe do Painel so por arredondamento, a linha do ✓ diz quanto e onde; sem diferenca, nao diz nada',
+        PR.resumo.conferencia.every(c => c.ok) && tR.endsWith('Resultado bruto. Diferença só de arredondamento de centavo: a coluna Líquido da aba Vendas soma ' + fmt31(0.01) + ' a mais que o Painel.') && tR0.indexOf('arredondamento') < 0,
+        JSON.stringify([tR, tR0]));
+
+      /* ---- 31f, rodada 6 (revisores numero r6 M1, M2, M3 e L1; disco r6 M1): o ✗ diz o motivo com a coluna e a linha do Excel; os rotulos
+         que escolhem o que entra em cada soma (Situação, Como entrou, Entra no Resumo?) e as colunas de conta (Lucro %, Custo por unidade,
+         Vale − custo %) sao conferidos contra o lancamento; diferenca acima de meio centavo por linha nao e arredondamento; parcelas vencidas
+         por parcela, com nota parcelada, marca de paga, vencimento hoje e singular; rodape das vendas com venda sem taxa; faixa com caixa
+         aberta e lote avulso; arredondamento a menos, nas compras e no ramo com ✗ ---- */
+      setg('movs', copiaF(movsPF0));
+      const celP = mexe => { let P; setg('_plDepoisDeMontar', mexe); try { P = A('montarPlanilhaTCG')(); } finally { setg('_plDepoisDeMontar', undefined); } return P; };
+      const achaId = (l, idm) => l.findIndex(x => x[x.length - 1] === idm);
+      const nU = lnF('Estoque e coleção (hoje)', l => l[l.length - 1] === 'fU'), nB = lnF('Compras', l => l[l.length - 1] === 'fB'), nW = lnF('Vendas', l => l[l.length - 1] === 'fW');
+      const PsE = celP(ab => { ab.estoque[achaId(ab.estoque, 'fU')][0] = 'Na coleção'; });
+      const PcT = celP(ab => { ab.compras[achaId(ab.compras, 'fB')][3] = 'Troca'; });
+      const PdR = celP(ab => { ab.despesas[0][4] = 'não — a pagar com data futura'; });
+      const xDesp = '✗ aba Despesas: linhas que entram no Resumo = despesas';
+      t('31f (controle negativo): Situação, Como entrou e "Entra no Resumo?" trocados na linha montada acusam, e o ✗ diz a coluna e a linha do Excel (a soma e a mesma, so o rotulo mudou)',
+        PsE.resumo.conferencia[2].ok === false && PsE.resumo.conferencia[3].ok === false && PsE.resumo.conferencia[2].motivo === 'a coluna Situação da linha ' + nU + ' não é a do lançamento'
+        && PcT.resumo.conferencia[0].ok === false && res31(PcT, '✗ = comprei (mercadoria)').t === 'NÃO fecha — a coluna Como entrou da linha ' + nB + ' da aba Compras não é a do lançamento.'
+        && PdR.resumo.conferencia[4].ok === false && res31(PdR, xDesp).t === 'NÃO fecha — a coluna "Entra no Resumo?" da linha 4 diz o contrário do app.',
+        JSON.stringify([PsE.resumo.conferencia[2], PsE.resumo.conferencia[3], res31(PcT, '✗ = comprei (mercadoria)').t, res31(PdR, xDesp).t]));
+      const PlP = celP(ab => { ab.vendas[achaId(ab.vendas, 'fW')][10] += 0.001; });
+      const PcU = celP(ab => { ab.estoque[achaId(ab.estoque, 'fU')][5] += 1; });
+      const PvP = celP(ab => { ab.estoque[achaId(ab.estoque, 'fU')][9] += 0.001; });
+      const PcV = celP(ab => { const l = ab.vendas[achaId(ab.vendas, 'fW')]; l[8] += 0.01; l[9] -= 0.01; });
+      t('31f (controle negativo): Lucro %, Custo por unidade e Vale − custo % que nao sao a conta das celulas da linha acusam; o Custo da venda mudado junto com o Lucro (a conta da linha fecha) acusa pela propria celula',
+        PlP.resumo.conferencia[1].ok === false && PlP.resumo.conferencia[1].motivo === 'a coluna Lucro % da linha ' + nW + ' não é Lucro ÷ Custo'
+        && PcU.resumo.conferencia[2].ok === false && PcU.resumo.conferencia[2].motivo === 'a coluna Custo por unidade da linha ' + nU + ' não é Custo ÷ Qtd'
+        && PvP.resumo.conferencia[3].ok === false && PvP.resumo.conferencia[3].motivo === 'a coluna Vale − custo % da linha ' + nU + ' não é (Vale − custo) ÷ custo'
+        && PcV.resumo.conferencia[1].ok === false && PcV.resumo.conferencia[1].motivo === 'a coluna Custo da linha ' + nW + ' não é o custo da venda',
+        JSON.stringify([PlP.resumo.conferencia[1], PcU.resumo.conferencia[2], PvP.resumo.conferencia[3], PcV.resumo.conferencia[1]]));
+      const PdL = celP(ab => { ab.despesas[0][4] = 'não — a pagar com data futura'; ab.brutos.despesas[0].entra = false; });
+      const PcL = celP(ab => { const i = achaId(ab.compras, 'fB'); ab.compras.splice(i, 1); ab.brutos.compras.splice(i, 1); });
+      t('31f (controle negativo): diferenca acima de meio centavo por linha nao e arredondamento: vira ✗ com o motivo nas Despesas e no comprei (antes a planilha chamava R$ 25,00 de arredondamento)',
+        res31(PdL, xDesp).t === 'NÃO fecha — a coluna Valor das despesas com "sim" em "Entra no Resumo?" soma ' + fmt31(25) + ' a menos que o Painel, e isso não é arredondamento de centavo.'
+        && res31(PcL, '✗ = comprei (mercadoria)').t === 'NÃO fecha — a conta acima soma ' + fmt31(130) + ', ' + fmt31(30) + ' a menos que o Painel, e isso não é arredondamento de centavo.',
+        JSON.stringify([res31(PdL, xDesp).t, res31(PcL, '✗ = comprei (mercadoria)').t]));
+      /* o valor do limite fica preso: R$ 0,05 fora da soma, com 1 linha somada, passa de meio centavo por linha (R$ 0,025) e fica abaixo de um
+         limite 10 vezes maior (revisor disco r7, M1) */
+      setg('movs', copiaF(movsPF0).concat([{ id:'fD2', tipo:'DESPESA', data:'2026-08-06', cat:'Taxa', valor:0.05, status:'pago', natureza:'ordinaria' }]));
+      const PdP = celP(ab => { const i = achaId(ab.despesas, 'fD2'); ab.despesas[i][4] = 'não — a pagar com data futura'; ab.brutos.despesas[i].entra = false; });
+      setg('movs', copiaF(movsPF0));
+      t('31f (controle negativo): R$ 0,05 fora da soma das despesas, com 1 linha somada, já não é arredondamento (o limite é meio centavo por linha, não 10 vezes isso)',
+        res31(PdP, xDesp).t === 'NÃO fecha — a coluna Valor das despesas com "sim" em "Entra no Resumo?" soma ' + fmt31(0.05) + ' a menos que o Painel, e isso não é arredondamento de centavo.',
+        res31(PdP, xDesp).t);
+      /* o limite da aba Compras conta os numeros arredondados de cada compra (Custo total e o que saiu em troca): 5 compras com pedaco trocado e
+         valores de 4 casas ficam a R$ 0,05 do Painel so por arredondamento (revisor numero r7, L2: antes dava ✗ falso) */
+      setg('movs', copiaF([1, 2, 3, 4, 5].reduce((l, i) => l.concat([F31f('tR' + i, { cat:'ETB', colecao:'T', valor:1.0002, situacao:'Em estoque' }),
+        F31f('tR' + i + 'x', { cat:'ETB', colecao:'T', valor:1.0049, situacao:'Trocado', loteOrigem:'tR' + i })]), [])));
+      const PT5 = A('montarPlanilhaTCG')(), tT5 = res31(PT5, '✓ = comprei (mercadoria)').t;
+      setg('movs', copiaF(movsPF0));
+      t('31f: 5 compras com pedaço trocado e valores de 4 casas: a diferença de R$ 0,05 é arredondamento na aba Compras (o limite conta o Custo total e o que saiu em troca de cada compra)',
+        PT5.resumo.conferencia[0].ok === true && tT5.endsWith('Diferença só de arredondamento de centavo: a conta acima soma ' + fmt31(0.05) + ' a mais que o Painel.'),
+        JSON.stringify([PT5.resumo.conferencia[0], tT5.slice(-170)]));
+      /* dois erros na mesma aba: o ✗ diz o primeiro e avisa que ha mais (revisor numero r7, L3) */
+      const PmM = celP(ab => { ab.estoque[achaId(ab.estoque, 'fU')][0] = 'Na coleção'; ab.estoque[achaId(ab.estoque, 'fB')][4] += 1; });
+      t('31f (controle negativo): com erro em duas linhas da mesma aba, o ✗ diz o primeiro e avisa que outras linhas dessa aba também têm erro',
+        PmM.resumo.conferencia[2].ok === false && PmM.resumo.conferencia[2].motivo === 'a coluna Situação da linha ' + nU + ' não é a do lançamento; outras linhas dessa aba também têm erro',
+        JSON.stringify(PmM.resumo.conferencia[2]));
+      /* ---- 31f, rodada 8 (le-como-felype r8, 1, 2 e 5; revisor numero r8, L1; revisor disco r8, M1): "outras linhas" conta linhas, com o
+         Custo e o Vale do estoque na mesma aba, tambem em Compras, Vendas e Despesas; a soma que nao bate (linha que faltou ou entrou duas
+         vezes) diz o nome, o lado e, na aba Compras, o total; com erro de celula ela entra no fim do motivo; o Resultado bruto diz o lado; o ✗
+         sobe para o topo do Resumo; o limite da aba Compras fica preso e diz "a mais"; e os nomes do Custo e do Vale do estoque ---- */
+      const nCU = lnF('Compras', l => l[l.length - 1] === 'fU'), nCV = lnF('Compras', l => l[l.length - 1] === 'fV'), nX = lnF('Vendas', l => l[l.length - 1] === 'fX');
+      const PeV = celP(ab => { ab.estoque[achaId(ab.estoque, 'fU')][4] += 1; ab.estoque[achaId(ab.estoque, 'fB')][6] += 1; });
+      const PcC2 = celP(ab => { ab.compras[achaId(ab.compras, 'fU')][4] += 1; ab.compras[achaId(ab.compras, 'fV')][4] += 1; });
+      const PvL2 = celP(ab => { ab.vendas[achaId(ab.vendas, 'fW')][8] += 1; ab.vendas[achaId(ab.vendas, 'fX')][7] += 1; });
+      const mV2 = nX < nW ? 'a coluna Líquido da linha ' + nX + ' não é o líquido da venda' : 'a coluna Custo da linha ' + nW + ' não é o custo da venda';
+      setg('movs', copiaF(movsPF0).concat([{ id:'fD3', tipo:'DESPESA', data:'2026-08-07', cat:'Taxa', valor:7, status:'pago', natureza:'ordinaria' }]));
+      const PdD2 = celP(ab => { ab.despesas.forEach(l => { l[2] += 1; }); });
+      setg('movs', copiaF(movsPF0));
+      t('31f (controle negativo): "outras linhas" também no Custo e no Vale do estoque (a mesma aba), nas Compras, nas Vendas e nas Despesas, com o primeiro erro de cada uma',
+        PeV.resumo.conferencia[2].motivo === 'a coluna Custo da linha ' + nU + ' não é o custo do lançamento; outras linhas dessa aba também têm erro'
+        && PeV.resumo.conferencia[3].motivo === 'a coluna Custo da linha ' + nU + ' não é o custo do lançamento; outras linhas dessa aba também têm erro'
+        && PcC2.resumo.conferencia[0].motivo === 'a coluna Custo total da linha ' + Math.min(nCU, nCV) + ' da aba Compras não é o custo da compra; outras linhas dessa aba também têm erro'
+        && PvL2.resumo.conferencia[1].motivo === mV2 + '; outras linhas dessa aba também têm erro'
+        && PdD2.resumo.conferencia[4].motivo === 'a coluna Valor da linha 4 não é o valor da despesa; outras linhas dessa aba também têm erro',
+        JSON.stringify([PeV.resumo.conferencia[2], PeV.resumo.conferencia[3], PcC2.resumo.conferencia[0], PvL2.resumo.conferencia[1], PdD2.resumo.conferencia[4]]));
+      const _motS = g('motor');
+      const comMotor = (ajuste, mexe) => { let P; setg('motor', function () { const r0 = _motS.apply(this, arguments); const r1 = Object.assign({}, r0); ajuste(r1); return r1; });
+        if (mexe) setg('_plDepoisDeMontar', mexe); try { P = A('montarPlanilhaTCG')(); } finally { setg('motor', _motS); setg('_plDepoisDeMontar', undefined); } return P; };
+      const PsV = comMotor(r1 => { r1.vendasLiq += 50; }), PsC = comMotor(r1 => { r1.investido += 30; }), PsB = comMotor(r1 => { r1.cmv -= 12; });
+      const PsVc = comMotor(r1 => { r1.vendasLiq += 50; }, ab => { ab.vendas[achaId(ab.vendas, 'fW')][9] += 1; });
+      const xV = '✗ aba Vendas: soma do Líquido = vendi (líquido)', xB = '✗ Resultado bruto = vendi (líquido) − custo do que já vendeu − despesas';
+      const temTopo = P => aba31(P, 'Resumo').linhas.some(x => x && x.celulas && x.celulas[0] && /^✗ Conferências? que não fech/.test(String(x.celulas[0].v)));
+      /* v2.6f (le-como-felype r9, M1 e M2): a soma que nao bate diz a causa do lado do app, e o topo diz o que fazer */
+      const causa31 = ': algum lançamento do app ficou fora dessa aba ou entrou nela duas vezes';
+      t('31f (controle negativo): a soma que não bate com o Painel diz o nome da soma e o lado (Vendas), o total da conta acima (Compras), a causa do lado do app e o lado do Resultado bruto; com erro de célula, entra no fim do motivo; e o ✗ sobe para o topo do Resumo com o que fazer',
+        res31(PsV, xV).t === 'NÃO fecha — a coluna Líquido da aba Vendas soma ' + fmt31(50) + ' a menos que o Painel, e isso não é arredondamento de centavo' + causa31 + '.'
+        && res31(PsC, '✗ = comprei (mercadoria)').t === 'NÃO fecha — a conta acima soma ' + fmt31(160) + ', ' + fmt31(30) + ' a menos que o Painel, e isso não é arredondamento de centavo' + causa31 + '.'
+        && res31(PsB, xB).t === 'NÃO fecha — o Resultado bruto dá ' + fmt31(12) + ' a menos que essa conta.'
+        && PsVc.resumo.conferencia[1].motivo === 'a coluna Lucro da linha ' + nW + ' não é Líquido − Custo; e a soma da aba também não bate com o Painel' + causa31
+        && res31(PsV, '✗ Conferência que não fecha').t === 'aba Vendas: a planilha saiu com erro nessa aba. Não some por ela nem use os valores dela: confira no app e avise o Felype. O motivo está em "Conferência das abas", no fim do Resumo.'
+        && res31(PsC, '✗ Conferências que não fecham').t === 'aba Compras: a planilha saiu com erro nessa aba. Não some por ela nem use os valores dela: confira no app. O Resultado bruto também não bate com a conta dele: não decida por esse número antes de avisar o Felype. O motivo está em "Conferência das abas", no fim do Resumo.'
+        && temTopo(PsV) && !temTopo(PF0),
+        JSON.stringify([res31(PsV, xV).t, res31(PsC, '✗ = comprei (mercadoria)').t, res31(PsB, xB).t, PsVc.resumo.conferencia[1].motivo, temTopo(PsV) && res31(PsV, '✗ Conferência que não fecha').t, temTopo(PsC) && res31(PsC, '✗ Conferências que não fecham').t, temTopo(PF0)]));
+      const PcLim = celP(ab => { const i = achaId(ab.compras, 'fU'); ab.compras[i][4] += 0.04; ab.brutos.compras[i].custo += 0.04; });
+      const PeL = celP(ab => { const i = ab.estoque.findIndex(l => l[8] === ''); ab.estoque[i][4] += 1; ab.estoque[i][5] += 1; ab.brutos.estoque[i].custo += 1; ab.estoque[i][6] += 1; ab.brutos.estoque[i].vale += 1; });
+      t('31f (controle negativo): o limite da aba Compras conta 1 número por compra sem troca (R$ 0,04 com 3 compras já não é arredondamento) e diz "a mais"; o ✗ do limite no Custo e no Vale do estoque diz o nome de cada soma',
+        PcLim.resumo.conferencia[0].ok === false && PcLim.resumo.conferencia[0].motivo === 'a conta acima soma ' + fmt31(160.04) + ', ' + fmt31(0.04) + ' a mais que o Painel, e isso não é arredondamento de centavo'
+        && PeL.resumo.conferencia[2].motivo === 'a coluna Custo da aba Estoque e coleção soma ' + fmt31(1) + ' a mais que o Painel, e isso não é arredondamento de centavo'
+        && PeL.resumo.conferencia[3].motivo === 'a coluna Vale das linhas No estoque e Na coleção soma ' + fmt31(1) + ' a mais que o Painel, e isso não é arredondamento de centavo',
+        JSON.stringify([PcLim.resumo.conferencia[0], PeL.resumo.conferencia[2], PeL.resumo.conferencia[3]]));
+      /* ---- 31f, rodada 9 (le-como-felype r9, M1 a M3 e L1 a L3; revisores disco r9 M1 e L1, numero r9 L1): o topo conta conferencias e diz qual
+         soma do estoque nao fecha; 2 abas e o Resultado bruto com o "e" no ultimo e o que fazer; o Resultado bruto "a mais"; abaixo de meio centavo
+         a conta bate ate o centavo e fica fora do topo e do aviso; a soma que nao bate no fim do motivo de celula em Compras, Estoque e Despesas;
+         e, ao baixar, a janela com OK so quando algo nao fecha de verdade ---- */
+      const topoDe = P => { const x = aba31(P, 'Resumo').linhas.find(y => y && y.celulas && y.celulas[0] && /^✗ Conferências? que não fech/.test(String(y.celulas[0].v)));
+        return x ? { r: String(x.celulas[0].v), s: x.celulas[0].s, t: String(x.celulas[2].v) } : null; };
+      const PtS = celP(ab => { ab.estoque[achaId(ab.estoque, 'fU')][0] = 'Na coleção'; });
+      const PtV = celP(ab => { ab.estoque[achaId(ab.estoque, 'fB')][6] += 1; });
+      const Pt3 = comMotor(r1 => { r1.vendasLiq += 50; r1.investido += 30; }), PtB = comMotor(r1 => { r1.investido -= 30; }), PtSub = comMotor(r1 => { r1.investido += 0.0049; });
+      const PtC7 = comMotor(r1 => { r1.investido += 7; }, ab => { ab.compras[achaId(ab.compras, 'fU')][4] += 1; });
+      const PtE7 = comMotor(r1 => { r1.estoque += 7; }, ab => { ab.estoque[achaId(ab.estoque, 'fU')][4] += 1; });
+      const PtD7 = comMotor(r1 => { r1.despTotal += 7; }, ab => { ab.despesas[0][2] += 1; });
+      const sufixo31 = '; e a soma da aba também não bate com o Painel' + causa31;
+      const tpS = topoDe(PtS), tpV = topoDe(PtV), tp3 = topoDe(Pt3), tpB = topoDe(PtB);
+      t('31f (controle negativo): o topo do Resumo conta conferências e diz qual soma do estoque não fecha (Custo e Vale, só o Vale); com 2 abas e o Resultado bruto, os nomes com o "e" no último e o que fazer; o rótulo leva o ✗ e o negrito',
+        !!tpS && tpS.r === '✗ Conferências que não fecham' && tpS.s === 'negrito' && tpS.t === 'aba Estoque e coleção (Custo e Vale): a planilha saiu com erro nessa aba. Não some por ela nem use os valores dela: confira no app e avise o Felype. O motivo está em "Conferência das abas", no fim do Resumo.'
+        && !!tpV && tpV.r === '✗ Conferência que não fecha' && tpV.t.indexOf('aba Estoque e coleção (Vale): a planilha saiu com erro nessa aba.') === 0
+        && !!tp3 && tp3.r === '✗ Conferências que não fecham' && tp3.t === 'aba Compras e aba Vendas: a planilha saiu com erro nessas abas. Não some por elas nem use os valores delas: confira no app. O Resultado bruto também não bate com a conta dele: não decida por esse número antes de avisar o Felype. O motivo está em "Conferência das abas", no fim do Resumo.',
+        JSON.stringify([tpS, tpV, tp3]));
+      t('31f (controle negativo): o Resultado bruto diz "a mais"; abaixo de meio centavo a conta bate até o centavo, nas Compras e no Resultado bruto, e fica fora do topo; a soma que não bate entra no fim do motivo de célula também em Compras, Estoque e Despesas',
+        res31(PtB, xB).t === 'NÃO fecha — o Resultado bruto dá ' + fmt31(30) + ' a mais que essa conta.' && !!tpB && tpB.t.indexOf('. O Resultado bruto também não bate') > 0
+        && res31(PtSub, '✗ = comprei (mercadoria)').t === 'NÃO fecha — a conta acima bate com o Painel até o centavo; a diferença é menor que um centavo e não muda soma nenhuma, mas avise o Felype.'
+        && res31(PtSub, xB).t === 'NÃO fecha — o Resultado bruto bate com essa conta até o centavo; a diferença é menor que um centavo e não muda o resultado, mas avise o Felype.'
+        && topoDe(PtSub) === null
+        && PtC7.resumo.conferencia[0].motivo === 'a coluna Custo total da linha ' + nCU + ' da aba Compras não é o custo da compra' + sufixo31
+        && PtE7.resumo.conferencia[2].motivo === 'a coluna Custo da linha ' + nU + ' não é o custo do lançamento' + sufixo31
+        && PtD7.resumo.conferencia[4].motivo === 'a coluna Valor da linha 4 não é o valor da despesa' + sufixo31,
+        JSON.stringify([res31(PtB, xB).t, tpB, res31(PtSub, '✗ = comprei (mercadoria)').t, res31(PtSub, xB).t, topoDe(PtSub), PtC7.resumo.conferencia[0].motivo, PtE7.resumo.conferencia[2].motivo, PtD7.resumo.conferencia[4].motivo]));
+      const exporta31 = async ajuste => { const toasts = [], alertas = [], _t = g('toast'), _a = ctx.alert, _d = g('descargaBinaria'), _p = g('_precosTentado');
+        if (ajuste) setg('motor', function () { const r0 = _motS.apply(this, arguments); const r1 = Object.assign({}, r0); ajuste(r1); return r1; });
+        try { setg('toast', m => { toasts.push(String(m)); }); ctx.alert = m => { alertas.push(String(m)); }; setg('descargaBinaria', () => {}); setg('_precosTentado', true); await A('exportarPlanilha')(); }
+        finally { setg('motor', _motS); setg('toast', _t); ctx.alert = _a; setg('descargaBinaria', _d); setg('_precosTentado', _p); }
+        return { toasts, alertas }; };
+      const eOk = await exporta31(null), eSub = await exporta31(r1 => { r1.investido += 0.0049; }), e3 = await exporta31(r1 => { r1.vendasLiq += 50; r1.investido += 30; });
+      t('31f (controle negativo): ao baixar, sem erro sai o balão "baixada ✓"; abaixo de meio centavo também; com conferência que não fecha de verdade, a janela com OK, uma vez só e sem contagem',
+        eOk.alertas.length === 0 && eOk.toasts.some(x => /^Planilha baixada ✓ — \d abas$/.test(x)) && eSub.alertas.length === 0 && eSub.toasts.some(x => /^Planilha baixada ✓/.test(x))
+        && e3.alertas.length === 1 && e3.alertas[0] === 'A planilha foi baixada, mas saiu com erro: veja a linha com ✗ no começo do Resumo.' && !e3.toasts.some(x => /baixada/.test(x)),
+        JSON.stringify([eOk, eSub, e3]));
+
+      setg('movs', copiaF([F31f('vL', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Em estoque', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('vL1', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'vL', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('vN1', { cat:'ETB', colecao:'W', valor:40, situacao:'Em estoque', notaId:'N60', notaNum:'60', pgTipo:'Parcelado', nParc:2, venc1:'2026-06-10', data:'2026-06-01' }),
+        F31f('vN2', { cat:'ETB', colecao:'W', valor:60, situacao:'Em estoque', notaId:'N60', notaNum:'60', pgTipo:'Parcelado', nParc:2, venc1:'2026-06-10', data:'2026-06-01' })]));
+      const tVN = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      setg('movs', copiaF([F31f('uV', { cat:'ETB', colecao:'U', valor:100, situacao:'Em estoque', pgTipo:'Parcelado', nParc:2, venc1:'2026-07-25' }),
+        F31f('uP', { cat:'ETB', colecao:'U', valor:100, situacao:'Em estoque', pgTipo:'Parcelado', nParc:2, venc1:'2026-07-25', pgParcelas:{ 1:'2026-07-25' } }),
+        F31f('uH', { cat:'ETB', colecao:'U', valor:30, situacao:'Em estoque', pgTipo:'Parcelado', nParc:1, venc1:'2026-08-20' })]));
+      const tVU = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      t('31f: as parcelas vencidas contam a nota parcelada (1 compra) junto com o lote; a parcela com a marca de paga nao conta; a que vence hoje fica so no que vai vencer; 1 parcela sai no singular',
+        tVN === 'Nada vence este mês. As 5 parcelas já vencidas de 2 compras (' + fmt31(400) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
+        && tVU === fmt31(130) + ' vence até o fim do mês. Já está descontado no caixa acima: as parcelas de compra que ainda vão vencer (' + fmt31(130) + '). A parcela já vencida de 1 compra (' + fmt31(50) + ') não entra: o app a conta como paga. Se ela não foi paga, este A pagar está menor do que devia.',
+        JSON.stringify([tVN, tVU]));
+      /* chave das vencidas pela familia da aba Compras e pela data de vencimento (revisor numero r7, L1): pedaco com outra 1a parcela conta os 4
+         vencimentos; dois pedacos orfaos da mesma compra apagada contam 1 compra, como a aba Compras mostra */
+      setg('movs', copiaF([F31f('dL', { cat:'Booster Box', colecao:'D', qtd:2, valor:150, situacao:'Em estoque', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('dL1', { cat:'Booster Box', colecao:'D', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'dL', pgTipo:'Parcelado', nParc:3, venc1:'2026-06-10', data:'2026-05-01' })]));
+      const tVD = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      setg('movs', copiaF([F31f('oR1', { cat:'Booster Box', colecao:'O', qtd:2, valor:150, situacao:'Em estoque', loteOrigem:'compraApagada31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('oR2', { cat:'Booster Box', colecao:'O', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'compraApagada31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' })]));
+      const tVO = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      t('31f: as vencidas contam os vencimentos de verdade (pedaço com outra 1ª parcela: 4 vencimentos de 1 compra) e os pedaços órfãos da mesma compra apagada como 1 compra',
+        tVD === 'Nada vence este mês. As 4 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
+        && tVO === 'Nada vence este mês. As 3 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.',
+        JSON.stringify([tVD, tVO]));
+      /* o mes nao junta vencimentos de dias diferentes, e orfaos de compras apagadas diferentes sao compras diferentes (revisor disco r8, M1: E2 e
+         E3 passavam com a secao 31 verde) */
+      setg('movs', copiaF([F31f('dM', { cat:'Booster Box', colecao:'M', qtd:2, valor:150, situacao:'Em estoque', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('dM1', { cat:'Booster Box', colecao:'M', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'dM', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-20', data:'2026-05-01' })]));
+      const tVM = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      setg('movs', copiaF([F31f('oS1', { cat:'Booster Box', colecao:'S', qtd:2, valor:150, situacao:'Em estoque', loteOrigem:'compraApagadaA31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
+        F31f('oS2', { cat:'Booster Box', colecao:'S', qtd:2, valor:150, situacao:'Em estoque', loteOrigem:'compraApagadaB31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' })]));
+      const tVS = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
+      t('31f: vencimentos do mesmo mês em dias diferentes contam separados, e pedaços órfãos de compras apagadas diferentes contam como compras diferentes',
+        tVM === 'Nada vence este mês. As 6 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
+        && tVS === 'Nada vence este mês. As 6 parcelas já vencidas de 2 compras (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.',
+        JSON.stringify([tVM, tVS]));
+
+      setg('movs', copiaF(movsPF0));
+      const rVM = rodape31(telaCons31('VENDA', 'itens', '')), rVS = rodape31(telaCons31('VENDA', 'itens', 'Caos'));
+      t('31f: o rodape das vendas com venda sem taxa misturada soma o liquido de todas (130 com 10% de taxa + 50 sem taxa = 167); so com venda sem taxa, nao fala de liquido',
+        rVM.v === fmt31(180) && rVM.nota === 'líquido ' + fmt31(167) + ', sem a taxa do app' && rVS.n === 1 && rVS.v === fmt31(50) && rVS.nota === '', JSON.stringify([rVM, rVS]));
+
+      /* ---- 31g (v2.6g, revisor confere-o-numero 14/09). M2: a Consulta dizia "320 lançamentos · total comprado R$ 115.447,00", o Relatorio
+         292 lancamentos para o mesmo total, e a linha "Caos ascendente · 18" abria Todos com 35 lancamentos. M3: o liquido do rodape de Vendas
+         somava na ordem da lista e dava 1 centavo diferente do Painel quando a soma exata caia em meio centavo ---- */
+      const ant31g = { ord:g('consOrd'), render:g('render'), tela:g('tela'), sel:g('perSel'), de:g('perDe'), ate:g('perAte') };
+      setg('render', () => {});
+      try {
+        setg('consOrd', 'emissao'); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('relJogo', ''); setg('relCol', ''); setg('relPess', ''); setg('relCat', '');
+        setg('movs', copiaF([
+          F31f('gc1', { cat:'ETB', colecao:'Conta', valor:100, situacao:'Em estoque' }),
+          F31f('gc2', { cat:'ETB', colecao:'Conta', valor:50, situacao:'Vendido', data:'2026-07-05' }),
+          F31f('gc3', { cat:'ETB', colecao:'Conta', valor:80, situacao:'Trocado' }),
+          F31f('gc4', { cat:'Booster Box', colecao:'Conta', valor:300, situacao:'Aberto' }),
+          F31f('gc5', { cat:'Booster', colecao:'Conta', qtd:18, valor:300, situacao:'Em estoque', loteOrigem:'gc4', origem:'ABERTURA' }),
+          { id:'gcV', tipo:'VENDA', data:'2026-08-12', jogo:'Pokémon', cat:'ETB', colecao:'Conta', qtd:1, valor:70, canal:'Pix', taxa:0, contraparte:'Cli' }]));
+        const rGc = rodape31(telaCons31('COMPRA', 'itens', '')), rGcBoo = rodape31(telaCons31('COMPRA', 'itens', 'Booster')), rGcTroc = rodape31(telaCons31('COMPRA', 'itens', 'Trocado')), rGcEst = rodape31(telaCons31('COMPRA', 'itens', 'Em estoque'));
+        t('31g: a aba Compras diz quantas compras da lista entram no total comprado (5 na lista, 3 no total de R$ 450,00, que é o que o Relatório conta), no singular e com "nenhum"; sem compra de fora, o texto de sempre',
+          rGc.n === 5 && rGc.rot === '3 entram no total comprado' && rGc.v === fmt31(450)
+          && rGcBoo.n === 2 && rGcBoo.rot === '1 entra no total comprado' && rGcBoo.v === fmt31(300)
+          && rGcTroc.n === 1 && rGcTroc.rot === 'nenhum entra no total comprado' && rGcTroc.v === fmt31(0)
+          && rGcEst.n === 2 && rGcEst.rot === 'total comprado' && rGcEst.v === fmt31(400),
+          JSON.stringify([rGc, rGcBoo, rGcTroc, rGcEst]));
+        const hGcT = telaCons31('tudo', 'itens', ''), hGcTBoo = telaCons31('tudo', 'itens', 'Booster'), hGcTEst = telaCons31('tudo', 'itens', 'Em estoque');
+        const comprado31g = h => (h.match(/🛒 comprado <b>[^<]*<\/b>[^<·]*/) || [''])[0];
+        t('31g: em Todos o comprado diz em quantos lançamentos (6 na lista, R$ 450,00 em 3; "em 1 lançamento" no singular); só com compras que entram, não repete a contagem da lista',
+          hGcT.indexOf('<span style="color:var(--mut)">6 lançamentos</span>') >= 0 && hGcT.indexOf('🛒 comprado <b>' + fmt31(450) + '</b> em 3 lançamentos · 💰 vendido <b>' + fmt31(70) + '</b>') >= 0
+          && hGcTBoo.indexOf('🛒 comprado <b>' + fmt31(300) + '</b> em 1 lançamento<') >= 0 && hGcTEst.indexOf('🛒 comprado <b>' + fmt31(400) + '</b></span>') >= 0,
+          JSON.stringify([comprado31g(hGcT), comprado31g(hGcTBoo), comprado31g(hGcTEst)]));
+        const tabGc = [];
+        setg('tabelaComp', (o, M, f, h) => { tabGc.push({ o:JSON.parse(JSON.stringify(o)), n:Object.fromEntries(Object.entries(M).map(([k, v]) => [k, v.length])), f:f || 'tudo' }); return _tcF31(o, M, f, h); });
+        try { setg('tela', 'relatorios'); setg('relDimAll', 'colecao'); setg('relCompView', 'tab'); A('vRelatorios')(); }
+        finally { setg('tabelaComp', _tcF31); setg('relCompView', 'lista'); }
+        const cmpGc = tabGc.find(x => x.o.Conta === 450) || { n:{} };
+        A('abrirConsultaPorDim')('Conta', cmpGc.f); const hGcToque = A('vConsultar')();
+        t('31g: a linha do Comprei do Relatório ("Conta", 3 lançamentos, R$ 450,00) abre a Consulta com o mesmo total e a mesma contagem ao lado dele',
+          cmpGc.n.Conta === 3 && cmpGc.f === 'tudo' && hGcToque.indexOf('🛒 comprado <b>' + fmt31(450) + '</b> em 3 lançamentos') >= 0,
+          JSON.stringify([cmpGc, comprado31g(hGcToque)]));
+        const hGcI = telaCons31('COMPRA', 'itens', '');
+        t('31g: o cabeçalho do mês na aba Compras diz quantos do mês entram no total dele (4 lanç., 2 no total de R$ 400,00); o mês sem compra de fora e os cabeçalhos de Todos seguem como antes',
+          hGcI.indexOf('· 4 lanç., 2 no total</span></span><b>' + fmt31(400) + '</b>') >= 0 && hGcI.indexOf('· 1 lanç.</span></span><b>' + fmt31(50) + '</b>') >= 0
+          && hGcT.indexOf('· 5 lanç.</span>') >= 0 && hGcT.indexOf('no total</span>') < 0,
+          JSON.stringify([hGcI.match(/· \d+ lanç\.[^<]*<\/span><\/span><b>[^<]*/g) || [], hGcT.match(/· \d+ lanç\.[^<]*<\/span>/g) || []]));
+
+        /* M3: tres vendas do app cujo liquido soma exatos 475,065. Na ordem em que estao guardadas (a do motor) a soma arredonda para R$ 475,06;
+           na ordem da lista (data mais nova primeiro) para R$ 475,07. O rodape de Vendas tem de dar o numero do Painel e da linha do Relatorio. */
+        setg('movs', copiaF([['lq1', '2026-08-01', 238.34, 14], ['lq2', '2026-08-02', 105.68, 15], ['lq3', '2026-08-03', 209.61, 14]].map(([idm, data, valor, taxa]) =>
+          ({ id:idm, tipo:'VENDA', data, jogo:'Pokémon', cat:'Booster', colecao:'Liq', qtd:1, valor, canal:'App', taxa, recDias:14, contraparte:'Cli' }))));
+        const liq31g = m => (+m.valor || 0) * (1 - (+m.taxa || 0) / 100);
+        const mLq = A('motor')(true), liqGuardado = g('movs').reduce((s, m) => s + liq31g(m), 0), liqLista = g('movs').slice().reverse().reduce((s, m) => s + liq31g(m), 0);
+        const rLq = rodape31(telaCons31('VENDA', 'itens', ''));
+        setg('tela', 'painel'); const vendLq = (A('vPainel')().match(/Vendido \(tudo\)<\/div><div class="v" style="color:var\(--green\)">([^<]*)<\/div>/) || [])[1];
+        t('31g: o líquido do rodapé de Vendas é o Vendido do Painel quando a soma exata cai em meio centavo (475,065): R$ 475,06 na ordem guardada, e a ordem da lista (que dava R$ 475,07) não decide; o número do Painel é o mesmo da conta antiga, bit a bit',
+          fmt31(liqLista) !== fmt31(liqGuardado) && Object.is(mLq.vendasLiq, liqGuardado)
+          && rLq.nota === 'líquido ' + fmt31(mLq.vendasLiq) + ', sem a taxa do app' && vendLq === fmt31(mLq.vendasLiq),
+          JSON.stringify([fmt31(liqLista), fmt31(liqGuardado), mLq.vendasLiq, rLq.nota, vendLq]));
+        const tabLq = [];
+        setg('tabelaComp', (o, M, f, h) => { tabLq.push({ o:JSON.parse(JSON.stringify(o)), f:f || 'tudo' }); return _tcF31(o, M, f, h); });
+        try { setg('tela', 'relatorios'); setg('relDimAll', 'colecao'); setg('relCompView', 'tab'); A('vRelatorios')(); }
+        finally { setg('tabelaComp', _tcF31); setg('relCompView', 'lista'); }
+        const vendiLq = tabLq.find(x => x.f === 'VENDA') || { o:{} };
+        A('abrirConsultaPorDim')('Liq', 'VENDA'); const rLqToque = rodape31(A('vConsultar')());
+        t('31g: a linha Vendi do Relatório ("Liq") abre Vendas com o mesmo líquido dela e do Painel',
+          fmt31(vendiLq.o.Liq) === fmt31(mLq.vendasLiq) && rLqToque.nota === 'líquido ' + fmt31(vendiLq.o.Liq) + ', sem a taxa do app',
+          JSON.stringify([vendiLq, rLqToque]));
+      } finally {
+        setg('render', ant31g.render); setg('consOrd', ant31g.ord); setg('tela', ant31g.tela); setg('perSel', ant31g.sel); setg('perDe', ant31g.de); setg('perAte', ant31g.ate);
+        setg('tabelaComp', _tcF31); setg('relCompView', 'lista'); setg('relDimAll', 'colecao'); setg('consF', 'tudo'); setg('consCol', ''); setg('consQ', ''); setg('consJogo', 'todos');
+      }
+
+      setg('movs', copiaF([F31f('qX', { cat:'Booster Box', colecao:'Omega', valor:300, situacao:'Aberto', notaId:'N70', notaNum:'70' }),
+        F31f('qX1', { cat:'Booster', colecao:'Omega', qtd:9, valor:150, situacao:'Em estoque', loteOrigem:'qX', origem:'ABERTURA' }),
+        F31f('qX2', { cat:'Booster', colecao:'Omega', qtd:9, valor:150, situacao:'Coleção', loteOrigem:'qX', origem:'ABERTURA' }),
+        F31f('qY', { cat:'ETB', colecao:'Zeta', valor:90, situacao:'Em estoque', notaId:'N70', notaNum:'70' }),
+        F31f('qM', { cat:'Booster Box', colecao:'Omega', valor:100, situacao:'Em estoque' }),
+        F31f('qM1', { cat:'Booster Box', colecao:'Omega', valor:100, situacao:'Aberto', loteOrigem:'qM' }),
+        F31f('qM2', { cat:'Booster', colecao:'Sigma', qtd:18, valor:100, situacao:'Em estoque', loteOrigem:'qM1', origem:'ABERTURA' })]));
+      const hQN = telaCons31('COMPRA', 'notas', 'Zeta'), hQL = telaCons31('COMPRA', 'notas', 'Sigma'), rQL = rodape31(hQL);
+      const fxQ = h => (h.match(/O valor do card[^<]*/) || [''])[0];
+      t('31f: faixa com busca: a caixa aberta da nota e a caixa do lote nao contam como escondidas (o card ja tirou a caixa), e o lote avulso parcial soma o que a busca escondeu (200 no card − 100 no total = 100)',
+        fxQ(hQN) === 'O valor do card é a nota inteira, menos a caixa aberta, mesmo quando esta aba mostra só parte dela.'
+        && rQL.v === fmt31(100) && fxQ(hQL) === 'O valor do card é a nota inteira. Com o filtro atual, ' + fmt31(100) + ' do valor dos cards são de lançamentos escondidos, que o total embaixo não soma.',
+        JSON.stringify([fxQ(hQN), rQL, fxQ(hQL)]));
+
+      setg('movs', copiaF([1, 2, 3].map(i => ({ id:'rw' + i, tipo:'VENDA', data:'2026-08-1' + i, jogo:'Pokémon', cat:'Booster', colecao:'R', qtd:1, valor:0.98, canal:'App', taxa:12, recDias:14, contraparte:'Cli' }))
+        .concat([1, 2, 3].map(i => F31f('rc' + i, { cat:'Booster', colecao:'R', valor:0.333, situacao:'Vendido' })))
+        .concat([{ id:'rd', tipo:'DESPESA', data:'2026-08-05', cat:'Frete', valor:5, status:'pago', natureza:'ordinaria' }])));
+      const PM = A('montarPlanilhaTCG')(), tMv = res31(PM, '✓ Vendas, Estoque e coleção, Despesas').t, tMc = res31(PM, '✓ = comprei (mercadoria)').t;
+      const PMx = celP(ab => { ab.despesas[0][2] += 0.01; }), tMx = res31(PMx, '✓ aba Vendas: soma do Líquido = vendi (líquido)').t;
+      const arr1 = (col, lado) => 'Diferença só de arredondamento de centavo: ' + col + ' soma ' + fmt31(0.01) + ' ' + lado + ' que o Painel.';
+      t('31f: o arredondamento a menos diz "a menos", tambem na linha do comprei; no ramo com um ✗, o ✓ que fecha mantem o aviso dele',
+        PM.resumo.conferencia.every(c => c.ok) && tMv.endsWith(arr1('a coluna Líquido da aba Vendas', 'a menos')) && tMc.endsWith(arr1('a conta acima', 'a menos'))
+        && PMx.resumo.conferencia[4].ok === false && tMx === 'Fecha. ' + arr1('a coluna Líquido da aba Vendas', 'a menos'),
+        JSON.stringify([tMv, tMc, tMx, PM.resumo.conferencia.filter(c => !c.ok)]));
+
+      /* o vazio de colecao e de tipo no seletor da Consulta (revisor disco r6, M1: 6 das 10 regras da opcao do vazio passavam verdes; a 31f so
+         tinha o de pessoa) */
+      setg('movs', copiaF([F31f('oA', { cat:'ETB', colecao:'Caos', valor:100, situacao:'Em estoque' }), F31f('oB', { cat:'', colecao:'', valor:40, situacao:'Em estoque' }),
+        { id:'oD', tipo:'DESPESA', data:'2026-08-05', cat:'Frete', valor:25, status:'pago', natureza:'ordinaria' }]));
+      const telaF = (col, cat) => { setg('tela', 'consultar'); setg('consMenu', false); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('consJogo', 'todos');
+        setg('consPess', ''); setg('consConta', ''); setg('consQ', ''); setg('consF', 'tudo'); setg('consVer', 'itens'); setg('expandId', null); setg('consCol', col); setg('consCat', cat); setg('consFOpen', true);
+        try { return A('vConsultar')(); } finally { setg('consFOpen', false); setg('consCol', ''); setg('consCat', ''); } };
+      const hOC = telaF('(sem coleção)', ''), hOT = telaF('', '(sem tipo)');
+      setg('movs', copiaF(movsPF0));
+      const hO0 = telaF('', '');
+      t('31f: o vazio de colecao e de tipo aparece marcado no seletor, a despesa nao entra no "(sem coleção)" em Todos, e sem compra ou venda vazia a opcao nao aparece (a despesa sem colecao nao conta)',
+        hOC.indexOf('<option selected>(sem coleção)</option>') >= 0 && hOC.indexOf('🛒 comprado <b>' + fmt31(40) + '</b>') >= 0 && hOC.indexOf('🧾 despesas') < 0
+        && hOT.indexOf('<option selected>(sem tipo)</option>') >= 0 && hOT.indexOf('🛒 comprado <b>' + fmt31(40) + '</b>') >= 0
+        && hO0.indexOf('(sem coleção)') < 0 && hO0.indexOf('(sem tipo)') < 0,
+        JSON.stringify([hOC.match(/<option[^>]*>\(sem [^<]*<\/option>/g) || [], hOT.match(/<option[^>]*>\(sem [^<]*<\/option>/g) || [], hOC.match(/🛒 comprado <b>[^<]*|🧾 despesas <b>[^<]*/g) || [], hO0.indexOf('(sem ')]));
+      /* aba Despesas com o vazio escolhido: a mensagem diz que o vazio so procura compras e vendas (le-como-felype r7, decisao b) */
+      const telaD = pess => { setg('tela', 'consultar'); setg('consMenu', false); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('consJogo', 'todos'); setg('consCol', ''); setg('consCat', '');
+        setg('consConta', ''); setg('consQ', ''); setg('consVer', 'itens'); setg('expandId', null); setg('consF', 'DESPESA'); setg('consPess', pess);
+        try { return A('vConsultar')(); } finally { setg('consPess', ''); setg('consF', 'tudo'); } };
+      const hDv = telaD('(sem cliente/fornecedor)'), hDn = telaD('Ninguem31f');
+      t('31f: na aba Despesas, o vazio escolhido diz que so procura compras e vendas; outro filtro sem resultado segue "Nada nesse filtro."',
+        hDv.indexOf('Nada nesse filtro: "(sem cliente/fornecedor)" só procura compras e vendas.') >= 0 && hDn.indexOf('<div class="empty">Nada nesse filtro.</div>') >= 0,
+        JSON.stringify([(hDv.match(/<div class="empty">[^<]*/) || [''])[0], (hDn.match(/<div class="empty">[^<]*/) || [''])[0]]));
+      /* o vazio de colecao e o de tipo tambem entram na mensagem, com o nome escolhido; com dois vazios a frase nomeia os dois; na aba Todos, um
+         vazio e uma busca que zera a lista seguem "Nada nesse filtro." (revisor disco r8, M1: B1 a B5 passavam com a secao 31 verde;
+         le-como-felype r8, 4) */
+      const telaV = (f, col, cat, pess, q) => { setg('tela', 'consultar'); setg('consMenu', false); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('consJogo', 'todos');
+        setg('consConta', ''); setg('consVer', 'itens'); setg('expandId', null); setg('consF', f); setg('consCol', col); setg('consCat', cat); setg('consPess', pess); setg('consQ', q);
+        try { return (A('vConsultar')().match(/<div class="empty">[^<]*/) || [''])[0]; } finally { setg('consCol', ''); setg('consCat', ''); setg('consPess', ''); setg('consQ', ''); setg('consF', 'tudo'); } };
+      const vC = telaV('DESPESA', '(sem coleção)', '', '', ''), vT = telaV('DESPESA', '', '(sem tipo)', '', ''), v2 = telaV('DESPESA', '(sem coleção)', '', '(sem cliente/fornecedor)', ''),
+        vTd = telaV('tudo', '', '', '(sem cliente/fornecedor)', 'zzzz31f');
+      t('31f: na aba Despesas o vazio de coleção e o de tipo também explicam, com o nome escolhido; com dois vazios a frase nomeia os dois; na aba Todos, um vazio e uma busca que zera a lista seguem "Nada nesse filtro."',
+        vC === '<div class="empty">Nada nesse filtro: "(sem coleção)" só procura compras e vendas.' && vT === '<div class="empty">Nada nesse filtro: "(sem tipo)" só procura compras e vendas.'
+        && v2 === '<div class="empty">Nada nesse filtro: "(sem coleção)" e "(sem cliente/fornecedor)" só procuram compras e vendas.' && vTd === '<div class="empty">Nada nesse filtro.',
+        JSON.stringify([vC, vT, v2, vTd]));
+    } finally {
+      semRelogio31();
+      setg('_precosLiga', _plF31); setg('render', _renderF31); setg('graficoCompSvg', _gcF31); setg('tabelaComp', _tcF31); setg('_plDepoisDeMontar', undefined);
+      setg('relCompView', 'lista'); setg('relDimAll', 'colecao'); setg('relJogo', ''); setg('relCol', ''); setg('relPess', ''); setg('relCat', ''); setg('consConta', ''); setg('consCat', ''); setg('consPess', ''); setg('consCol', ''); setg('consJogo', 'todos');
+    }
+  }
+  setg('movs', []); setg('perDe', ''); setg('perAte', ''); setg('consF', 'tudo'); setg('consVer', 'itens'); setg('consQ', ''); setg('expandId', null); reset();
+}).catch(e=>{fail++;console.log('  FALHOU  secao 31 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
+  /* ===== 32. FLUXO DE ESTOQUE (19/09/2026) =====
+     O que 7 rodadas de revisao adversarial achou no fluxo "pedido a caminho -> chegou / vendido antes de chegar / separado pra colecao"
+     e nas tres curvas (estoque, dinheiro, colecao) que a aba Fluxo de estoque desenha. Nenhum destes casos tinha teste: a suite
+     terminava na secao 31 e o fluxo so era provado pelo revisor, a mao, a cada rodada. Cada bloco (32a..32k) cobre uma funcao e
+     nomeia o achado que a fez nascer (G1, G2, M2, M3...).
+     Como esta secao e construida: cada bloco monta o PROPRIO fixture com reset(), nao depende de ordem e restaura no finally tudo o
+     que mexe (prompt, confirm, alert, getElementById, tela, editId, tipoSel, toast, diarioReg...) — um bloco que explode vira UMA
+     linha FALHOU e os outros seguem. Relogio real, nada de Date falso: "hoje" e new Date().toISOString().slice(0,10), igual ao app.
+     Controle negativo (19/09/2026): cada mutacao no app abaixo deixa VERMELHOS os blocos citados —
+       pedidosAgrupados sem a linha de colecao: 32d 32i | separarParaColecao sem destIni: 32c | sem origemPedido: 32c 32d 32i |
+       chegouPedido sem delete origemPedido: 32b 32j | vEstoque com fmt(r.pedido): 32i | serieColecao sem "if(s==='Pedido')return": 32f |
+       serieColecao sem clamp: 32f | serieEstoque sem clamp: 32e | serieDinheiro sem o filtro Parcelado da nota: 32g |
+       serieDinheiro sem o dedupe por slot: 32g | serieColecao entrando pela dataChegada: 32f.
+     CONHECIDO e ADIADO, sem teste de proposito: G-1 — pagamento registrado ANTES do fracionamento e contado em dobro por
+     serieDinheiro depois de um JSON.parse(JSON.stringify(movs)) (a referencia compartilhada de pgParcelas some no recarregamento).
+     A raiz esta em baixarLote (copia rasa) e a cura pede revisao propria (mexe tambem em contasPagas e saldoConta). */
+  console.log('');
+  console.log('=== 32. fluxo de estoque: chegada, separar pra colecao, agrupamento, curvas, card e ciclo de origemPedido ===');
+  const hoje32 = () => new Date().toISOString().slice(0, 10);
+  const ehHoje32 = (v, antes) => v === antes || v === hoje32();
+  const fmt32 = g('fmt');
+  const r2_32 = x => Math.round(x * 100) / 100;
+  const foto32 = () => JSON.stringify(M());
+  const S32 = s => JSON.stringify(s);
+  const ultimo32 = s => (s.length ? s[s.length - 1].total : 0);
+  const pt32 = (s, d) => s.find(p => p.data === d);
+  const gravado32 = idm => (JSON.parse(ctx.localStorage.getItem(g('MK')) || '[]').find(m => m.id === idm) || {});
+  const compra32 = (idc, extra) => Object.assign({ id: idc, tipo: 'COMPRA', data: '2026-01-10', jogo: 'Pokémon', cat: 'ETB', colecao: '151', qtd: 1, valor: 10,
+    situacao: 'Em estoque', destino: 'Vender', contraparte: 'Forn', pgTipo: 'À vista' }, extra || {});
+  /* pre-venda = o que salvar() faz numa venda de item 'Pedido': fraciona como Vendido, cria a VENDA ligada por origemId e grava vendaRef no pedaco */
+  const preVenda32 = (idPai, qtd, quem, extras) => {
+    const ex = Object.assign({ dataVenda: '2026-09-01', dataSaida: '2026-09-01' }, extras || {});
+    const peca = A('baixarLote')(idPai, qtd, 'Vendido', ex);
+    const venda = { id: 'V_' + peca.id, tipo: 'VENDA', data: ex.dataVenda, valor: 99, origemId: idPai, vendaDe: 'pedido', contraparte: quem, qtd: peca.qtd };
+    M().push(venda);
+    if (peca.id !== idPai) peca.vendaRef = venda.id;
+    return { peca, venda };
+  };
+  /* dublê de DOM que LE campos (o padrao e um stub novo por chamada, com value vazio: nada digitado "fica") */
+  const campos32 = {};
+  const elCampo32 = idc => ({
+    get value() { return (idc in campos32) ? campos32[idc] : ''; }, set value(v) { campos32[idc] = v; },
+    checked: false, textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, children: [],
+    appendChild() {}, remove() {}, addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; }, scrollIntoView() {}, focus() {},
+    insertAdjacentHTML() {}, getAttribute() { return null; }, setAttribute() {}, removeAttribute() {}, closest() { return null; }, cloneNode() { return elCampo32(idc); }
+  });
+  /* tudo o que os blocos podem mexer; cada bloco devolve o app ao estado em que o achou */
+  const G32 = ['tela', 'editId', 'tipoSel', 'pgTipo', 'consMenu', 'perDe', 'perAte', 'perSel', '_pendVolta', '_lancarDirty', '_fotosPend', 'navHist',
+    'verCaixaEstoque', 'verColecaoEstoque', '_db', '_syncReady', '_restaurando', '_baseH', 'diarioReg', 'toast', 'vendaDe', 'vendaUn', 'canal', '_preSel'];
+  /* pre-requisito: o app carregado TEM o fluxo de estoque. Contra um build sem ele (o tcg-web/index.html antigo, antes do build) a secao
+     nao pode virar 11 explosoes confusas nem passar calada: vira UMA linha vermelha que nomeia o que falta. */
+  const FUNCS32 = ['chegouPeca', 'chegouPedido', 'separarParaColecao', 'pedidosAgrupados', 'serieEstoque', 'serieDinheiro', 'serieColecao',
+    'graficoLinhaEstoque', 'vEstoque', 'soltarIntrusa', 'diagLote', 'baixarLote', 'salvar', 'motor', 'aPagar', 'sitDe'];
+  const faltam32 = FUNCS32.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('32a: [pre-requisito] o app carregado tem todas as ' + FUNCS32.length + ' funcoes do fluxo de estoque que esta secao exercita',
+    faltam32.length === 0, 'FALTAM no app: ' + faltam32.join(', ') + ' — este teste esta rodando contra um build sem o fluxo de estoque?');
+  const bloco32 = async (rot, corpo) => {
+    if (faltam32.length) return;   /* o pre-requisito ja acusou; sem as funcoes cada bloco so repetiria o mesmo erro */
+    const salvos = [];
+    const orig = { prompt: ctx.prompt, confirm: ctx.confirm, alert: ctx.alert, geb: ctx.document.getElementById };
+    try { G32.forEach(n => { const v = g(n); salvos.push([n, Array.isArray(v) ? v.slice() : v]); }); reset(); await corpo(); }
+    catch (e) { t('32' + rot + ': o bloco explodiu antes de terminar (o que vinha depois dele NAO foi provado)', false, String((e && e.stack) || e).slice(0, 700)); }
+    finally {
+      ctx.prompt = orig.prompt; ctx.confirm = orig.confirm; ctx.alert = orig.alert; ctx.document.getElementById = orig.geb;
+      salvos.forEach(([n, v]) => setg(n, v));
+      reset();
+    }
+  };
+  /* captura tudo o que o usuario VE ou responde: toast, diario, alert, confirm (texto) e prompt (pergunta + resposta programada) */
+  const capturas32 = () => {
+    const c = { toasts: [], diario: [], alertas: [], confirms: [], perguntas: [], confirmar: true, resposta: '1' };
+    setg('toast', m => { c.toasts.push(String(m)); });
+    setg('diarioReg', a => { c.diario.push(String(a)); });
+    ctx.alert = m => { c.alertas.push(String(m)); };
+    ctx.confirm = m => { c.confirms.push(String(m)); return c.confirmar; };
+    ctx.prompt = (q, d) => { c.perguntas.push([String(q), d]); return c.resposta; };
+    return c;
+  };
+
+  /* ---------- 32a: chegouPeca (confirmar a chegada de peca pre-vendida OU separada pra colecao) ---------- */
+  await bloco32('a', async () => {
+    setg('tela', 'estoque');
+    let c = capturas32();
+    /* peca PRE-VENDIDA (Vendido, ainda sem chegada) */
+    M().push(compra32('a1', { data: '2026-08-01', qtd: 3, valor: 30, situacao: 'Pedido' }));
+    const { peca: pv, venda: vd } = preVenda32('a1', 1, 'Fulano');
+    const vendaAntes = JSON.stringify(vd), valorAntes = pv.valor;
+    let antes = foto32(); c.confirmar = false;
+    A('chegouPeca')(pv.id);
+    t('32a: cancelar o confirm NAO grava nada — nenhum registro muda, sem toast e sem linha no diario (a pergunta foi feita 1 vez)',
+      foto32() === antes && c.toasts.length === 0 && c.diario.length === 0 && c.confirms.length === 1, S32([c.confirms.length, c.toasts, c.diario]));
+    c = capturas32(); c.confirmar = true;
+    const d0 = hoje32();
+    A('chegouPeca')(pv.id);
+    const pvD = M().find(m => m.id === pv.id);
+    t('32a: confirmar a chegada da peca vendida grava dataChegada = hoje',
+      ehHoje32(pvD.dataChegada, d0), 'dataChegada=' + pvD.dataChegada + ' hoje=' + d0);
+    t('32a: e NAO mexe em situacao, valor, datas da venda, vinculo (vendaRef) nem cria registro novo',
+      A('sitDe')(pvD) === 'Vendido' && pvD.valor === valorAntes && pvD.dataSaida === '2026-09-01' && pvD.dataVenda === '2026-09-01' && pvD.vendaRef === vd.id && M().length === 3,
+      S32([A('sitDe')(pvD), pvD.valor, pvD.dataSaida, pvD.vendaRef, M().length]));
+    t('32a: a VENDA lançada continua exatamente como estava (o dinheiro e o lucro ja contavam desde a venda)',
+      JSON.stringify(M().find(m => m.id === vd.id)) === vendaAntes);
+    t('32a: para peca VENDIDA a pergunta fala em "esta venda" (e nunca "esta peça")', /esta venda/.test(c.confirms[0]) && !/esta peça/.test(c.confirms[0]), c.confirms[0]);
+    t('32a: a chegada fica GRAVADA no armazenamento local (save foi chamado) e o toast e o diario dizem que era peca "pré-vendida"',
+      ehHoje32(gravado32(pv.id).dataChegada, d0) && c.toasts.some(x => /Chegada confirmada/.test(x)) && c.diario.length === 1 && /pré-vendida/.test(c.diario[0]) && !/coleção/.test(c.diario[0]),
+      S32([gravado32(pv.id).dataChegada, c.toasts, c.diario]));
+    /* peca separada pra COLECAO (Coleção + origemPedido) */
+    c = capturas32(); c.confirmar = false;
+    M().push(compra32('a2', { data: '2026-08-01', valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true }));
+    antes = foto32();
+    A('chegouPeca')('a2');
+    t('32a: cancelar tambem nao grava nada na peca de colecao', foto32() === antes && c.toasts.length === 0 && c.diario.length === 0 && c.confirms.length === 1);
+    c = capturas32(); c.confirmar = true;
+    const d1 = hoje32();
+    A('chegouPeca')('a2');
+    const a2 = M().find(m => m.id === 'a2');
+    t('32a: para peca de COLECAO a pergunta fala em "esta peça" e NAO contem a palavra "venda"', /esta peça/.test(c.confirms[0]) && !/venda/i.test(c.confirms[0]), c.confirms[0]);
+    t('32a: a peca de colecao ganha dataChegada = hoje e segue Coleção com origemPedido e o mesmo valor (nao muda de destino)',
+      ehHoje32(a2.dataChegada, d1) && A('sitDe')(a2) === 'Coleção' && a2.origemPedido === true && a2.valor === 20, S32(a2));
+    t('32a: o diario fala em peca separada pra "coleção" (nao "pré-vendida") e o toast confirma',
+      c.diario.length === 1 && /coleção/.test(c.diario[0]) && !/pré-vendida/.test(c.diario[0]) && c.toasts.some(x => /Chegada confirmada/.test(x)), S32([c.diario, c.toasts]));
+    /* id que nao existe: nao pergunta nem quebra */
+    c = capturas32(); antes = foto32();
+    A('chegouPeca')('nao-existe');
+    t('32a: id inexistente nao pergunta nada, nao muda nada e nao quebra', c.confirms.length === 0 && foto32() === antes && c.toasts.length === 0);
+  });
+
+  /* ---------- 32b: chegouPedido (a peca do Pedido entra no estoque disponivel) ---------- */
+  await bloco32('b', async () => {
+    setg('tela', 'estoque');
+    let c = capturas32();
+    M().push(compra32('b1', { data: '2026-09-01', qtd: 2, valor: 50, situacao: 'Pedido', origemPedido: true }));
+    t('32b: [antes] o Pedido conta em motor().pedido e ainda nao no estoque disponivel', A('motor')().pedido === 50 && A('motor')().estoque === 0);
+    let antes = foto32(); c.confirmar = false;
+    A('chegouPedido')('b1');
+    t('32b: cancelar o confirm nao muda nada (continua Pedido, com origemPedido, sem dataChegada)', foto32() === antes && c.toasts.length === 0 && c.diario.length === 0 && /pedido chegou/.test(c.confirms[0]), S32(c.confirms));
+    c = capturas32(); c.confirmar = true;
+    const d0 = hoje32();
+    A('chegouPedido')('b1');
+    const b1 = M().find(m => m.id === 'b1');
+    t('32b: confirmar vira Em estoque, destino Vender, dataChegada = hoje', A('sitDe')(b1) === 'Em estoque' && b1.destino === 'Vender' && ehHoje32(b1.dataChegada, d0), S32(b1));
+    t('32b: e o origemPedido some, mesmo a peca tendo vindo com origemPedido:true "de sobra" (o campo nao pode sobreviver a esta confirmacao)',
+      !('origemPedido' in b1), S32(b1));
+    t('32b: valor e quantidade nao mudam; o estoque disponivel de hoje passa a incluir o valor e o Pedido zera',
+      b1.valor === 50 && b1.qtd === 2 && A('motor')().estoque === 50 && A('motor')().pedido === 0, S32([b1.valor, b1.qtd, A('motor')().estoque, A('motor')().pedido]));
+    t('32b: fica gravado no armazenamento local e o toast/diario dizem que chegou',
+      ehHoje32(gravado32('b1').dataChegada, d0) && !('origemPedido' in gravado32('b1')) && c.toasts.some(x => /Chegou/.test(x)) && /chegado/.test(c.diario[0]), S32([gravado32('b1'), c.toasts, c.diario]));
+    /* Pedido sem origemPedido (o caso normal) tambem chega sem quebrar */
+    reset(); c = capturas32();
+    M().push(compra32('b2', { data: '2026-09-01', valor: 8, situacao: 'Pedido' }));
+    A('chegouPedido')('b2');
+    const b2 = M().find(m => m.id === 'b2');
+    t('32b: Pedido comum (sem origemPedido) tambem chega: Em estoque e dataChegada = hoje', A('sitDe')(b2) === 'Em estoque' && ehHoje32(b2.dataChegada, d0) && !('origemPedido' in b2), S32(b2));
+  });
+
+  /* ---------- 32c: separarParaColecao (separar parte de um pedido, antes de chegar, pra colecao) ---------- */
+  await bloco32('c', async () => {
+    setg('tela', 'estoque');
+    let c = capturas32();
+    M().push(compra32('c1', { data: '2026-09-01', qtd: 5, valor: 100.03, situacao: 'Pedido' }));
+    const inicio = foto32();
+    /* entradas invalidas: nada muda, avisa "Quantidade inválida." */
+    ['0', '-3', 'abc', '', '0.4'].forEach(ent => {
+      c = capturas32(); c.resposta = ent;
+      A('separarParaColecao')('c1');
+      t('32c: entrada invalida ' + JSON.stringify(ent) + ' nao muda nada e avisa "Quantidade inválida."',
+        foto32() === inicio && S32(c.alertas) === S32(['Quantidade inválida.']) && c.toasts.length === 0 && c.diario.length === 0, S32([c.alertas, c.toasts]));
+    });
+    /* cancelar (prompt devolve null) */
+    c = capturas32(); c.resposta = null;
+    A('separarParaColecao')('c1');
+    t('32c: cancelar o prompt (null) nao muda nada e nao avisa nada', foto32() === inicio && c.alertas.length === 0 && c.toasts.length === 0);
+    t('32c: a pergunta mostra quantas unidades o pedido tem ("de 5") e sugere 1', /de 5/.test(c.perguntas[0][0]) && c.perguntas[0][1] === '1', S32(c.perguntas));
+    /* 2 de 5: fraciona */
+    c = capturas32(); c.resposta = '2';
+    A('separarParaColecao')('c1');
+    const pai = M().find(m => m.id === 'c1'), fil = M().find(m => m.loteOrigem === 'c1');
+    t('32c: "2" de 5 cria UM registro novo (o filho) e mantem o pai', M().length === 2 && !!fil, S32(M().map(m => m.id)));
+    t('32c: o pai fica com 3 un., continua Pedido e SEM origemPedido (o resto do pedido nao "chegou" nem virou colecao)',
+      pai.qtd === 3 && A('sitDe')(pai) === 'Pedido' && !('origemPedido' in pai), S32(pai));
+    t('32c: o filho tem 2 un., situacao Coleção, destino Coleção, origemPedido:true e aponta pro pai (loteOrigem)',
+      fil.qtd === 2 && A('sitDe')(fil) === 'Coleção' && fil.destino === 'Coleção' && fil.origemPedido === true && fil.loteOrigem === 'c1', S32(fil));
+    t('32c: o filho nasce com destIni "Coleção" (nunca foi estoque de revenda; sem isto, vendido depois, viraria fantasma na curva de estoque)',
+      fil.destIni === 'Coleção', 'destIni=' + fil.destIni);
+    t('32c: conservacao exata — valor do pai + valor do filho = valor original (centavo por centavo)',
+      Math.round((pai.valor + fil.valor) * 100) === Math.round(100.03 * 100), S32([pai.valor, fil.valor]));
+    t('32c: o filho sai da expectativa de estoque: Pedido so com o pai, Coleção so com o filho, estoque zerado',
+      A('motor')().pedido === pai.valor && A('motor')().colCusto === fil.valor && A('motor')().estoque === 0, S32(A('motor')()).slice(0, 200));
+    t('32c: fica gravado, o toast diz que foi separado e o diario registra que separou pra "coleção"',
+      gravado32(fil.id).origemPedido === true && c.toasts.some(x => /^Separado pra coleção/.test(x)) && /coleção/.test(c.diario[0]), S32([c.toasts, c.diario]));
+    /* 99 de 3: limita ao disponivel e o PROPRIO registro muda no lugar */
+    reset(); c = capturas32(); c.resposta = '99';
+    M().push(compra32('c2', { data: '2026-09-01', qtd: 3, valor: 45, situacao: 'Pedido' }));
+    A('separarParaColecao')('c2');
+    const c2 = M().find(m => m.id === 'c2');
+    t('32c: "99" de 3 limita a 3 e o PROPRIO registro vira Coleção no lugar — mesmo id, nenhum registro novo',
+      M().length === 1 && A('sitDe')(c2) === 'Coleção' && c2.destino === 'Coleção' && c2.qtd === 3 && c2.valor === 45, S32(M()));
+    t('32c: o registro que virou Coleção no lugar leva origemPedido:true e destIni "Coleção" (o G3: baixarLote grava "Em estoque" e isso tem de ser corrigido tambem neste caminho)',
+      c2.origemPedido === true && c2.destIni === 'Coleção', S32(c2));
+  });
+
+  /* ---------- 32d: pedidosAgrupados (a lista "Pedidos a caminho": remanescente, pre-venda, coleção) ---------- */
+  await bloco32('d', async () => {
+    setg('tela', 'estoque');
+    const c = capturas32();
+    const gruposDe = () => A('pedidosAgrupados')();
+    const resumo = () => S32(gruposDe().map(x => ({ raiz: x.raiz && x.raiz.id, rem: x.remanescentes.map(m => m.id), pecas: x.pecas.map(p => [p.peca.id, p.venda ? p.venda.contraparte : null]), col: x.colecao.map(m => m.id) })));
+    /* (a) um Pedido */
+    M().push(compra32('d1', { qtd: 2, valor: 20, situacao: 'Pedido' }));
+    let gs = gruposDe();
+    t('32d: um Pedido solto vira 1 grupo com 1 remanescente (a raiz e ele mesmo), sem peca vendida e sem peca de colecao',
+      gs.length === 1 && gs[0].raiz.id === 'd1' && gs[0].remanescentes.length === 1 && gs[0].pecas.length === 0 && gs[0].colecao.length === 0, resumo());
+    /* (b) pre-venda */
+    reset();
+    M().push(compra32('d2', { qtd: 2, valor: 20, situacao: 'Pedido' }));
+    const pv = preVenda32('d2', 1, 'Fulano');
+    gs = gruposDe();
+    t('32d: pre-venda de 1 de 2 — o grupo tem o pai em remanescentes e o filho em pecas, com o comprador da venda ("Fulano")',
+      gs.length === 1 && gs[0].remanescentes.length === 1 && gs[0].remanescentes[0].id === 'd2' && gs[0].pecas.length === 1 && gs[0].pecas[0].peca.id === pv.peca.id && gs[0].pecas[0].venda.contraparte === 'Fulano', resumo());
+    A('chegouPeca')(pv.peca.id);
+    gs = gruposDe();
+    t('32d: depois de chegouPeca do filho vendido ele SAI da lista de pecas, e o remanescente continua la',
+      gs.length === 1 && gs[0].pecas.length === 0 && gs[0].remanescentes.length === 1, resumo());
+    /* (c) G1 — pedido INTEIRO separado pra colecao */
+    reset();
+    M().push(compra32('d3', { qtd: 3, valor: 45, situacao: 'Pedido' }));
+    c.resposta = '3'; A('separarParaColecao')('d3');
+    gs = gruposDe();
+    t('32d: [G1] separar o pedido INTEIRO pra colecao: o grupo NAO some — 0 remanescentes e a peca aparece em colecao',
+      gs.length === 1 && gs[0].remanescentes.length === 0 && gs[0].colecao.length === 1 && gs[0].colecao[0].id === 'd3' && gs[0].pecas.length === 0, resumo());
+    /* (d) G2 — pedido de 2: pre-venda de 1 + o resto pra colecao; confirmar a chegada do vendido NAO derruba a peca de colecao */
+    reset();
+    M().push(compra32('d4', { qtd: 2, valor: 20, situacao: 'Pedido' }));
+    const pv4 = preVenda32('d4', 1, 'Beltrano');
+    c.resposta = '1'; A('separarParaColecao')('d4');   /* o resto (1 un.) e' o proprio d4: vira Coleção no lugar */
+    gs = gruposDe();
+    t('32d: [G2] antes de confirmar: o grupo lista a peca vendida (pecas) E a de colecao (colecao), sem remanescentes',
+      gs.length === 1 && gs[0].remanescentes.length === 0 && gs[0].pecas.length === 1 && gs[0].colecao.length === 1 && gs[0].colecao[0].id === 'd4', resumo());
+    A('chegouPeca')(pv4.peca.id);
+    gs = gruposDe();
+    t('32d: [G2] confirmar a chegada do filho vendido: a peca de colecao CONTINUA em colecao (ela ainda nao chegou) — antes da correcao sumia junto',
+      gs.length === 1 && gs[0].pecas.length === 0 && gs[0].colecao.length === 1 && gs[0].colecao[0].id === 'd4', resumo());
+    /* (e) M2 — dois 'Pedido' na mesma raiz */
+    reset();
+    M().push(compra32('d5', { qtd: 4, valor: 40, situacao: 'Pedido' }));
+    A('baixarLote')('d5', 2, 'Pedido');   /* fracionamento normal: um segundo registro 'Pedido' com loteOrigem = d5 */
+    gs = gruposDe();
+    t('32d: [M2] dois registros Pedido na mesma raiz ficam num grupo so, com remanescentes.length === 2 (e nao um sobrescrevendo o outro)',
+      M().length === 2 && gs.length === 1 && gs[0].raiz.id === 'd5' && gs[0].remanescentes.length === 2, resumo());
+    /* raizes diferentes = grupos diferentes */
+    M().push(compra32('d5b', { qtd: 1, valor: 9, situacao: 'Pedido' }));
+    t('32d: pedidos de raizes diferentes formam grupos diferentes', gruposDe().length === 2, resumo());
+    /* (f) M3 — vinculo quebrado */
+    reset();
+    M().push(compra32('d6', { valor: 12, situacao: 'Vendido', dataSaida: '2026-02-10' }));
+    gs = gruposDe();
+    t('32d: [M3] compra Vendido SEM dataChegada e SEM nenhuma venda achavel aparece em pecas, com venda vazia (lado seguro: tratada como pre-venda ainda nao confirmada)',
+      gs.length === 1 && gs[0].pecas.length === 1 && gs[0].pecas[0].peca.id === 'd6' && gs[0].pecas[0].venda == null, resumo());
+    M().find(m => m.id === 'd6').vendaRef = 'nao-existe';
+    gs = gruposDe();
+    t('32d: [M3] o mesmo com vendaRef apontando pra uma venda que nao existe mais (vinculo quebrado por sync/exclusao)',
+      gs.length === 1 && gs[0].pecas.length === 1 && gs[0].pecas[0].venda == null, resumo());
+    M().find(m => m.id === 'd6').dataChegada = '2026-02-05';
+    t('32d: [M3] com dataChegada preenchida a mesma compra NAO aparece mais (ja chegou)', gruposDe().length === 0, resumo());
+    /* venda NORMAL (nao de pedido) sem dataChegada nao e "aguardando chegada" */
+    reset();
+    M().push(compra32('d7', { valor: 30, qtd: 3, situacao: 'Em estoque' }));
+    const normal = A('baixarLote')('d7', 1, 'Vendido', { dataVenda: '2026-02-10', dataSaida: '2026-02-10' });
+    M().push({ id: 'd7v', tipo: 'VENDA', data: '2026-02-10', valor: 20, origemId: 'd7', vendaDe: 'estoque', contraparte: 'Cli', qtd: 1 });
+    normal.vendaRef = 'd7v';
+    t('32d: venda NORMAL (de estoque) sem dataChegada nao aparece como "aguardando chegada"', gruposDe().length === 0, resumo());
+    /* (g) coleção SEM origemPedido (veio de CONSUMO) nunca aparece */
+    reset();
+    M().push(compra32('d8', { valor: 30, qtd: 3, situacao: 'Em estoque' }));
+    const consumo = A('baixarLote')('d8', 1, 'Coleção', { dataSaida: '2026-03-05' });
+    t('32d: peca de Coleção SEM origemPedido (veio do estoque por CONSUMO) nunca aparece em Pedidos a caminho',
+      A('sitDe')(consumo) === 'Coleção' && !('origemPedido' in consumo) && gruposDe().length === 0, resumo());
+    /* (h) coleção com origemPedido mas ja com dataChegada */
+    reset();
+    M().push(compra32('d9', { valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true }));
+    t('32d: peca de Coleção com origemPedido e SEM dataChegada aparece em colecao', gruposDe().length === 1 && gruposDe()[0].colecao.length === 1, resumo());
+    M().find(m => m.id === 'd9').dataChegada = '2026-09-10';
+    t('32d: com origemPedido mas JA com dataChegada ela NAO aparece mais', gruposDe().length === 0, resumo());
+    /* a venda de uma peca e achada pelo VINCULO (origemId / vendaRef), nunca pela primeira VENDA que aparecer no array */
+    reset();
+    M().push({ id: 'vx0', tipo: 'VENDA', data: '2026-01-02', valor: 5, origemId: 'zzz', vendaDe: 'estoque', contraparte: 'Outro', qtd: 1 });   /* venda alheia, ANTES no array */
+    M().push(compra32('d12', { qtd: 2, valor: 20, situacao: 'Pedido' }));
+    preVenda32('d12', 1, 'Fulano');
+    gs = gruposDe();
+    t('32d: com uma VENDA alheia antes no array a pre-venda continua ligada a SUA venda: fica em pecas com o comprador "Fulano" (nunca herda a primeira VENDA que aparece)',
+      gs.length === 1 && gs[0].pecas.length === 1 && !!gs[0].pecas[0].venda && gs[0].pecas[0].venda.contraparte === 'Fulano', resumo());
+    /* separar so PARTE do pedido: o filho de colecao fica no grupo do pai (mesma raiz), nao num grupo a parte */
+    reset();
+    M().push(compra32('d13', { qtd: 5, valor: 50, situacao: 'Pedido' }));
+    c.resposta = '2'; A('separarParaColecao')('d13');
+    gs = gruposDe();
+    t('32d: separar 2 de 5 pra colecao: o filho de colecao entra no MESMO grupo do pai (mesma raiz), 1 grupo so — remanescente d13 e colecao com loteOrigem d13',
+      gs.length === 1 && gs[0].raiz.id === 'd13' && gs[0].remanescentes.length === 1 && gs[0].colecao.length === 1 && gs[0].colecao[0].loteOrigem === 'd13', resumo());
+    /* [ponta a ponta] o SINAL da pre-venda nasce em salvar(): vender pelo FORMULARIO um item que esta Pedido grava vendaDe:'pedido' na venda e o
+       vendaRef no pedaco. Os fixtures acima montam esse sinal na mao; se salvar() deixar de grava-lo a lista e as curvas morrem caladas — so este
+       teste ve. Depois segue o caminho do usuario: aparece na lista com o comprador, "chegou" tira da lista e a curva registra o dia. */
+    reset(); c.confirms.length = 0; c.confirmar = true;
+    M().push(compra32('d10', { data: '2026-08-01', qtd: 2, valor: 20, situacao: 'Pedido' }));
+    setg('tipoSel', 'VENDA'); setg('vendaDe', 'estoque'); setg('vendaUn', 'un'); setg('canal', 'Pix'); setg('editId', null); setg('_preSel', null); setg('pgTipo', 'À vista'); setg('_fotosPend', []);
+    setg('_db', null); setg('_syncReady', false); setg('_restaurando', false); setg('excluidos', {}); setg('_baseH', {});
+    Object.keys(campos32).forEach(k => delete campos32[k]);
+    Object.assign(campos32, { f_val: '50', f_data: '2026-09-02', f_qtd: '1', f_cp: 'Fulano', f_origem: 'd10', f_conta: '' });
+    ctx.document.getElementById = elCampo32;
+    A('salvar')();
+    const vSalva = M().find(m => m.tipo === 'VENDA'), pSalva = M().find(m => m.loteOrigem === 'd10');
+    t('32d: [ponta a ponta] vender pelo formulario um item Pedido pergunta (item "PEDIDO") e grava a venda com vendaDe:"pedido", origemId do pai e o comprador',
+      !!vSalva && vSalva.vendaDe === 'pedido' && vSalva.origemId === 'd10' && vSalva.contraparte === 'Fulano' && vSalva.qtd === 1 && c.confirms.some(x => /PEDIDO/.test(x)), S32([vSalva, c.confirms.map(x => x.slice(0, 40))]));
+    t('32d: [ponta a ponta] e o pedaco vendido nasce Vendido, com vendaRef apontando pra venda, dataSaida e SEM dataChegada',
+      !!pSalva && A('sitDe')(pSalva) === 'Vendido' && pSalva.vendaRef === (vSalva || {}).id && pSalva.dataSaida === '2026-09-02' && !pSalva.dataChegada, S32(pSalva));
+    gs = gruposDe();
+    t('32d: [ponta a ponta] a lista de Pedidos a caminho mostra o pai como remanescente e o pedaco vendido com o nome do comprador ("Fulano")',
+      gs.length === 1 && gs[0].remanescentes.length === 1 && gs[0].remanescentes[0].id === 'd10' && gs[0].pecas.length === 1 && !!pSalva && gs[0].pecas[0].peca.id === pSalva.id && gs[0].pecas[0].venda && gs[0].pecas[0].venda.contraparte === 'Fulano', resumo());
+    const sVenda = A('serieEstoque')();
+    t('32d: [ponta a ponta] e a curva de estoque trata a venda como pre-venda NAO confirmada (nada entra, nada vira semData)', sVenda.length === 0 && sVenda.semData === 0, S32([sVenda, sVenda.semData]));
+    const dHoje = hoje32();
+    A('chegouPeca')(pSalva.id);
+    const sChegou = A('serieEstoque')();
+    t('32d: [ponta a ponta] confirmar a chegada tira a peca da lista e a curva registra entrada e saida no dia da chegada (ponto de hoje, total 0)',
+      gruposDe()[0].pecas.length === 0 && sChegou.length === 1 && ehHoje32(sChegou[0].data, dHoje) && sChegou[0].total === 0, S32([resumo(), sChegou]));
+  });
+
+  /* ---------- 32e: serieEstoque (curva cumulativa do estoque a custo) ---------- */
+  await bloco32('e', async () => {
+    const s0 = A('serieEstoque')();
+    t('32e: sem lancamentos a curva e um array vazio, com semData e semDataValor zerados',
+      Array.isArray(s0) && s0.length === 0 && s0.semData === 0 && s0.semDataValor === 0, S32([s0.length, s0.semData, s0.semDataValor]));
+    /* cenario misto: Em estoque, Pedido, Coleção, Vendido normal, pre-venda nao confirmada, pre-venda confirmada */
+    M().push(compra32('e1', { data: '2026-01-10', valor: 100 }));
+    M().push(compra32('e2', { data: '2026-01-20', dataChegada: '2026-02-05', valor: 50 }));
+    M().push(compra32('e3', { data: '2026-01-25', valor: 70, situacao: 'Pedido' }));
+    M().push(compra32('e4', { data: '2026-01-15', valor: 30, situacao: 'Coleção', destino: 'Coleção' }));
+    M().push(compra32('e5', { data: '2026-01-12', valor: 40, situacao: 'Vendido', dataSaida: '2026-03-01' }));
+    M().push({ id: 'e5v', tipo: 'VENDA', data: '2026-03-01', valor: 80, origemId: 'e5', vendaDe: 'estoque', contraparte: 'Cli', qtd: 1 });
+    M().push(compra32('e6', { data: '2026-03-15', valor: 60, qtd: 2, situacao: 'Pedido' }));
+    preVenda32('e6', 1, 'Fulano', { dataSaida: '2026-03-20', dataVenda: '2026-03-20' });               /* pre-venda NAO confirmada */
+    M().push(compra32('e7', { data: '2026-03-16', valor: 60, qtd: 2, situacao: 'Pedido' }));
+    const pv2 = preVenda32('e7', 1, 'Beltrano', { dataSaida: '2026-03-25', dataVenda: '2026-03-25' });
+    pv2.peca.dataChegada = '2026-04-02';                                                                /* pre-venda CONFIRMADA em 02/04 */
+    const sm = A('serieEstoque')();
+    t('32e: cenario misto — a curva inteira: entradas na data de chegada (ou da compra), baixa normal sai em dataSaida, Pedido/Coleção/pre-venda nao confirmada ficam de fora',
+      S32(sm) === S32([{ data: '2026-01-10', total: 100 }, { data: '2026-01-12', total: 140 }, { data: '2026-02-05', total: 190 }, { data: '2026-03-01', total: 150 }, { data: '2026-04-02', total: 150 }]), S32(sm));
+    t('32e: o ponto final da curva e IGUAL a motor().estoque (a curva termina no numero do card "Estoque disponivel hoje")',
+      Math.abs(ultimo32(sm) - A('motor')().estoque) < 0.005, S32([ultimo32(sm), A('motor')().estoque]));
+    t('32e: pre-venda NAO confirmada nao entra: nenhum ponto na data da compra (15/03) nem na da venda (20/03) dela',
+      !pt32(sm, '2026-03-15') && !pt32(sm, '2026-03-20'), S32(sm.map(p => p.data)));
+    t('32e: pre-venda CONFIRMADA gera entrada e saida no MESMO dia da chegada (02/04): existe o ponto, o total la nao muda (150 = 150) e NADA aparece na data da venda (25/03)',
+      !!pt32(sm, '2026-04-02') && pt32(sm, '2026-04-02').total === pt32(sm, '2026-03-01').total && !pt32(sm, '2026-03-25'), S32(sm));
+    t('32e: nada disso gera aviso — semData e semDataValor zerados', sm.semData === 0 && sm.semDataValor === 0);
+    /* baixa normal: Vendido / Trocado / Aberto entram em dataChegada||data e saem em dataSaida */
+    ['Vendido', 'Trocado', 'Aberto'].forEach(sit => {
+      const monta = extra => {
+        reset();
+        M().push(compra32('eb', Object.assign({ data: '2026-01-12', valor: 40, situacao: sit }, extra)));
+        if (sit === 'Vendido') M().push({ id: 'ebv', tipo: 'VENDA', data: '2026-03-01', valor: 80, origemId: 'eb', vendaDe: 'estoque', contraparte: 'Cli', qtd: 1 });
+        return A('serieEstoque')();
+      };
+      let s = monta({ dataSaida: '2026-03-01' });
+      t('32e: ' + sit + ' com dataSaida entra na data da compra (12/01) e sai em dataSaida (01/03)',
+        S32(s) === S32([{ data: '2026-01-12', total: 40 }, { data: '2026-03-01', total: 0 }]) && s.semData === 0, S32(s));
+      s = monta({ dataSaida: '2026-03-01', dataChegada: '2026-01-20' });
+      t('32e: ' + sit + ' com dataChegada entra na dataChegada (20/01), nao na data da compra',
+        S32(s) === S32([{ data: '2026-01-20', total: 40 }, { data: '2026-03-01', total: 0 }]), S32(s));
+      s = monta({});
+      t('32e: ' + sit + ' SEM dataSaida fica fora da curva (nem entrada nem saida) e conta em semData/semDataValor',
+        s.length === 0 && s.semData === 1 && s.semDataValor === 40, S32([s, s.semData, s.semDataValor]));
+      /* clamp cronologico: data DEPOIS da saida nunca da total negativo */
+      s = monta({ data: '2026-05-10', dataSaida: '2026-05-01' });
+      t('32e: ' + sit + ' com a data da compra DEPOIS da dataSaida: a entrada e puxada pra dataSaida e o total nunca fica negativo',
+        S32(s) === S32([{ data: '2026-05-01', total: 0 }]) && s.every(p => p.total >= 0), S32(s));
+      s = monta({ data: '2026-01-01', dataChegada: '2026-05-12', dataSaida: '2026-05-01' });
+      t('32e: ' + sit + ' com a dataChegada DEPOIS da dataSaida: mesmo clamp (a saida nunca desenha antes da entrada)',
+        S32(s) === S32([{ data: '2026-05-01', total: 0 }]) && s.every(p => p.total >= 0), S32(s));
+    });
+    /* nasceu pra colecao e foi vendido/trocado: nunca foi estoque de revenda */
+    ['Vendido', 'Trocado', 'Aberto'].forEach(sit => {
+      reset();
+      M().push(compra32('ec', { data: '2026-01-12', valor: 40, situacao: sit, destIni: 'Coleção', dataSaida: '2026-03-01' }));
+      if (sit === 'Vendido') M().push({ id: 'ecv', tipo: 'VENDA', data: '2026-03-01', valor: 80, origemId: 'ec', vendaDe: 'colecao', contraparte: 'Cli', qtd: 1 });
+      let s = A('serieEstoque')();
+      t('32e: ' + sit + ' com destIni "Coleção" (nasceu pra colecao) e IGNORADO pela curva de estoque', s.length === 0 && s.semData === 0, S32([s, s.semData]));
+      M().find(m => m.id === 'ec').dataSaida = undefined;
+      s = A('serieEstoque')();
+      t('32e: ' + sit + ' com destIni "Coleção" e SEM dataSaida tambem nao vira aviso de semData (ignorado antes de contar)', s.length === 0 && s.semData === 0, S32([s, s.semData]));
+    });
+    /* espelho: a curva e a lista "Pedidos a caminho" usam o MESMO sinal de "ainda nao chegou" */
+    const espelho = (rot, monta, listadoEsperado, serieEsperada) => {
+      reset(); monta();
+      const listado = A('pedidosAgrupados')().some(x => x.pecas.length > 0);
+      const s = A('serieEstoque')();
+      const fora = s.length === 0 && s.semData === 0;
+      t('32e: [espelho] ' + rot + ' — a lista diz "' + (listado ? 'aguardando chegada' : 'ja chegou / venda normal') + '" e a curva concorda (' + (fora ? 'fora' : 'dentro') + ')',
+        listado === listadoEsperado && fora === listadoEsperado && (!serieEsperada || S32(s) === S32(serieEsperada)), S32([listado, fora, s]));
+    };
+    const dentro = [{ data: '2026-02-01', total: 10 }, { data: '2026-02-10', total: 0 }];
+    espelho('pre-venda nao confirmada', () => { M().push(compra32('m1', { qtd: 2, valor: 20, situacao: 'Pedido' })); preVenda32('m1', 1, 'F', { dataSaida: '2026-02-10', dataVenda: '2026-02-10' }); }, true);
+    espelho('vinculo quebrado SEM dataChegada', () => { M().push(compra32('m2', { data: '2026-02-01', valor: 10, situacao: 'Vendido', dataSaida: '2026-02-10', vendaRef: 'nao-existe' })); }, true);
+    espelho('vinculo quebrado COM dataChegada', () => { M().push(compra32('m3', { data: '2026-02-01', valor: 10, situacao: 'Vendido', dataSaida: '2026-02-10', vendaRef: 'nao-existe', dataChegada: '2026-02-01' })); }, false, dentro);
+    espelho('venda normal sem dataChegada', () => { M().push(compra32('m4', { data: '2026-02-01', valor: 10, situacao: 'Vendido', dataSaida: '2026-02-10' })); M().push({ id: 'm4v', tipo: 'VENDA', data: '2026-02-10', valor: 20, origemId: 'm4', vendaDe: 'estoque', contraparte: 'C', qtd: 1 }); }, false, dentro);
+  });
+
+  /* ---------- 32f: serieColecao (curva cumulativa do custo em colecao) ---------- */
+  await bloco32('f', async () => {
+    setg('tela', 'estoque');
+    const c = capturas32();
+    const s0 = A('serieColecao')();
+    t('32f: sem lancamentos a curva e um array vazio com semData, semDataValor, semChegada e semChegadaValor zerados',
+      Array.isArray(s0) && s0.length === 0 && s0.semData === 0 && s0.semDataValor === 0 && s0.semChegada === 0 && s0.semChegadaValor === 0);
+    /* cenario SEM peca pendente: coleção direta, CONSUMO, saiu da colecao, separada de pedido e ja confirmada */
+    M().push(compra32('k1', { data: '2026-02-01', valor: 25, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção' }));
+    M().push(compra32('k2', { data: '2026-01-10', dataChegada: '2026-01-20', valor: 60, qtd: 3, situacao: 'Em estoque' }));
+    const k2f = A('baixarLote')('k2', 1, 'Coleção', { dataSaida: '2026-03-05' });               /* CONSUMO: 1 un. do estoque foi pra colecao em 05/03 */
+    M().push(compra32('k3', { data: '2026-01-05', valor: 15, situacao: 'Vendido', destIni: 'Coleção', dataSaida: '2026-04-01' }));
+    M().push(compra32('k4', { data: '2026-01-25', dataChegada: '2026-02-20', valor: 35, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true }));
+    const sk = A('serieColecao')();
+    t('32f: cenario sem peca pendente — a curva inteira: entrada na data (ou na dataChegada da peca separada de pedido), saida em dataSaida',
+      S32(sk) === S32([{ data: '2026-01-05', total: 15 }, { data: '2026-02-01', total: 40 }, { data: '2026-02-20', total: 75 }, { data: '2026-03-05', total: 95 }, { data: '2026-04-01', total: 80 }]), S32(sk));
+    t('32f: o ponto final da curva e IGUAL a motor().colCusto (o card "Na coleção")', Math.abs(ultimo32(sk) - A('motor')().colCusto) < 0.005 && A('motor')().colCusto === 80, S32([ultimo32(sk), A('motor')().colCusto]));
+    t('32f: sem pendencia nenhuma os quatro contadores ficam zerados', sk.semData === 0 && sk.semChegada === 0 && sk.semChegadaValor === 0 && sk.semDataValor === 0);
+    t('32f: peca que veio do estoque por CONSUMO (sem origemPedido) entra na data da MIGRACAO (dataSaida 05/03), NAO na dataChegada antiga (20/01) que herdou do lote',
+      k2f.dataChegada === '2026-01-20' && !('origemPedido' in k2f) && !!pt32(sk, '2026-03-05') && pt32(sk, '2026-03-05').total - pt32(sk, '2026-02-20').total === 20 && !pt32(sk, '2026-01-20'), S32([k2f.dataChegada, sk]));
+    /* peca separada de pedido e ainda nao confirmada */
+    M().push(compra32('k5', { data: '2026-01-26', valor: 12, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true }));
+    const sp = A('serieColecao')();
+    t('32f: Coleção com origemPedido e SEM dataChegada fica FORA da curva e conta em semChegada/semChegadaValor',
+      S32(sp) === S32(sk) && sp.semChegada === 1 && sp.semChegadaValor === 12, S32([sp.semChegada, sp.semChegadaValor, sp]));
+    t('32f: a divergencia com o card fica VISIVEL e exata: motor().colCusto - fim da curva = semChegadaValor (92 - 80 = 12)',
+      Math.abs((A('motor')().colCusto - ultimo32(sp)) - sp.semChegadaValor) < 0.005 && A('motor')().colCusto === 92, S32([A('motor')().colCusto, ultimo32(sp), sp.semChegadaValor]));
+    const d0 = hoje32();
+    c.confirmar = true; A('chegouPeca')('k5');
+    const sc = A('serieColecao')();
+    t('32f: depois de chegouPeca a peca entra na curva com data = dataChegada (hoje) e o aviso some — o fim da curva volta a ser motor().colCusto',
+      sc.semChegada === 0 && sc.semChegadaValor === 0 && ehHoje32(sc[sc.length - 1].data, d0) && sc[sc.length - 1].total === 92 && Math.abs(ultimo32(sc) - A('motor')().colCusto) < 0.005, S32(sc));
+    /* Pedido com destIni "Coleção" residual */
+    reset();
+    M().push(compra32('k6', { data: '2026-02-01', valor: 9, situacao: 'Pedido', destIni: 'Coleção' }));
+    let s = A('serieColecao')();
+    t('32f: peca Pedido com destIni "Coleção" residual (mudarSit cicla por Pedido sem limpar) e IGNORADA: nem saida nem semData',
+      s.length === 0 && s.semData === 0 && s.semChegada === 0, S32([s, s.semData, s.semChegada]));
+    M().find(m => m.id === 'k6').dataSaida = '2026-03-01';
+    s = A('serieColecao')();
+    t('32f: e ignorada mesmo se tiver dataSaida de uma vida anterior (nao vira entrada+saida fantasma)', s.length === 0 && s.semData === 0, S32(s));
+    /* saida da colecao */
+    reset();
+    M().push(compra32('k7', { data: '2026-01-05', valor: 15, situacao: 'Vendido', destIni: 'Coleção', dataSaida: '2026-04-01' }));
+    s = A('serieColecao')();
+    t('32f: saida da colecao (destIni "Coleção", hoje Vendido com dataSaida) gera entrada em data (05/01) e saida em dataSaida (01/04)',
+      S32(s) === S32([{ data: '2026-01-05', total: 15 }, { data: '2026-04-01', total: 0 }]) && s.semData === 0, S32(s));
+    M().find(m => m.id === 'k7').dataSaida = undefined;
+    s = A('serieColecao')();
+    t('32f: saida da colecao SEM dataSaida fica fora da curva e conta em semData/semDataValor',
+      s.length === 0 && s.semData === 1 && s.semDataValor === 15, S32([s, s.semData, s.semDataValor]));
+    /* clamp cronologico */
+    reset();
+    M().push(compra32('k8', { data: '2026-05-10', valor: 40, situacao: 'Vendido', destIni: 'Coleção', dataSaida: '2026-05-01' }));
+    s = A('serieColecao')();
+    t('32f: data DEPOIS da dataSaida: a entrada e puxada pra dataSaida e o total nunca fica negativo (mesmo clamp do estoque)',
+      S32(s) === S32([{ data: '2026-05-01', total: 0 }]) && s.every(p => p.total >= 0), S32(s));
+    /* peca separada de pedido que depois SAIU da colecao: dataChegada so vale se nao vier depois da saida */
+    reset();
+    M().push(compra32('k9', { data: '2026-01-01', dataChegada: '2026-03-10', valor: 30, situacao: 'Vendido', destIni: 'Coleção', origemPedido: true, dataSaida: '2026-04-01' }));
+    s = A('serieColecao')();
+    t('32f: peca de origemPedido que saiu da colecao entra na dataChegada (10/03) quando ela nao e depois da saida',
+      S32(s) === S32([{ data: '2026-03-10', total: 30 }, { data: '2026-04-01', total: 0 }]), S32(s));
+    M().find(m => m.id === 'k9').dataChegada = '2026-04-01';
+    s = A('serieColecao')();
+    t('32f: peca de origemPedido que chegou e saiu no MESMO dia (dataChegada = dataSaida, 01/04): a chegada vale — entra e sai naquele dia (o unico ponto) e nao volta pra data da compra',
+      S32(s) === S32([{ data: '2026-04-01', total: 0 }]), S32(s));
+    M().find(m => m.id === 'k9').dataChegada = '2026-05-01';
+    s = A('serieColecao')();
+    t('32f: se a dataChegada vier DEPOIS da saida, prevalece a data da compra (01/01) — nunca uma chegada posterior a propria saida',
+      S32(s) === S32([{ data: '2026-01-01', total: 30 }, { data: '2026-04-01', total: 0 }]) && s.every(p => p.total >= 0), S32(s));
+  });
+
+  /* ---------- 32g: serieDinheiro (curva cumulativa do caixa, convencao emissao) ---------- */
+  await bloco32('g', async () => {
+    const s0 = A('serieDinheiro')();
+    t('32g: sem lancamentos a curva e um array vazio com semPagar e semPagarValor zerados', Array.isArray(s0) && s0.length === 0 && s0.semPagar === 0 && s0.semPagarValor === 0);
+    /* regras basicas */
+    M().push(compra32('g1', { data: '2026-01-05', valor: 100 }));
+    M().push({ id: 'g2', tipo: 'VENDA', data: '2026-01-10', valor: 200, taxa: 10, contraparte: 'Cli', qtd: 1, canal: 'App', recDias: 14 });
+    M().push({ id: 'g3', tipo: 'DESPESA', data: '2026-01-12', valor: 30, status: 'pago', natureza: 'ordinaria', cat: 'Frete' });
+    M().push({ id: 'g4', tipo: 'DESPESA', data: '2026-01-14', valor: 77, status: 'apagar', natureza: 'ordinaria', cat: 'Frete' });
+    M().push({ id: 'g5', tipo: 'DESPESA', data: '2026-01-15', dataPagamento: '2026-01-20', valor: 20, status: 'pago', natureza: 'ordinaria', cat: 'Frete' });
+    M().push(compra32('g6', { data: '2026-01-20', valor: 500, origem: 'TROCA' }));
+    let s = A('serieDinheiro')();
+    t('32g: compra a vista sai na propria data (-100 em 05/01), venda entra LIQUIDA da taxa na data (+180 em 10/01), despesa so se paga (na dataPagamento quando houver), despesa "a pagar" e compra de TROCA ficam de fora',
+      S32(s) === S32([{ data: '2026-01-05', total: -100 }, { data: '2026-01-10', total: 80 }, { data: '2026-01-12', total: 50 }, { data: '2026-01-20', total: 30 }]) && s.semPagar === 0, S32(s));
+    /* compra parcelada SOLO */
+    reset();
+    M().push(compra32('gs', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-05' }));
+    s = A('serieDinheiro')();
+    t('32g: compra parcelada SOLO sem pagamentos nao entra na curva e conta semPagar === nParc (3) e semPagarValor === valor (300)',
+      s.length === 0 && s.semPagar === 3 && s.semPagarValor === 300, S32([s, s.semPagar, s.semPagarValor]));
+    M().find(m => m.id === 'gs').pgParcelas = { 1: { d: '2026-02-01', v: 100 } };
+    s = A('serieDinheiro')();
+    t('32g: com a parcela 1 paga ({d:"2026-02-01", v:100}) sai 100 em 01/02 e semPagar cai pra 2 (200)',
+      S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2 && s.semPagarValor === 200, S32([s, s.semPagar, s.semPagarValor]));
+    M().find(m => m.id === 'gs').pgParcelas = { 1: '2026-02-01' };
+    s = A('serieDinheiro')();
+    t('32g: formato LEGADO da parcela paga (so a data, string) tambem conta, pelo valor da parcela (300/3 = 100)',
+      S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2, S32([s, s.semPagar]));
+    /* pedacos fracionados com plano PROPRIO */
+    reset();
+    M().push(compra32('gp', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-05' }));
+    const gpf = A('baixarLote')('gp', 1, 'Coleção', { dataSaida: '2026-03-01' });      /* pai 200 (2 un.), filho 100 (1 un.) */
+    const gpp = M().find(m => m.id === 'gp');
+    gpp.pgParcelas = { 1: { d: '2026-02-01', v: 66.67 } };
+    gpf.pgParcelas = { 1: { d: '2026-02-01', v: 33.33 } };
+    s = A('serieDinheiro')();
+    t('32g: dois pedacos fracionados com objetos pgParcelas DISTINTOS (cada um com a parcela 1 paga) contam OS DOIS: -100 em 01/02 (66,67 + 33,33)',
+      gpp.pgParcelas !== gpf.pgParcelas && S32(s) === S32([{ data: '2026-02-01', total: -100 }]), S32([s, gpp.pgParcelas === gpf.pgParcelas]));
+    t('32g: cada pedaco tem plano PROPRIO (valor do pedaco / nParc): 2 parcelas abertas de 200/3 no pai + 2 de 100/3 no filho = 4 parcelas, R$ 200',
+      s.semPagar === 4 && s.semPagarValor === 200, S32([s.semPagar, s.semPagarValor]));
+    /* MESMA sessao: pagamento registrado ANTES do fracionamento — pai e filho compartilham o MESMO objeto */
+    reset();
+    M().push(compra32('gq', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-05' }));
+    const gqp = M().find(m => m.id === 'gq');
+    gqp.pgParcelas = { 1: { d: '2026-02-01', v: 100 } };
+    const gqf = A('baixarLote')('gq', 1, 'Coleção', { dataSaida: '2026-03-01' });
+    s = A('serieDinheiro')();
+    t('32g: pagamento registrado ANTES do fracionamento (pai e filho apontam pro MESMO objeto pgParcelas, na mesma sessao) conta UMA vez so: -100, e nao -200',
+      gqf.pgParcelas === gqp.pgParcelas && S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2, S32([gqf.pgParcelas === gqp.pgParcelas, s, s.semPagar]));
+    /* CONHECIDO: G-1 — depois de JSON.parse(JSON.stringify(movs)) o objeto compartilhado vira dois objetos iguais e o pagamento passa a contar
+       em dobro. Raiz em baixarLote (copia rasa do pai pro filho); cura adiada pra proxima sessao (mexe tambem em contasPagas e saldoConta).
+       Sem asserçao de proposito: teste vermelho hoje nao seria regressao, seria o defeito ja conhecido.
+       Medido em 19/09 (sonda, nao teste): na MESMA sessao, com o objeto compartilhado, so a curva dedupa — saldoFisicoConta desconta o
+       pagamento 2x (saldo 800 em vez de 900) e contasPagas lista 2 linhas pagas de 100, contra -100 da curva. */
+    /* a chave de dedupe e POR COMPRA: duas parceladas solo diferentes, sem nenhum pagamento, nunca se confundem */
+    reset();
+    M().push(compra32('gx1', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3 }));
+    M().push(compra32('gx2', { data: '2026-01-06', valor: 120, pgTipo: 'Parcelado', nParc: 2 }));
+    s = A('serieDinheiro')();
+    t('32g: duas compras parceladas SOLO diferentes, sem pagamento algum, contam separadas: semPagar 3 + 2 = 5 e R$ 420 (a chave de dedupe e por compra, nao uma so pra todas)',
+      s.semPagar === 5 && s.semPagarValor === 420, S32([s.semPagar, s.semPagarValor]));
+    M().find(m => m.id === 'gx1').pgParcelas = { 1: { d: '2026-02-01', v: 100 } };
+    s = A('serieDinheiro')();
+    t('32g: e uma parcela paga numa delas nao apaga o cronograma da outra: -100 em 01/02, restam 2 + 2 parcelas (R$ 320)',
+      S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 4 && s.semPagarValor === 320, S32([s, s.semPagar, s.semPagarValor]));
+    /* pgTipo e nParc tem de concordar pra ser parcelado (o a-pagar exige os dois) */
+    reset();
+    M().push(compra32('gy1', { data: '2026-01-05', valor: 60, pgTipo: 'Parcelado', nParc: 0 }));
+    M().push(compra32('gy2', { data: '2026-01-06', valor: 40, pgTipo: 'À vista', nParc: 3 }));
+    s = A('serieDinheiro')();
+    t('32g: "Parcelado" com 0 parcelas e "À vista" com nParc sobrando contam como compra A VISTA na data (-60 e -40) — a mesma leitura do a-pagar, que exige os dois campos',
+      S32(s) === S32([{ data: '2026-01-05', total: -60 }, { data: '2026-01-06', total: -100 }]) && s.semPagar === 0 && A('aPagar')(true).concat(A('aPagar')()).length === 0, S32([s, s.semPagar]));
+    /* NOTA: 3 itens, mesmo notaId, todos Parcelado nParc 3, valores 300/200/100 */
+    const notaFix = () => { reset(); [300, 200, 100].forEach((v, i) => M().push(compra32('n' + (i + 1), { data: '2026-08-01', valor: v, notaId: 'N1', notaNum: '1', pgTipo: 'Parcelado', nParc: 3, venc1: '2026-08-01' }))); };
+    notaFix();
+    s = A('serieDinheiro')();
+    t('32g: NOTA parcelada = UM cronograma pela cabeca: parcela = 600/3 = 200, semPagar === 3 (nao 9) e semPagarValor === 600 (nao 1800)',
+      s.length === 0 && s.semPagar === 3 && s.semPagarValor === 600, S32([s, s.semPagar, s.semPagarValor]));
+    M()[0].pgParcelas = { 1: { d: '2026-08-05', v: 200 } };      /* pgParcelas so na cabeca (o primeiro item), como o app grava */
+    s = A('serieDinheiro')();
+    t('32g: NOTA com a parcela 1 paga so na cabeca: sai 200 em 05/08 e restam 2 parcelas (400)',
+      S32(s) === S32([{ data: '2026-08-05', total: -200 }]) && s.semPagar === 2 && s.semPagarValor === 400, S32([s, s.semPagar, s.semPagarValor]));
+    /* pagar TODAS as linhas que o a-pagar mostra: a curva tem de acompanhar exatamente */
+    notaFix();
+    const antesTot = ultimo32(A('serieDinheiro')());
+    const linhas = A('aPagar')(true).concat(A('aPagar')());
+    let pago = 0;
+    linhas.forEach(L => { L.m.pgParcelas = L.m.pgParcelas || {}; L.m.pgParcelas[L.pi] = { d: '2026-09-15', v: r2_32(L.valor) }; pago += r2_32(L.valor); });
+    t('32g: [pre] o a-pagar (vencidas + a vencer) lista as 3 parcelas da nota, todas pela cabeca e de 200',
+      linhas.length === 3 && linhas.every(L => L.m.id === 'n1' && r2_32(L.valor) === 200), S32(linhas.map(L => [L.m.id, L.pi, L.valor])));
+    s = A('serieDinheiro')();
+    t('32g: pagar TODAS as linhas do a-pagar esvazia aPagar(true) e aPagar() E zera semPagar/semPagarValor',
+      A('aPagar')(true).length === 0 && A('aPagar')().length === 0 && s.semPagar === 0 && s.semPagarValor === 0, S32([A('aPagar')(true).length, A('aPagar')().length, s.semPagar, s.semPagarValor]));
+    t('32g: e o total da curva se moveu EXATAMENTE o valor pago (-600), na data do pagamento',
+      pago === 600 && r2_32(ultimo32(s) - antesTot) === -pago && S32(s) === S32([{ data: '2026-09-15', total: -600 }]), S32([antesTot, ultimo32(s), pago, s]));
+    /* item da nota editado pra a vista: sai do cronograma e vira compra a vista na propria data */
+    notaFix();
+    const n1 = M()[0]; n1.pgTipo = 'À vista'; n1.nParc = 0;       /* o item de 300 (o PRIMEIRO, que seria a cabeca) vira a vista */
+    s = A('serieDinheiro')();
+    t('32g: item da nota editado pra "À vista" sai do cronograma — a cabeca e o total sao so dos que continuam parcelados: 3 parcelas de (200+100)/3, semPagarValor 300 (nao 600)',
+      s.semPagar === 3 && s.semPagarValor === 300, S32([s.semPagar, s.semPagarValor]));
+    t('32g: e o item editado passa a contar como compra a vista na PROPRIA data (-300 em 01/08)', S32(s) === S32([{ data: '2026-08-01', total: -300 }]), S32(s));
+    const linhasE = A('aPagar')(true).concat(A('aPagar')());
+    t('32g: o a-pagar concorda com a curva: 3 parcelas de 100 pela nova cabeca (n2)', linhasE.length === 3 && linhasE.every(L => L.m.id === 'n2' && r2_32(L.valor) === 100), S32(linhasE.map(L => [L.m.id, L.valor])));
+    /* ABERTURA dentro da nota */
+    notaFix();
+    M().push(compra32('n4', { data: '2026-08-01', valor: 50, notaId: 'N1', pgTipo: 'Parcelado', nParc: 3, venc1: '2026-08-01', origem: 'ABERTURA', loteOrigem: 'n1' }));
+    s = A('serieDinheiro')();
+    t('32g: registro origem "ABERTURA" dentro da nota NAO entra no total do cronograma (600, nao 650) e nao gera parcelas proprias',
+      s.semPagar === 3 && s.semPagarValor === 600 && s.length === 0, S32([s.semPagar, s.semPagarValor, s]));
+  });
+
+  /* ---------- 32h: graficoLinhaEstoque (o HTML da curva, nas 4 combinacoes das chaves dinheiro/colecao) ---------- */
+  await bloco32('h', async () => {
+    /* fixture com TODOS os contadores acima de zero */
+    M().push(compra32('h1', { data: '2026-01-10', valor: 100 }));
+    M().push(compra32('h2', { data: '2026-02-01', valor: 40, situacao: 'Trocado', dataSaida: '2026-03-01' }));
+    M().push(compra32('h3', { data: '2026-02-10', valor: 25, situacao: 'Trocado' }));                                      /* estoque: 1 baixa sem data (25) */
+    M().push(compra32('h4', { data: '2026-01-20', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3 }));                   /* dinheiro: 3 parcelas sem pagamento (300) */
+    M().push(compra32('h5', { data: '2026-02-05', valor: 35, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true })); /* coleção: 1 sem chegada (35) */
+    M().push(compra32('h6', { data: '2026-02-15', valor: 15, situacao: 'Vendido', destIni: 'Coleção' }));                  /* coleção: 1 saida sem data (15) */
+    M().push(compra32('h7', { data: '2026-01-30', valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção' }));
+    const sE = A('serieEstoque')(), sD = A('serieDinheiro')(), sC = A('serieColecao')();
+    t('32h: [fixture] os quatro contadores estao acima de zero (senao o teste dos avisos nao prova nada)',
+      sE.semData === 1 && sE.semDataValor === 25 && sD.semPagar === 3 && sD.semPagarValor === 300 && sC.semChegada === 1 && sC.semChegadaValor === 35 && sC.semData === 1 && sC.semDataValor === 15,
+      S32([sE.semData, sE.semDataValor, sD.semPagar, sD.semPagarValor, sC.semChegada, sC.semChegadaValor, sC.semData, sC.semDataValor]));
+    const legenda = html => { const m = html.match(/<div class="legend"[^>]*>([\s\S]*?)<\/div>/); return m ? m[1].replace(/<[^>]*>/g, '') : null; };
+    [[false, false], [true, false], [false, true], [true, true]].forEach(([vc, vk]) => {
+      const rot = '[dinheiro ' + (vc ? 'ligado' : 'desligado') + ', colecao ' + (vk ? 'ligada' : 'desligada') + ']';
+      const html = A('graficoLinhaEstoque')(sE, sD, sC, vc, vk);
+      const leg = legenda(html);
+      t('32h: ' + rot + ' o HTML nunca contem NaN, undefined nem null e desenha a curva (svg)', !/NaN|undefined|null/.test(html) && html.indexOf('<svg') >= 0, (html.match(/.{0,30}(NaN|undefined|null).{0,30}/) || [''])[0]);
+      t('32h: ' + rot + ' a legenda lista "estoque" sempre e "dinheiro"/"coleção" SO quando ligados',
+        leg !== null && leg.indexOf('estoque') >= 0 && (leg.indexOf('dinheiro') >= 0) === vc && (leg.indexOf('coleção') >= 0) === vk, 'legenda=' + leg);
+      const xs = [], ys = [];
+      (html.match(/points="[^"]*"/g) || []).forEach(pp => pp.slice(8, -1).trim().split(/\s+/).forEach(par => { const q = par.split(',').map(Number); xs.push(q[0]); ys.push(q[1]); }));
+      (html.match(/<circle cx="[^"]*" cy="[^"]*"/g) || []).forEach(cc => { const q = cc.match(/cx="([^"]*)" cy="([^"]*)"/); xs.push(+q[1]); ys.push(+q[2]); });
+      t('32h: ' + rot + ' todos os pontos das linhas e bolinhas caem DENTRO da caixa do grafico (720 x 200): a escala vertical cobre estoque, dinheiro negativo e colecao',
+        xs.length > 0 && xs.length === ys.length && xs.every(v => isFinite(v) && v >= 0 && v <= 720) && ys.every(v => isFinite(v) && v >= 0 && v <= 200), S32([xs.length, Math.min.apply(null, ys), Math.max.apply(null, ys)]));
+      t('32h: ' + rot + ' so desenha a linha do dinheiro (verde) e a da colecao (roxa) quando ligadas',
+        (html.indexOf('stroke="var(--green)"') >= 0) === vc && (html.indexOf('stroke="var(--purple)"') >= 0) === vk);
+      t('32h: ' + rot + ' os botoes-chave mostram o estado (● ligado / ○ desligado)',
+        html.indexOf((vc ? '● ' : '○ ') + '💰 dinheiro') >= 0 && html.indexOf((vk ? '● ' : '○ ') + '⭐ coleção') >= 0);
+      t('32h: ' + rot + ' o aviso de baixa de estoque sem data (semData) aparece SEMPRE (contador 1) e traz o valor (R$ 25,00)',
+        html.indexOf('de estoque sem data de saída registrada') >= 0 && html.indexOf(fmt32(25)) >= 0);
+      t('32h: ' + rot + ' o aviso de parcelas de compra ainda nao pagas (semPagar) so aparece com o dinheiro LIGADO, com o valor (R$ 300,00)',
+        (html.indexOf('de compra ainda não paga') >= 0) === vc && (!vc || html.indexOf(fmt32(300)) >= 0));
+      t('32h: ' + rot + ' os avisos da colecao (semChegada e saida sem data) so aparecem com a colecao LIGADA, com os valores (R$ 35,00 e R$ 15,00)',
+        (html.indexOf('como chegada') >= 0) === vk && (html.indexOf('da coleção sem data registrada') >= 0) === vk && (!vk || (html.indexOf(fmt32(35)) >= 0 && html.indexOf(fmt32(15)) >= 0)));
+    });
+    /* sem pendencia nenhuma nao ha aviso nenhum, com tudo ligado */
+    reset();
+    M().push(compra32('h8', { data: '2026-01-10', valor: 100 }));
+    M().push(compra32('h9', { data: '2026-02-01', valor: 40, situacao: 'Trocado', dataSaida: '2026-03-01' }));
+    M().push(compra32('h10', { data: '2026-01-20', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3, pgParcelas: { 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-04-01', v: 100 } } }));
+    M().push(compra32('h11', { data: '2026-01-30', valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção' }));
+    const limpo = A('graficoLinhaEstoque')(A('serieEstoque')(), A('serieDinheiro')(), A('serieColecao')(), true, true);
+    t('32h: sem nenhum contador acima de zero nao aparece aviso (⚠) em lugar nenhum, com tudo ligado, e o HTML continua sem NaN/undefined/null',
+      limpo.indexOf('⚠') < 0 && !/NaN|undefined|null/.test(limpo) && limpo.indexOf('<svg') >= 0, (limpo.match(/⚠.{0,80}/) || [''])[0]);
+    /* curva PLANA (todos os pontos iguais): a escala nao pode dividir por zero */
+    reset();
+    M().push(compra32('h20', { data: '2026-01-10', valor: 100 }));
+    M().push(compra32('h21', { data: '2026-02-01', valor: 50, situacao: 'Trocado', dataSaida: '2026-02-01' }));      /* entra e sai no mesmo dia: 100 -> 100 */
+    const planoPos = A('serieEstoque')();
+    const combos = [[false, false], [true, false], [false, true], [true, true]];
+    const htmlsPlano = combos.map(([vc, vk]) => A('graficoLinhaEstoque')(planoPos, A('serieDinheiro')(), A('serieColecao')(), vc, vk));
+    t('32h: curva PLANA acima de zero (100 -> 100): o HTML sai sem NaN/undefined/null nas 4 combinacoes (a escala nao divide por zero)',
+      S32(planoPos) === S32([{ data: '2026-01-10', total: 100 }, { data: '2026-02-01', total: 100 }]) && htmlsPlano.every(h => h.indexOf('<svg') >= 0 && !/NaN|undefined|null/.test(h)), S32(planoPos));
+    reset();
+    M().push(compra32('h22', { data: '2026-01-10', valor: 30, situacao: 'Trocado', dataSaida: '2026-01-10' }));
+    M().push(compra32('h23', { data: '2026-02-01', valor: 30, situacao: 'Trocado', dataSaida: '2026-02-01' }));
+    const planoZero = A('serieEstoque')();
+    const htmlsZero = combos.map(([vc, vk]) => A('graficoLinhaEstoque')(planoZero, A('serieDinheiro')(), A('serieColecao')(), vc, vk));
+    t('32h: curva PLANA em zero (0 -> 0) tambem sai sem NaN/undefined/null nas 4 combinacoes',
+      S32(planoZero) === S32([{ data: '2026-01-10', total: 0 }, { data: '2026-02-01', total: 0 }]) && htmlsZero.every(h => h.indexOf('<svg') >= 0 && !/NaN|undefined|null/.test(h)), S32(planoZero));
+    /* rotulos do eixo X: de tantos em tantos pontos, e o ultimo SEMPRE aparece, ancorado no fim */
+    reset();
+    for (let i = 1; i <= 10; i++) M().push(compra32('hx' + i, { data: '2026-03-' + String(i).padStart(2, '0'), valor: 10 * i }));
+    const htmlX = A('graficoLinhaEstoque')(A('serieEstoque')(), A('serieDinheiro')(), A('serieColecao')(), false, false);
+    const ancoras = (htmlX.match(/<text x="[^"]*" y="187" text-anchor="\w+"[^>]*>[^<]*<\/text>/g) || []).map(x => [x.match(/text-anchor="(\w+)"/)[1], x.match(/>([^<]*)<\/text>/)[1]]);
+    t('32h: com 10 pontos o eixo X rotula de 2 em 2 (5 rotulos) mais o ULTIMO, sempre, ancorado no fim: 6 rotulos, do 01/03 ao 10/03',
+      ancoras.length === 6 && ancoras.slice(0, 5).every(a => a[0] === 'middle') && ancoras[5][0] === 'end' && ancoras[0][1] === '01/03' && ancoras[5][1] === '10/03', S32(ancoras));
+    /* sem curva pra desenhar: os avisos nao se perdem */
+    reset();
+    M().push(compra32('h12', { data: '2026-02-10', valor: 25, situacao: 'Trocado' }));
+    const vazio = A('graficoLinhaEstoque')(A('serieEstoque')(), A('serieDinheiro')(), A('serieColecao')(), true, true);
+    t('32h: sem historico pra desenhar a mensagem diz isso e o aviso de baixa sem data continua la (nao se perde com a curva)',
+      vazio.indexOf('Ainda não há histórico') >= 0 && vazio.indexOf('de estoque sem data de saída registrada') >= 0 && vazio.indexOf('<svg') < 0 && !/NaN|undefined|null/.test(vazio));
+    reset();
+    M().push(compra32('h13', { data: '2026-02-10', valor: 25 }));
+    const umPonto = A('graficoLinhaEstoque')(A('serieEstoque')(), A('serieDinheiro')(), A('serieColecao')(), false, false);
+    t('32h: com um ponto so a mensagem diz que a curva nasce com duas datas (sem svg, sem NaN)', umPonto.indexOf('Só existe um ponto') >= 0 && umPonto.indexOf('<svg') < 0 && !/NaN|undefined|null/.test(umPonto));
+  });
+
+  /* ---------- 32i: vEstoque (a aba: card "Ainda nao confirmado" e a lista) ---------- */
+  await bloco32('i', async () => {
+    setg('tela', 'estoque');
+    const c = capturas32();
+    const cardValor = html => { const m = html.match(/Ainda não confirmado[^<]*<\/div><div class="v"[^>]*>([^<]*)<\/div>/); return m ? m[1] : null; };
+    /* mistura: remanescente + pre-venda + separada pra colecao (nao confirmada) + separada ja confirmada (fora) */
+    M().push(compra32('i1', { data: '2026-09-01', qtd: 2, valor: 20, situacao: 'Pedido' }));
+    const pvI = preVenda32('i1', 1, 'Fulano', { dataSaida: '2026-09-02', dataVenda: '2026-09-02' });   /* pai i1 = 10 (Pedido); filho = 10 (pre-vendido) */
+    M().push(compra32('i2', { data: '2026-09-01', qtd: 3, valor: 30, situacao: 'Pedido' }));
+    c.resposta = '1'; A('separarParaColecao')('i2');                                                    /* pai i2 = 20 (Pedido); filho = 10 (coleção) */
+    const colI = M().find(m => m.loteOrigem === 'i2' && A('sitDe')(m) === 'Coleção');
+    M().push(compra32('i3', { data: '2026-09-01', valor: 99, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true, dataChegada: '2026-09-10' }));
+    let html = A('vEstoque')();
+    t('32i: o rotulo do card e "Ainda não confirmado" (nao mais "Pedidos a caminho (ainda não chegaram)")',
+      html.indexOf('Ainda não confirmado') >= 0 && html.indexOf('Pedidos a caminho (ainda não chegaram)') < 0);
+    t('32i: o valor do card e a soma de TUDO que a lista mostra (10 + 10 + 20 + 10 = R$ 50,00) — e nao o motor().pedido (R$ 30,00), que so soma o que ainda esta marcado Pedido',
+      cardValor(html) === fmt32(50) && A('motor')().pedido === 30, 'card=' + cardValor(html) + ' motor().pedido=' + A('motor')().pedido);
+    t('32i: o card bate com a soma do que pedidosAgrupados() lista (remanescentes + pecas + colecao)',
+      cardValor(html) === fmt32(A('pedidosAgrupados')().reduce((s, gr) => s + gr.remanescentes.reduce((a, m) => a + m.valor, 0) + gr.pecas.reduce((a, p) => a + p.peca.valor, 0) + gr.colecao.reduce((a, m) => a + m.valor, 0), 0)));
+    t('32i: cada linha da lista tem o botao ligado ao registro certo — remanescente: p/ coleção + chegou; pre-vendida: chegouPeca com o nome do comprador; separada: chegouPeca',
+      html.indexOf("separarParaColecao('i1')") >= 0 && html.indexOf("chegouPedido('i1')") >= 0 && html.indexOf("chegouPedido('i2')") >= 0
+      && html.indexOf("chegouPeca('" + pvI.peca.id + "')") >= 0 && html.indexOf('Fulano') >= 0 && html.indexOf('vendido · aguardando chegada') >= 0
+      && html.indexOf("chegouPeca('" + colI.id + "')") >= 0 && html.indexOf('Separado pra coleção') >= 0 && html.indexOf('não vai ser vendido') >= 0);
+    t('32i: cada linha da lista mostra o valor da PROPRIA peca: R$ 10,00 nas tres de 10 (remanescente i1, pre-vendida, separada) e R$ 20,00 no remanescente i2',
+      (html.match(/<b>R\$ 10,00<\/b>/g) || []).length === 3 && (html.match(/<b>R\$ 20,00<\/b>/g) || []).length === 1, S32(html.match(/<b>R\$ [^<]*<\/b>/g)));
+    t('32i: a peca de colecao que JA chegou (i3) nao aparece na lista', html.indexOf("chegouPeca('i3')") < 0 && html.indexOf('99,00') < 0);
+    /* o caminho do usuario: toca em "chegou" numa linha e a aba mostra o resultado */
+    c.confirmar = true; A('chegouPeca')(colI.id);
+    html = A('vEstoque')();
+    t('32i: depois de confirmar a chegada da peca separada o card cai pra R$ 40,00 e a linha some (o resto continua)',
+      cardValor(html) === fmt32(40) && html.indexOf("chegouPeca('" + colI.id + "')") < 0 && html.indexOf("chegouPeca('" + pvI.peca.id + "')") >= 0, 'card=' + cardValor(html));
+    /* G1: pedido INTEIRO separado pra colecao */
+    reset();
+    M().push(compra32('i4', { data: '2026-09-01', qtd: 3, valor: 45, situacao: 'Pedido' }));
+    c.resposta = '3'; A('separarParaColecao')('i4');
+    html = A('vEstoque')();
+    t('32i: [G1] pedido INTEIRO separado pra colecao: o card mostra o valor da peca (R$ 45,00) e NAO R$ 0,00, mesmo com motor().pedido zerado',
+      A('motor')().pedido === 0 && cardValor(html) === fmt32(45), 'card=' + cardValor(html) + ' motor().pedido=' + A('motor')().pedido);
+    t('32i: [G1] a linha "Separado pra coleção" esta na lista e nao existe "Ainda sem comprador"', html.indexOf('Separado pra coleção') >= 0 && html.indexOf('Ainda sem comprador') < 0);
+    /* pedido sem colecao e sem tipo: o titulo do grupo nunca fica em branco */
+    reset();
+    M().push(compra32('i6', { data: '2026-09-01', valor: 10, situacao: 'Pedido', cat: '', colecao: '' }));
+    html = A('vEstoque')();
+    t('32i: pedido sem colecao e sem tipo aparece com o titulo "item" (nunca em branco) e o card mostra o valor', html.indexOf('>item</div>') >= 0 && cardValor(html) === fmt32(10), 'card=' + cardValor(html));
+    /* nada a caminho */
+    reset();
+    M().push(compra32('i5', { data: '2026-09-01', valor: 10 }));
+    html = A('vEstoque')();
+    t('32i: sem nada a caminho o card mostra R$ 0,00 e a lista diz "Nada a caminho agora."', cardValor(html) === fmt32(0) && html.indexOf('Nada a caminho agora.') >= 0, 'card=' + cardValor(html));
+  });
+
+  /* ---------- 32j: ciclo de vida de origemPedido (chegouPedido e a EDICAO pelo formulario, salvar()) ---------- */
+  await bloco32('j', async () => {
+    const c = capturas32();
+    /* origemPedido nao pode "vazar" pra um filho de CONSUMO depois de a peca ja ter chegado ao estoque */
+    reset();
+    M().push(compra32('j1', { data: '2026-09-01', qtd: 3, valor: 30, situacao: 'Pedido', origemPedido: true }));
+    A('chegouPedido')('j1');
+    const fj = A('baixarLote')('j1', 1, 'Coleção', { dataSaida: '2026-09-15' });
+    t('32j: depois de chegouPedido, um CONSUMO (baixarLote pra Coleção) NAO herda origemPedido no filho — senao ele reapareceria em "Pedidos a caminho" como se ainda nao tivesse chegado',
+      fj.id !== 'j1' && !('origemPedido' in fj) && A('sitDe')(fj) === 'Coleção' && A('pedidosAgrupados')().length === 0, S32(fj));
+    /* a edicao pelo formulario: salvar() com a Situacao mudando */
+    const editar = (rec, sitNova) => {
+      reset(); M().push(rec);
+      setg('editId', rec.id); setg('tipoSel', 'COMPRA'); setg('tela', 'lancar'); setg('pgTipo', 'À vista'); setg('_fotosPend', []);
+      setg('_db', null); setg('_syncReady', false); setg('_restaurando', false); setg('excluidos', {}); setg('_baseH', {});
+      Object.keys(campos32).forEach(k => delete campos32[k]);
+      Object.assign(campos32, { f_val: String(rec.valor), f_data: rec.data, f_jogo: 'Pokémon', f_cat: 'ETB', f_col: '151', f_idi: '—', f_qtd: String(rec.qtd), f_cp: 'F', f_sit: sitNova, f_taxa: '0', f_pg: 'À vista' });
+      ctx.document.getElementById = elCampo32;
+      A('salvar')();
+      return M().find(m => m.id === rec.id);
+    };
+    let d0 = hoje32();
+    let r = editar(compra32('j2', { data: '2026-09-01', qtd: 2, valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true }), 'Em estoque');
+    t('32j: [salvar] editar a Situacao de Coleção pra Em estoque grava a mudanca (a edicao foi mesmo salva)', !!r && A('sitDe')(r) === 'Em estoque' && c.toasts.some(x => /Alteração salva/.test(x)), S32([r, c.toasts]));
+    t('32j: [salvar] Coleção -> Em estoque REMOVE origemPedido e NAO carimba dataChegada (a peca ja existia fisicamente; carimbar "hoje" reescreveria a historia da curva de estoque)',
+      !('origemPedido' in r) && r.dataChegada === undefined, S32(r));
+    const fj2 = A('baixarLote')('j2', 1, 'Coleção', { dataSaida: '2026-09-16' });
+    t('32j: [salvar] e o CONSUMO seguinte dessa peca nao herda origemPedido', !('origemPedido' in fj2) && A('pedidosAgrupados')().length === 0, S32(fj2));
+    r = editar(compra32('j3', { data: '2026-09-01', qtd: 2, valor: 20, situacao: 'Pedido', destino: 'Vender', origemPedido: true }), 'Em estoque');
+    t('32j: [salvar] Pedido -> Em estoque carimba dataChegada = hoje e REMOVE origemPedido (mesmo o "de sobra")', A('sitDe')(r) === 'Em estoque' && ehHoje32(r.dataChegada, d0) && !('origemPedido' in r), S32(r));
+    r = editar(compra32('j4', { data: '2026-09-01', qtd: 2, valor: 20, situacao: 'Pedido', destino: 'Vender', dataChegada: '2026-08-30' }), 'Em estoque');
+    t('32j: [salvar] Pedido -> Em estoque que JA tinha dataChegada nao a sobrescreve (fica 30/08)', r.dataChegada === '2026-08-30', S32(r));
+    r = editar(compra32('j5', { data: '2026-09-01', qtd: 2, valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true }), 'Coleção');
+    t('32j: [salvar] controle — editar SEM mudar a Situacao (Coleção -> Coleção) MANTEM origemPedido e nao carimba dataChegada (a peca ainda nao chegou de verdade)',
+      A('sitDe')(r) === 'Coleção' && r.origemPedido === true && r.dataChegada === undefined, S32(r));
+    r = editar(compra32('j6', { data: '2026-09-01', qtd: 2, valor: 20, situacao: 'Em estoque' }), 'Em estoque');
+    t('32j: [salvar] controle — editar uma peca que ja esta Em estoque nao carimba dataChegada', A('sitDe')(r) === 'Em estoque' && r.dataChegada === undefined, S32(r));
+  });
+
+  /* ---------- 32k: soltarIntrusa (limpeza de origemPedido ao soltar a peca de um lote com a conta quebrada) ---------- */
+  await bloco32('k', async () => {
+    const c = capturas32();
+    /* lote de 100 (raiz 60 + filho legitimo 40) com uma "intrusa" de 25 grudada: soma 125, referencia 100 */
+    const familia = (sitIntr, extras) => {
+      reset();
+      M().push(compra32('kr', { valor: 60, qtd: 6, valorOrig: 100, destIni: 'Em estoque' }));
+      M().push(compra32('kf', { valor: 40, qtd: 4, loteOrigem: 'kr' }));
+      M().push(compra32('ki', Object.assign({ valor: 25, qtd: 2, loteOrigem: 'kr', situacao: sitIntr, origemPedido: true }, extras || {})));
+    };
+    familia('Em estoque');
+    const dg = A('diagLote')('kr');
+    t('32k: [fixture] diagLote acha a peca ki como a intrusa (soma 125 x referencia 100)', !!dg && !!dg.intrusa && dg.intrusa.id === 'ki' && !dg.ambiguo && dg.dif === 25, S32(dg && { intrusa: dg.intrusa && dg.intrusa.id, dif: dg.dif, amb: dg.ambiguo }));
+    A('soltarIntrusa')('kr');
+    const msg1 = c.confirms[c.confirms.length - 1];
+    let ki = M().find(m => m.id === 'ki');
+    t('32k: a pergunta nomeia a peca e mostra a conta que vai fechar: "Soltar "151 · ETB" (2 un · R$ 25,00)" e "fecha: R$ 100,00 = R$ 100,00" (sem o aviso de TROCADA, que e so do Trocado)',
+      msg1.indexOf('Soltar "151 · ETB" (2 un · ' + fmt32(25) + ') deste lote?') === 0 && msg1.indexOf('fecha: ' + fmt32(100) + ' = ' + fmt32(100)) >= 0 && !/TROCADA/.test(msg1), msg1);
+    t('32k: a observacao da peca solta comeca pela nota "[solta do lote em ...]" (sem "undefined" de observacao vazia)',
+      ki.obs.indexOf('[solta do lote em ') === 0 && !/undefined/.test(ki.obs), ki.obs);
+    t('32k: intrusa Em estoque com origemPedido:true: ao soltar perde o campo, vira raiz propria (sem loteOrigem) e segue Em estoque',
+      !('origemPedido' in ki) && !('loteOrigem' in ki) && A('sitDe')(ki) === 'Em estoque' && ki.valorOrig === 25, S32(ki));
+    t('32k: e a conta do lote fecha (diagLote devolve null), nada foi apagado (3 registros) e ficou a nota na observacao',
+      A('diagLote')('kr') === null && M().length === 3 && /solta do lote/.test(ki.obs), S32([A('diagLote')('kr'), M().length, ki.obs]));
+    familia('Trocado', { trocaId: 'tr1', dataTroca: '2026-08-20' });
+    A('soltarIntrusa')('kr');
+    const msg2 = c.confirms[c.confirms.length - 1];
+    ki = M().find(m => m.id === 'ki');
+    t('32k: para a intrusa Trocado a pergunta avisa que ela esta marcada como TROCADA sem troca registrada',
+      /TROCADA sem troca registrada/.test(msg2), msg2);
+    t('32k: intrusa Trocado (marcada como trocada sem troca registrada) volta pra Em estoque, destino Vender, e perde origemPedido, dataTroca e trocaId',
+      A('sitDe')(ki) === 'Em estoque' && ki.destino === 'Vender' && !('origemPedido' in ki) && !('dataTroca' in ki) && !('trocaId' in ki) && !('loteOrigem' in ki), S32(ki));
+    familia('Coleção', { destino: 'Coleção' });
+    A('soltarIntrusa')('kr');
+    ki = M().find(m => m.id === 'ki');
+    t('32k: intrusa Coleção MANTEM origemPedido (ela ainda nao confirmou a chegada; limpar seria o erro contrario), continua Coleção e ganha vida propria (sem loteOrigem)',
+      A('sitDe')(ki) === 'Coleção' && ki.origemPedido === true && !('loteOrigem' in ki) && A('diagLote')('kr') === null, S32(ki));
+    /* sem intrusa (conta fecha): nao mexe em nada */
+    reset();
+    M().push(compra32('kr', { valor: 60, qtd: 6, valorOrig: 100 }));
+    M().push(compra32('kf', { valor: 40, qtd: 4, loteOrigem: 'kr' }));
+    const antes = foto32(), nConf = c.confirms.length;
+    A('soltarIntrusa')('kr');
+    t('32k: lote com a conta fechada (sem intrusa) — soltarIntrusa nao muda nada e nem chega a perguntar', foto32() === antes && c.confirms.length === nConf, S32([c.confirms.length, nConf]));
+  });
+}).catch(e=>{fail++;console.log('  FALHOU  secao 32 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
+  /* ===== 33. PARCELA PAGA ALEM DO PLANO (M-1) E PECA JA CONFIRMADA QUE VOLTA (19/09/2026) =====
+     Decisao do Felype ("nao entendi. pode auditar umas 3x e resolver"): compra parcelada cujo numero de parcelas foi editado
+     DEPOIS de pagar (4x virou 3x com a parcela 4 ja marcada) deixa uma marca com indice MAIOR que nParc. Ate hoje as telas de
+     dinheiro so liam 1..nParc e esse dinheiro sumia em silencio. Agora ele conta em contasPagas (Fluxo de caixa > pagas, com
+     "desmarcar"), saldoFisicoConta e serieDinheiro (grafico, com aviso contado), a Projecao do caixa desconta so o excedente que
+     o valor da compra nao cobre (por conta, no mesmo escopo do saldo por emissao) e o Diagnostico so afirma o que o codigo faz.
+     Duas auditorias adversariais + a leitura "como o Felype" moldaram cada caso (G1, G2, M1, M3, M4, m1 da rodada 1; M-A, M-B,
+     m-2, m-3, m-6 da rodada 2). O agente de testes achou de quebra que a peca vendida ANTES de chegar e depois CONFIRMADA
+     (chegouPeca) voltava pra "Pedido" quando a venda era desfeita — voltaDe() resolve.
+     Como esta secao e construida (mesmo padrao da 32): cada bloco monta o PROPRIO fixture com reset(), nao depende de ordem e
+     restaura no finally tudo o que mexe; um bloco que explode vira UMA linha FALHOU e os outros seguem. Datas fixas no passado
+     (fev-mai/2026), pra o teste nao envelhecer. O filtro de periodo do app (padrao: ultimos 30 dias) e zerado no bloco, senao
+     as parcelas de fevereiro sumiriam da tela por causa do filtro e nao por causa do codigo.
+     Controle negativo (19/09/2026): cada mutacao no app abaixo deixa VERMELHOS os blocos citados —
+       voltaDe sem olhar dataChegada: 33n | contasPagas com Math.ceil trocado por floor: 33e | helper sem a chave canonica: 33a |
+       helper sem a data ISO: 33a 33c | excessoPagoAlemDoPlano sem o escopo da conta/data-base: 33h | rotulo "(x.pn>1||x.alem)" sem
+       o "||x.alem": 33f | texto "fora do plano de N×" trocado por "N de M": 33f | saldoFisicoConta sem a linha das parcelas alem do
+       plano: 33b 33d 33h | aviso do grafico sem pagasAlem: 33b 33k | Diagnostico com o texto antigo: 33j |
+       desmarcarParcela com o texto antigo: 33m.
+     3a rodada (19/09/2026: 27 mutacoes do revisor de substancia, a correcao M9 do revisor de numeros e as minhas; todas vermelhas):
+       Diagnostico voltando a oferecer "desmarque" como saida igual: 33j | Diagnostico prometendo "saldos" quando nenhum saldo debita a marca: 33j |
+       desmarcar sem o aviso "cancele e acerte o nº de parcelas": 33m | desmarcar sem o Math.ceil (plano fracionario): 33m |
+       excedente escopado pela COMPRA (conta/data da compra) em vez da MARCA (conta de quem pagou/data do pagamento): 33h |
+       excedente sem o filtro de compra de troca: 33h | excedente sem o filtro nParc>0: 33h | excedente negativo somando na projecao: 33h |
+       saldoFisicoConta atribuindo a parcela alem do plano a conta da compra em vez da conta do pagamento: 33h |
+       papel sem o texto "fora do plano": 33g | papel da nota sem o "||x.alem": 33g | salvar sem a pergunta ao reduzir o parcelamento: 33o |
+       salvar sem a trava do nº de parcelas inteiro: 33o | voltaDe fora de devolver/desvincular: 33n.
+     4a rodada (19/09/2026, revisor independente do delta da 3a; todas vermelhas): pergunta do salvar sem comparar com o plano ANTERIOR (dispara em toda
+       edicao de compra que ja esta fora do plano e o Cancelar jogava fora a edicao): 33o | pergunta do salvar em compra de troca: 33o |
+       teto do nº de parcelas: 33o | excedente sem o peso por cadastro (dois cadastros de conta com o mesmo nome): 33h.
+     CONHECIDO e ADIADO, sem teste de proposito: G-1 (pai e filho de baixarLote duplicam o pagamento em contasPagas e
+     saldoFisicoConta, e a curva so dedupa enquanto a referencia compartilhada existe) — a raiz esta em baixarLote e e a
+     prioridade da proxima sessao; M-A (aPagar/contasPagas somam abertura/troca dentro da nota); nParc fracionario (o formulario passou a recusar; em
+     dado antigo o rotulo "do plano"/"fora do plano" da parcela do teto diverge entre telas, os numeros fecham); marca DENTRO do plano sem data legivel
+     (o saldo debita e a curva nao), 1 centavo de rateio entre Pagas e Saldo e a venda no App que cai HOJE (aReceber ainda a lista e saldoFisicoConta ja a credita: a
+     projecao a desconta um dia a mais) — todos pre-existentes. Este bloco NAO afirma nada
+     sobre lote fracionado nas telas oficiais, so que a marca alem do plano de um lote na mesma sessao conta UMA vez na curva. */
+  console.log('');
+  console.log('=== 33. parcela paga alem do plano nas telas de dinheiro; peca ja confirmada nao volta pra Pedido ===');
+  const fmt33 = g('fmt');
+  const r2_33 = x => Math.round(x * 100) / 100;
+  const S33 = s => JSON.stringify(s);
+  const ultimo33 = s => (s.length ? s[s.length - 1].total : 0);
+  const compra33 = (idc, extra) => Object.assign({ id: idc, tipo: 'COMPRA', data: '2026-01-10', jogo: 'Pokémon', cat: 'ETB', colecao: '151', qtd: 1, valor: 300,
+    situacao: 'Em estoque', destino: 'Vender', contraparte: 'Loja', conta: 'X', pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-01' }, extra || {});
+  /* n marcas de 100, nas datas 01/02, 01/03, 01/04, 01/05... de 2026 (todas no passado) */
+  const marcas33 = n => { const o = {}; for (let i = 1; i <= n; i++) o[i] = { d: '2026-0' + (i + 1) + '-01', v: 100 }; return o; };
+  const banco33 = () => [{ nome: 'X', saldoIni: 1000, saldoData: '' }];
+  const sfis33 = () => A('saldoFisicoConta')({ nome: 'X', saldoIni: 1000, saldoData: '' });
+  const alem33 = () => A('contasPagas')().filter(x => x.alem);
+  const totPagas33 = () => r2_33(A('contasPagas')().reduce((s, x) => s + x.valor, 0));
+  const proj33 = () => A('projecaoCaixa')().atual;
+  const exc33 = () => A('excessoPagoAlemDoPlano')();
+  /* a tela do Fluxo de caixa com todos os grupos abertos, como o "expandir tudo" faz */
+  const telaContas33 = () => { A('vContas')(); const ex = {}; g('_ctKeys').forEach(k => { ex[k] = true; }); setg('ctExp', ex); return A('vContas')(); };
+  /* pre-venda = o que salvar() faz numa venda de item 'Pedido' (mesmo helper da 32, que mora dentro do closure dela) */
+  const preVenda33 = (idPai, qtd, quem, extras) => {
+    const ex = Object.assign({ dataVenda: '2026-09-01', dataSaida: '2026-09-01' }, extras || {});
+    const peca = A('baixarLote')(idPai, qtd, 'Vendido', ex);
+    const venda = { id: 'V_' + peca.id, tipo: 'VENDA', data: ex.dataVenda, valor: 99, origemId: idPai, vendaDe: 'pedido', contraparte: quem, qtd: peca.qtd, custoOrigem: peca.valor };
+    M().push(venda);
+    if (peca.id !== idPai) peca.vendaRef = venda.id;
+    return { peca, venda };
+  };
+  /* tudo o que os blocos mexem; cada bloco devolve o app ao estado em que o achou */
+  const G33 = ['contasBanc', 'ctExp', 'ctSec', 'ctPess', 'ctJogo', 'ctConta', 'ctCat', 'perDe', 'perAte', 'perSel', 'fxSelMode', 'fxSel', 'ctAgrupo', '_psec',
+    'render', 'toast', 'diarioReg', 'imprimir', 'tela', 'editId', 'tipoSel', 'pgTipo', '_fotosPend', '_db', '_syncReady', '_restaurando', '_baseH', 'excluidos',
+    'navHist', '_pendVolta', '_lancarDirty', 'notaItens', 'notaHead'];
+  /* objetos de estado que o app muda NO LUGAR (uma copia rasa guarda o que o bloco encontrou); os demais (ex.: _db) voltam pela mesma referencia */
+  const PLANOS33 = new Set(['ctExp', 'ctSec', 'fxSel', '_psec', '_baseH', 'excluidos', 'notaHead']);
+  const copia33 = (v, n) => Array.isArray(v) ? v.slice() : ((PLANOS33.has(n) && v && typeof v === 'object') ? Object.assign({}, v) : v);
+  const neutro33 = () => ({ contasBanc: banco33(), ctExp: {}, ctSec: {}, ctPess: '', ctJogo: '', ctConta: '', ctCat: '', perDe: '', perAte: '', perSel: 'tudo',
+    fxSelMode: false, fxSel: {}, ctAgrupo: 'mes', _psec: { pagar: true, receber: true, saldo: false, pagas: false, extrato: false },
+    render: () => {}, toast: () => {}, diarioReg: () => {}, imprimir: () => {} });
+  const FUNCS33 = ['parcelasAlemDoPlano', 'excessoPagoAlemDoPlano', 'projecaoCaixa', 'contasPagas', 'saldoFisicoConta', 'serieDinheiro', 'serieEstoque', 'serieColecao',
+    'provaReal', 'vContas', 'voltaDe', 'desmarcarParcela', 'graficoLinhaEstoque', 'imprimirFluxoGo', 'execExcl', 'execDev', 'desvincular', 'chegouPeca', 'baixarLote', 'motor', 'sitDe', 'aPagar',
+    'marcaEntraNoSaldo', 'salvar', 'salvarNota'];
+  const faltam33 = FUNCS33.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('33a: [pre-requisito] o app carregado tem as ' + FUNCS33.length + ' funcoes da parcela paga alem do plano que esta secao exercita', faltam33.length === 0,
+    'FALTAM no app: ' + faltam33.join(', ') + ' — este teste esta rodando contra um build sem a parcela paga alem do plano?');
+  const bloco33 = async (rot, corpo) => {
+    if (faltam33.length) return;   /* o pre-requisito ja acusou; sem as funcoes cada bloco so repetiria o mesmo erro */
+    const salvos = [];
+    const orig = { confirm: ctx.confirm, prompt: ctx.prompt, alert: ctx.alert, geb: ctx.document.getElementById, ins: ctx.document.body.insertAdjacentHTML };
+    try {
+      G33.forEach(n => { try { salvos.push([n, copia33(g(n), n)]); } catch (e) { /* nome que este build nao tem */ } });
+      reset();
+      const nz = neutro33();
+      Object.keys(nz).forEach(n => { try { setg(n, nz[n]); } catch (e) { /* idem */ } });
+      await corpo();
+    } catch (e) { t('33' + rot + ': o bloco explodiu antes de terminar (o que vinha depois dele NAO foi provado)', false, String((e && e.stack) || e).slice(0, 700)); }
+    finally {
+      ctx.confirm = orig.confirm; ctx.prompt = orig.prompt; ctx.alert = orig.alert; ctx.document.getElementById = orig.geb; ctx.document.body.insertAdjacentHTML = orig.ins;
+      salvos.forEach(([n, v]) => { try { setg(n, v); } catch (e) { /* idem */ } });
+      reset();
+    }
+  };
+
+  /* ---- 33a: o helper que decide o que e "parcela alem do plano" ---- */
+  await bloco33('a', () => {
+    const f = A('parcelasAlemDoPlano'), ks = (pg, nP) => f(pg, nP).map(e => e.k), d = '2026-05-01';
+    const raras = { 4: { d }, '4.0': { d }, ' 5 ': { d }, '+6': { d }, '4e0': { d }, abc: { d }, '-1': { d }, '0': { d }, '2.5': { d } };
+    t('33a: so conta chave inteira CANONICA maior que o plano ("4" sim; "4.0", " 5 ", "+6", "4e0", "abc", "-1", "0", "2.5" nao — e a chave que o desmarcar apaga)',
+      S33(ks(raras, 3)) === '[4]', S33(ks(raras, 3)));
+    t('33a: so entra o que passa do plano (k > nP): com o plano em 3, a chave 3 fica de fora e a 4 e a 5 entram, ordenadas',
+      S33(ks({ 5: { d }, 3: { d }, 4: { d } }, 3)) === '[4,5]', S33(ks({ 5: { d }, 3: { d }, 4: { d } }, 3)));
+    const datas = { 4: { d: '2026-05-01T10:00' }, 5: { d: '01/05/2026' }, 6: { d: '' }, 7: { d: '2026-13-45' }, 8: { v: 100 }, 9: null, 10: '2026-05-01' };
+    t('33a: a data tem de ser ISO real AAAA-MM-DD (com hora, no formato BR, vazia, inexistente, ausente ou marca nula NAO contam; o legado, so a data em texto, conta)',
+      S33(ks(datas, 3)) === '[10]', S33(ks(datas, 3)));
+    t('33a: pg vazio, nulo, indefinido ou que nao e objeto devolve lista vazia sem lancar',
+      f(null, 3).length === 0 && f(undefined, 3).length === 0 && f('x', 3).length === 0 && f({}, 3).length === 0 && f(5, 3).length === 0, '');
+  });
+
+  /* ---- 33b: caso central, compra solo — as telas de dinheiro, o aviso e o desmarcar ---- */
+  await bloco33('b', () => {
+    M().push(compra33('s1', { pgParcelas: marcas33(4) }));
+    const sd = A('serieDinheiro')();
+    t('33b: a curva de dinheiro conta as 4 parcelas pagas (400) mesmo com o plano em 3x, e nao ha parcela em aberto', r2_33(ultimo33(sd)) === -400 && sd.semPagar === 0, S33([ultimo33(sd), sd.semPagar]));
+    t('33b: o aviso conta 1 parcela paga a mais, de R$ 100', sd.pagasAlem === 1 && r2_33(sd.pagasAlemValor) === 100, S33([sd.pagasAlem, sd.pagasAlemValor]));
+    const al = alem33();
+    t('33b: Fluxo de caixa > pagas lista a parcela 4 de 3 como "alem" do plano, com valor 100 e o desmarcar (pagaManual)',
+      al.length === 1 && al[0].pi === 4 && al[0].pn === 3 && r2_33(al[0].valor) === 100 && al[0].pagaManual === true, S33(al.map(x => ({ pi: x.pi, pn: x.pn, v: x.valor, pm: x.pagaManual }))));
+    t('33b: a lista de pagas soma as 4 parcelas (400), nenhuma a mais nem a menos', totPagas33() === 400, String(totPagas33()));
+    t('33b: o saldo fisico da conta debita as 4 (1000 - 400 = 600)', r2_33(sfis33()) === 600, String(sfis33()));
+    t('33b: a lista de A PAGAR nao ganha linha nenhuma (marca paga nunca vira "a pagar")', A('aPagar')().length === 0 && A('aPagar')(true).length === 0, S33([A('aPagar')().length, A('aPagar')(true).length]));
+    ctx.confirm = () => true;
+    A('desmarcarParcela')('s1', 4);
+    const sd2 = A('serieDinheiro')();
+    t('33b: desmarcar a parcela 4 tira a marca e as telas voltam JUNTAS ao numero sem ela (curva -300, saldo 700, projecao 700, pagas 300, sem linha alem, sem aviso)',
+      !(4 in M()[0].pgParcelas) && r2_33(ultimo33(sd2)) === -300 && r2_33(sfis33()) === 700 && r2_33(proj33()) === 700 && totPagas33() === 300 && alem33().length === 0 && sd2.pagasAlem === 0,
+      S33([Object.keys(M()[0].pgParcelas), ultimo33(sd2), sfis33(), proj33(), totPagas33(), alem33().length, sd2.pagasAlem]));
+  });
+
+  /* ---- 33c: bordas de dado (nenhuma tela pode lancar, e so a marca valida conta) ---- */
+  await bloco33('c', () => {
+    const base = () => ({ 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-04-01', v: 100 } });
+    const casos = [
+      ['marca alem do plano SEM data', Object.assign(base(), { 4: { v: 100 } }), 300, 0],
+      ['marca alem do plano com data no formato BR (torta)', Object.assign(base(), { 4: { d: '01/05/2026', v: 100 } }), 300, 0],
+      ['chaves fora do padrao (abc, 2.5, -1, 0, "4.0")', Object.assign(base(), { abc: { d: '2026-05-01', v: 9 }, '2.5': { d: '2026-05-01', v: 9 }, '-1': { d: '2026-05-01', v: 9 }, '0': { d: '2026-05-01', v: 9 }, '4.0': { d: '2026-05-01', v: 9 } }), 300, 0],
+      ['formato legado (so a data em texto) usa valor/nParc = 100', { 1: '2026-02-01', 2: '2026-03-01', 3: '2026-04-01', 4: '2026-05-01' }, 400, 1],
+      ['marca alem do plano sem valor (v ausente) cai no rateio valor/nParc', Object.assign(base(), { 4: { d: '2026-05-01' } }), 400, 1],
+    ];
+    casos.forEach(([rot, pg, esperado, nAlem]) => {
+      reset(); setg('contasBanc', banco33());
+      M().push(compra33('b1', { pgParcelas: pg }));
+      let sd, msg = '';
+      try { sd = A('serieDinheiro')(); A('contasPagas')(); sfis33(); A('projecaoCaixa')(); telaContas33(); } catch (e) { msg = String((e && e.message) || e); }
+      t('33c: ' + rot + ' — nenhuma tela lanca; a curva mostra -' + esperado + ' e ' + nAlem + ' parcela(s) alem do plano',
+        !msg && r2_33(ultimo33(sd)) === -esperado && sd.pagasAlem === nAlem, S33([msg, sd && ultimo33(sd), sd && sd.pagasAlem]));
+    });
+  });
+
+  /* ---- 33d: nota (a cabeca carrega o cronograma e a marca alem do plano) ---- */
+  await bloco33('d', () => {
+    M().push(compra33('n1', { valor: 200, notaId: 'N9', nParc: 2, pgParcelas: { 1: { d: '2026-02-01', v: 150 }, 2: { d: '2026-03-01', v: 150 }, 3: { d: '2026-04-01', v: 150 } } }));
+    M().push(compra33('n2', { valor: 400, notaId: 'N9', nParc: 2 }));
+    const sd = A('serieDinheiro')(), al = alem33();
+    t('33d: nota parcelada em 2x com 3 parcelas pagas (450): a curva conta as 3, uma delas alem do plano, e nada fica em aberto',
+      r2_33(ultimo33(sd)) === -450 && sd.pagasAlem === 1 && sd.semPagar === 0, S33([ultimo33(sd), sd.pagasAlem, sd.semPagar]));
+    t('33d: Fluxo de caixa > pagas mostra a parcela 3 de 2 da nota, com os dados da nota (cabeca n1)',
+      al.length === 1 && al[0].pi === 3 && al[0].pn === 2 && al[0].m.id === 'n1' && !!al[0].nota && al[0].nota.parcela === 3 && al[0].nota.nP === 2,
+      S33(al.map(x => ({ pi: x.pi, pn: x.pn, id: x.m.id, nota: x.nota }))));
+    t('33d: o saldo fisico debita as 3 parcelas da nota (1000 - 450 = 550)', r2_33(sfis33()) === 550, String(sfis33()));
+    /* nota em que a PRIMEIRA (que seria a cabeca) e a vista: a cabeca passa a ser o proximo item parcelado e a marca alem do plano dele conta */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('m1', { valor: 200, notaId: 'N8', pgTipo: 'À vista', nParc: 0 }));
+    M().push(compra33('m2', { valor: 400, notaId: 'N8', nParc: 2, pgParcelas: { 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-04-01', v: 100 } } }));
+    const sd2 = A('serieDinheiro')();
+    t('33d: nota em que o primeiro item e a vista: a cabeca e o item parcelado, a marca alem do plano dele conta (curva -500 = 200 a vista + 300 pagos)',
+      sd2.pagasAlem === 1 && r2_33(ultimo33(sd2)) === -500, S33([sd2.pagasAlem, ultimo33(sd2), sd2.semPagar]));
+  });
+
+  /* ---- 33e: nParc fracionario (o laco normal do contasPagas vai ate o TETO; o helper dele tem de acompanhar) ---- */
+  await bloco33('e', () => {
+    [3.5, 2.9].forEach(np => {
+      reset(); setg('contasBanc', banco33());
+      M().push(compra33('f1', { nParc: np, pgParcelas: marcas33(4) }));
+      const sd = A('serieDinheiro')();
+      t('33e: nParc ' + np + ' com 4 marcas de 100: a lista de pagas soma 400 (nenhuma parcela contada duas vezes), a curva -400 e o saldo 600',
+        totPagas33() === 400 && r2_33(ultimo33(sd)) === -400 && r2_33(sfis33()) === 600, S33([totPagas33(), ultimo33(sd), sfis33()]));
+    });
+  });
+
+  /* ---- 33f: a tela do Fluxo de caixa (rotulos, desmarcar, subtitulo) ---- */
+  await bloco33('f', () => {
+    M().push(compra33('s1', { pgParcelas: marcas33(4) }));
+    let html = telaContas33();
+    t('33f: a linha da parcela alem do plano diz "4 · fora do plano de 3×" (e nao "4 de 3", que parece conta errada) e as do plano seguem "1 de 3"',
+      html.indexOf('4 · fora do plano de 3×') >= 0 && html.indexOf('1 de 3') >= 0 && html.indexOf('4 de 3') < 0, '');
+    t('33f: cada linha paga tem o desmarcar dela, inclusive a da parcela 4', html.indexOf("desmarcarParcela('s1',4)") >= 0 && html.indexOf("desmarcarParcela('s1',1)") >= 0, '');
+    t('33f: o subtitulo da secao Pagas cita as "parcelas pagas a mais"', html.indexOf('parcelas pagas a mais') >= 0, '');
+    const semAtributos = html.replace(/\son\w+="[^"]*"/g, '');
+    t('33f: nenhuma palavra estranha na tela (NaN, undefined, null)', !/NaN|undefined|null/.test(semAtributos), (semAtributos.match(/.{20}(NaN|undefined|null).{20}/) || [''])[0]);
+    /* plano reduzido a 1x: o rotulo nao pode sumir (senao 3 linhas iguais, todas "paga", sem dizer qual e qual) */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('u1', { nParc: 1, pgParcelas: marcas33(3) }));
+    html = telaContas33();
+    t('33f: com o plano reduzido a 1x, as parcelas 2 e 3 aparecem como "fora do plano de 1×" e cada uma com o proprio desmarcar',
+      html.indexOf('2 · fora do plano de 1×') >= 0 && html.indexOf('3 · fora do plano de 1×') >= 0 && html.indexOf("desmarcarParcela('u1',2)") >= 0 && html.indexOf("desmarcarParcela('u1',3)") >= 0, '');
+    /* nota */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('n1', { valor: 200, notaId: 'N9', nParc: 2, pgParcelas: { 1: { d: '2026-02-01', v: 150 }, 2: { d: '2026-03-01', v: 150 }, 3: { d: '2026-04-01', v: 150 } } }));
+    M().push(compra33('n2', { valor: 400, notaId: 'N9', nParc: 2 }));
+    html = telaContas33();
+    t('33f: na nota o rotulo tambem diz "3 · fora do plano de 2×" e o desmarcar aponta pra CABECA da nota (n1), onde a marca mora',
+      html.indexOf('3 · fora do plano de 2×') >= 0 && html.indexOf("desmarcarParcela('n1',3)") >= 0, '');
+    /* nota com o plano reduzido a 1x: o rotulo tambem nao pode sumir (o "||x.alem" da nota so faz diferenca aqui) */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('w1', { valor: 200, notaId: 'N7', nParc: 1, pgParcelas: { 1: { d: '2026-02-01', v: 200 }, 2: { d: '2026-03-01', v: 100 } } }));
+    M().push(compra33('w2', { valor: 100, notaId: 'N7', nParc: 1 }));
+    html = telaContas33();
+    t('33f: nota com o plano reduzido a 1x: a parcela 2 aparece como "2 · fora do plano de 1×", com o desmarcar da cabeca (w1)',
+      html.indexOf('2 · fora do plano de 1×') >= 0 && html.indexOf("desmarcarParcela('w1',2)") >= 0, '');
+  });
+
+  /* ---- 33g: a folha impressa ---- */
+  await bloco33('g', () => {
+    M().push(compra33('s1', { pgParcelas: marcas33(4) }));
+    const cap = [];
+    ctx.document.body.insertAdjacentHTML = (pos, h) => { cap.push(String(h)); };
+    ctx.document.getElementById = idc => ({ checked: idc === 'ps_pagas', value: '', style: {}, classList: { add() {}, remove() {}, toggle() {} }, remove() {}, dataset: {} });
+    A('imprimirFluxoGo')();
+    const papel = cap.join('');
+    t('33g: a folha impressa lista a parcela alem do plano na coluna Parc. como 4/3 (as do plano seguem 1/3, 2/3, 3/3)',
+      papel.indexOf('4/3') >= 0 && papel.indexOf('1/3') >= 0 && papel.indexOf('2/3') >= 0 && papel.indexOf('3/3') >= 0, (papel.match(/.{0,30}4\/3.{0,30}/) || [papel.slice(0, 120)])[0]);
+    t('33g: a folha impressa nao tem NaN nem undefined', papel.length > 200 && !/NaN|undefined/.test(papel), papel.slice(0, 120));
+    /* plano reduzido a 1x: a coluna Parc. tambem tem de dizer qual parcela e qual (o "||x.alem" do papel so faz diferenca aqui) */
+    reset(); setg('contasBanc', banco33()); cap.length = 0;
+    M().push(compra33('s2', { nParc: 1, pgParcelas: marcas33(2) }));
+    A('imprimirFluxoGo')();
+    const papel1 = cap.join('');
+    t('33g: com o plano reduzido a 1x, a folha impressa mostra a parcela alem do plano como 2/1 e a do plano continua sem numero (1x nao tem "1/1")',
+      papel1.indexOf('>2/1<') >= 0 && papel1.indexOf('>1/1<') < 0, (papel1.match(/.{0,40}\/1.{0,20}/) || [papel1.slice(0, 120)])[0]);
+    t('33g: a descricao da linha do papel diz "fora do plano de 3×" (so na parcela alem do plano) — no papel a coluna Parc. diz 4/3, que sozinha parece conta errada',
+      papel.indexOf('fora do plano de 3×') >= 0 && (papel.match(/fora do plano/g) || []).length === 1, (papel.match(/.{0,50}fora do plano.{0,20}/) || [papel.slice(0, 120)])[0]);
+    /* nota com o plano reduzido a 1x, no papel (o "||x.alem" do ramo da NOTA so faz diferenca aqui) */
+    reset(); setg('contasBanc', banco33()); cap.length = 0;
+    M().push(compra33('w1', { valor: 200, notaId: 'N7', nParc: 1, pgParcelas: { 1: { d: '2026-02-01', v: 200 }, 2: { d: '2026-03-01', v: 100 } } }));
+    M().push(compra33('w2', { valor: 100, notaId: 'N7', nParc: 1 }));
+    A('imprimirFluxoGo')();
+    const papelN = cap.join('');
+    t('33g: nota com o plano reduzido a 1x: o papel mostra a parcela 2 como 2/1, com "fora do plano de 1×" na descricao',
+      papelN.indexOf('>2/1<') >= 0 && papelN.indexOf('fora do plano de 1×') >= 0, (papelN.match(/.{0,60}\/1.{0,60}/) || [papelN.slice(0, 120)])[0]);
+  });
+
+  /* ---- 33h: a Projecao do caixa (por conta, no mesmo escopo do saldo por emissao) ---- */
+  await bloco33('h', () => {
+    /* (R) 4x virou 3x com as 4 pagas e o valor igual: o valor cobre tudo — nao ha excedente e as duas telas batem */
+    M().push(compra33('r1', { valor: 400, pgParcelas: marcas33(4) }));
+    t('33h: 4x virou 3x, 4 pagas, valor igual (400): saldo fisico e projecao batem em 600 e o excedente e zero', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600 && exc33() === 0, S33([sfis33(), proj33(), exc33()]));
+    /* (O) valor corrigido pra baixo depois de pagar: saiu 100 alem do valor, e so o saldo fisico enxerga; a projecao desconta o excedente */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('o1', { valor: 300, pgParcelas: marcas33(4) }));
+    t('33h: valor corrigido pra 300 depois de pagar 400: o excedente e 100, e saldo fisico e projecao batem em 600', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600 && r2_33(exc33()) === 100, S33([sfis33(), proj33(), exc33()]));
+    /* (P) o valor cobre so uma parte do que passou: o excedente e a diferenca (100 pagos alem do plano - 50 que o valor ainda cobre) */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('p2', { valor: 350, pgParcelas: marcas33(4) }));
+    t('33h: valor 350 com 4 pagas de 100: o valor cobre 50 do que passou do plano, o excedente e 50 e as duas telas batem em 600', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600 && r2_33(exc33()) === 50, S33([sfis33(), proj33(), exc33()]));
+    /* duas contas: cada excedente fica na conta da compra */
+    reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }, { nome: 'Y', saldoIni: 500, saldoData: '' }]);
+    M().push(compra33('x1', { valor: 400, conta: 'X', pgParcelas: marcas33(4) }));
+    M().push(compra33('y1', { valor: 300, conta: 'Y', pgParcelas: marcas33(4) }));
+    const cbX = { nome: 'X', saldoIni: 1000, saldoData: '' }, cbY = { nome: 'Y', saldoIni: 500, saldoData: '' };
+    t('33h: duas contas: so a compra da conta Y passou do valor (excedente 100; a de X fecha), o saldo fisico total e a projecao batem em 700 (600 em X + 100 em Y)',
+      r2_33(exc33()) === 100 && r2_33(A('saldoFisicoConta')(cbX) + A('saldoFisicoConta')(cbY)) === 700 && r2_33(proj33()) === 700,
+      S33([exc33(), A('saldoFisicoConta')(cbX), A('saldoFisicoConta')(cbY), proj33()]));
+    /* compra SEM conta: nao entra em saldo nenhum, entao nao pode mexer na projecao */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('c0', { valor: 300, conta: '', pgParcelas: marcas33(4) }));
+    t('33h: compra sem conta com parcela alem do plano nao mexe em saldo nem na projecao (ficam em 1000 e 1000)', r2_33(sfis33()) === 1000 && r2_33(proj33()) === 1000, S33([sfis33(), proj33()]));
+    /* compra anterior a data-base da conta: ja esta dentro do saldo inicial */
+    reset(); const base0601 = { nome: 'X', saldoIni: 1000, saldoData: '2026-06-01' }; setg('contasBanc', [base0601]);
+    M().push(compra33('c1', { valor: 300, pgParcelas: marcas33(4) }));
+    t('33h: compra anterior a data-base da conta (01/06) nao mexe na projecao nem no saldo fisico (1000 e 1000)', r2_33(A('saldoFisicoConta')(base0601)) === 1000 && r2_33(proj33()) === 1000, S33([A('saldoFisicoConta')(base0601), proj33()]));
+    /* zero contas cadastradas (o estado real do Felype hoje): a marca alem do plano nao muda a projecao */
+    reset(); setg('contasBanc', []);
+    M().push(compra33('z1', { valor: 300, pgParcelas: marcas33(4) }));
+    let com, sem, msg = '';
+    try { com = proj33(); delete M()[0].pgParcelas; sem = proj33(); } catch (e) { msg = String((e && e.message) || e); }
+    t('33h: sem nenhuma conta cadastrada a projecao nao lanca e e a mesma com ou sem a marca alem do plano', !msg && com === sem, S33([msg, com, sem]));
+    /* sem marca alem do plano o excedente e zero e a projecao e a conta de sempre */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('p1', { valor: 300, pgParcelas: marcas33(3) }));
+    t('33h: sem marca alem do plano o excedente e zero e projecao e saldo fisico seguem iguais (700)', exc33() === 0 && r2_33(proj33()) === 700 && r2_33(sfis33()) === 700, S33([exc33(), proj33(), sfis33()]));
+    /* nota: o valor que cobre e a soma dos itens parcelados */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('n1', { valor: 200, notaId: 'N9', nParc: 2, pgParcelas: { 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-04-01', v: 100 } } }));
+    M().push(compra33('n2', { valor: 100, notaId: 'N9', nParc: 2 }));
+    t('33h: nota de 300 com 3 pagas de 100 (uma alem do plano): o valor da nota cobre, o excedente e zero e as duas telas batem em 700', exc33() === 0 && r2_33(sfis33()) === 700 && r2_33(proj33()) === 700, S33([exc33(), sfis33(), proj33()]));
+    /* o excedente nunca fica negativo: se as marcas somam MENOS que o valor, nada e "pago a mais" (o resto e o m-1 conhecido, que a marca alem do plano nao cria) */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('f1', { valor: 500, pgParcelas: marcas33(4) }));
+    t('33h: valor 500 com 4 pagas de 100 (o valor cobre mais do que foi pago): o excedente e zero, nunca negativo', exc33() === 0, S33([exc33(), proj33(), sfis33()]));
+    /* compra de troca: o saldo fisico a ignora (nao entra em conta nenhuma), entao o excedente tambem */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('k9', { origem: 'TROCA', valor: 300, pgParcelas: marcas33(4) }));
+    t('33h: compra de troca com parcela alem do plano: nao mexe no saldo fisico nem na projecao (ficam em 1000 e 1000) e o excedente e zero', exc33() === 0 && r2_33(sfis33()) === 1000 && r2_33(proj33()) === 1000, S33([exc33(), sfis33(), proj33()]));
+    /* "Parcelado" com nParc 0 (dado antigo): as telas o tratam como a vista, e o excedente tambem */
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('j9', { nParc: 0, valor: 100, pgParcelas: marcas33(2) }));
+    t('33h: compra "Parcelado" com nParc 0 (dado antigo, tratada como a vista): o excedente e zero e saldo fisico e projecao batem em 900', exc33() === 0 && r2_33(sfis33()) === 900 && r2_33(proj33()) === 900, S33([exc33(), sfis33(), proj33()]));
+    /* a parcela alem do plano paga de OUTRA conta sai dessa conta (saldo fisico), e o total das duas contas segue batendo com a projecao */
+    reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }, { nome: 'Y', saldoIni: 500, saldoData: '' }]);
+    const pgY = marcas33(4); pgY[4].conta = 'Y';
+    M().push(compra33('x2', { valor: 300, conta: 'X', pgParcelas: pgY }));
+    const sX = A('saldoFisicoConta')({ nome: 'X', saldoIni: 1000, saldoData: '' }), sY = A('saldoFisicoConta')({ nome: 'Y', saldoIni: 500, saldoData: '' });
+    t('33h: parcela alem do plano paga da conta Y: sai de Y (X 700, Y 400) e o total das duas contas bate com a projecao (1100)', r2_33(sX) === 700 && r2_33(sY) === 400 && r2_33(proj33()) === 1100, S33([sX, sY, proj33()]));
+    /* ESCOPO PELA MARCA (3a rodada, achado grave dos dois revisores): quem decide se a parcela alem do plano saiu do saldo fisico e a conta de quem
+       pagou + a data do PAGAMENTO, nao a conta/data da compra. Tres jeitos de a compra e a marca cairem em escopos diferentes: */
+    const alvo = (contas, mov, rot, sfEsperado) => {
+      reset(); setg('contasBanc', contas.map(c => Object.assign({}, c))); M().push(mov);
+      const sf = r2_33(contas.reduce((a, c) => a + A('saldoFisicoConta')(Object.assign({}, c)), 0)), pj = r2_33(proj33());
+      t('33h: ' + rot + ' — saldo fisico ' + sfEsperado + ' e a projecao bate com ele', sf === sfEsperado && pj === sfEsperado, S33([sf, pj, exc33()]));
+    };
+    alvo([{ nome: 'X', saldoIni: 1000, saldoData: '2026-03-15' }], compra33('g1', { data: '2026-01-10', venc1: '2026-02-01', pgParcelas: { 4: { d: '2026-05-01', v: 100 } } }),
+      'compra ANTES da data-base da conta, parcela alem do plano paga DEPOIS dela (o saldo debita, a compra nao entrou no saldo por emissao)', 900);
+    alvo([{ nome: 'X', saldoIni: 1000, saldoData: '' }], compra33('g2', { pgParcelas: Object.assign(marcas33(3), { 4: { d: '2026-05-01', v: 100, conta: 'Z' } }) }),
+      'parcela alem do plano paga de uma conta EXCLUIDA depois (Z fora do cadastro: nenhum saldo a debita)', 700);
+    alvo([{ nome: 'X', saldoIni: 1000, saldoData: '2026-05-01' }], compra33('g3', { data: '2026-05-10', venc1: '2026-05-10', pgParcelas: { 1: { d: '2026-05-10', v: 100 }, 2: { d: '2026-06-10', v: 100 }, 3: { d: '2026-07-10', v: 100 }, 4: { d: '2026-04-01', v: 100 } } }),
+      'parcela alem do plano paga ANTES da data-base da conta, compra depois dela (a marca ja esta no saldo inicial)', 700);
+    alvo([{ nome: 'X', saldoIni: 1000, saldoData: '2026-04-01' }], compra33('g4', { data: '2026-01-10', valor: 500, venc1: '2026-02-01',
+      pgParcelas: { 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-03-20', v: 100 }, 4: { d: '2026-05-01', v: 100 } } }),
+      'compra ANTES da data-base cujo valor nao foi todo pago (as 3 do plano ficaram dentro do saldo inicial e sobram 200 do valor): a parcela alem do plano paga depois da data-base sai do saldo fisico e a projecao a desconta INTEIRA, sem abater a folga do valor', 900);
+    /* dois cadastros com o MESMO nome (o app nao barra): saldoFisicoConta e saldoConta debitam nos dois; a projecao acompanha em vez de piorar o numero (4a rodada) */
+    reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }, { nome: 'X', saldoIni: 0, saldoData: '' }]);
+    M().push(compra33('dup', { valor: 300, pgParcelas: marcas33(4) }));
+    const sfDup = r2_33(g('contasBanc').reduce((a, c) => a + A('saldoFisicoConta')(Object.assign({}, c)), 0));
+    t('33h: dois cadastros de conta com o mesmo nome: a projecao acompanha o saldo fisico (que debita nos dois) — 200 e 200', sfDup === 200 && r2_33(proj33()) === 200, S33([sfDup, proj33(), exc33()]));
+  });
+
+  /* ---- 33i: chave herdada de Object.prototype e custo ---- */
+  await bloco33('i', () => {
+    M().push(compra33('k1', { notaId: 'constructor', pgParcelas: marcas33(4) }));
+    let msg = '';
+    try { exc33(); A('serieDinheiro')(); } catch (e) { msg = String((e && e.message) || e); }
+    t('33i: nota cujo id e "constructor" (chave herdada de Object.prototype) nao quebra o calculo do excedente nem a curva', !msg, msg);
+    reset(); setg('contasBanc', banco33());
+    for (let i = 0; i < 4000; i++) M().push(compra33('q' + i, { valor: 30, notaId: 'NT' + Math.floor(i / 3), nParc: 3, pgParcelas: (i % 3 === 0) ? marcas33(4) : undefined }));
+    const t0 = Date.now(), ex = exc33(), ms = Date.now() - t0;
+    t('33i: o excedente numa base de 4.000 itens em notas de 3 roda numa passada so, com folga (menos de 1 s), e devolve um numero', ms < 1000 && typeof ex === 'number' && !isNaN(ex), ms + ' ms, excedente ' + ex);
+  });
+
+  /* ---- 33j: o Diagnostico so afirma o que o codigo faz ---- */
+  await bloco33('j', () => {
+    const achados = () => A('provaReal')().A.filter(x => /^Parcela (paga a mais|marcada numa compra)/.test(x.titulo));
+    const casos = [
+      ['V1 parcelada + chave canonica + data ISO: diz que JA ESTA CONTADA e como acertar', compra33('d1', { pgParcelas: marcas33(4) }),
+        x => /^Parcela paga a mais do que o plano da compra: /.test(x.titulo) && /já está contada \(Fluxo de caixa › pagas, saldos e gráfico de dinheiro\)/.test(x.detalhe)
+          && /Se ela foi paga de verdade, acerte o nº de parcelas da compra: o botão abaixo leva até ela, e é só tocar em ✏️ editar/.test(x.detalhe)
+          && /Só desmarque a parcela se esse pagamento nunca aconteceu \(Fluxo de caixa › pagas, com o período em "tudo"\)/.test(x.detalhe) && x.detalhe.indexOf(' ou desmarque') < 0,
+        () => r2_33(sfis33()) === 600 && alem33().length === 1],
+      ['V1 sem data na compra: nao promete a lista de pagas (ela exige a data) e o saldo e o grafico contam de fato', compra33('d1', { data: '', pgParcelas: marcas33(4) }),
+        x => /já está contada \(saldos e gráfico de dinheiro\)/.test(x.detalhe) && x.detalhe.indexOf('pagas') < 0 && x.detalhe.indexOf('desmarque') < 0,
+        () => r2_33(sfis33()) === 600 && alem33().length === 0 && r2_33(ultimo33(A('serieDinheiro')())) === -400],
+      ['V2 parcelada com a marca invalida (data torta): diz que NAO entra nas contas e o saldo confirma (so as 3 do plano)', compra33('d1', { pgParcelas: Object.assign(marcas33(3), { 4: { d: '01/05/2026', v: 100 } }) }),
+        x => /^Parcela paga a mais do que o plano da compra: /.test(x.titulo) && /não entra nas contas \(data inválida ou número fora do padrão\)/.test(x.detalhe) && x.detalhe.indexOf('já está contada') < 0,
+        () => r2_33(sfis33()) === 700 && alem33().length === 0],
+      ['V3 compra editada pra a vista com as marcas: diz que a marca NAO conta em conta nenhuma (o valor inteiro ja conta na data da compra) e nao fala em "0×"',
+        compra33('d1', { pgTipo: 'À vista', nParc: 0, pgParcelas: marcas33(2) }),
+        x => /^Parcela marcada numa compra que hoje é à vista: /.test(x.titulo) && /essa compra não é mais parcelada/.test(x.detalhe) && /não entra em conta nenhuma/.test(x.detalhe) && x.detalhe.indexOf('0×') < 0,
+        () => r2_33(sfis33()) === 700 && totPagas33() === 300 && alem33().length === 0],
+      ['V4 compra de troca que virou parcelada: diz que so a lista de pagas mostra (saldos e grafico nao contam)', compra33('d1', { origem: 'TROCA', pgParcelas: marcas33(4) }),
+        x => /^Parcela marcada numa compra de troca ou de caixa aberta: /.test(x.titulo) && /Só a lista de pagas a mostra/.test(x.detalhe) && /os saldos e o gráfico de dinheiro não a contam/.test(x.detalhe),
+        () => r2_33(sfis33()) === 1000 && alem33().length === 1 && r2_33(ultimo33(A('serieDinheiro')())) === 0],
+    ];
+    /* a marca que nenhum saldo debita (pagamento antes da data-base da conta; conta de quem pagou fora do cadastro): o texto NAO promete "saldos" */
+    const cbBase51 = { nome: 'X', saldoIni: 1000, saldoData: '2026-05-01' };
+    casos.push(
+      ['V1 com a marca paga ANTES da data-base da conta: o texto so promete a lista de pagas e o grafico (nenhum saldo a debita)',
+        compra33('d1', { data: '2026-05-10', venc1: '2026-05-10', pgParcelas: { 1: { d: '2026-05-10', v: 100 }, 2: { d: '2026-06-10', v: 100 }, 3: { d: '2026-07-10', v: 100 }, 4: { d: '2026-04-01', v: 100 } } }),
+        x => /já está contada \(Fluxo de caixa › pagas e gráfico de dinheiro\)/.test(x.detalhe) && x.detalhe.indexOf('saldos') < 0,
+        () => r2_33(A('saldoFisicoConta')(cbBase51)) === 700 && alem33().length === 1, [cbBase51]],
+      ['V1 com a marca paga de uma conta que nao esta mais no cadastro: idem, sem "saldos"',
+        compra33('d1', { pgParcelas: Object.assign(marcas33(3), { 4: { d: '2026-05-01', v: 100, conta: 'Z' } }) }),
+        x => /já está contada \(Fluxo de caixa › pagas e gráfico de dinheiro\)/.test(x.detalhe) && x.detalhe.indexOf('saldos') < 0,
+        () => r2_33(sfis33()) === 700 && alem33().length === 1, null]);
+    casos.forEach(([rot, mov, okTexto, okRealidade, contas]) => {
+      reset(); setg('contasBanc', contas || banco33());
+      M().push(mov);
+      const a = achados();
+      t('33j: ' + rot + ' — o texto', a.length >= 1 && okTexto(a[0]), S33(a.map(x => [x.titulo, x.detalhe])));
+      t('33j: ' + rot + ' — e a realidade das telas bate com o que o texto promete', okRealidade(), S33([sfis33(), alem33().length, totPagas33()]));
+    });
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('d9', { pgParcelas: marcas33(3) }));
+    t('33j: sem marca alem do plano o Diagnostico nao acusa nada desta classe', achados().length === 0, S33(achados()));
+  });
+
+  /* ---- 33k: o aviso do grafico ---- */
+  await bloco33('k', () => {
+    M().push(compra33('a1', { pgParcelas: marcas33(4) }));
+    const gr = (cx, col) => A('graficoLinhaEstoque')(A('serieEstoque')(), A('serieDinheiro')(), A('serieColecao')(), cx, col);
+    const ligado = gr(true, false), desligado = gr(false, false);
+    t('33k: com o dinheiro ligado o grafico avisa "1 parcela paga a mais do que o plano da compra (R$ 100,00)" e diz que o dinheiro esta contado',
+      ligado.indexOf('1 parcela paga a mais do que o plano da compra (' + fmt33(100) + ')') >= 0 && ligado.indexOf('Esse dinheiro está contado aqui') >= 0, (ligado.match(/parcela[^<]{0,160}/) || [''])[0]);
+    t('33k: com o dinheiro desligado o aviso some (como os outros avisos do dinheiro)', desligado.indexOf('paga a mais do que o plano') < 0, '');
+    t('33k: nenhum dos dois traz NaN ou undefined', !/NaN|undefined/.test(ligado + desligado), '');
+  });
+
+  /* ---- 33l: mesma sessao, pai e filho de baixarLote compartilham o objeto pgParcelas — a marca alem do plano conta uma vez na curva ---- */
+  await bloco33('l', () => {
+    M().push(compra33('p1', { qtd: 3, pgParcelas: marcas33(4) }));
+    const filho = A('baixarLote')('p1', 1, 'Vendido', { dataVenda: '2026-06-01', dataSaida: '2026-06-01' });
+    const sd = A('serieDinheiro')();
+    t('33l: lote fracionado na mesma sessao (pai e filho com a mesma marca alem do plano): a curva conta a marca UMA vez (1 parcela, R$ 100)',
+      sd.pagasAlem === 1 && r2_33(sd.pagasAlemValor) === 100, S33([filho.id !== 'p1', filho.pgParcelas === M()[0].pgParcelas, sd.pagasAlem, sd.pagasAlemValor]));
+  });
+
+  /* ---- 33m: o texto do desmarcar diz o que de fato acontece ---- */
+  await bloco33('m', () => {
+    M().push(compra33('s1', { pgParcelas: marcas33(4) }));
+    const msgs = [], toasts = [];
+    let resp = false;
+    ctx.confirm = q => { msgs.push(String(q)); return resp; };
+    setg('toast', m => { toasts.push(String(m)); });
+    A('desmarcarParcela')('s1', 4);
+    t('33m: cancelar o desmarcar nao apaga a marca (a pergunta foi feita 1 vez e nada foi avisado)', msgs.length === 1 && (4 in M()[0].pgParcelas) && toasts.length === 0, S33([msgs.length, Object.keys(M()[0].pgParcelas), toasts]));
+    resp = true;
+    A('desmarcarParcela')('s1', 4);
+    A('desmarcarParcela')('s1', 3);
+    t('33m: parcela FORA do plano: a pergunta diz que ela deixa de contar como paga e NAO volta pro "a pagar" (nao existe "a pagar" pra ela); a do plano segue "Ela volta pro a pagar"',
+      msgs.length === 3 && /fora do plano da compra \(3×\)/.test(msgs[1]) && /não volta pro "a pagar"/.test(msgs[1]) && msgs[1].indexOf('Ela volta') < 0 && /Ela volta pro "a pagar"/.test(msgs[2]),
+      S33(msgs));
+    t('33m: a pergunta da parcela fora do plano protege quem pagou de verdade: manda cancelar e acertar o nº de parcelas da compra (desmarcar deixaria o saldo fisico dizendo que saiu menos dinheiro do que saiu)',
+      /Se esse pagamento aconteceu de verdade, cancele e acerte o nº de parcelas da compra/.test(msgs[1]) && msgs[2].indexOf('cancele') < 0, S33(msgs));
+    t('33m: o aviso na tela tambem: "deixou de contar como paga" pra fora do plano e "voltou pro a pagar" pra do plano',
+      toasts.length === 2 && /deixou de contar como paga/.test(toasts[0]) && /voltou pro a pagar/.test(toasts[1]), S33(toasts));
+    /* plano fracionario (dado antigo): a parcela 4 de um plano de 3,5 e parcela DO plano (as listas de pagar/pagas usam o teto), entao volta pro "a pagar" */
+    reset(); setg('contasBanc', banco33()); msgs.length = 0;
+    M().push(compra33('f1', { nParc: 3.5, pgParcelas: marcas33(4) }));
+    A('desmarcarParcela')('f1', 4);
+    t('33m: plano fracionario (3,5): a parcela 4 e do plano (teto), entao a pergunta diz "Ela volta pro a pagar" e nao fala em fora do plano',
+      msgs.length === 1 && /Ela volta pro "a pagar"/.test(msgs[0]) && msgs[0].indexOf('fora do plano') < 0, S33(msgs));
+  });
+
+  /* ---- 33n: peca vendida ANTES de chegar e depois CONFIRMADA nao volta pra Pedido quando a venda e desfeita ---- */
+  await bloco33('n', () => {
+    const vd = A('voltaDe');
+    t('33n: venda de peca vendida antes de chegar (vendaDe pedido), chegada NAO confirmada: volta pra Pedido', vd({ vendaDe: 'pedido' }, {}) === 'Pedido' && vd({ vendaDe: 'pedido' }, null) === 'Pedido', '');
+    t('33n: a mesma peca com dataChegada gravada ja esta na mao: volta pra Em estoque', vd({ vendaDe: 'pedido' }, { dataChegada: '2026-09-10' }) === 'Em estoque', '');
+    t('33n: venda de colecao volta pra Coleção mesmo com dataChegada; venda normal e venda ausente voltam pra Em estoque',
+      vd({ vendaTipo: 'colecao', vendaDe: 'pedido' }, { dataChegada: '2026-09-10' }) === 'Coleção' && vd({ vendaDe: 'estoque' }, {}) === 'Em estoque' && vd(null, {}) === 'Em estoque' && vd(undefined, undefined) === 'Em estoque', '');
+    /* ponta a ponta: pre-venda -> chegada confirmada -> excluir a venda devolvendo o produto */
+    ctx.confirm = () => true;
+    M().push(compra33('vp', { pgTipo: 'À vista', nParc: 0, qtd: 2, valor: 200, situacao: 'Pedido', destino: 'Vender', conta: '' }));
+    let pv = preVenda33('vp', 1, 'Fulano');
+    A('chegouPeca')(pv.peca.id);
+    A('execExcl')(pv.venda.id, 'vendaVolta');
+    let peca = M().find(m => m.id === pv.peca.id);
+    let mt = A('motor')();
+    t('33n: peca pre-vendida com chegada CONFIRMADA e venda excluida "devolvendo o produto": volta pra Em estoque, mantem a dataChegada e entra no estoque disponivel (100; os outros 100 seguem no pedido)',
+      A('sitDe')(peca) === 'Em estoque' && !!peca.dataChegada && r2_33(mt.estoque) === 100 && r2_33(mt.pedido) === 100, S33([A('sitDe')(peca), peca.dataChegada, mt.estoque, mt.pedido]));
+    reset(); setg('contasBanc', banco33());
+    M().push(compra33('vq', { pgTipo: 'À vista', nParc: 0, qtd: 2, valor: 200, situacao: 'Pedido', destino: 'Vender', conta: '' }));
+    pv = preVenda33('vq', 1, 'Fulano');
+    A('execExcl')(pv.venda.id, 'vendaVolta');
+    peca = M().find(m => m.id === pv.peca.id);
+    mt = A('motor')();
+    t('33n: a mesma peca SEM chegada confirmada volta pra Pedido (ainda nao chegou — o que o desfazer sempre fez): estoque 0 e pedido 200',
+      A('sitDe')(peca) === 'Pedido' && !peca.dataChegada && r2_33(mt.estoque) === 0 && r2_33(mt.pedido) === 200, S33([A('sitDe')(peca), peca.dataChegada, mt.estoque, mt.pedido]));
+    /* os outros dois caminhos que devolvem a peca: a DEVOLUCAO (execDev) e o "desfazer vinculo" (desvincular) */
+    const caminho = (rot, id0, confirmada, agir) => {
+      reset(); setg('contasBanc', banco33()); ctx.confirm = () => true;
+      M().push(compra33(id0, { pgTipo: 'À vista', nParc: 0, qtd: 2, valor: 200, situacao: 'Pedido', destino: 'Vender', conta: '' }));
+      const v = preVenda33(id0, 1, 'Fulano');
+      if (confirmada) A('chegouPeca')(v.peca.id);
+      agir(v);
+      const pc = M().find(m => m.id === v.peca.id), esperado = confirmada ? 'Em estoque' : 'Pedido';
+      t('33n: ' + rot + ' — chegada ' + (confirmada ? 'CONFIRMADA' : 'NAO confirmada') + ': a peca volta pra ' + esperado, A('sitDe')(pc) === esperado && !('dataVenda' in pc) && !('vendaRef' in pc), S33([A('sitDe')(pc), pc.dataVenda, pc.vendaRef]));
+    };
+    caminho('devolucao (execDev)', 'vr1', true, v => A('execDev')(v.venda.id));
+    caminho('devolucao (execDev)', 'vr2', false, v => A('execDev')(v.venda.id));
+    caminho('desfazer vinculo (desvincular)', 'vr3', true, v => A('desvincular')(v.venda.id));
+    caminho('desfazer vinculo (desvincular)', 'vr4', false, v => A('desvincular')(v.venda.id));
+  });
+
+  /* ---- 33o: salvar() — nº de parcelas inteiro e a pergunta ao REDUZIR o parcelamento de compra que ja tem parcela paga com numero maior ---- */
+  await bloco33('o', () => {
+    const campos = {};
+    const elCampo = idc => ({
+      get value() { return (idc in campos) ? campos[idc] : ''; }, set value(v) { campos[idc] = v; },
+      checked: false, textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, children: [],
+      appendChild() {}, remove() {}, addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; }, scrollIntoView() {}, focus() {},
+      insertAdjacentHTML() {}, getAttribute() { return null; }, setAttribute() {}, removeAttribute() {}, closest() { return null; }, cloneNode() { return elCampo(idc); }
+    });
+    const avisos = [], perguntas = [];
+    let resp = true;
+    ctx.alert = m => { avisos.push(String(m)); };
+    ctx.confirm = m => { perguntas.push(String(m)); return resp; };
+    /* o que o formulario de EDICAO faz: abre a compra, muda o nº de parcelas e toca em salvar */
+    const editar = (rec, nParcNovo, extra) => {
+      reset(); M().push(rec);
+      setg('editId', rec.id); setg('tipoSel', 'COMPRA'); setg('tela', 'lancar'); setg('pgTipo', 'Parcelado'); setg('_fotosPend', []);
+      setg('_db', null); setg('_syncReady', false); setg('_restaurando', false); setg('excluidos', {}); setg('_baseH', {});
+      Object.keys(campos).forEach(k => delete campos[k]);
+      Object.assign(campos, { f_val: String(rec.valor), f_data: rec.data, f_jogo: 'Pokémon', f_cat: 'ETB', f_col: '151', f_idi: '—', f_qtd: String(rec.qtd), f_cp: 'Loja',
+        f_sit: 'Em estoque', f_nparc: String(nParcNovo), f_venc1: rec.venc1, f_conta: 'X', f_taxa: '0', f_pg: 'Parcelado' }, extra || {});
+      ctx.document.getElementById = elCampo;
+      avisos.length = 0; perguntas.length = 0;
+      A('salvar')();
+      return M().find(m => m.id === rec.id);
+    };
+    const quatro = () => compra33('s1', { nParc: 4, valor: 400, pgParcelas: marcas33(4) });
+    let r = editar(quatro(), 3);
+    t('33o: reduzir de 4x pra 3x com a parcela 4 ja paga PERGUNTA antes (1 vez), dizendo que a parcela 4 ja esta marcada como paga, que passa a ficar FORA do plano e que o mais certo e manter o nº de parcelas',
+      perguntas.length === 1 && /mudando o parcelamento para 3×/.test(perguntas[0]) && /a parcela 4 já está marcada como paga/.test(perguntas[0]) && /FORA do plano da compra/.test(perguntas[0]) && /o mais certo é manter o número de parcelas/.test(perguntas[0]),
+      S33(perguntas));
+    t('33o: respondendo OK, a edicao e salva (3x) e a marca da parcela 4 fica onde estava (o dinheiro segue contado)', r.nParc === 3 && (4 in r.pgParcelas) && avisos.length === 0, S33([r.nParc, Object.keys(r.pgParcelas), avisos]));
+    resp = false;
+    r = editar(quatro(), 3);
+    t('33o: respondendo Cancelar, NADA e salvo: a compra segue em 4x com as 4 marcas', perguntas.length === 1 && r.nParc === 4 && Object.keys(r.pgParcelas).length === 4, S33([perguntas.length, r.nParc, Object.keys(r.pgParcelas)]));
+    resp = true;
+    r = editar(compra33('s2', { nParc: 5, valor: 500, pgParcelas: marcas33(5) }), 3);
+    t('33o: com duas parcelas alem do novo plano a pergunta fala no plural: "as parcelas 4, 5 ... elas passam"',
+      perguntas.length === 1 && /as parcelas 4, 5 já estão marcadas como pagas/.test(perguntas[0]) && /elas passam a ficar FORA do plano/.test(perguntas[0]), S33(perguntas));
+    r = editar(compra33('s3', { nParc: 4, valor: 400, pgParcelas: marcas33(3) }), 3);
+    t('33o: reduzir de 4x pra 3x quando a parcela 4 ainda NAO foi paga nao pergunta nada (edicao normal nao e interrompida) e salva', perguntas.length === 0 && r.nParc === 3, S33([perguntas, r.nParc]));
+    r = editar(quatro(), 4);
+    t('33o: editar uma compra sem mudar o nº de parcelas nao pergunta nada', perguntas.length === 0 && r.nParc === 4, S33([perguntas, r.nParc]));
+    r = editar(compra33('s4', { nParc: 3, valor: 300 }), 2);
+    t('33o: compra sem nenhuma parcela paga (sem pgParcelas) reduz sem pergunta', perguntas.length === 0 && r.nParc === 2, S33([perguntas, r.nParc]));
+    /* nº de parcelas tem de ser inteiro */
+    ['3.5', '-2', '2.9', '999999', '1e3', '121'].forEach(v => {
+      r = editar(quatro(), v);
+      t('33o: nº de parcelas "' + v + '" e recusado com aviso claro (inteiro, de 1 a 120) e NADA e salvo (a compra segue em 4x)',
+        avisos.length === 1 && /inteiro, de 1 a 120/.test(avisos[0]) && perguntas.length === 0 && r.nParc === 4, S33([avisos, perguntas, r.nParc]));
+    });
+    r = editar(compra33('s10', { nParc: 4, valor: 400 }), '120');
+    t('33o: 120 parcelas (o teto) ainda e aceito', avisos.length === 0 && r.nParc === 120, S33([avisos, r.nParc]));
+    r = editar(compra33('s5', { nParc: 4, valor: 400 }), '');
+    t('33o: campo de parcelas vazio segue valendo 1 (como sempre) — sem aviso de inteiro', avisos.length === 0 && r.nParc === 1, S33([avisos, r.nParc]));
+    /* 4a rodada: compra que JA esta na situacao (nParc 3, marca 4) — editar outra coisa nao pergunta nada, e o Cancelar nao pode jogar fora a edicao */
+    const jaFora = () => compra33('s6', { nParc: 3, valor: 300, pgParcelas: marcas33(4) });
+    r = editar(jaFora(), 3, { f_obs: 'texto novo' });
+    t('33o: compra que JA tem a parcela 4 fora do plano de 3x: editar so a observacao NAO pergunta nada e salva (o Cancelar nao joga fora a edicao)',
+      perguntas.length === 0 && r.obs === 'texto novo' && r.nParc === 3 && (4 in r.pgParcelas), S33([perguntas, r.obs, r.nParc]));
+    r = editar(compra33('s7', { nParc: 3, valor: 300, pgParcelas: marcas33(5) }), 2);
+    t('33o: ja com as parcelas 4 e 5 fora do plano de 3x, reduzir pra 2x pergunta SO da que a edicao deixa fora agora (a 3)',
+      perguntas.length === 1 && /a parcela 3 já está marcada como paga/.test(perguntas[0]) && perguntas[0].indexOf('4') < 0 && perguntas[0].indexOf('5') < 0, S33(perguntas));
+    r = editar(jaFora(), 4);
+    t('33o: com a parcela 4 fora do plano de 3x, AUMENTAR pra 4x (o que acerta a compra) nao pergunta nada e a parcela passa a ser do plano',
+      perguntas.length === 0 && r.nParc === 4 && A('parcelasAlemDoPlano')(r.pgParcelas, r.nParc).length === 0, S33([perguntas, r.nParc]));
+    r = editar(compra33('s8', { origem: 'TROCA', nParc: 4, valor: 400, pgParcelas: marcas33(4) }), 3);
+    t('33o: compra de troca (origem) nunca ganha a pergunta (as telas de dinheiro nao a tratam como parcelada)', perguntas.length === 0, S33(perguntas));
+    r = editar(compra33('s9', { pgTipo: 'À vista', nParc: 0, valor: 300, pgParcelas: marcas33(4) }), 3);
+    t('33o: compra que era a vista e virou 3x com a parcela 4 ja marcada pergunta (a marca passa a contar como fora do plano)',
+      perguntas.length === 1 && /a parcela 4 já está marcada como paga/.test(perguntas[0]), S33(perguntas));
+    /* a nota: a mesma trava na hora de salvar */
+    reset(); avisos.length = 0;
+    setg('notaItens', [{ cat: 'ETB', qtd: 1, valor: 100 }]);
+    setg('notaHead', { frete: 0, taxa: 0, cp: 'Loja', conta: 'X', sit: 'Em estoque', data: '2026-03-01', num: '', pg: 'Parcelado', nParc: 3.5, venc1: '2026-04-01', obs: '' });
+    A('salvarNota')();
+    t('33o: nota com "3,5" parcelas e recusada com o mesmo aviso e nada e salvo', avisos.length === 1 && /inteiro, de 1 a 120/.test(avisos[0]) && M().length === 0, S33([avisos, M().length]));
+    setg('notaItens', []);
+  });
+}).catch(e=>{fail++;console.log('  FALHOU  secao 33 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');
   console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
   process.exit(fail ? 1 : 0);

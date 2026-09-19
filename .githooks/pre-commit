@@ -16,25 +16,38 @@
 # As regras moram em checks-app.js (fonte canonica); este arquivo so o chama.
 #
 # DESENHO (skill 25): detector de ESTADO determinado — o app faz o que tem que fazer, ou nao.
-# FAIL-OPEN quanto ao AMBIENTE: sem node, ou sem o checks-app.js, o commit PASSA com aviso
-# (a trava nunca vira o motivo de voce nao conseguir salvar trabalho).
+# FAIL-OPEN quanto ao AMBIENTE: sem node, ou sem o checks-app.js no repositorio (nem neste commit nem no HEAD), o commit PASSA com aviso
+# (a trava nunca vira o motivo de voce nao conseguir salvar trabalho). Tirar do commit uma peca que o HEAD tem (git rm, git mv) BARRA.
 # FAIL-CLOSED quanto ao CONTEUDO: se o checks-app.js rodar e reprovar, o commit para.
 # ESCAPE: git commit --no-verify  (ou apague este arquivo).
 set -e
-MUDOU=$(git diff --cached --name-only | grep -xE 'index.html|checks-app.js|checks-suite.py|testes-nucleo.js' || true)
+# [v2.6e, revisor fiacao r8 M1] Ctrl+C dentro do hook saia mudo e deixava a copia do index.html e a pasta das pecas no TEMP (perto de 1 MB)
+TMP=""; BASE=""; PECAS=""; TP=""; TC=""
+# [v2.6f, revisor fiacao r9 L1] temporarios com prefixo fixo e faxina no comeco: com a tecla de verdade o git cai no meio e leva o hook junto, e
+# pelo publicar.sh com o terminal aberto nada era limpo em 7 de 8 interrupcoes (cerca de 1,8 MB por Ctrl+C); o hook seguinte, pelo publicar.sh
+# ou a mao, apaga os que tem mais de 10 minutos
+TMPD=${TMPDIR:-/tmp}
+tmpf() { mktemp "$TMPD/tcg-precommit.XXXXXX" 2>/dev/null || echo "$TMPD/tcg-precommit.$$.$1"; }
+tmpd() { mktemp -d "$TMPD/tcg-precommit.XXXXXX" 2>/dev/null || { mkdir -p "$TMPD/tcg-precommit.$$.pecas"; echo "$TMPD/tcg-precommit.$$.pecas"; }; }
+find "$TMPD" -maxdepth 1 -name 'tcg-precommit.*' -mmin +10 -exec rm -rf {} + 2>/dev/null || true
+limpa() { for f in "$TMP" "$BASE" "$PECAS" "$TP" "$TC"; do [ -n "$f" ] && rm -rf "$f"; done; return 0; }
+trap 'limpa; echo "[pre-commit] interrompido: nada foi commitado"; exit 130' INT TERM
+# [v2.6e, revisor fiacao r8 L1] --no-renames: com a deteccao de renomeacao, `git mv checks-app.js outro.js` so mostrava o nome novo, o filtro
+# nao via a peca saindo e o hook saia antes da cura
+MUDOU=$(git diff --cached --no-renames --name-only | grep -xE 'index.html|checks-app.js|checks-suite.py|testes-nucleo.js|testes-nucleo.minimo|trava-nucleo.sh' || true)
 
 # TRAVA DO DADO DE PRECO (2026-08-21). O filtro acima so olha o CODIGO do app; o precos.json,
 # que e o dado que o Felype de fato le na tela, nao era conferido por nada — commit que mexia
 # so nele passava por zero trava. Foi assim que "Vaporeon (tg02-tg30)" perdeu o preco de
 # R$200,00 em silencio: o robo renomeou a ficha e a linha do cadastro ficou orfa.
 # Confere a versao do INDICE, nao a do disco — e o que vai ser commitado de verdade.
-DADO=$(git diff --cached --name-only | grep -xE 'precos.json|robo/codigos.txt' || true)
+DADO=$(git diff --cached --no-renames --name-only | grep -xE 'precos.json|robo/codigos.txt' || true)
 if [ -n "$DADO" ]; then
   if ! command -v node >/dev/null 2>&1 || [ ! -f robo/check-fichas-rachadas.js ]; then
     echo "[pre-commit] node ou check-fichas-rachadas.js ausente — sem conferir o dado de preco (passando)"
   else
-    TP=$(mktemp 2>/dev/null || echo "/tmp/precommit-precos.json")
-    TC=$(mktemp 2>/dev/null || echo "/tmp/precommit-codigos.txt")
+    TP=$(tmpf precos)
+    TC=$(tmpf codigos)
     git show :precos.json      > "$TP" 2>/dev/null || git show HEAD:precos.json      > "$TP" 2>/dev/null || true
     git show :robo/codigos.txt > "$TC" 2>/dev/null || git show HEAD:robo/codigos.txt > "$TC" 2>/dev/null || true
     PRECOS_JSON="$TP" CODIGOS_TXT="$TC" node robo/check-fichas-rachadas.js || { rm -f "$TP" "$TC"; exit 1; }
@@ -44,7 +57,15 @@ fi
 
 [ -n "$MUDOU" ] || exit 0
 command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem conferir o app (passando)"; exit 0; }
-[ -f checks-app.js ] || { echo "[pre-commit] checks-app.js ausente — sem conferir o app (passando)"; exit 0; }
+# [v2.6d, revisor fiacao r7 L1] "ausente" so e ambiente quando o HEAD tambem nao tem a peca: `git rm checks-app.js` saia por aqui, antes do laco
+# que barra as pecas, e o commit passava sem --no-verify. [v2.6e, revisor fiacao r8 L1] a peca no INDICE, nao no disco: apagar so do disco
+# barrava com motivo falso, e o commit levava a peca do mesmo jeito
+if ! git cat-file -e :checks-app.js 2>/dev/null; then
+  if git cat-file -e HEAD:checks-app.js 2>/dev/null; then
+    echo "COMMIT BARRADO: checks-app.js sai do repositorio neste commit — rode: git checkout HEAD -- checks-app.js e git add checks-app.js. Tirar de proposito e decisao consciente: git commit --no-verify passa daqui, e o CI reprova"; exit 1
+  fi
+  echo "[pre-commit] checks-app.js ausente — sem conferir o app (passando)"; exit 0
+fi
 
 # Confere o index.html COMO ELE VAI FICAR APOS O COMMIT — que e sempre a versao do INDICE:
 # se o commit toca o index.html, o indice tem a versao nova; se toca so o checks-app.js, o
@@ -53,7 +74,7 @@ command -v node >/dev/null 2>&1 || { echo "[pre-commit] node ausente — sem con
 # "senao confere o do disco" que NUNCA rodava — `git show :index.html` sempre tem sucesso
 # pra arquivo rastreado, esteja ou nao staged. Comentario que descreve caminho morto engana
 # quem for mexer depois.]
-TMP=$(mktemp 2>/dev/null || echo "/tmp/precommit-index.html")
+TMP=$(tmpf index)
 git show :index.html > "$TMP" 2>/dev/null || { echo "[pre-commit] index.html fora do indice — nada a conferir"; exit 0; }
 # REDE GROSSA: compara com a versao ANTERIOR (HEAD) e barra se alguma funcao sumiu sem
 # declaracao. E o unico check que nao depende de alguem ter lembrado de enumerar a capacidade,
@@ -61,21 +82,29 @@ git show :index.html > "$TMP" 2>/dev/null || { echo "[pre-commit] index.html for
 # Remocao proposital:  PODE_REMOVER="nomeA,nomeB" git commit -m "msg" -m "PODE_REMOVER=nomeA,nomeB"
 # (a variavel libera AQUI; a linha na MENSAGEM libera no CI, que nao ve ambiente. Publicando
 #  por `PODE_REMOVER=... sh publicar.sh`, o carimbo na mensagem sai sozinho.)
-BASE=$(mktemp 2>/dev/null || echo "/tmp/precommit-base.html")
+# [13/09, revisor fiacao r2 M6] cada peca na versao do INDICE, nao a do disco: o app ja vinha do indice, mas o checks-app.js, o
+# testes-nucleo.js e o minimo vinham do disco — o commit era certificado com uma combinacao que nao era a dele (visto: commit
+# barrado mostrando so "checks do app OK", porque a secao nova do disco estourava contra o app velho do indice).
+# [13/09, revisor fiacao r3 M2] sem reserva do disco: ela so era alcancada quando a peca NAO ia no commit (git rm --cached,
+# commit -am com a peca nova ainda nao adicionada) — ou seja, certificava justamente a combinacao errada, e o CI ficava
+# vermelho depois. Peca fora do indice barra o commit dizendo o que adicionar.
+PECAS=$(tmpd)
+
+doIndice() { if git show ":$1" > "$PECAS/$1" 2>/dev/null; then echo "$PECAS/$1"; fi; }
+# [v2.6, revisor fiacao r5 L4] a suite da vacina tambem tem de estar no commit: apagada, o publicar.sh seguia sem ela e so o CI via, depois do push
+CHECKS=$(doIndice checks-app.js); TESTES=$(doIndice testes-nucleo.js); MINIMO=$(doIndice testes-nucleo.minimo); TRAVA=$(doIndice trava-nucleo.sh); SUITE=$(doIndice checks-suite.py)
+for par in "checks-app.js:$CHECKS" "testes-nucleo.js:$TESTES" "testes-nucleo.minimo:$MINIMO" "trava-nucleo.sh:$TRAVA" "checks-suite.py:$SUITE"; do
+  # [v2.6c, revisor fiacao r6 L4] quem barra a peca fora do commit e este hook (a nota SEM-SUITE do publicar.sh so chega ao commit quando o
+  # proprio hook tambem sumiu); a saida consciente fica dita na mensagem
+  [ -n "${par#*:}" ] || { echo "COMMIT BARRADO: ${par%%:*} nao esta neste commit (removido ou ainda nao adicionado) — rode: git add ${par%%:*}. Tirar de proposito e decisao consciente: git commit --no-verify passa daqui, e o CI reprova"; limpa; exit 1; }
+done
+BASE=$(tmpf base)
 if git show HEAD:index.html > "$BASE" 2>/dev/null; then
-  node checks-app.js "$TMP" --contra "$BASE" || { rm -f "$TMP" "$BASE"; exit 1; }
+  node "$CHECKS" "$TMP" --contra "$BASE" || { limpa; exit 1; }
 else
-  node checks-app.js "$TMP" || { rm -f "$TMP"; exit 1; }
+  node "$CHECKS" "$TMP" || { limpa; exit 1; }
 fi
-rm -f "$BASE"
-# regras de negocio de ponta a ponta, sobre a MESMA versao do indice que a vacina acabou de ver
-# [fotos F1 23/08, P0-5] portao fail-closed: arquivo obrigatorio e contagem minima (testes-nucleo.minimo)
-[ -f testes-nucleo.js ] || { echo "COMMIT BARRADO: testes-nucleo.js nao existe"; rm -f "$TMP"; exit 1; }
-MIN_TESTES=$(cat testes-nucleo.minimo 2>/dev/null | tr -d '[:space:]')
-[ -n "$MIN_TESTES" ] || { echo "COMMIT BARRADO: testes-nucleo.minimo ausente ou vazio"; rm -f "$TMP"; exit 1; }
-SAIDA_TESTES=$(node testes-nucleo.js "$TMP" 2>&1); RC_TESTES=$?
-echo "$SAIDA_TESTES" | tail -3
-[ $RC_TESTES -eq 0 ] || { rm -f "$TMP"; exit 1; }
-N_TESTES=$(echo "$SAIDA_TESTES" | grep -o '[0-9][0-9]* passaram' | tail -1 | grep -o '^[0-9]*')
-[ "${N_TESTES:-0}" -ge "$MIN_TESTES" ] || { echo "COMMIT BARRADO: testes-nucleo passou $N_TESTES testes, minimo $MIN_TESTES"; rm -f "$TMP"; exit 1; }
-rm -f "$TMP"
+# regras de negocio de ponta a ponta, sobre a MESMA versao do indice que a vacina acabou de ver. [fotos F1 23/08, P0-5] portao
+# fail-closed; [13/09, M1] a regra mora em trava-nucleo.sh, a mesma do publicar.sh e do CI (a copia antiga saia muda com set -e)
+sh "$TRAVA" "$TMP" "$TESTES" "$MINIMO" || { echo "COMMIT BARRADO (o motivo esta acima)"; limpa; exit 1; }
+limpa

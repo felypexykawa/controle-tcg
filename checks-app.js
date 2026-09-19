@@ -368,10 +368,12 @@ const CAPACIDADES = [
        pra uma venda que nao existe mais: some do estoque sem ter sido vendido. */
     nome: 'exclusao segue o lastro (venda devolve o produto, compra mostra a familia)',
     perde: 'o item preso em "Vendido" sem dono depois de apagar a venda — e a exclusao de estoque que deixa o pedido do mesmo produto orfao para tras',
-    precisa: ['pecaDaVenda', 'voltarPeca', 'famDe', 'rotDe', 'sitDe', 'raizDe', 'excluir', 'execExcl', 'devolver', 'execDev', 'modalAviso'],
-    recorta: ['pecaDaVenda', 'voltarPeca', 'famDe', 'rotDe', 'sitDe', 'raizDe'],
+    precisa: ['pecaDaVenda', 'voltarPeca', 'voltaDe', 'famDe', 'rotDe', 'sitDe', 'raizDe', 'excluir', 'execExcl', 'devolver', 'execDev', 'modalAviso'],
+    recorta: ['pecaDaVenda', 'voltarPeca', 'voltaDe', 'famDe', 'rotDe', 'sitDe', 'raizDe'],
     chamadas: [['execExcl', 6, 'os botoes do aviso de exclusao (serie, so, vendaSo, vendaVolta, vendaTudo, compraTudo, compraSobra)'],
-               ['modalAviso', 5, 'todo caminho de exclusao/devolucao mostra o aviso completo em tela']],
+               ['modalAviso', 5, 'todo caminho de exclusao/devolucao mostra o aviso completo em tela'],
+               /* 19/09/2026: `voltaDe` decide pra onde a peca volta e tem 4 chamadores: voltarPeca (excluir venda / devolucao), o aviso de excluir venda, o aviso da devolucao e desvincular — definida e nao ligada (ou ligada so em parte) faria a peca ja confirmada voltar pro pedido por um dos caminhos */
+               ['voltaDe', 4, 'voltarPeca, o aviso de excluir venda, o aviso da devolucao e o desfazer vinculo usam a MESMA regra de pra onde a peca volta']],
     atributos: [[/onclick="devolver\(/g, 1, 'o botao ↩ devolucao no card da venda']],
     contexto: () => {
       const movs = [
@@ -392,6 +394,7 @@ const CAPACIDADES = [
       const volta = F.voltarPeca(peca, venda);
       const voltaPedido = F.voltarPeca({ situacao: 'Vendido' }, { vendaDe: 'pedido' });
       const voltaColecao = F.voltarPeca({ situacao: 'Vendido' }, { vendaTipo: 'colecao' });
+      const voltaConfirmada = F.voltarPeca({ situacao: 'Vendido', dataChegada: '2026-09-10' }, { vendaDe: 'pedido' });   /* 19/09/2026: vendida antes de chegar, chegada JA confirmada */
       return [
         ['acha o produto da venda pelo vinculo gravado', porRef && porRef.id, 'V'],
         ['acha o produto da venda tambem no legado (sem vinculo gravado)', porHeuristica && porHeuristica.id, 'V'],
@@ -404,6 +407,7 @@ const CAPACIDADES = [
         ['devolver poe o produto de volta no estoque', [volta, peca.situacao, peca.vendaRef], ['Em estoque', 'Em estoque', undefined]],
         ['produto que saiu do PEDIDO volta pro pedido, nao pro estoque', voltaPedido, 'Pedido'],
         ['produto que saiu da COLECAO volta pra colecao', voltaColecao, 'Coleção'],
+        ['produto vendido antes de chegar, com a chegada JA confirmada, volta pro estoque (ja esta na mao) e nao pro pedido', voltaConfirmada, 'Em estoque'],
         ['o aviso sabe nomear o produto', F.rotDe({ colecao: 'SS', cat: 'Booster' }), 'SS · Booster']
       ];
     }
@@ -953,6 +957,24 @@ let exercicios = 0;
 
 try { new Function(js); }
 catch (e) { falhas.push(['sintaxe', 'o JavaScript do app nao parseia: ' + e.message, 'publicar assim deixa o app no ar sem funcionar']); }
+/* CARACTERE INVISIVEL (13/09/2026): o gerador de planilha nasceu com NUL e outros caracteres de controle
+   LITERAIS dentro de uma expressao regular. O Node e o new Function acima ACEITAM; o navegador troca o NUL
+   por U+FFFD ao ler o HTML, a expressao fica invalida e o script INTEIRO morre na abertura (app sem nenhum
+   botao). So apareceu porque o teste abriu num Chrome de verdade. Causa medida: a gravacao de arquivo pelas
+   ferramentas do agente decodifica a sequencia de escape unicode. Regra dura, zero falso positivo: nenhum
+   caractere de controle alem de tab e quebra de linha, nem U+FFFE/U+FFFF. Os caracteres sao montados por
+   codigo aqui pelo mesmo motivo. Mutacao INV na checks-suite.py. */
+{
+  const invisiveis = new Set();
+  for (let i = 0; i < 32; i++) if (i !== 9 && i !== 10 && i !== 13) invisiveis.add(String.fromCharCode(i));
+  invisiveis.add(String.fromCharCode(65534)); invisiveis.add(String.fromCharCode(65535));
+  const achados = [];
+  for (let i = 0; i < html.length && achados.length < 5; i++) {
+    if (invisiveis.has(html[i])) achados.push('linha ' + html.slice(0, i).split(String.fromCharCode(10)).length + ' (codigo ' + html.charCodeAt(i) + ')');
+  }
+  if (achados.length) falhas.push(['caractere invisivel no arquivo', 'caractere de controle gravado literalmente: ' + achados.join(', '),
+    'o navegador troca esse caractere ao abrir a pagina e o JavaScript INTEIRO do app para de rodar — tela sem nenhum botao funcionando']);
+}
 
 for (const cap of CAPACIDADES) {
   /* presenca e chamadas sempre sobre o codigo SEM COMENTARIOS — comentario que menciona o

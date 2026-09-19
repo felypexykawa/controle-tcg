@@ -17,9 +17,9 @@
      por que: publicacao. NAO roda no pre-commit de proposito — encarecer o
               commit empurra pra rota que contorna.
      a mao  : node C:\Users\USER\.claude\health\provar-caminhos.js C:\Users\USER\tcg-web\caminhos.js
-     provar as travas (mensal, ou ao mexer num caminho):
+     provar as travas: o publicar.sh roda sozinho quando caminhos.js muda na publicacao; a mao, ao mexer num caminho:
               ...\provar-caminhos.js ...\caminhos.js --negativo
-              (roda cada caminho COM A CURA REMOVIDA e exige que ele reprove)
+              (roda cada caminho primeiro COM a cura, que tem de ficar verde, e depois SEM ela, e exige que reprove)
 
    REGRAS QUE ESTE ARQUIVO OBEDECE
      - todo caminho declara `negativo`: a mutacao que remove a cura. Caminho que
@@ -258,27 +258,40 @@ async function lancarCompra(p, marca, extra) {
 
 /* ------------------------------------------------------------------ caminhos */
 const BASE_CONTROLES = path.join(__dirname, 'caminhos-controles.json');
-const TELAS_VARRIDAS = ['Painel', 'Consultar', 'Fluxo de caixa', 'Relatório', 'Simular', 'Lançar'];
+const TELAS_VARRIDAS = ['Painel', 'Consultar', 'Fluxo de caixa', 'Fluxo de estoque', 'Relatório', 'Simular', 'Lançar'];
+
+/* rotulo comparavel entre rodadas: numero vira "#" e mes com ano ("ago/26") vira "mês/#" — SO nesse formato, porque "set" e
+   "dez" sao palavras comuns num app de TCG ("Coleção / set") e trocar a palavra solta juntaria dois controles num so (revisor
+   disco r2, L7). Vale dos DOIS lados: no que a tela mostra agora e no inventario gravado (revisor fiacao r2, M2 — de um lado so,
+   a virada de mes virava "controle sumiu", e a saida que o caminho sugere apagava o inventario inteiro). */
+function normControle(item) {
+  const s = String(item), i = s.indexOf(':');
+  if (i < 0) return s;
+  let rot = s.slice(i + 1).replace(/\s+/g, ' ').trim();
+  rot = rot.replace(/\b(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\/(?=[\d#])/gi, 'mês/');
+  rot = rot.replace(/\d+/g, '#').trim().slice(0, 60);
+  return s.slice(0, i) + ':' + rot;
+}
 
 async function varrerControles(p) {
   const mapa = {};
   for (const tela of TELAS_VARRIDAS) {
     await clicar(p, tela, 'aba do rodape/cabecalho');
     await p.waitForTimeout(350);
-    mapa[tela] = await p.evaluate(() => {
+    const crus = await p.evaluate(() => {
       const visivel = e => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
-      const set = new Set();
+      const lista = [];
       document.querySelectorAll('button,select,input,[onclick]').forEach(e => {
         if (!visivel(e)) return;
         const tag = e.tagName.toLowerCase();
-        let rot = (tag === 'input' || tag === 'select')
+        const rot = (tag === 'input' || tag === 'select')
           ? (e.id || e.getAttribute('placeholder') || '')
           : (e.innerText || '').replace(/\s+/g, ' ').trim();
-        rot = rot.replace(/\d+/g, '#').trim().slice(0, 60);
-        if (rot) set.add(tag + ':' + rot);
+        if (rot) lista.push(tag + ':' + rot);
       });
-      return [...set].sort();
+      return lista;
     });
+    mapa[tela] = [...new Set(crus.map(normControle))].sort();
   }
   return mapa;
 }
@@ -405,7 +418,10 @@ module.exports = {
       aparelhos: 2,
       /* a cura: o registro de exclusao (tumulos). Sem ele a uniao de "ausente"
          com "presente" da PRESENTE, e o que foi apagado ressuscita. */
-      negativo: { de: 'function estaExcluido(id){return !!(id&&excluidos[id]);}', para: 'function estaExcluido(id){return false;}' },
+      /* [13/09] o trecho antigo ("!!(id&&excluidos[id])") deixou de existir no commit 8c6f5a5 de 25/08 (marca de exclusao com
+         sinal) e este negativo ficou MORTO 19 dias sem ninguem ver, porque nenhuma porta rodava --negativo (revisor fiacao r2, M4).
+         Achado na 1a vez que o publicar.sh passou a rodar o negativo. */
+      negativo: { de: 'function estaExcluido(id){return !!(id&&+excluidos[id]>0);}', para: 'function estaExcluido(id){return false;}' },
       limiteMs: 45000,
       async rodar(t) {
         const [A, B] = t.paginas;
@@ -538,6 +554,59 @@ module.exports = {
       }
     },
 
+    /* ----------------------------------------------------------------- (5b) */
+    {
+      id: 'planilha-pelo-botao-do-backup',
+      titulo: 'as 3 portas "Planilha completa (Excel)" (Consulta, Relatório e Backup) baixam um .xlsx de verdade com o lancamento dentro',
+      /* a cura (13/09): os botoes ligados ao gerador da planilha. O negativo faz o gerador sair sem gerar nada —
+         o download nao vem e o caminho tem de reprovar. A planilha e ZIP sem compressao, entao a marca do
+         lancamento aparece crua dentro do arquivo: da pra afirmar que ELE esta la sem abrir o Excel.
+         As 3 portas, nao so a do Backup (revisor fiacao r2, L2: a da Consulta nao era vista por nada ligado).
+         O Backup vai por ultimo: o modal dele cobre a tela inteira e ficaria na frente das outras portas. */
+      negativo: { de: 'async function exportarPlanilha(){', para: 'async function exportarPlanilha(){return;' },
+      limiteMs: 90000,
+      async rodar(t) {
+        const p = t.p;
+        await esperarApp(p);
+        const marca = 'PROVA-PLANILHA-' + String(Date.now()).slice(-6);
+        await lancarCompra(p, marca, { valor: 25 });
+        const portas = [
+          ['Consulta', async () => { await irConsultar(p, 'Tudo'); }],
+          ['Relatório', async () => { await clicar(p, 'Relatório', 'aba do rodape/cabecalho'); await p.waitForTimeout(400); }],
+          ['Backup', async () => {
+            await clicar(p, 'Painel'); await p.waitForTimeout(300);
+            await clicar(p, 'backup · restaurar · exportar', 'acesso ao backup no Painel'); await p.waitForTimeout(400); }]
+        ];
+        for (const [porta, abrir] of portas) {
+          await abrir();
+          /* Promise.all e nao "espera solta": se o botao nao existir, o clicar reprova e a espera do download
+             fica sem dono — rejeitada depois que a pagina fecha, derrubava o runner INTEIRO (visto no sandbox
+             de 13/09: os caminhos seguintes nem rodaram). Com Promise.all a rejeicao tardia tem quem a receba. */
+          let dl;
+          try {
+            [dl] = await Promise.all([
+              p.waitForEvent('download', { timeout: 10000 }),
+              clicar(p, 'Planilha completa (Excel)', 'botao da planilha na porta ' + porta)
+            ]);
+          } catch (e) {
+            /* botao que nao existe ja reprova sozinho. Tempo esgotado e 'tocou e nao veio arquivo': ASSERCAO. Qualquer outro
+               erro e da maquina e segue como erro — no modo negativo o runner nao pode contar pane do navegador como
+               "reprovou sem a cura" (revisor fiacao r2, L1: antes todo erro virava reprova) */
+            if (e && e.reprova) throw e;
+            if (!e || e.name !== 'TimeoutError') throw e;
+            t.reprova('porta ' + porta + ': tocar em "Planilha completa (Excel)" nao baixou nenhum arquivo em 10 s');
+          }
+          const buf = fs.readFileSync(await dl.path());
+          t.ok(dl.suggestedFilename().slice(-5) === '.xlsx', 'porta ' + porta + ': o arquivo baixado nao termina em .xlsx: ' + dl.suggestedFilename());
+          t.igual(buf.slice(0, 2).toString('latin1'), 'PK', 'porta ' + porta + ': o arquivo baixado nao e um .xlsx (zip)');
+          t.ok(buf.length > 4000, 'porta ' + porta + ': o arquivo baixado tem so ' + buf.length + ' bytes');
+          const txt = buf.toString('utf8');
+          t.contem(txt, 'xl/worksheets/sheet2.xml', 'porta ' + porta + ': a planilha baixada nao tem a aba Compras');
+          t.contem(txt, marca, 'porta ' + porta + ': o lancamento feito agora nao aparece dentro da planilha baixada');
+        }
+      }
+    },
+
     /* ------------------------------------------------------------------ (6) */
     {
       id: 'nenhum-controle-sumiu-da-tela',
@@ -567,7 +636,9 @@ module.exports = {
           t.reprova('nao existia inventario anterior — acabei de gravar caminhos-controles.json. ' +
             'Confira e commite: a partir da proxima rodada, controle que sumir e barrado.');
         }
-        const antes = JSON.parse(fs.readFileSync(BASE_CONTROLES, 'utf8'));
+        /* o inventario gravado passa pela MESMA normalizacao da tela antes de comparar (revisor fiacao r2, M2) */
+        const antesCru = JSON.parse(fs.readFileSync(BASE_CONTROLES, 'utf8')), antes = {};
+        for (const tela of Object.keys(antesCru)) antes[tela] = [...new Set((antesCru[tela] || []).map(normControle))];
         const sumidos = [], novos = [];
         for (const tela of TELAS_VARRIDAS) {
           const a = new Set(antes[tela] || []), b = new Set(agora[tela] || []);

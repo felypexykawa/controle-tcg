@@ -20,6 +20,15 @@ on:
       - 'checks-app.js'
       - 'checks-suite.py'
       - 'testes-nucleo.js'
+      # [13/09, revisor fiacao r3 L3] as pecas das travas tambem disparam: push que mudava so a trava, o minimo, os caminhos
+      # (a suite confere por texto as mutacoes deles) ou o proprio workflow passava sem CI nenhum
+      - 'testes-nucleo.minimo'
+      - 'trava-nucleo.sh'
+      - 'caminhos.js'
+      - '.github/workflows/app-sintaxe.yml'
+      # [v2.6e, revisor fiacao r8 L3] as portas tambem disparam: commit que so mudava o publicar.sh ou o pre-commit passava sem CI nenhum
+      - 'publicar.sh'
+      - '.githooks/pre-commit'
       # [2026-08-21] O DADO tambem viaja por aqui. Ate hoje esta lista so olhava o CODIGO do
       # app; um push que mexia so no precos.json nao disparava CI nenhum — e foi por essa
       # fresta que "Vaporeon (tg02-tg30)" perdeu R$200,00 sem ninguem ver. O hook local pega
@@ -33,7 +42,9 @@ on:
 jobs:
   sintaxe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # v2.6f (revisores disco e fiacao r9): a suite com 300 mutacoes leva de 97 a 131 s nesta maquina; estourar o tempo daria vermelho falso
+    # depois de o Pages ja ter servido o app
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,13 +76,11 @@ jobs:
 
       - name: as regras de negocio rodam de ponta a ponta?
         run: |
-          # [fotos F1 23/08, P0-5] fail-closed: arquivo obrigatorio e contagem minima (testes-nucleo.minimo)
-          [ -f testes-nucleo.js ] || { echo "testes-nucleo.js nao existe neste commit — prova obrigatoria"; exit 1; }
-          MIN=$(cat testes-nucleo.minimo 2>/dev/null | tr -d '[:space:]'); [ -n "$MIN" ] || { echo "testes-nucleo.minimo ausente ou vazio"; exit 1; }
-          SAIDA=$(node testes-nucleo.js index.html 2>&1); RC=$?; echo "$SAIDA" | tail -4
-          [ $RC -eq 0 ] || exit 1
-          N=$(echo "$SAIDA" | grep -o '[0-9][0-9]* passaram' | tail -1 | grep -o '^[0-9]*')
-          [ "${N:-0}" -ge "$MIN" ] || { echo "testes-nucleo passou $N, minimo $MIN"; exit 1; }
+          # [fotos F1 23/08, P0-5] fail-closed: arquivo obrigatorio e contagem minima (testes-nucleo.minimo).
+          # [13/09, revisor fiacao r2 M1] a regra mora em trava-nucleo.sh, a mesma do publicar.sh e do pre-commit: com
+          # `bash -e` (o que o Actions usa de fato), a copia antiga (SAIDA=$(...); RC=$?) saia muda na atribuicao, sem mostrar o que falhou
+          [ -f trava-nucleo.sh ] || { echo "trava-nucleo.sh nao existe neste commit — a trava dos testes do nucleo e obrigatoria"; exit 1; }
+          sh trava-nucleo.sh index.html testes-nucleo.js testes-nucleo.minimo
 
       - name: a propria vacina esta provada? (mutacoes conhecidas + refatoracoes legitimas)
         run: python checks-suite.py

@@ -147,7 +147,7 @@ checks={
  'consultar filtros completos':'consCol' in chk and 'consPess' in chk and 'consConta' in chk,
  'composicoes 3 modos':'function graficoCompSvg' in chk and 'function tabelaComp' in chk and 'relCompView' in chk,
  'linha do tempo 3 modos':'function tabelaFluxo' in chk and 'relTLView' in chk,
- 'parcela N de M + total':'de ${nota.nP}' in chk and 'total ${fmt(nota.tot)}' in chk,
+ 'parcela N de M + total':"nota.parcela+' de '+nota.nP" in chk and 'total ${fmt(nota.tot)}' in chk,   # 19/09/2026: o rotulo virou condicional (parcela alem do plano diz "K · fora do plano de N×"); a forma "K de N" segue existindo pra parcela do plano
  'fotos no lancar':'function aplicarFotosPend' in chk and 'abrirFotosPend' in chk,
  'miniatura real':'fotoThumb' in chk and 'function fotoThumbDe' in chk,
  'excluir nota inteira':'function excluirNotaInteira' in chk,
@@ -212,7 +212,7 @@ checks={
  'edicao preserva vinculo/parcelas/nota/fotos':'Object.assign({},e,obj)' in chk,
  'pedido vendavel (pool + guard)':"sitDe(d)==='Pedido'?'🚚 ':''" in chk and 'eraPedido' in chk and chk.count('PEDIDO (a caminho')>=2,
  'vinculo aceita item em pedido':"sitDe(c)==='Pedido')" in chk and "sitAntes==='Pedido'?'pedido'" in chk,
- 'desvincular devolve ao pedido':"v.vendaDe==='pedido'?'Pedido'" in chk,
+ 'desvincular devolve ao pedido':'function voltaDe(v,peca)' in chk and "?'Pedido'" in chk and chk.count('voltaDe(')>=5,   # 19/09/2026: a regra "vendida antes de chegar volta pro pedido" morou em 4 lugares e virou UMA funcao (voltaDe: so volta pro pedido se a chegada ainda nao foi confirmada) + 4 chamadores
  'venda multi-item agrupada (verVenda)':'function verVenda' in chk and 'venda ×' in chk and 'ver a venda completa' in chk,
  'lote completo (verLote)':'function verLote' in chk and 'ver o lote completo' in chk and 'Custo total do lote' in chk,
  'trocas na consulta':"['TROCA','🔄','Trocas'" in chk and "consF==='TROCA'" in chk and 'duas pontas' in chk,
@@ -352,7 +352,7 @@ checks={
  'prova real compara vinculo por unidade (nao falso-alarme apos editar qtd)':'custoUnitV=(+v.custoOrigem||0)/vQ,custoUnitAlvo=(+alvo.valor||0)/alvoQ' in chk and 'custoUnitV>custoUnitAlvo+0.02' in chk,
  'perfis de acesso: Laura so-lancamento (chokepoint no render)':'const PAPEL_POR_EMAIL' in chk and 'function papelAtual' in chk and "papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}" in chk,
  'perfis de acesso: nav escondida + boot direto no lancar + logout acessivel':"if(papelAtual()==='lancamento')document.querySelectorAll('nav button[data-t],.htop[data-t]').forEach" in chk and "go(papelAtual()==='lancamento'?'lancar':'painel')" in chk and 'papelAtual()===' + chr(39) + 'lancamento' + chr(39) + '?' + chr(96) + '<div class="lnk" style="margin-top:10px" onclick="sairConta()"' in chk,
- 'condicao da carta (NM/LP/MP/HP) no cadastro e nas exibicoes':'const CONDS=' in chk and 'id="f_cond"' in chk and "condicao:(g('f_cond')&&g('f_cond')!=='—')?g('f_cond'):''" in chk and "d.condicao?' ['+d.condicao+']':''" in chk and 'Condicao' in chk,
+ 'condicao da carta (NM/LP/MP/HP) no cadastro e nas exibicoes':'const CONDS=' in chk and 'id="f_cond"' in chk and "condicao:(g('f_cond')&&g('f_cond')!=='—')?g('f_cond'):''" in chk and "d.condicao?' ['+d.condicao+']':''" in chk and "T('Condição','texto'" in chk,  # [13/09] a exportacao virou planilha .xlsx: a coluna agora e T('Condição',...) (antes era o cabecalho Condicao do CSV)
  'condicao propaga em todos os caminhos de vinculo (5)':'condicao:src.condicao' in chk and 'condicao:it.condicao' in chk and 'cnd=it.condicao' in chk and 'venda.condicao=alvo.condicao' in chk and 'v.condicao=f.condicao' in chk,
  'acesso: default invertido pra restrito, dev local nao afetado':"const PAPEL_POR_EMAIL = {'felypexykawa@gmail.com':'admin','pokecentertcgoficial@gmail.com':'admin'}" in chk and "if(!_userEmail)return 'admin';return PAPEL_POR_EMAIL[_userEmail.toLowerCase()]||'lancamento';" in chk and "'projetofelype@gmail.com'" in chk,
  # [revisao C 23/08, N2] eram 4 barras fixas: a do titulo da Consultar deixou de ser fixa de proposito (a de Filtros leva o nome da aba); ficam 3 filtros fixos
@@ -465,9 +465,87 @@ checks={
  'aviso de gemeos com custo diferente no vinculo de venda':'gêmeo com custo diferente' in chk and 'chaveDup' in chk,
  'mesma compra: segunda saida do diagnostico (nunca so soltar), com redistribuicao provada':'function _calcMesmaCompra' in chk and 'function aplicarMesmaCompra' in chk and 'nada vai pra coleção' in chk and 'MESMA compra' in chk,
  'mesma compra: pedaco com filhos proprios fica fora da redistribuicao':'!movs.some(y=>y.loteOrigem===p.id)' in chk,
- 'diagLote nao conta em dobro caixa aberta (mesma regra da prova real)':"origem==='ABERTURA'" in chk and 'filhosD' in chk,
+ # [13/09, revisor fiacao r2 M3] o check cravava um detalhe ('filhosD') e punia a consolidacao da regra; agora exige a CHAMADA
+ 'diagLote nao conta em dobro caixa aberta (mesma regra da prova real)':'caixaRedistribuida(x,filhosD)' in chk,
  'diagnostico neutro: duas leituras, nunca induz (soltar OU mesma compra)':'Duas leituras possíveis' in chk and 'ela é de OUTRA compra' in chk and 'ela é da MESMA compra' in chk,
 }
+# [13/09, revisor fiacao r2 M3 + disco r2 G1] a regra da caixa aberta mora em UMA funcao. Cada conta que soma compra tem de
+# CHAMAR caixaRedistribuida, a forma copiada (.some(...ABERTURA)) so pode existir dentro dela, e o rodape da Consulta usa a
+# mesma regra do card. Trecho de funcao = do "function nome(" ate a proxima funcao de topo.
+def _trecho(nome):
+    i = chk.find('\nfunction ' + nome + '(')
+    if i < 0: return ''
+    j = chk.find('\nfunction ', i + 1)
+    return chk[i:j if j > 0 else len(chk)]
+# [13/09, revisor fiacao r3 M4] contar UMA grafia so pegava a copia escrita igual. Agora e um CENSO: toda ocorrencia de ABERTURA
+# no app, por funcao, contra a lista de usos conhecidos. Uso novo em qualquer grafia reprova. Se ele NAO for a regra da caixa
+# aberta (ex.: um rotulo novo), acrescente na lista COM o motivo — nunca para calar uma copia da regra.
+# [v2.5, revisor fiacao r4 M3] cada entrada guarda o MOTIVO como dado (entrada sem motivo reprova), e a mensagem mostra cada
+# ocorrencia de uma funcao fora da lista, com a linha e o contexto, e diz as duas saidas: por 1 na lista nao pode ser o conserto
+# automatico de uma COPIA da regra (a mesma orientacao que a suite ja da na mutacao morta).
+_ABERTURA_OK = {
+    'caixaRedistribuida': (2, 'a regra: ramo com mapa de filhos e ramo sem mapa'),
+    'montarPlanilhaTCG': (3, 'rotulos "Saiu de item aberto" (2) e o agrupamento por unidade da "Situacao hoje" (1)'),
+    'aplicarMesmaCompra': (1, 'cria o pedaco com origem ABERTURA'),
+    'transformarItem': (1, 'cria o pedaco com origem ABERTURA'),
+    'provaReal': (1, 'comentario que explica a exclusao'),
+}
+def _censo_abertura():
+    c, onde = {}, {}
+    for m_ in re.finditer('ABERTURA', chk):
+        i_ = m_.start(); j_ = max(chk.rfind('\nfunction ', 0, i_), chk.rfind('\nasync function ', 0, i_))
+        nome_ = re.match(r'\n(?:async )?function ([A-Za-z0-9_$]+)', chk[j_:j_ + 80]).group(1) if j_ >= 0 else '(topo)'
+        c[nome_] = c.get(nome_, 0) + 1
+        onde.setdefault(nome_, []).append(i_)
+    return c, onde
+_censo, _censo_onde = _censo_abertura()
+_censo_lista = {k: v[0] for k, v in _ABERTURA_OK.items() if isinstance(v, tuple)}
+_censo_sem_motivo = [k for k, v in _ABERTURA_OK.items() if not (isinstance(v, tuple) and len(v) == 2 and str(v[1]).strip())]
+if _censo != _censo_lista or _censo_sem_motivo:
+    if _censo_sem_motivo:
+        print('CENSO ABERTURA: entrada da lista sem motivo escrito:', _censo_sem_motivo)
+    for k in sorted(set(_censo) | set(_censo_lista)):
+        if _censo.get(k, 0) == _censo_lista.get(k, 0):
+            continue
+        print('CENSO ABERTURA: a funcao %s tem %d ocorrencia(s) de ABERTURA; a lista de usos conhecidos diz %d.' % (k, _censo.get(k, 0), _censo_lista.get(k, 0)))
+        for i_ in _censo_onde.get(k, []):
+            # [v2.6, revisor fiacao r5 L6] a linha da FONTE de dev: o artefato reprovado nao e gravado, e la o trecho esta em outra linha
+            _ctx = chk[max(0, i_ - 60):i_ + 30]
+            # [v2.6c, revisor fiacao r6 L6] a mesma ocorrencia na fonte (a k-esima do contexto), nao a primeira: com a regra copiada
+            # literalmente, a primeira era a regra original e o ponteiro apontava a linha errada
+            _k = max(1, chk.count(_ctx, 0, max(0, i_ - 60) + len(_ctx)))
+            _j = -1
+            for _n in range(_k):
+                _j = src.find(_ctx, _j + 1)
+                if _j < 0:
+                    break
+            _onde = ('linha %d da fonte de dev' % (src.count('\n', 0, _j + (i_ - max(0, i_ - 60))) + 1)) if _j >= 0 else ('linha %d do artefato (nao gravado)' % (chk.count('\n', 0, i_) + 1))
+            print('   %s: ...%s...' % (_onde, _ctx.replace('\n', ' ')))
+    print('   Duas saidas: (1) se o trecho DECIDE se a caixa aberta conta na soma, ele e uma copia da regra: chame caixaRedistribuida(x,filhos)')
+    print('   e NAO mexa na lista; (2) se e rotulo, criacao do pedaco ou comentario, acrescente em _ABERTURA_OK com o numero E o motivo.')
+checks['caixa aberta: UMA regra (caixaRedistribuida) nas contas que somam compra, nos cards, no verLote e na Consulta; censo de ABERTURA = lista'] = (
+    'function caixaRedistribuida(x,filhos)' in chk and 'function mapaFilhosCompra()' in chk
+    and all('caixaRedistribuida(' in _trecho(n) for n in ('diagLote', 'provaReal', 'aceitarConservacao', 'compraOriginalDe', 'montarPlanilhaTCG', 'verLote', 'vConsultar'))
+    and _censo == _censo_lista and not _censo_sem_motivo)
+# [13/09, revisores numero r3 G1 e disco r3 G1] o "comprei" do Painel e UMA regra: motor, Relatorio, Consulta e planilha chamam
+# entraNoComprei, e a exclusao antiga escrita a mao dentro do motor nao pode voltar
+# [v2.5, revisor disco r4 M1] o Relatorio calcula o comprei do periodo UMA vez (compComprei), para o card e para o comparativo.
+# [v2.6, revisor fiacao r5 M1] as buscas do comparativo rodam sobre o texto SEM comentarios (a regra da skill 21): com o texto canonico
+# guardado num comentario e a lista crua na linha, o check passava e o nucleo dava 468/0. [L6] cada condicao tem nome, e a que falha aparece.
+_chk_sc = re.sub(r'(?<=[\s;{}(),])//[^\n]*', '', re.sub(r'(?<=[\s;{}(),])/\*[\s\S]*?\*/', '', chk))
+_comprei = [
+    ('existe function entraNoComprei(m)', 'function entraNoComprei(m)' in chk),
+    ('motor, vRelatorios, vConsultar e montarPlanilhaTCG chamam entraNoComprei', all('entraNoComprei' in _trecho(n) for n in ('motor', 'vRelatorios', 'vConsultar', 'montarPlanilhaTCG'))),
+    ('a exclusao antiga escrita a mao no motor nao voltou', "s==='Trocado'||s==='Aberto')continue" not in chk),
+    ('compPer.filter(entraNoComprei) uma vez so, em const compComprei (fora de comentario)', _chk_sc.count('compPer.filter(entraNoComprei)') == 1 and 'const compComprei=compPer.filter(entraNoComprei);' in _chk_sc),
+    ('nenhum agg(compPer, fora de comentario', re.search(r'agg\(\s*compPer\s*,', _chk_sc) is None)]
+# [v2.6c, revisor fiacao r6 L7] saiu a busca literal "o:agg(compComprei,relDimAll,false)[0]": barrava refatoracao legitima (variavel
+# intermediaria, espacos, lista renomeada) e deixava passar truque fora do estilo que a regex reconhece. Quem segura o comparativo e o
+# teste 31f, pela conta, nas tres portas (publicar, pre-commit e CI).
+for _nome_c, _ok_c in _comprei:
+    if not _ok_c:
+        print('   comprei: falhou a condicao "%s"' % _nome_c)
+checks['comprei: UMA regra (entraNoComprei) no motor, no Relatorio, na Consulta e na planilha'] = all(_ok_c for _, _ok_c in _comprei)
 print('--- BUILD tcg-web ---')
 for k,v in checks.items():print(('OK  ' if v else 'FALHA ')+k)
 print(f'bytes deploy={len(chk)}  fonte={len(src)}  diff={len(chk)-len(src)}')
@@ -475,6 +553,8 @@ if not all(checks.values()):
     print('TEM FALHA')
     print('ARTEFATO NAO FOI TROCADO — o arquivo publicado continua exatamente como estava.')
     raise SystemExit(1)   # [21/08] antes saia 0 mesmo reprovando: quem chamasse por script via sucesso
-open(DEP,'w',encoding='utf-8').write(out)
-open(_VERSAO_JSON,'w',encoding='utf-8').write(_CARIMBO)   # [21/08] o carimbo anda junto com o artefato, nunca antes
+# newline='': sem ele o Windows gravava CRLF e o artefato testado era diferente do publicado (o carimbo do publicar.sh regrava em LF)
+# — revisor fiacao r2, L5: os sandboxes provaram 5.331 CR que nao iam ao ar
+open(DEP,'w',encoding='utf-8',newline='').write(out)
+open(_VERSAO_JSON,'w',encoding='utf-8',newline='').write(_CARIMBO)   # [21/08] o carimbo anda junto com o artefato, nunca antes
 print('TODOS OK')
