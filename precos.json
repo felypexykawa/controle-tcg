@@ -1,5 +1,5 @@
 {
- "atualizadoEm": "2026-09-13T16:43:19Z",
+ "atualizadoEm": "2026-09-19T02:49:50Z",
  "fonte": "Chrome local — extrator v2",
  "cartas": {
   "135/108": {
@@ -10,15 +10,15 @@
     {
      "v": "Normal",
      "mn": 49.9,
-     "md": 101.54,
+     "md": 114.42,
      "mx": 249.9
     }
    ],
    "menor": 49.9,
-   "medio": 101.54,
+   "medio": 114.42,
    "maior": 249.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=135%2F108",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 15
@@ -32,15 +32,15 @@
     {
      "v": "Normal",
      "mn": 350,
-     "md": 581.87,
+     "md": 578.44,
      "mx": 948.99
     }
    ],
    "menor": 350,
-   "medio": 581.87,
+   "medio": 578.44,
    "maior": 948.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=245%2F198",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "en": 6,
@@ -52,7 +52,7 @@
    "status": "AMBIGUO",
    "titulo": "188/172 — 2 cartas com esse número (escolher qual é a sua)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=188%2F172",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Fire Energy",
@@ -88,17 +88,17 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/773/6a0e05baace72-n0btd-veqnz-e63bc45e9a4283e88131280cd1dc1931.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 764.9,
-     "md": 1127.87,
+     "md": 1105.96,
      "mx": 4000
     }
    ],
    "menor": 764.9,
-   "medio": 1127.87,
+   "medio": 1105.96,
    "maior": 4000,
    "idiomaConferido": {
     "pten": 1,
@@ -113,16 +113,16 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 40,
-     "md": 86.17,
+     "mn": 67,
+     "md": 108.58,
      "mx": 150
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Kingdra%20(TG03%2FTG30)",
-   "menor": 40,
-   "medio": 86.17,
+   "menor": 67,
+   "medio": 108.58,
    "maior": 150,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "tw": 3,
@@ -138,21 +138,21 @@
     {
      "v": "Normal",
      "mn": 220,
-     "md": 344.23,
+     "md": 359.95,
      "mx": 499.9
     },
     {
      "v": "Foil",
-     "mn": 178,
-     "md": 424.81,
+     "mn": 145,
+     "md": 414.91,
      "mx": 2999.9
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=226%2F217",
    "menor": 220,
-   "medio": 344.23,
+   "medio": 359.95,
    "maior": 499.9,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 6,
@@ -177,7 +177,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/706/683a0dbe3891f-hu6no-xrpyl-f67d0c4fb2c68709661fb1ac787983c5.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -188,7 +188,7 @@
     {
      "v": "Foil",
      "mn": 89.9,
-     "md": 134.38,
+     "md": 132.61,
      "mx": 239.9
     }
    ],
@@ -214,8 +214,8 @@
     },
     {
      "v": "Foil",
-     "mn": 150,
-     "md": 189.67,
+     "mn": 149.99,
+     "md": 190.1,
      "mx": 279.9
     }
    ],
@@ -223,7 +223,7 @@
    "menor": 149.99,
    "medio": 195,
    "maior": 270,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 66
@@ -252,7 +252,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/700/6810f69738232-elrtf-c4twy-03670ba8f67d0ef732dfa5ddf8068a49.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -281,8 +281,8 @@
     },
     {
      "v": "Foil",
-     "mn": 200,
-     "md": 245.83,
+     "mn": 195,
+     "md": 243.18,
      "mx": 360
     }
    ],
@@ -290,7 +290,7 @@
    "menor": 149.67,
    "medio": 149.67,
    "maior": 149.67,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 27,
@@ -305,15 +305,15 @@
     {
      "v": "Normal",
      "mn": 136,
-     "md": 193.7,
+     "md": 195.23,
      "mx": 360
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Eevee%20(TG11%2FTG30)",
    "menor": 136,
-   "medio": 193.7,
+   "medio": 195.23,
    "maior": 360,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 18,
@@ -336,22 +336,22 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 199,
-     "md": 199,
-     "mx": 199
+     "mn": 168,
+     "md": 191.5,
+     "mx": 200
     },
     {
      "v": "Foil",
      "mn": 159.99,
-     "md": 219.34,
+     "md": 220.7,
      "mx": 650
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Mega%20Charizard%20X%20ex%20(109%2F094)",
-   "menor": 199,
-   "medio": 199,
-   "maior": 199,
-   "verificadoEm": "2026-09-13",
+   "menor": 168,
+   "medio": 191.5,
+   "maior": 200,
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 159,
@@ -365,22 +365,22 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 99,
-     "md": 128.56,
+     "mn": 119,
+     "md": 139.6,
      "mx": 149.9
     },
     {
      "v": "Foil",
-     "mn": 99,
-     "md": 258.91,
+     "mn": 94.5,
+     "md": 250.95,
      "mx": 3499.9
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Meowth%20(106%2F094)",
-   "menor": 99,
-   "medio": 128.56,
+   "menor": 119,
+   "medio": 139.6,
    "maior": 149.9,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 147,
@@ -401,8 +401,8 @@
     },
     {
      "v": "Foil",
-     "mn": 185,
-     "md": 289.11,
+     "mn": 184.9,
+     "md": 287.69,
      "mx": 899.9
     }
    ],
@@ -410,7 +410,7 @@
    "medio": 270.56,
    "maior": 459.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=120%2F088",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 144,
@@ -431,7 +431,7 @@
     {
      "v": "Foil",
      "mn": 249.99,
-     "md": 474.94,
+     "md": 473.31,
      "mx": 1000
     }
    ],
@@ -439,7 +439,7 @@
    "medio": 398.5,
    "maior": 548,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Pikachu%20(160%2F159)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 4,
     "pt": 81,
@@ -455,15 +455,15 @@
     {
      "v": "Normal",
      "mn": 99.9,
-     "md": 265.48,
+     "md": 264.06,
      "mx": 1000
     }
    ],
    "menor": 99.9,
-   "medio": 265.48,
+   "medio": 264.06,
    "maior": 1000,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=140%2F145",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 33,
@@ -477,16 +477,16 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 25.99,
-     "md": 26.53,
-     "mx": 26.89
+     "mn": 23.8,
+     "md": 27.09,
+     "mx": 29
     }
    ],
-   "menor": 25.99,
-   "medio": 26.53,
-   "maior": 26.89,
+   "menor": 23.8,
+   "medio": 27.09,
+   "maior": 29,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Noibat%20(111%2F100)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 9
@@ -499,16 +499,16 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 319.9,
-     "md": 524.09,
+     "mn": 379.9,
+     "md": 528.2,
      "mx": 1200
     }
    ],
-   "menor": 319.9,
-   "medio": 524.09,
+   "menor": 379.9,
+   "medio": 528.2,
    "maior": 1200,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=168%2F165",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 78,
@@ -523,22 +523,22 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 199.99,
-     "md": 199.99,
+     "mn": 148,
+     "md": 165.33,
      "mx": 199.99
     },
     {
      "v": "Foil",
-     "mn": 133.8,
-     "md": 274.43,
+     "mn": 147.25,
+     "md": 273.49,
      "mx": 800
     }
    ],
-   "menor": 199.99,
-   "medio": 199.99,
+   "menor": 148,
+   "medio": 165.33,
    "maior": 199.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Psyduck%20(199%2F193)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 84
@@ -566,7 +566,7 @@
    "medio": 699,
    "maior": 699,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Zorua%20do%20N%20(108%2F100)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 21
@@ -585,8 +585,8 @@
     },
     {
      "v": "Foil",
-     "mn": 43.52,
-     "md": 70.35,
+     "mn": 45,
+     "md": 73.29,
      "mx": 139.99
     }
    ],
@@ -594,7 +594,7 @@
    "medio": 68,
    "maior": 68,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Dawn%20(118%2F094)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 7,
     "pt": 135,
@@ -614,8 +614,8 @@
     },
     {
      "v": "Foil",
-     "mn": 270,
-     "md": 354.06,
+     "mn": 259.85,
+     "md": 346.89,
      "mx": 999.9
     }
    ],
@@ -623,10 +623,10 @@
    "medio": 307.1,
    "maior": 324.85,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Psyduck%20(175JP%2F165)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
-    "jp": 51
+    "jp": 54
    },
    "idiomaDivergente": false
   },
@@ -643,7 +643,7 @@
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=211%2F172",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "menor": 600,
    "medio": 799.5,
    "maior": 999,
@@ -665,19 +665,19 @@
     },
     {
      "v": "Foil",
-     "mn": 189.95,
-     "md": 221.91,
-     "mx": 299
+     "mn": 184.4,
+     "md": 232.94,
+     "mx": 649.98
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Ninetales%20(110%2F108)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "menor": 199.99,
    "medio": 206.66,
    "maior": 210,
    "idiomaConferido": {
     "pten": 1,
-    "jp": 45
+    "jp": 48
    },
    "idiomaDivergente": false
   },
@@ -695,18 +695,18 @@
     {
      "v": "Foil",
      "mn": 140,
-     "md": 218.31,
+     "md": 242.42,
      "mx": 1500
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Articuno%20(102%2F100)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "menor": 499,
    "medio": 499,
    "maior": 499,
    "idiomaConferido": {
     "pten": 1,
-    "jp": 66,
+    "jp": 69,
     "ko": 3
    },
    "idiomaDivergente": false
@@ -725,7 +725,7 @@
     {
      "v": "Foil",
      "mn": 160,
-     "md": 256.28,
+     "md": 261.83,
      "mx": 1195
     }
    ],
@@ -733,10 +733,10 @@
    "medio": 245,
    "maior": 300,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Squirtle%20(170JP%2F165)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
-    "jp": 66
+    "jp": 60
    },
    "idiomaDivergente": false
   },
@@ -753,8 +753,8 @@
     },
     {
      "v": "Foil",
-     "mn": 37,
-     "md": 79.66,
+     "mn": 33.3,
+     "md": 79.04,
      "mx": 134.9
     }
    ],
@@ -762,7 +762,7 @@
    "menor": 39.5,
    "medio": 57.87,
    "maior": 80,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 4,
     "jp": 6,
@@ -777,16 +777,22 @@
    "versoes": [
     {
      "v": "Normal",
+     "mn": 19.99,
+     "md": 19.99,
+     "mx": 19.99
+    },
+    {
+     "v": "Foil",
      "mn": 19.9,
      "md": 21.57,
      "mx": 22.9
     }
    ],
-   "menor": 19.9,
-   "medio": 21.57,
-   "maior": 22.9,
+   "menor": 19.99,
+   "medio": 19.99,
+   "maior": 19.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=104%2F081",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 9
@@ -806,7 +812,7 @@
     {
      "v": "Foil",
      "mn": 19.5,
-     "md": 19.76,
+     "md": 19.8,
      "mx": 20
     }
    ],
@@ -814,7 +820,7 @@
    "medio": 19.45,
    "maior": 19.45,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=103%2F081",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 12
@@ -827,22 +833,22 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 54.79,
-     "md": 78.27,
+     "mn": 49.99,
+     "md": 75.3,
      "mx": 89.9
     },
     {
      "v": "Foil",
      "mn": 49.9,
-     "md": 75.54,
+     "md": 74.83,
      "mx": 119.99
     }
    ],
-   "menor": 54.79,
-   "medio": 78.27,
+   "menor": 49.99,
+   "medio": 75.3,
    "maior": 89.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=087%2F084",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 3,
@@ -857,22 +863,22 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 16,
-     "md": 27.93,
+     "mn": 20,
+     "md": 30.32,
      "mx": 56.9
     },
     {
      "v": "Foil",
-     "mn": 5,
-     "md": 28.05,
+     "mn": 9.31,
+     "md": 26.88,
      "mx": 59.99
     }
    ],
-   "menor": 16,
-   "medio": 27.93,
+   "menor": 20,
+   "medio": 30.32,
    "maior": 56.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=097%2F084",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 186,
@@ -886,22 +892,22 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 22,
-     "md": 46.23,
+     "mn": 25.8,
+     "md": 49.2,
      "mx": 90
     },
     {
      "v": "Foil",
-     "mn": 18,
-     "md": 43.1,
+     "mn": 17.9,
+     "md": 40.42,
      "mx": 115
     }
    ],
-   "menor": 22,
-   "medio": 46.23,
+   "menor": 25.8,
+   "medio": 49.2,
    "maior": 90,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=094%2F084",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 261,
@@ -917,21 +923,21 @@
     {
      "v": "Normal",
      "mn": 0.2,
-     "md": 1.74,
+     "md": 1.73,
      "mx": 4.5
     },
     {
      "v": "Reverse Foil",
      "mn": 0.8,
-     "md": 4.58,
+     "md": 4.56,
      "mx": 7
     }
    ],
    "menor": 0.2,
-   "medio": 1.74,
+   "medio": 1.73,
    "maior": 4.5,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=217%2F217",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 10,
     "pt": 276,
@@ -945,16 +951,22 @@
    "versoes": [
     {
      "v": "Normal",
+     "mn": 95,
+     "md": 95,
+     "mx": 95
+    },
+    {
+     "v": "Foil",
      "mn": 49.89,
-     "md": 73.34,
+     "md": 71.19,
      "mx": 99.9
     }
    ],
-   "menor": 49.89,
-   "medio": 73.34,
-   "maior": 99.9,
+   "menor": 95,
+   "medio": 95,
+   "maior": 95,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=213%2F191",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 21,
@@ -969,21 +981,21 @@
     {
      "v": "Normal",
      "mn": 5,
-     "md": 7.14,
+     "md": 7.78,
      "mx": 10
     },
     {
      "v": "Foil",
      "mn": 2.99,
-     "md": 8.76,
+     "md": 8.8,
      "mx": 14.9
     }
    ],
    "menor": 5,
-   "medio": 7.14,
+   "medio": 7.78,
    "maior": 10,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=068%2F191",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 4,
     "en": 60,
@@ -1007,7 +1019,7 @@
    "medio": 17.81,
    "maior": 44.75,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=232%2F191",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 4,
     "pt": 99,
@@ -1028,15 +1040,15 @@
     {
      "v": "Foil",
      "mn": 6.98,
-     "md": 12.34,
-     "mx": 14.9
+     "md": 12.06,
+     "mx": 19.89
     }
    ],
    "menor": 15,
    "medio": 15,
    "maior": 15,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=133%2F191",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 75,
@@ -1051,15 +1063,15 @@
     {
      "v": "Normal",
      "mn": 899,
-     "md": 1064.88,
+     "md": 1085.12,
      "mx": 1500
     }
    ],
    "menor": 899,
-   "medio": 1064.88,
+   "medio": 1085.12,
    "maior": 1500,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Starmie-V%20(TG13%2FTG30)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "tk": 6,
@@ -1072,7 +1084,7 @@
    "status": "OK",
    "titulo": "Morpeko ex (053/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Morpeko ex (053/081)&ed=M5&num=053",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Kirlia",
@@ -1113,7 +1125,7 @@
    "status": "OK",
    "titulo": "Rampardos ex (043/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Rampardos ex (043/081)&ed=M5&num=043",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "M Tyranitar-EX",
@@ -1136,7 +1148,7 @@
     {
      "v": "Foil",
      "mn": 11.95,
-     "md": 16.37,
+     "md": 16.59,
      "mx": 20
     }
    ],
@@ -1153,7 +1165,7 @@
    "status": "OK",
    "titulo": "Mega Excadrill ex (063/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Mega Excadrill ex (063/081)&ed=M5&num=063",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Eevee",
@@ -1194,7 +1206,7 @@
    "status": "OK",
    "titulo": "Mega Zeraora ex (026/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Mega Zeraora ex (026/081)&ed=M5&num=026",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Jolteon",
@@ -1217,7 +1229,7 @@
     {
      "v": "Foil",
      "mn": 13.95,
-     "md": 15.36,
+     "md": 15.34,
      "mx": 20
     }
    ],
@@ -1234,7 +1246,7 @@
    "status": "OK",
    "titulo": "Goldeen (084/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Goldeen (084/081)&ed=M5&num=084",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Kyurem-EX",
@@ -1256,8 +1268,8 @@
     },
     {
      "v": "Foil",
-     "mn": 34.9,
-     "md": 116.33,
+     "mn": 44.99,
+     "md": 105.42,
      "mx": 499
     }
    ],
@@ -1275,7 +1287,7 @@
    "status": "OK",
    "titulo": "Armarouge (083/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Armarouge (083/081)&ed=M5&num=083",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "M Sceptile-EX",
@@ -1297,8 +1309,8 @@
     },
     {
      "v": "Foil",
-     "mn": 23.79,
-     "md": 25.12,
+     "mn": 19.9,
+     "md": 25.92,
      "mx": 49
     }
    ],
@@ -1315,7 +1327,7 @@
    "status": "OK",
    "titulo": "Slowbro (087/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Slowbro (087/081)&ed=M5&num=087",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Hoopa-EX",
@@ -1332,12 +1344,12 @@
     {
      "v": "Normal",
      "mn": 75,
-     "md": 91.75,
+     "md": 91.27,
      "mx": 130
     }
    ],
    "menor": 75,
-   "medio": 91.75,
+   "medio": 91.27,
    "maior": 130,
    "idiomaConferido": {
     "pten": 1,
@@ -1349,7 +1361,7 @@
    "status": "OK",
    "titulo": "Mega Chandelure ex (097/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Mega Chandelure ex (097/081)&ed=M5&num=097",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Trainers' Mail",
@@ -1371,9 +1383,9 @@
     },
     {
      "v": "Foil",
-     "mn": 44,
-     "md": 53.5,
-     "mx": 60
+     "mn": 40,
+     "md": 43.5,
+     "mx": 50
     }
    ],
    "menor": 45,
@@ -1389,7 +1401,7 @@
    "status": "OK",
    "titulo": "Mega Zeraora ex (096/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Mega Zeraora ex (096/081)&ed=M5&num=096",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Energy Retrieval",
@@ -1424,7 +1436,7 @@
    "status": "OK",
    "titulo": "Silvally (093/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Silvally (093/081)&ed=M5&num=093",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Primal Kyogre-EX",
@@ -1447,7 +1459,7 @@
     {
      "v": "Foil",
      "mn": 11.95,
-     "md": 14.52,
+     "md": 15.3,
      "mx": 29.99
     }
    ],
@@ -1464,7 +1476,7 @@
    "status": "OK",
    "titulo": "Lurantis ex (094/081)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Lurantis ex (094/081)&ed=M5&num=094",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Primal Groudon-EX",
@@ -1498,7 +1510,7 @@
    "status": "AMBIGUO",
    "titulo": "015/081 — 2 cartas com esse número (escolher qual é a sua)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=015%2F081",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Entei",
@@ -1517,7 +1529,7 @@
    "status": "OK",
    "titulo": "Mew (183/172)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Mew (183/172)&ed=s12a&num=183",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Galarian Moltres-V",
@@ -1540,8 +1552,8 @@
     {
      "v": "Foil",
      "mn": 399.9,
-     "md": 541.19,
-     "mx": 799.99
+     "md": 591.27,
+     "mx": 1099.99
     }
    ],
    "menor": 439,
@@ -1560,14 +1572,14 @@
     {
      "v": "Normal",
      "mn": 115,
-     "md": 315.04,
+     "md": 313.71,
      "mx": 500
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Flareon-V%20(SWSH179%2F71)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "menor": 115,
-   "medio": 315.04,
+   "medio": 313.71,
    "maior": 500,
    "idiomaConferido": {
     "pten": 1,
@@ -1580,7 +1592,7 @@
    "status": "OK",
    "titulo": "Jolteon-V (SWSH183/71)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Jolteon-V%20(SWSH183%2F71)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -1591,7 +1603,7 @@
     {
      "v": "Foil",
      "mn": 105,
-     "md": 217.9,
+     "md": 213.23,
      "mx": 759.91
     }
    ],
@@ -1611,17 +1623,17 @@
    "status": "OK",
    "titulo": "Vaporeon-V (SWSH181/71)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Vaporeon-V%20(SWSH181%2F71)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 119.9,
-     "md": 236.27,
+     "md": 235.72,
      "mx": 750
     }
    ],
    "menor": 119.9,
-   "medio": 236.27,
+   "medio": 235.72,
    "maior": 750,
    "idiomaConferido": {
     "pten": 1,
@@ -1636,7 +1648,7 @@
    "status": "AMBIGUO",
    "titulo": "036/08 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=036%2F08",
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "168jp/165": {
    "codigo": "168jp/165",
@@ -1652,12 +1664,12 @@
     {
      "v": "Foil",
      "mn": 199.09,
-     "md": 282.83,
+     "md": 285.44,
      "mx": 900
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Charmander%20(168JP%2F165)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "menor": 230,
    "medio": 264.95,
    "maior": 299.9,
@@ -1809,7 +1821,7 @@
    "status": "AMBIGUO",
    "titulo": "0106-07/196 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=0106-07%2F196",
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "192/184": {
    "codigo": "192/184",
@@ -1818,16 +1830,16 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 30.84,
-     "md": 34.11,
+     "mn": 30.8,
+     "md": 33.56,
      "mx": 39.99
     }
    ],
-   "menor": 30.84,
-   "medio": 34.11,
+   "menor": 30.8,
+   "medio": 33.56,
    "maior": 39.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=192%2F184",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 12
@@ -1840,16 +1852,16 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 58.9,
-     "md": 69.66,
+     "mn": 56.05,
+     "md": 70.2,
      "mx": 139.9
     }
    ],
-   "menor": 58.9,
-   "medio": 69.66,
+   "menor": 56.05,
+   "medio": 70.2,
    "maior": 139.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=070%2F068",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 39
@@ -1871,7 +1883,7 @@
    "medio": 55.75,
    "maior": 54.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=194%2F184",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 6
@@ -1890,8 +1902,8 @@
     },
     {
      "v": "Foil",
-     "mn": 19.85,
-     "md": 36.47,
+     "mn": 18,
+     "md": 35.77,
      "mx": 69.99
     }
    ],
@@ -1899,7 +1911,7 @@
    "medio": 30,
    "maior": 30,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=249%2F217",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 75,
@@ -1920,7 +1932,7 @@
     {
      "v": "Foil",
      "mn": 23.85,
-     "md": 28.53,
+     "md": 29.23,
      "mx": 49.98
     }
    ],
@@ -1928,7 +1940,7 @@
    "medio": 40,
    "maior": 40,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Spiritomb%20(076%2F071)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 42,
@@ -1942,16 +1954,16 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 99.9,
-     "md": 108.52,
+     "mn": 95,
+     "md": 107.46,
      "mx": 109.9
     }
    ],
-   "menor": 99.9,
-   "medio": 108.52,
+   "menor": 95,
+   "medio": 107.46,
    "maior": 109.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Hoothoot%20(073%2F067)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 12
@@ -1971,7 +1983,7 @@
     {
      "v": "Foil",
      "mn": 20,
-     "md": 27.94,
+     "md": 28.37,
      "mx": 32
     }
    ],
@@ -1979,7 +1991,7 @@
    "medio": 21.85,
    "maior": 21.85,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=198%2F184",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 27
@@ -1999,7 +2011,7 @@
     {
      "v": "Foil",
      "mn": 45,
-     "md": 108.32,
+     "md": 107.48,
      "mx": 249.99
     }
    ],
@@ -2007,7 +2019,7 @@
    "medio": 59.67,
    "maior": 79.98,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=238%2F217",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 4,
     "jp": 12,
@@ -2023,15 +2035,15 @@
     {
      "v": "Normal",
      "mn": 42.9,
-     "md": 44.42,
+     "md": 44.26,
      "mx": 44.99
     }
    ],
    "menor": 42.9,
-   "medio": 44.42,
+   "medio": 44.26,
    "maior": 44.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=204%2F184",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 9
@@ -2053,7 +2065,7 @@
    "medio": 41.34,
    "maior": 45,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Arcanine%20de%20Hisui%20(075%2F071)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 24
@@ -2075,7 +2087,7 @@
    "medio": 47.07,
    "maior": 161.41,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Torkoal%20(237%2F236)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 75,
@@ -2090,15 +2102,15 @@
     {
      "v": "Normal",
      "mn": 17.99,
-     "md": 43.46,
+     "md": 41.72,
      "mx": 123.41
     }
    ],
    "menor": 17.99,
-   "medio": 43.46,
+   "medio": 41.72,
    "maior": 123.41,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Stoutland%20(248%2F236)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 30,
@@ -2128,7 +2140,7 @@
    "medio": 24.95,
    "maior": 24.95,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Kleavor%20(071%2F067)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 33
@@ -2148,7 +2160,7 @@
     {
      "v": "Foil",
      "mn": 32.9,
-     "md": 47.02,
+     "md": 48.1,
      "mx": 60
     }
    ],
@@ -2156,7 +2168,7 @@
    "medio": 39.99,
    "maior": 39.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Roserade%20(068%2F067)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 21,
@@ -2178,7 +2190,7 @@
     {
      "v": "Foil",
      "mn": 15,
-     "md": 17.78,
+     "md": 17.67,
      "mx": 40
     }
    ],
@@ -2186,7 +2198,7 @@
    "medio": 18.64,
    "maior": 19.85,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Wyrdeer%20(070%2F067)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 30
@@ -2200,15 +2212,15 @@
     {
      "v": "Normal",
      "mn": 65,
-     "md": 72.47,
+     "md": 73.96,
      "mx": 89.99
     }
    ],
    "menor": 65,
-   "medio": 72.47,
+   "medio": 73.96,
    "maior": 89.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=190%2F184",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "jp": 12
@@ -2221,19 +2233,19 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 50,
-     "md": 59.95,
+     "mn": 59.9,
+     "md": 64.9,
      "mx": 69.89
     }
    ],
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=125%2F122",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "tk": 6
    },
-   "menor": 50,
-   "medio": 59.95,
+   "menor": 59.9,
+   "medio": 64.9,
    "maior": 69.89
   },
   "206/∞": {
@@ -2252,15 +2264,15 @@
     {
      "v": "Normal",
      "mn": 139.95,
-     "md": 202.45,
+     "md": 194.2,
      "mx": 360
     }
    ],
    "menor": 139.95,
-   "medio": 202.45,
+   "medio": 194.2,
    "maior": 360,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Vaporeon%20(TG02%2FTG30)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 24,
@@ -2272,17 +2284,17 @@
    "status": "OK",
    "titulo": "Jolteon (TG04/TG30)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Jolteon%20(TG04%2FTG30)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 72.25,
-     "md": 154.23,
+     "md": 153.4,
      "mx": 360
     }
    ],
    "menor": 72.25,
-   "medio": 154.23,
+   "medio": 153.4,
    "maior": 360,
    "idiomaConferido": {
     "pten": 1,
@@ -2295,7 +2307,7 @@
    "status": "OK",
    "titulo": "Traquinagem da Acerola / Acerola's Mischief (183/132)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Acerola's Mischief (183/132)&ed=MEG&num=183",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Fire Energy",
@@ -2317,8 +2329,8 @@
     },
     {
      "v": "Foil",
-     "mn": 142.9,
-     "md": 253.44,
+     "mn": 139.9,
+     "md": 230.76,
      "mx": 499.99
     }
    ],
@@ -2336,7 +2348,7 @@
    "status": "OK",
    "titulo": "Mega Venusaur ex (177/132)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Mega Venusaur ex (177/132)&ed=MEG&num=177",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Shauna",
@@ -2357,13 +2369,13 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 446,
-     "md": 566.08,
+     "mn": 449.9,
+     "md": 569.59,
      "mx": 999.99
     }
    ],
-   "menor": 446,
-   "medio": 566.08,
+   "menor": 449.9,
+   "medio": 569.59,
    "maior": 999.99,
    "idiomaConferido": {
     "pten": 1,
@@ -2376,7 +2388,7 @@
    "status": "OK",
    "titulo": "Jolteon-V (SWSH183/71)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Jolteon-V%20(SWSH183%2F71)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -2387,7 +2399,7 @@
     {
      "v": "Foil",
      "mn": 105,
-     "md": 217.9,
+     "md": 213.23,
      "mx": 759.91
     }
    ],
@@ -2405,17 +2417,17 @@
    "status": "OK",
    "titulo": "Vaporeon-V (SWSH181/71)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Vaporeon-V%20(SWSH181%2F71)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 119.9,
-     "md": 236.27,
+     "md": 235.72,
      "mx": 750
     }
    ],
    "menor": 119.9,
-   "medio": 236.27,
+   "medio": 235.72,
    "maior": 750,
    "idiomaConferido": {
     "pten": 1,
@@ -2428,7 +2440,7 @@
    "status": "OK",
    "titulo": "Amigos em Sinnoh / Friends in Sinnoh (149/159)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Friends in Sinnoh (149/159)&ed=CRZ&num=149",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Friends in Sinnoh",
@@ -2450,9 +2462,9 @@
     },
     {
      "v": "Foil",
-     "mn": 54.9,
-     "md": 82.34,
-     "mx": 100
+     "mn": 45,
+     "md": 71.85,
+     "mx": 125
     }
    ],
    "menor": 124.98,
@@ -2469,7 +2481,7 @@
    "status": "OK",
    "titulo": "Pesquisa de Professores: Prof. Carvalho / Professor's Research: Professor Oak (24/25)",
    "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Professor's Research: Professor Oak (24/25)&ed=CEL&num=24",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Multi Energy",
@@ -2527,7 +2539,7 @@
     {
      "v": "Foil",
      "mn": 14.9,
-     "md": 33,
+     "md": 32.61,
      "mx": 299.99
     }
    ],
@@ -2545,17 +2557,17 @@
    "status": "OK",
    "titulo": "Arceus (XY116/∞)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Arceus%20(Xy116%2F%E2%88%9E)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 40.41,
-     "md": 82.24,
+     "md": 82.14,
      "mx": 109.9
     }
    ],
    "menor": 40.41,
-   "medio": 82.24,
+   "medio": 82.14,
    "maior": 109.9
   },
   "Op13-051": {
@@ -2602,15 +2614,15 @@
     {
      "v": "Normal",
      "mn": 139.95,
-     "md": 202.45,
+     "md": 194.2,
      "mx": 360
     }
    ],
    "menor": 139.95,
-   "medio": 202.45,
+   "medio": 194.2,
    "maior": 360,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Vaporeon%20(TG02%2FTG30)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 24,
@@ -2639,7 +2651,7 @@
     "pten": 1,
     "jp": 6
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "100/084": {
    "codigo": "100/084",
@@ -2648,19 +2660,19 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 13,
-     "md": 27.96,
+     "mn": 20,
+     "md": 29.13,
      "mx": 49.98
     },
     {
      "v": "Foil",
-     "mn": 12.9,
-     "md": 27.09,
+     "mn": 9.75,
+     "md": 25.68,
      "mx": 75
     }
    ],
-   "menor": 13,
-   "medio": 27.96,
+   "menor": 20,
+   "medio": 29.13,
    "maior": 49.98,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=100%2F084",
    "idiomaConferido": {
@@ -2668,7 +2680,7 @@
     "pt": 228,
     "en": 66
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "093/084": {
    "codigo": "093/084",
@@ -2678,18 +2690,18 @@
     {
      "v": "Normal",
      "mn": 11.9,
-     "md": 33.54,
+     "md": 33.86,
      "mx": 69.9
     },
     {
      "v": "Foil",
-     "mn": 10.9,
-     "md": 29.34,
+     "mn": 10,
+     "md": 28.99,
      "mx": 75
     }
    ],
    "menor": 11.9,
-   "medio": 33.54,
+   "medio": 33.86,
    "maior": 69.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=093%2F084",
    "idiomaConferido": {
@@ -2698,7 +2710,7 @@
     "en": 72,
     "jp": 3
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "098/084": {
    "codigo": "098/084",
@@ -2708,18 +2720,18 @@
     {
      "v": "Normal",
      "mn": 30,
-     "md": 44.42,
+     "md": 44.8,
      "mx": 59.98
     },
     {
      "v": "Foil",
-     "mn": 22.4,
-     "md": 44.25,
+     "mn": 22.3,
+     "md": 41.74,
      "mx": 105
     }
    ],
    "menor": 30,
-   "medio": 44.42,
+   "medio": 44.8,
    "maior": 59.98,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=098%2F084",
    "idiomaConferido": {
@@ -2727,7 +2739,7 @@
     "pt": 216,
     "en": 42
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "181/195": {
    "codigo": "181/195",
@@ -2737,12 +2749,12 @@
     {
      "v": "Normal",
      "mn": 49.5,
-     "md": 90.46,
+     "md": 90.57,
      "mx": 129.95
     }
    ],
    "menor": 49.5,
-   "medio": 90.46,
+   "medio": 90.57,
    "maior": 129.95,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=181%2F195",
    "idiomaConferido": {
@@ -2751,7 +2763,7 @@
     "tk": 3,
     "en": 12
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "108/101": {
    "codigo": "108/101",
@@ -2760,20 +2772,20 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 37.95,
-     "md": 46.41,
+     "mn": 37,
+     "md": 43.27,
      "mx": 49.9
     }
    ],
-   "menor": 37.95,
-   "medio": 46.41,
+   "menor": 37,
+   "medio": 43.27,
    "maior": 49.9,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=108%2F101",
    "idiomaConferido": {
     "pten": 1,
     "jp": 12
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "069/068": {
    "codigo": "069/068",
@@ -2795,7 +2807,7 @@
     "pten": 1,
     "jp": 18
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "065JP/165": {
    "codigo": "065JP/165",
@@ -2805,22 +2817,22 @@
     {
      "v": "Normal",
      "mn": 12.9,
-     "md": 24.67,
+     "md": 26.37,
      "mx": 95
     }
    ],
    "menor": 12.9,
-   "medio": 24.67,
+   "medio": 26.37,
    "maior": 95,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=065%2F165",
    "idiomaConferido": {
     "pten": 1,
-    "pt": 27,
-    "en": 39,
+    "pt": 24,
+    "en": 36,
     "fr": 3,
     "jp": 9
    },
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaDivergente": true
   },
   "071/068": {
@@ -2837,7 +2849,7 @@
     {
      "v": "Foil",
      "mn": 36.9,
-     "md": 64.09,
+     "md": 65.34,
      "mx": 199.9
     }
    ],
@@ -2849,7 +2861,7 @@
     "pten": 1,
     "jp": 39
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "108/081": {
    "codigo": "108/081",
@@ -2871,7 +2883,7 @@
     "pten": 1,
     "jp": 30
    },
-   "verificadoEm": "2026-09-13"
+   "verificadoEm": "2026-09-18"
   },
   "172JP/165": {
    "codigo": "172JP/165",
@@ -2880,22 +2892,28 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 140,
-     "md": 211.28,
+     "mn": 215.99,
+     "md": 215.99,
+     "mx": 215.99
+    },
+    {
+     "v": "Foil",
+     "mn": 85,
+     "md": 209.75,
      "mx": 400
     }
    ],
-   "menor": 140,
-   "medio": 211.28,
-   "maior": 400,
+   "menor": 215.99,
+   "medio": 215.99,
+   "maior": 215.99,
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=172%2F165",
    "idiomaConferido": {
     "pten": 1,
-    "jp": 15,
-    "pt": 60,
-    "en": 21
+    "jp": 18,
+    "pt": 66,
+    "en": 24
    },
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaDivergente": true
   },
   "004/084": {
@@ -2915,23 +2933,23 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/792/6a57f0cd628ee-sklf5-h1kqw-c12613501292e3e4835bcc8170db2e99.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 2.89,
-     "md": 8.67,
+     "md": 8.53,
      "mx": 15
     },
     {
      "v": "Foil",
-     "mn": 2.4,
-     "md": 7.93,
+     "mn": 2,
+     "md": 7.9,
      "mx": 25
     }
    ],
    "menor": 2.89,
-   "medio": 8.67,
+   "medio": 8.53,
    "maior": 15,
    "idiomaConferido": {
     "pten": 4,
@@ -2956,7 +2974,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/744/693b03b5130ce-y7qfg-2w8bn-b03c599105a658b920ff003ba7eae81a.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3017,7 +3035,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/747/69405f8d05527-rhsyu-4pxgn-7fd71f2a54171766ae7d794ed21c2916.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3071,7 +3089,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/527/66199b66257b8-924ya-iz80b-f4ee3d69fde51ce98a5c383d8af51b9d.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3081,9 +3099,9 @@
     },
     {
      "v": "Foil",
-     "mn": 25.89,
-     "md": 69.11,
-     "mx": 99.9
+     "mn": 44.99,
+     "md": 69.99,
+     "mx": 99.8
     }
    ],
    "menor": 35,
@@ -3117,7 +3135,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/729/688d3fcc06671-vh1od-oxq1z-a3ebebdad40d08aef1a3fa29ffbe10c9.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3128,7 +3146,7 @@
     {
      "v": "Foil",
      "mn": 54.85,
-     "md": 137.69,
+     "md": 150.74,
      "mx": 1250
     }
    ],
@@ -3158,7 +3176,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/764/697b95e6416b5-fuv76-xhq0f-0b3e10ea9e8d03fd4a17cc3a12de28c8.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3168,8 +3186,8 @@
     },
     {
      "v": "Foil",
-     "mn": 29.45,
-     "md": 35.27,
+     "mn": 29.9,
+     "md": 35.48,
      "mx": 54.72
     }
    ],
@@ -3198,23 +3216,23 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/792/6a57f1136ae9a-e8bc3-jnbch-c12613501292e3e4835bcc8170db2e99.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
-     "mn": 8.9,
-     "md": 27.52,
+     "mn": 7.67,
+     "md": 27.94,
      "mx": 65
     },
     {
      "v": "Foil",
      "mn": 5,
-     "md": 20.06,
+     "md": 19.27,
      "mx": 64.95
     }
    ],
-   "menor": 8.9,
-   "medio": 27.52,
+   "menor": 7.67,
+   "medio": 27.94,
    "maior": 65,
    "idiomaConferido": {
     "pten": 4,
@@ -3239,23 +3257,23 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/792/6a57f10229fc8-traid-yzfbv-c12613501292e3e4835bcc8170db2e99.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 6,
-     "md": 15.13,
+     "md": 15.3,
      "mx": 19.9
     },
     {
      "v": "Foil",
-     "mn": 5.49,
-     "md": 14.87,
+     "mn": 5.4,
+     "md": 15.18,
      "mx": 39.95
     }
    ],
    "menor": 6,
-   "medio": 15.13,
+   "medio": 15.3,
    "maior": 19.9,
    "idiomaConferido": {
     "pten": 1,
@@ -3281,17 +3299,17 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/706/683a0ddf613b0-fxldo-6envh-f67d0c4fb2c68709661fb1ac787983c5.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 39.9,
-     "md": 50.55,
+     "md": 50.48,
      "mx": 69.99
     }
    ],
    "menor": 39.9,
-   "medio": 50.55,
+   "medio": 50.48,
    "maior": 69.99,
    "idiomaConferido": {
     "pten": 1,
@@ -3321,7 +3339,7 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/730/68d6d96af3bce-0t7mq-p1mtg-bda68739bd4cf82472222621b2fdd599.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3331,8 +3349,8 @@
     },
     {
      "v": "Foil",
-     "mn": 36.5,
-     "md": 70.79,
+     "mn": 40,
+     "md": 77.85,
      "mx": 249.9
     }
    ],
@@ -3367,18 +3385,18 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/729/688d3fe75ffa6-z4crj-xao9f-a3ebebdad40d08aef1a3fa29ffbe10c9.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
      "mn": 14.9,
-     "md": 14.9,
-     "mx": 14.9
+     "md": 14.93,
+     "mx": 15
     }
    ],
    "menor": 14.9,
-   "medio": 14.9,
-   "maior": 14.9,
+   "medio": 14.93,
+   "maior": 15,
    "idiomaConferido": {
     "pten": 1,
     "jp": 6
@@ -3406,23 +3424,23 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/728/688d3de86b740-4ivm6-yfpio-83ca5e8c9eb0b3f2342dc8bbcb79268e.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
-     "mn": 19,
-     "md": 19,
+     "mn": 15,
+     "md": 17,
      "mx": 19
     },
     {
      "v": "Foil",
      "mn": 11.85,
-     "md": 26.24,
+     "md": 27.89,
      "mx": 44.9
     }
    ],
-   "menor": 19,
-   "medio": 19,
+   "menor": 15,
+   "medio": 17,
    "maior": 19,
    "idiomaConferido": {
     "pten": 1,
@@ -3456,23 +3474,23 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/764/697b95dab3059-czgai-cbmke-0b3e10ea9e8d03fd4a17cc3a12de28c8.jpg"
     }
    ],
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
-     "mn": 35.9,
-     "md": 45.23,
+     "mn": 30,
+     "md": 41.43,
      "mx": 49.9
     },
     {
      "v": "Foil",
-     "mn": 21.95,
-     "md": 32.79,
+     "mn": 29,
+     "md": 33.24,
      "mx": 40
     }
    ],
-   "menor": 35.9,
-   "medio": 45.23,
+   "menor": 30,
+   "medio": 41.43,
    "maior": 49.9,
    "idiomaConferido": {
     "pten": 1,
@@ -3484,7 +3502,7 @@
    "status": "OK",
    "titulo": "Venusaur ex (174C/151)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Venusaur%20ex%20(174C%2F151)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
@@ -3507,21 +3525,21 @@
    "status": "OK",
    "titulo": "Blastoise ex (186JP/165)",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Blastoise%20ex%20(186JP%2F165)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "versoes": [
     {
      "v": "Normal",
-     "mn": 234.99,
-     "md": 254.97,
+     "mn": 234.98,
+     "md": 250.97,
      "mx": 242.99
     }
    ],
-   "menor": 234.99,
-   "medio": 254.97,
+   "menor": 234.98,
+   "medio": 250.97,
    "maior": 242.99,
    "idiomaConferido": {
     "pten": 1,
-    "jp": 12
+    "jp": 15
    }
   },
   "Evolucao woopper - Base7 - Pokedex": {
@@ -3534,14 +3552,14 @@
    "codigo": "0104/15",
    "status": "AMBIGUO",
    "titulo": "0104/15 — a Liga não devolveu nenhuma carta com esse código (conferir cadastro)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=0104%2F15"
   },
   "035/078": {
    "codigo": "035/078",
    "status": "OK",
    "titulo": "Sylveon (035/078)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Sylveon",
@@ -3574,12 +3592,12 @@
     {
      "v": "Normal",
      "mn": 9.9,
-     "md": 19.78,
+     "md": 21.39,
      "mx": 39.9
     }
    ],
    "menor": 9.9,
-   "medio": 19.78,
+   "medio": 21.39,
    "maior": 39.9,
    "idiomaConferido": {
     "pten": 1,
@@ -3591,7 +3609,7 @@
    "codigo": "052/072",
    "status": "SEM_PRECO",
    "titulo": "052/072 — o nome do cadastro (Eevee) não bate com nenhuma carta com esse número (conferir o nome e o número)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Scrafty",
@@ -3616,7 +3634,7 @@
    "codigo": "054/078",
    "status": "OK",
    "titulo": "Eevee (054/078)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Eevee",
@@ -3649,18 +3667,18 @@
     {
      "v": "Normal",
      "mn": 0.65,
-     "md": 2.83,
+     "md": 2.85,
      "mx": 15
     },
     {
-     "v": "Reverse Foil",
-     "mn": 4.5,
-     "md": 11.87,
-     "mx": 20
+     "v": "Foil",
+     "mn": 14.9,
+     "md": 14.9,
+     "mx": 14.9
     }
    ],
    "menor": 0.65,
-   "medio": 2.83,
+   "medio": 2.85,
    "maior": 15,
    "idiomaConferido": {
     "pten": 7,
@@ -3672,7 +3690,7 @@
    "codigo": "095/086",
    "status": "OK",
    "titulo": "Sliggoo (095/086)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Claydol",
@@ -3699,19 +3717,19 @@
    "versoes": [
     {
      "v": "Normal",
-     "mn": 15.9,
-     "md": 19.3,
+     "mn": 11.99,
+     "md": 17.73,
      "mx": 29.99
     },
     {
      "v": "Foil",
-     "mn": 12.9,
-     "md": 21.65,
+     "mn": 11.4,
+     "md": 21.92,
      "mx": 40.5
     }
    ],
-   "menor": 15.9,
-   "medio": 19.3,
+   "menor": 11.99,
+   "medio": 17.73,
    "maior": 29.99,
    "idiomaConferido": {
     "pten": 4,
@@ -3723,7 +3741,7 @@
    "codigo": "104/159",
    "status": "SEM_PRECO",
    "titulo": "104/159 — o nome do cadastro (Eevee) não bate com nenhuma carta com esse número (conferir o nome e o número)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Duraludon-VMAX",
@@ -3747,14 +3765,14 @@
     {
      "v": "Normal",
      "mn": 13.9,
-     "md": 31.45,
+     "md": 33.13,
      "mx": 40.76
     }
    ],
    "menor": 13.9,
-   "medio": 31.45,
+   "medio": 33.13,
    "maior": 40.76,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 30
@@ -3765,7 +3783,7 @@
    "codigo": "118/086",
    "status": "OK",
    "titulo": "Mega Dragalge ex (118/086)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Solosis",
@@ -3788,18 +3806,18 @@
     {
      "v": "Normal",
      "mn": 240,
-     "md": 346.67,
+     "md": 322.75,
      "mx": 400
     },
     {
      "v": "Foil",
-     "mn": 124.99,
-     "md": 234.02,
+     "mn": 120,
+     "md": 226.57,
      "mx": 599.95
     }
    ],
    "menor": 240,
-   "medio": 346.67,
+   "medio": 322.75,
    "maior": 400,
    "idiomaConferido": {
     "pten": 1,
@@ -3811,7 +3829,7 @@
    "codigo": "133/165",
    "status": "SEM_PRECO",
    "titulo": "133/165 — o nome do cadastro (Evee) não bate com nenhuma carta com esse número (conferir o nome e o número)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Tauros",
@@ -3831,7 +3849,7 @@
    "codigo": "155/214",
    "status": "OK",
    "titulo": "Eevee (155/214)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Eevee",
@@ -3849,7 +3867,7 @@
     {
      "v": "Normal",
      "mn": 9,
-     "md": 16.83,
+     "md": 17.03,
      "mx": 29.99
     },
     {
@@ -3860,7 +3878,7 @@
     }
    ],
    "menor": 9,
-   "medio": 16.83,
+   "medio": 17.03,
    "maior": 29.99,
    "idiomaConferido": {
     "pten": 1,
@@ -3872,7 +3890,7 @@
    "codigo": "155/236",
    "status": "OK",
    "titulo": "Sylveon (155/236)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Fraxure",
@@ -3895,18 +3913,18 @@
     {
      "v": "Normal",
      "mn": 19,
-     "md": 37.57,
+     "md": 37.93,
      "mx": 54
     },
     {
-     "v": "Foil",
-     "mn": 39.9,
-     "md": 39.9,
-     "mx": 39.9
+     "v": "Reverse Foil",
+     "mn": 29.9,
+     "md": 76.75,
+     "mx": 100
     }
    ],
    "menor": 19,
-   "medio": 37.57,
+   "medio": 37.93,
    "maior": 54,
    "idiomaConferido": {
     "pten": 4,
@@ -3917,7 +3935,7 @@
    "codigo": "166/236",
    "status": "OK",
    "titulo": "Eevee (166/236)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Noctowl",
@@ -3940,19 +3958,19 @@
     {
      "v": "Normal",
      "mn": 14.9,
-     "md": 27.13,
-     "mx": 32.5
+     "md": 28.24,
+     "mx": 34.75
     },
     {
      "v": "Reverse Foil",
      "mn": 50,
-     "md": 70.33,
+     "md": 71.76,
      "mx": 94.9
     }
    ],
    "menor": 14.9,
-   "medio": 27.13,
-   "maior": 32.5,
+   "medio": 28.24,
+   "maior": 34.75,
    "idiomaConferido": {
     "pten": 1,
     "pt": 84
@@ -3966,7 +3984,7 @@
     {
      "v": "Normal",
      "mn": 7.9,
-     "md": 12.64,
+     "md": 12.63,
      "mx": 79.9
     },
     {
@@ -3977,9 +3995,9 @@
     }
    ],
    "menor": 7.9,
-   "medio": 12.64,
+   "medio": 12.63,
    "maior": 79.9,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 54
@@ -3988,9 +4006,9 @@
   },
   "30/30": {
    "codigo": "30/30",
-   "status": "AMBIGUO",
-   "titulo": "30/30 — 20 cartas com esse número (escolher qual é a sua)",
-   "verificadoEm": "2026-09-13",
+   "status": "OK",
+   "titulo": "Sylveon (30/30)",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Latias (Pink Symbol)",
@@ -4093,7 +4111,18 @@
      "img": "https://repositorio.sbrauble.com/arquivos/in/pokemon_bkp/cd/157/47_30.jpg"
     }
    ],
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=30%2F30"
+   "url": "https://www.ligapokemon.com.br/?view=cards/card&card=Sylveon (30/30)&ed=XYT3&num=30",
+   "versoes": [
+    {
+     "v": "Normal",
+     "mn": 29.99,
+     "md": 29.99,
+     "mx": 29.99
+    }
+   ],
+   "menor": 29.99,
+   "medio": 29.99,
+   "maior": 29.99
   },
   "49/68": {
    "codigo": "49/68",
@@ -4103,7 +4132,7 @@
     {
      "v": "Normal",
      "mn": 12.9,
-     "md": 33.79,
+     "md": 35.12,
      "mx": 39.9
     },
     {
@@ -4114,9 +4143,9 @@
     }
    ],
    "menor": 12.9,
-   "medio": 33.79,
+   "medio": 35.12,
    "maior": 39.9,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "pt": 42,
@@ -4132,14 +4161,14 @@
     {
      "v": "Normal",
      "mn": 10.9,
-     "md": 24.12,
+     "md": 23.78,
      "mx": 58.2
     }
    ],
    "menor": 10.9,
-   "medio": 24.12,
+   "medio": 23.78,
    "maior": 58.2,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 1,
     "en": 42,
@@ -4152,7 +4181,7 @@
    "codigo": "59/111",
    "status": "OK",
    "titulo": "Eevee (59/111)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Eevee",
@@ -4180,7 +4209,7 @@
     {
      "v": "Normal",
      "mn": 8.1,
-     "md": 19.63,
+     "md": 20.75,
      "mx": 34.99
     },
     {
@@ -4191,7 +4220,7 @@
     }
    ],
    "menor": 8.1,
-   "medio": 19.63,
+   "medio": 20.75,
    "maior": 34.99,
    "idiomaConferido": {
     "pten": 1,
@@ -4202,7 +4231,7 @@
    "codigo": "72/111",
    "status": "OK",
    "titulo": "Sylveon (72/111)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "opcoes": [
     {
      "titulo": "Shuckle",
@@ -4230,18 +4259,18 @@
     {
      "v": "Normal",
      "mn": 8,
-     "md": 17.44,
+     "md": 16.67,
      "mx": 30
     },
     {
      "v": "Foil",
-     "mn": 7.67,
-     "md": 36.65,
+     "mn": 9.9,
+     "md": 36.85,
      "mx": 62.99
     }
    ],
    "menor": 8,
-   "medio": 17.44,
+   "medio": 16.67,
    "maior": 30,
    "idiomaConferido": {
     "pten": 1,
@@ -4258,7 +4287,7 @@
     {
      "v": "Normal",
      "mn": 34.5,
-     "md": 57.54,
+     "md": 57.19,
      "mx": 80
     },
     {
@@ -4269,9 +4298,9 @@
     }
    ],
    "menor": 34.5,
-   "medio": 57.54,
+   "medio": 57.19,
    "maior": 80,
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "idiomaConferido": {
     "pten": 4,
     "pt": 51,
@@ -4283,7 +4312,7 @@
    "codigo": "swsh095",
    "status": "SEM_PRECO",
    "titulo": "swsh095 — o nome do cadastro (Evee) não bate com nenhuma carta com esse número (conferir o nome e o número) — a busca \"Evee (swsh095)\" caiu em Eevee (SWSH095/71), preço não gravado",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=swsh095",
    "nomeNaoBate": true
   },
@@ -4291,18 +4320,18 @@
    "codigo": "swsh211",
    "status": "OK",
    "titulo": "Sylveon (SWSH211/71)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Sylveon%20(swsh211)",
    "versoes": [
     {
      "v": "Normal",
      "mn": 17.9,
-     "md": 35.99,
+     "md": 36.35,
      "mx": 49.99
     }
    ],
    "menor": 17.9,
-   "medio": 35.99,
+   "medio": 36.35,
    "maior": 49.99,
    "idiomaConferido": {
     "pten": 1,
@@ -4313,19 +4342,25 @@
    "codigo": "xy04",
    "status": "OK",
    "titulo": "Sylveon (XY04/∞)",
-   "verificadoEm": "2026-09-13",
+   "verificadoEm": "2026-09-18",
    "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Sylveon%20(xy04)",
    "versoes": [
     {
      "v": "Normal",
+     "mn": 50.5,
+     "md": 50.5,
+     "mx": 50.5
+    },
+    {
+     "v": "Foil",
      "mn": 49.9,
-     "md": 95.77,
+     "md": 89.69,
      "mx": 169.99
     }
    ],
-   "menor": 49.9,
-   "medio": 95.77,
-   "maior": 169.99,
+   "menor": 50.5,
+   "medio": 50.5,
+   "maior": 50.5,
    "idiomaConferido": {
     "pten": 4,
     "pt": 57
@@ -4382,6 +4417,12 @@
      "mn": 49.9,
      "md": 101.54,
      "mx": 249.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 49.9,
+     "md": 114.42,
+     "mx": 249.9
     }
    ]
   },
@@ -4433,6 +4474,12 @@
      "d": "2026-09-13",
      "mn": 350,
      "md": 581.87,
+     "mx": 948.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 350,
+     "md": 578.44,
      "mx": 948.99
     }
    ],
@@ -4494,6 +4541,12 @@
      "mn": 40,
      "md": 86.17,
      "mx": 150
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 67,
+     "md": 108.58,
+     "mx": 150
     }
    ]
   },
@@ -4546,6 +4599,12 @@
      "mn": 220,
      "md": 344.23,
      "mx": 499.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 220,
+     "md": 359.95,
+     "mx": 499.9
     }
    ],
    "Foil": [
@@ -4595,6 +4654,12 @@
      "d": "2026-09-13",
      "mn": 178,
      "md": 424.81,
+     "mx": 2999.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 145,
+     "md": 414.91,
      "mx": 2999.9
     }
    ]
@@ -4648,6 +4713,12 @@
      "mn": 149.99,
      "md": 195,
      "mx": 270
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 149.99,
+     "md": 195,
+     "mx": 270
     }
    ],
    "Foil": [
@@ -4673,6 +4744,12 @@
      "d": "2026-09-13",
      "mn": 150,
      "md": 189.67,
+     "mx": 279.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 149.99,
+     "md": 190.1,
      "mx": 279.9
     }
    ]
@@ -4726,6 +4803,12 @@
      "mn": 149.67,
      "md": 149.67,
      "mx": 149.67
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 149.67,
+     "md": 149.67,
+     "mx": 149.67
     }
    ],
    "Foil": [
@@ -4751,6 +4834,12 @@
      "d": "2026-09-13",
      "mn": 200,
      "md": 245.83,
+     "mx": 360
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 195,
+     "md": 243.18,
      "mx": 360
     }
    ]
@@ -4804,6 +4893,12 @@
      "mn": 136,
      "md": 193.7,
      "mx": 360
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 136,
+     "md": 195.23,
+     "mx": 360
     }
    ]
   },
@@ -4856,6 +4951,12 @@
      "mn": 199,
      "md": 199,
      "mx": 199
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 168,
+     "md": 191.5,
+     "mx": 200
     }
    ],
    "Foil": [
@@ -4905,6 +5006,12 @@
      "d": "2026-09-13",
      "mn": 159.99,
      "md": 219.34,
+     "mx": 650
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 159.99,
+     "md": 220.7,
      "mx": 650
     }
    ]
@@ -4958,6 +5065,12 @@
      "mn": 99,
      "md": 128.56,
      "mx": 149.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 119,
+     "md": 139.6,
+     "mx": 149.9
     }
    ],
    "Foil": [
@@ -5007,6 +5120,12 @@
      "d": "2026-09-13",
      "mn": 99,
      "md": 258.91,
+     "mx": 3499.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 94.5,
+     "md": 250.95,
      "mx": 3499.9
     }
    ]
@@ -5060,6 +5179,12 @@
      "mn": 184.5,
      "md": 270.56,
      "mx": 459.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 184.5,
+     "md": 270.56,
+     "mx": 459.9
     }
    ],
    "Foil": [
@@ -5109,6 +5234,12 @@
      "d": "2026-09-13",
      "mn": 185,
      "md": 289.11,
+     "mx": 899.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 184.9,
+     "md": 287.69,
      "mx": 899.9
     }
    ]
@@ -5162,6 +5293,12 @@
      "mn": 249,
      "md": 398.5,
      "mx": 548
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 249,
+     "md": 398.5,
+     "mx": 548
     }
    ],
    "Foil": [
@@ -5211,6 +5348,12 @@
      "d": "2026-09-13",
      "mn": 249.99,
      "md": 474.94,
+     "mx": 1000
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 249.99,
+     "md": 473.31,
      "mx": 1000
     }
    ]
@@ -5264,6 +5407,12 @@
      "mn": 99.9,
      "md": 265.48,
      "mx": 1000
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 99.9,
+     "md": 264.06,
+     "mx": 1000
     }
    ]
   },
@@ -5316,6 +5465,12 @@
      "mn": 25.99,
      "md": 26.53,
      "mx": 26.89
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 23.8,
+     "md": 27.09,
+     "mx": 29
     }
    ]
   },
@@ -5367,6 +5522,12 @@
      "d": "2026-09-13",
      "mn": 319.9,
      "md": 524.09,
+     "mx": 1200
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 379.9,
+     "md": 528.2,
      "mx": 1200
     }
    ],
@@ -5440,6 +5601,12 @@
      "mn": 199.99,
      "md": 199.99,
      "mx": 199.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 148,
+     "md": 165.33,
+     "mx": 199.99
     }
    ],
    "Foil": [
@@ -5489,6 +5656,12 @@
      "d": "2026-09-13",
      "mn": 133.8,
      "md": 274.43,
+     "mx": 800
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 147.25,
+     "md": 273.49,
      "mx": 800
     }
    ]
@@ -5542,11 +5715,23 @@
      "mn": 699,
      "md": 699,
      "mx": 699
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 699,
+     "md": 699,
+     "mx": 699
     }
    ],
    "Foil": [
     {
      "d": "2026-09-13",
+     "mn": 162.9,
+     "md": 198.09,
+     "mx": 270
+    },
+    {
+     "d": "2026-09-18",
      "mn": 162.9,
      "md": 198.09,
      "mx": 270
@@ -5602,6 +5787,12 @@
      "mn": 68,
      "md": 68,
      "mx": 68
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 68,
+     "md": 68,
+     "mx": 68
     }
    ],
    "Foil": [
@@ -5651,6 +5842,12 @@
      "d": "2026-09-13",
      "mn": 43.52,
      "md": 70.35,
+     "mx": 139.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 45,
+     "md": 73.29,
      "mx": 139.99
     }
    ]
@@ -5704,6 +5901,12 @@
      "mn": 300,
      "md": 307.1,
      "mx": 324.85
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 300,
+     "md": 307.1,
+     "mx": 324.85
     }
    ],
    "Foil": [
@@ -5729,6 +5932,12 @@
      "d": "2026-09-13",
      "mn": 270,
      "md": 354.06,
+     "mx": 999.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 259.85,
+     "md": 346.89,
      "mx": 999.9
     }
    ]
@@ -5782,6 +5991,12 @@
      "mn": 190,
      "md": 245,
      "mx": 300
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 190,
+     "md": 245,
+     "mx": 300
     }
    ],
    "Foil": [
@@ -5831,6 +6046,12 @@
      "d": "2026-09-13",
      "mn": 160,
      "md": 256.28,
+     "mx": 1195
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 160,
+     "md": 261.83,
      "mx": 1195
     }
    ]
@@ -5890,6 +6111,12 @@
      "mn": 39.5,
      "md": 57.87,
      "mx": 80
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 39.5,
+     "md": 57.87,
+     "mx": 80
     }
    ],
    "Foil": [
@@ -5946,6 +6173,12 @@
      "mn": 37,
      "md": 79.66,
      "mx": 134.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 33.3,
+     "md": 79.04,
+     "mx": 134.9
     }
    ]
   },
@@ -5989,6 +6222,20 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 19.9,
+     "md": 21.57,
+     "mx": 22.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 19.99,
+     "md": 19.99,
+     "mx": 19.99
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-09-18",
      "mn": 19.9,
      "md": 21.57,
      "mx": 22.9
@@ -6038,6 +6285,12 @@
      "mn": 19.45,
      "md": 19.45,
      "mx": 19.45
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 19.45,
+     "md": 19.45,
+     "mx": 19.45
     }
    ],
    "Foil": [
@@ -6081,6 +6334,12 @@
      "d": "2026-09-13",
      "mn": 19.5,
      "md": 19.76,
+     "mx": 20
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 19.5,
+     "md": 19.8,
      "mx": 20
     }
    ]
@@ -6128,6 +6387,12 @@
      "mn": 54.79,
      "md": 78.27,
      "mx": 89.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 49.99,
+     "md": 75.3,
+     "mx": 89.9
     }
    ],
    "Foil": [
@@ -6171,6 +6436,12 @@
      "d": "2026-09-13",
      "mn": 49.9,
      "md": 75.54,
+     "mx": 119.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 49.9,
+     "md": 74.83,
      "mx": 119.99
     }
    ]
@@ -6218,6 +6489,12 @@
      "mn": 16,
      "md": 27.93,
      "mx": 56.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 20,
+     "md": 30.32,
+     "mx": 56.9
     }
    ],
    "Foil": [
@@ -6261,6 +6538,12 @@
      "d": "2026-09-13",
      "mn": 5,
      "md": 28.05,
+     "mx": 59.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 9.31,
+     "md": 26.88,
      "mx": 59.99
     }
    ]
@@ -6308,6 +6591,12 @@
      "mn": 22,
      "md": 46.23,
      "mx": 90
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 25.8,
+     "md": 49.2,
+     "mx": 90
     }
    ],
    "Foil": [
@@ -6351,6 +6640,12 @@
      "d": "2026-09-13",
      "mn": 18,
      "md": 43.1,
+     "mx": 115
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 17.9,
+     "md": 40.42,
      "mx": 115
     }
    ]
@@ -6398,6 +6693,12 @@
      "mn": 0.2,
      "md": 1.74,
      "mx": 4.5
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 0.2,
+     "md": 1.73,
+     "mx": 4.5
     }
    ],
    "Reverse Foil": [
@@ -6441,6 +6742,12 @@
      "d": "2026-09-13",
      "mn": 0.8,
      "md": 4.58,
+     "mx": 7
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 0.8,
+     "md": 4.56,
      "mx": 7
     }
    ]
@@ -6488,6 +6795,20 @@
      "mn": 49.89,
      "md": 73.34,
      "mx": 99.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 95,
+     "md": 95,
+     "mx": 95
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-09-18",
+     "mn": 49.89,
+     "md": 71.19,
+     "mx": 99.9
     }
    ]
   },
@@ -6534,6 +6855,12 @@
      "mn": 5,
      "md": 7.14,
      "mx": 10
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 5,
+     "md": 7.78,
+     "mx": 10
     }
    ],
    "Foil": [
@@ -6578,6 +6905,12 @@
      "mn": 2.99,
      "md": 8.76,
      "mx": 14.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 2.99,
+     "md": 8.8,
+     "mx": 14.9
     }
    ]
   },
@@ -6621,6 +6954,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 12,
+     "md": 17.81,
+     "mx": 44.75
+    },
+    {
+     "d": "2026-09-18",
      "mn": 12,
      "md": 17.81,
      "mx": 44.75
@@ -6690,6 +7029,12 @@
      "mn": 15,
      "md": 15,
      "mx": 15
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 15,
+     "md": 15,
+     "mx": 15
     }
    ],
    "Foil": [
@@ -6734,6 +7079,12 @@
      "mn": 6.98,
      "md": 12.34,
      "mx": 14.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 6.98,
+     "md": 12.06,
+     "mx": 19.89
     }
    ]
   },
@@ -6780,6 +7131,12 @@
      "mn": 899,
      "md": 1064.88,
      "mx": 1500
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 899,
+     "md": 1085.12,
+     "mx": 1500
     }
    ]
   },
@@ -6823,6 +7180,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 600,
+     "md": 799.5,
+     "mx": 999
+    },
+    {
+     "d": "2026-09-18",
      "mn": 600,
      "md": 799.5,
      "mx": 999
@@ -6872,6 +7235,12 @@
      "mn": 199.99,
      "md": 206.66,
      "mx": 210
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 199.99,
+     "md": 206.66,
+     "mx": 210
     }
    ],
    "Foil": [
@@ -6892,6 +7261,12 @@
      "mn": 189.95,
      "md": 221.91,
      "mx": 299
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 184.4,
+     "md": 232.94,
+     "mx": 649.98
     }
    ]
   },
@@ -6938,6 +7313,12 @@
      "mn": 499,
      "md": 499,
      "mx": 499
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 499,
+     "md": 499,
+     "mx": 499
     }
    ],
    "Foil": [
@@ -6945,6 +7326,12 @@
      "d": "2026-09-13",
      "mn": 140,
      "md": 218.31,
+     "mx": 1500
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 140,
+     "md": 242.42,
      "mx": 1500
     }
    ]
@@ -6992,6 +7379,12 @@
      "mn": 30.84,
      "md": 34.11,
      "mx": 39.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 30.8,
+     "md": 33.56,
+     "mx": 39.99
     }
    ]
   },
@@ -7037,6 +7430,12 @@
      "d": "2026-09-13",
      "mn": 58.9,
      "md": 69.66,
+     "mx": 139.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 56.05,
+     "md": 70.2,
      "mx": 139.9
     }
    ],
@@ -7092,6 +7491,12 @@
      "mn": 53.99,
      "md": 55.75,
      "mx": 54.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 53.99,
+     "md": 55.75,
+     "mx": 54.9
     }
    ]
   },
@@ -7135,6 +7540,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 30,
+     "md": 30,
+     "mx": 30
+    },
+    {
+     "d": "2026-09-18",
      "mn": 30,
      "md": 30,
      "mx": 30
@@ -7182,6 +7593,12 @@
      "mn": 19.85,
      "md": 36.47,
      "mx": 69.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 18,
+     "md": 35.77,
+     "mx": 69.99
     }
    ]
   },
@@ -7225,6 +7642,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 40,
+     "md": 40,
+     "mx": 40
+    },
+    {
+     "d": "2026-09-18",
      "mn": 40,
      "md": 40,
      "mx": 40
@@ -7272,6 +7695,12 @@
      "mn": 23.85,
      "md": 28.53,
      "mx": 49.98
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 23.85,
+     "md": 29.23,
+     "mx": 49.98
     }
    ]
   },
@@ -7317,6 +7746,12 @@
      "d": "2026-09-13",
      "mn": 99.9,
      "md": 108.52,
+     "mx": 109.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 95,
+     "md": 107.46,
      "mx": 109.9
     }
    ],
@@ -7384,6 +7819,12 @@
      "mn": 21.85,
      "md": 21.85,
      "mx": 21.85
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 21.85,
+     "md": 21.85,
+     "mx": 21.85
     }
    ],
    "Foil": [
@@ -7409,6 +7850,12 @@
      "d": "2026-09-13",
      "mn": 20,
      "md": 27.94,
+     "mx": 32
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 20,
+     "md": 28.37,
      "mx": 32
     }
    ]
@@ -7456,6 +7903,12 @@
      "mn": 52.9,
      "md": 59.67,
      "mx": 79.98
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 52.9,
+     "md": 59.67,
+     "mx": 79.98
     }
    ],
    "Foil": [
@@ -7493,6 +7946,12 @@
      "d": "2026-09-13",
      "mn": 45,
      "md": 108.32,
+     "mx": 249.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 45,
+     "md": 107.48,
      "mx": 249.99
     }
    ]
@@ -7539,6 +7998,12 @@
      "d": "2026-09-13",
      "mn": 42.9,
      "md": 44.42,
+     "mx": 44.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 42.9,
+     "md": 44.26,
      "mx": 44.99
     }
    ],
@@ -7594,6 +8059,12 @@
      "mn": 35,
      "md": 41.34,
      "mx": 45
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 35,
+     "md": 41.34,
+     "mx": 45
     }
    ]
   },
@@ -7637,6 +8108,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 24.99,
+     "md": 47.07,
+     "mx": 161.41
+    },
+    {
+     "d": "2026-09-18",
      "mn": 24.99,
      "md": 47.07,
      "mx": 161.41
@@ -7686,6 +8163,12 @@
      "mn": 17.99,
      "md": 43.46,
      "mx": 123.41
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 17.99,
+     "md": 41.72,
+     "mx": 123.41
     }
    ]
   },
@@ -7732,6 +8215,12 @@
      "mn": 24.95,
      "md": 24.95,
      "mx": 24.95
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 24.95,
+     "md": 24.95,
+     "mx": 24.95
     }
    ],
    "Foil": [
@@ -7755,6 +8244,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 21.99,
+     "md": 31.29,
+     "mx": 65
+    },
+    {
+     "d": "2026-09-18",
      "mn": 21.99,
      "md": 31.29,
      "mx": 65
@@ -7804,6 +8299,12 @@
      "mn": 39.99,
      "md": 39.99,
      "mx": 39.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 39.99,
+     "md": 39.99,
+     "mx": 39.99
     }
    ],
    "Foil": [
@@ -7829,6 +8330,12 @@
      "d": "2026-09-13",
      "mn": 32.9,
      "md": 47.02,
+     "mx": 60
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 32.9,
+     "md": 48.1,
      "mx": 60
     }
    ]
@@ -7876,6 +8383,12 @@
      "mn": 15,
      "md": 18.64,
      "mx": 19.85
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 15,
+     "md": 18.64,
+     "mx": 19.85
     }
    ],
    "Foil": [
@@ -7901,6 +8414,12 @@
      "d": "2026-09-13",
      "mn": 15,
      "md": 17.78,
+     "mx": 40
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 15,
+     "md": 17.67,
      "mx": 40
     }
    ]
@@ -7948,6 +8467,12 @@
      "mn": 65,
      "md": 72.47,
      "mx": 89.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 65,
+     "md": 73.96,
+     "mx": 89.99
     }
    ]
   },
@@ -7993,6 +8518,12 @@
      "d": "2026-09-13",
      "mn": 139.95,
      "md": 202.45,
+     "mx": 360
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 139.95,
+     "md": 194.2,
      "mx": 360
     }
    ],
@@ -8066,6 +8597,12 @@
      "mn": 72.25,
      "md": 154.23,
      "mx": 360
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 72.25,
+     "md": 153.4,
+     "mx": 360
     }
    ]
   },
@@ -8097,6 +8634,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 100,
+     "md": 100,
+     "mx": 100
+    },
+    {
+     "d": "2026-09-18",
      "mn": 100,
      "md": 100,
      "mx": 100
@@ -8132,6 +8675,12 @@
      "mn": 105,
      "md": 217.9,
      "mx": 759.91
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 105,
+     "md": 213.23,
+     "mx": 759.91
     }
    ]
   },
@@ -8165,6 +8714,12 @@
      "d": "2026-09-13",
      "mn": 119.9,
      "md": 236.27,
+     "mx": 750
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 119.9,
+     "md": 235.72,
      "mx": 750
     }
    ]
@@ -8200,6 +8755,12 @@
      "mn": 230,
      "md": 264.95,
      "mx": 299.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 230,
+     "md": 264.95,
+     "mx": 299.9
     }
    ],
    "Foil": [
@@ -8225,6 +8786,12 @@
      "d": "2026-09-13",
      "mn": 199.09,
      "md": 282.83,
+     "mx": 900
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 199.09,
+     "md": 285.44,
      "mx": 900
     }
    ]
@@ -8260,6 +8827,12 @@
      "mn": 115,
      "md": 315.04,
      "mx": 500
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 115,
+     "md": 313.71,
+     "mx": 500
     }
    ]
   },
@@ -8285,6 +8858,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 89,
+     "md": 94.45,
+     "mx": 99.9
+    },
+    {
+     "d": "2026-09-18",
      "mn": 89,
      "md": 94.45,
      "mx": 99.9
@@ -8316,6 +8895,12 @@
      "mn": 13,
      "md": 27.96,
      "mx": 49.98
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 20,
+     "md": 29.13,
+     "mx": 49.98
     }
    ],
    "Foil": [
@@ -8341,6 +8926,12 @@
      "d": "2026-09-13",
      "mn": 12.9,
      "md": 27.09,
+     "mx": 75
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 9.75,
+     "md": 25.68,
      "mx": 75
     }
    ]
@@ -8370,6 +8961,12 @@
      "mn": 11.9,
      "md": 33.54,
      "mx": 69.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.9,
+     "md": 33.86,
+     "mx": 69.9
     }
    ],
    "Foil": [
@@ -8395,6 +8992,12 @@
      "d": "2026-09-13",
      "mn": 10.9,
      "md": 29.34,
+     "mx": 75
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 10,
+     "md": 28.99,
      "mx": 75
     }
    ]
@@ -8424,6 +9027,12 @@
      "mn": 30,
      "md": 44.42,
      "mx": 59.98
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 30,
+     "md": 44.8,
+     "mx": 59.98
     }
    ],
    "Foil": [
@@ -8449,6 +9058,12 @@
      "d": "2026-09-13",
      "mn": 22.4,
      "md": 44.25,
+     "mx": 105
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 22.3,
+     "md": 41.74,
      "mx": 105
     }
    ]
@@ -8478,6 +9093,12 @@
      "mn": 49.5,
      "md": 90.46,
      "mx": 129.95
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 49.5,
+     "md": 90.57,
+     "mx": 129.95
     }
    ]
   },
@@ -8505,6 +9126,12 @@
      "d": "2026-09-13",
      "mn": 37.95,
      "md": 46.41,
+     "mx": 49.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 37,
+     "md": 43.27,
      "mx": 49.9
     }
    ],
@@ -8542,6 +9169,12 @@
      "mn": 96.9,
      "md": 165,
      "mx": 200
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 96.9,
+     "md": 165,
+     "mx": 200
     }
    ]
   },
@@ -8569,6 +9202,12 @@
      "d": "2026-09-13",
      "mn": 12.9,
      "md": 24.67,
+     "mx": 95
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 12.9,
+     "md": 26.37,
      "mx": 95
     }
    ]
@@ -8598,6 +9237,12 @@
      "mn": 114.9,
      "md": 114.9,
      "mx": 114.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 114.9,
+     "md": 114.9,
+     "mx": 114.9
     }
    ],
    "Foil": [
@@ -8624,6 +9269,12 @@
      "mn": 36.9,
      "md": 64.09,
      "mx": 199.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 36.9,
+     "md": 65.34,
+     "mx": 199.9
     }
    ]
   },
@@ -8649,6 +9300,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 300,
+     "md": 367.82,
+     "mx": 479
+    },
+    {
+     "d": "2026-09-18",
      "mn": 300,
      "md": 367.82,
      "mx": 479
@@ -8680,6 +9337,20 @@
      "mn": 140,
      "md": 211.28,
      "mx": 400
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 215.99,
+     "md": 215.99,
+     "mx": 215.99
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-09-18",
+     "mn": 85,
+     "md": 209.75,
+     "mx": 400
     }
    ]
   },
@@ -8701,6 +9372,12 @@
      "d": "2026-09-13",
      "mn": 13.9,
      "md": 31.45,
+     "mx": 40.76
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 13.9,
+     "md": 33.13,
      "mx": 40.76
     }
    ]
@@ -8724,6 +9401,12 @@
      "mn": 7.9,
      "md": 12.64,
      "mx": 79.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 7.9,
+     "md": 12.63,
+     "mx": 79.9
     }
    ],
    "Reverse Foil": [
@@ -8741,6 +9424,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 59.9,
+     "md": 67.24,
+     "mx": 71.91
+    },
+    {
+     "d": "2026-09-18",
      "mn": 59.9,
      "md": 67.24,
      "mx": 71.91
@@ -8766,6 +9455,12 @@
      "mn": 12.9,
      "md": 33.79,
      "mx": 39.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 12.9,
+     "md": 35.12,
+     "mx": 39.9
     }
    ],
    "Reverse Foil": [
@@ -8783,6 +9478,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 22.8,
+     "md": 40.73,
+     "mx": 49.9
+    },
+    {
+     "d": "2026-09-18",
      "mn": 22.8,
      "md": 40.73,
      "mx": 49.9
@@ -8808,6 +9509,12 @@
      "mn": 10.9,
      "md": 24.12,
      "mx": 58.2
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 10.9,
+     "md": 23.78,
+     "mx": 58.2
     }
    ]
   },
@@ -8830,6 +9537,12 @@
      "mn": 34.5,
      "md": 57.54,
      "mx": 80
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 34.5,
+     "md": 57.19,
+     "mx": 80
     }
    ],
    "Reverse Foil": [
@@ -8847,6 +9560,12 @@
     },
     {
      "d": "2026-09-13",
+     "mn": 42.5,
+     "md": 94.64,
+     "mx": 119.99
+    },
+    {
+     "d": "2026-09-18",
      "mn": 42.5,
      "md": 94.64,
      "mx": 119.99
@@ -8872,6 +9591,12 @@
      "mn": 50,
      "md": 59.95,
      "mx": 69.89
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 59.9,
+     "md": 64.9,
+     "mx": 69.89
     }
    ]
   },
@@ -8881,6 +9606,12 @@
      "d": "2026-09-13",
      "mn": 764.9,
      "md": 1127.87,
+     "mx": 4000
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 764.9,
+     "md": 1105.96,
      "mx": 4000
     }
    ]
@@ -8892,6 +9623,12 @@
      "mn": 99.5,
      "md": 99.5,
      "mx": 99.5
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 99.5,
+     "md": 99.5,
+     "mx": 99.5
     }
    ],
    "Foil": [
@@ -8900,6 +9637,12 @@
      "mn": 89.9,
      "md": 134.38,
      "mx": 239.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 89.9,
+     "md": 132.61,
+     "mx": 239.9
     }
    ]
   },
@@ -8907,6 +9650,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 300,
+     "md": 300,
+     "mx": 300
+    },
+    {
+     "d": "2026-09-18",
      "mn": 300,
      "md": 300,
      "mx": 300
@@ -8920,11 +9669,23 @@
      "mn": 14.98,
      "md": 14.98,
      "mx": 14.98
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 14.98,
+     "md": 14.98,
+     "mx": 14.98
     }
    ],
    "Foil": [
     {
      "d": "2026-09-13",
+     "mn": 6.9,
+     "md": 13.75,
+     "mx": 15
+    },
+    {
+     "d": "2026-09-18",
      "mn": 6.9,
      "md": 13.75,
      "mx": 15
@@ -8938,6 +9699,12 @@
      "mn": 9.9,
      "md": 9.9,
      "mx": 9.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 9.9,
+     "md": 9.9,
+     "mx": 9.9
     }
    ],
    "Foil": [
@@ -8945,6 +9712,12 @@
      "d": "2026-09-13",
      "mn": 11.95,
      "md": 16.37,
+     "mx": 20
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.95,
+     "md": 16.59,
      "mx": 20
     }
    ]
@@ -8956,11 +9729,23 @@
      "mn": 13.9,
      "md": 13.9,
      "mx": 13.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 13.9,
+     "md": 13.9,
+     "mx": 13.9
     }
    ],
    "Foil": [
     {
      "d": "2026-09-13",
+     "mn": 6.9,
+     "md": 11.92,
+     "mx": 14.99
+    },
+    {
+     "d": "2026-09-18",
      "mn": 6.9,
      "md": 11.92,
      "mx": 14.99
@@ -8974,6 +9759,12 @@
      "mn": 11.9,
      "md": 11.9,
      "mx": 11.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.9,
+     "md": 11.9,
+     "mx": 11.9
     }
    ],
    "Foil": [
@@ -8981,6 +9772,12 @@
      "d": "2026-09-13",
      "mn": 13.95,
      "md": 15.36,
+     "mx": 20
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 13.95,
+     "md": 15.34,
      "mx": 20
     }
    ]
@@ -8992,6 +9789,12 @@
      "mn": 85,
      "md": 85,
      "mx": 85
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 85,
+     "md": 85,
+     "mx": 85
     }
    ],
    "Foil": [
@@ -8999,6 +9802,12 @@
      "d": "2026-09-13",
      "mn": 34.9,
      "md": 116.33,
+     "mx": 499
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 44.99,
+     "md": 105.42,
      "mx": 499
     }
    ]
@@ -9010,6 +9819,12 @@
      "mn": 25,
      "md": 37.45,
      "mx": 49.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 25,
+     "md": 37.45,
+     "mx": 49.9
     }
    ],
    "Foil": [
@@ -9017,6 +9832,12 @@
      "d": "2026-09-13",
      "mn": 23.79,
      "md": 25.12,
+     "mx": 49
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 19.9,
+     "md": 25.92,
      "mx": 49
     }
    ]
@@ -9028,6 +9849,12 @@
      "mn": 75,
      "md": 91.75,
      "mx": 130
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 75,
+     "md": 91.27,
+     "mx": 130
     }
    ]
   },
@@ -9035,6 +9862,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 45,
+     "md": 45,
+     "mx": 45
+    },
+    {
+     "d": "2026-09-18",
      "mn": 45,
      "md": 45,
      "mx": 45
@@ -9046,6 +9879,12 @@
      "mn": 44,
      "md": 53.5,
      "mx": 60
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 40,
+     "md": 43.5,
+     "mx": 50
     }
    ]
   },
@@ -9053,6 +9892,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 27.9,
+     "md": 37.43,
+     "mx": 45
+    },
+    {
+     "d": "2026-09-18",
      "mn": 27.9,
      "md": 37.43,
      "mx": 45
@@ -9066,6 +9911,12 @@
      "mn": 15.85,
      "md": 15.85,
      "mx": 15.85
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 15.85,
+     "md": 15.85,
+     "mx": 15.85
     }
    ],
    "Foil": [
@@ -9073,6 +9924,12 @@
      "d": "2026-09-13",
      "mn": 11.95,
      "md": 14.52,
+     "mx": 29.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.95,
+     "md": 15.3,
      "mx": 29.99
     }
    ]
@@ -9084,6 +9941,12 @@
      "mn": 439,
      "md": 449.5,
      "mx": 459.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 439,
+     "md": 449.5,
+     "mx": 459.99
     }
    ],
    "Foil": [
@@ -9092,6 +9955,12 @@
      "mn": 399.9,
      "md": 541.19,
      "mx": 799.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 399.9,
+     "md": 591.27,
+     "mx": 1099.99
     }
    ]
   },
@@ -9099,6 +9968,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 149,
+     "md": 491.27,
+     "mx": 799
+    },
+    {
+     "d": "2026-09-18",
      "mn": 149,
      "md": 491.27,
      "mx": 799
@@ -9110,6 +9985,12 @@
      "mn": 142.9,
      "md": 253.44,
      "mx": 499.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 139.9,
+     "md": 230.76,
+     "mx": 499.99
     }
    ]
   },
@@ -9119,6 +10000,12 @@
      "d": "2026-09-13",
      "mn": 446,
      "md": 566.08,
+     "mx": 999.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 449.9,
+     "md": 569.59,
      "mx": 999.99
     }
    ]
@@ -9130,6 +10017,12 @@
      "mn": 124.98,
      "md": 124.98,
      "mx": 124.98
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 124.98,
+     "md": 124.98,
+     "mx": 124.98
     }
    ],
    "Foil": [
@@ -9138,6 +10031,12 @@
      "mn": 54.9,
      "md": 82.34,
      "mx": 100
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 45,
+     "md": 71.85,
+     "mx": 125
     }
    ]
   },
@@ -9145,6 +10044,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 19.6,
+     "md": 24.5,
+     "mx": 30
+    },
+    {
+     "d": "2026-09-18",
      "mn": 19.6,
      "md": 24.5,
      "mx": 30
@@ -9156,6 +10061,12 @@
      "mn": 14.9,
      "md": 33,
      "mx": 299.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 14.9,
+     "md": 32.61,
+     "mx": 299.99
     }
    ]
   },
@@ -9166,6 +10077,12 @@
      "mn": 2.89,
      "md": 8.67,
      "mx": 15
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 2.89,
+     "md": 8.53,
+     "mx": 15
     }
    ],
    "Foil": [
@@ -9173,6 +10090,12 @@
      "d": "2026-09-13",
      "mn": 2.4,
      "md": 7.93,
+     "mx": 25
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 2,
+     "md": 7.9,
      "mx": 25
     }
    ]
@@ -9184,11 +10107,23 @@
      "mn": 40,
      "md": 40,
      "mx": 40
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 40,
+     "md": 40,
+     "mx": 40
     }
    ],
    "Foil": [
     {
      "d": "2026-09-13",
+     "mn": 49.99,
+     "md": 49.99,
+     "mx": 50
+    },
+    {
+     "d": "2026-09-18",
      "mn": 49.99,
      "md": 49.99,
      "mx": 50
@@ -9202,6 +10137,12 @@
      "mn": 38,
      "md": 38,
      "mx": 38
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 38,
+     "md": 38,
+     "mx": 38
     }
    ]
   },
@@ -9209,6 +10150,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 35,
+     "md": 49.93,
+     "mx": 64.85
+    },
+    {
+     "d": "2026-09-18",
      "mn": 35,
      "md": 49.93,
      "mx": 64.85
@@ -9220,6 +10167,12 @@
      "mn": 25.89,
      "md": 69.11,
      "mx": 99.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 44.99,
+     "md": 69.99,
+     "mx": 99.8
     }
    ]
   },
@@ -9227,6 +10180,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 58.99,
+     "md": 58.99,
+     "mx": 58.99
+    },
+    {
+     "d": "2026-09-18",
      "mn": 58.99,
      "md": 58.99,
      "mx": 58.99
@@ -9238,6 +10197,12 @@
      "mn": 54.85,
      "md": 137.69,
      "mx": 1250
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 54.85,
+     "md": 150.74,
+     "mx": 1250
     }
    ]
   },
@@ -9245,6 +10210,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 28.99,
+     "md": 41.72,
+     "mx": 79.9
+    },
+    {
+     "d": "2026-09-18",
      "mn": 28.99,
      "md": 41.72,
      "mx": 79.9
@@ -9256,6 +10227,12 @@
      "mn": 29.45,
      "md": 35.27,
      "mx": 54.72
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 29.9,
+     "md": 35.48,
+     "mx": 54.72
     }
    ]
   },
@@ -9266,6 +10243,12 @@
      "mn": 8.9,
      "md": 27.52,
      "mx": 65
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 7.67,
+     "md": 27.94,
+     "mx": 65
     }
    ],
    "Foil": [
@@ -9273,6 +10256,12 @@
      "d": "2026-09-13",
      "mn": 5,
      "md": 20.06,
+     "mx": 64.95
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 5,
+     "md": 19.27,
      "mx": 64.95
     }
    ]
@@ -9284,6 +10273,12 @@
      "mn": 6,
      "md": 15.13,
      "mx": 19.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 6,
+     "md": 15.3,
+     "mx": 19.9
     }
    ],
    "Foil": [
@@ -9291,6 +10286,12 @@
      "d": "2026-09-13",
      "mn": 5.49,
      "md": 14.87,
+     "mx": 39.95
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 5.4,
+     "md": 15.18,
      "mx": 39.95
     }
    ]
@@ -9302,6 +10303,12 @@
      "mn": 39.9,
      "md": 50.55,
      "mx": 69.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 39.9,
+     "md": 50.48,
+     "mx": 69.99
     }
    ]
   },
@@ -9309,6 +10316,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 47.5,
+     "md": 80.71,
+     "mx": 100
+    },
+    {
+     "d": "2026-09-18",
      "mn": 47.5,
      "md": 80.71,
      "mx": 100
@@ -9320,6 +10333,12 @@
      "mn": 36.5,
      "md": 70.79,
      "mx": 249.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 40,
+     "md": 77.85,
+     "mx": 249.9
     }
    ]
   },
@@ -9330,6 +10349,12 @@
      "mn": 14.9,
      "md": 14.9,
      "mx": 14.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 14.9,
+     "md": 14.93,
+     "mx": 15
     }
    ]
   },
@@ -9340,6 +10365,12 @@
      "mn": 19,
      "md": 19,
      "mx": 19
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 15,
+     "md": 17,
+     "mx": 19
     }
    ],
    "Foil": [
@@ -9347,6 +10378,12 @@
      "d": "2026-09-13",
      "mn": 11.85,
      "md": 26.24,
+     "mx": 44.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.85,
+     "md": 27.89,
      "mx": 44.9
     }
    ]
@@ -9358,6 +10395,12 @@
      "mn": 35.9,
      "md": 45.23,
      "mx": 49.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 30,
+     "md": 41.43,
+     "mx": 49.9
     }
    ],
    "Foil": [
@@ -9366,6 +10409,12 @@
      "mn": 21.95,
      "md": 32.79,
      "mx": 40
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 29,
+     "md": 33.24,
+     "mx": 40
     }
    ]
   },
@@ -9373,6 +10422,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 100,
+     "md": 116,
+     "mx": 149.99
+    },
+    {
+     "d": "2026-09-18",
      "mn": 100,
      "md": 116,
      "mx": 149.99
@@ -9386,6 +10441,12 @@
      "mn": 234.99,
      "md": 254.97,
      "mx": 242.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 234.98,
+     "md": 250.97,
+     "mx": 242.99
     }
    ]
   },
@@ -9395,6 +10456,12 @@
      "d": "2026-09-13",
      "mn": 9.9,
      "md": 19.78,
+     "mx": 39.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 9.9,
+     "md": 21.39,
      "mx": 39.9
     }
    ]
@@ -9406,6 +10473,12 @@
      "mn": 0.65,
      "md": 2.83,
      "mx": 15
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 0.65,
+     "md": 2.85,
+     "mx": 15
     }
    ],
    "Reverse Foil": [
@@ -9414,6 +10487,14 @@
      "mn": 4.5,
      "md": 11.87,
      "mx": 20
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-09-18",
+     "mn": 14.9,
+     "md": 14.9,
+     "mx": 14.9
     }
    ]
   },
@@ -9424,6 +10505,12 @@
      "mn": 15.9,
      "md": 19.3,
      "mx": 29.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.99,
+     "md": 17.73,
+     "mx": 29.99
     }
    ],
    "Foil": [
@@ -9431,6 +10518,12 @@
      "d": "2026-09-13",
      "mn": 12.9,
      "md": 21.65,
+     "mx": 40.5
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 11.4,
+     "md": 21.92,
      "mx": 40.5
     }
    ]
@@ -9442,6 +10535,12 @@
      "mn": 240,
      "md": 346.67,
      "mx": 400
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 240,
+     "md": 322.75,
+     "mx": 400
     }
    ],
    "Foil": [
@@ -9449,6 +10548,12 @@
      "d": "2026-09-13",
      "mn": 124.99,
      "md": 234.02,
+     "mx": 599.95
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 120,
+     "md": 226.57,
      "mx": 599.95
     }
    ]
@@ -9460,11 +10565,23 @@
      "mn": 9,
      "md": 16.83,
      "mx": 29.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 9,
+     "md": 17.03,
+     "mx": 29.99
     }
    ],
    "Foil": [
     {
      "d": "2026-09-13",
+     "mn": 25,
+     "md": 29,
+     "mx": 33
+    },
+    {
+     "d": "2026-09-18",
      "mn": 25,
      "md": 29,
      "mx": 33
@@ -9478,6 +10595,12 @@
      "mn": 19,
      "md": 37.57,
      "mx": 54
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 19,
+     "md": 37.93,
+     "mx": 54
     }
    ],
    "Foil": [
@@ -9486,6 +10609,14 @@
      "mn": 39.9,
      "md": 39.9,
      "mx": 39.9
+    }
+   ],
+   "Reverse Foil": [
+    {
+     "d": "2026-09-18",
+     "mn": 29.9,
+     "md": 76.75,
+     "mx": 100
     }
    ]
   },
@@ -9496,6 +10627,12 @@
      "mn": 14.9,
      "md": 27.13,
      "mx": 32.5
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 14.9,
+     "md": 28.24,
+     "mx": 34.75
     }
    ],
    "Reverse Foil": [
@@ -9503,6 +10640,12 @@
      "d": "2026-09-13",
      "mn": 50,
      "md": 70.33,
+     "mx": 94.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 50,
+     "md": 71.76,
      "mx": 94.9
     }
    ]
@@ -9514,11 +10657,23 @@
      "mn": 8.1,
      "md": 19.63,
      "mx": 34.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 8.1,
+     "md": 20.75,
+     "mx": 34.99
     }
    ],
    "Reverse Foil": [
     {
      "d": "2026-09-13",
+     "mn": 79.9,
+     "md": 79.93,
+     "mx": 80
+    },
+    {
+     "d": "2026-09-18",
      "mn": 79.9,
      "md": 79.93,
      "mx": 80
@@ -9532,6 +10687,12 @@
      "mn": 8,
      "md": 17.44,
      "mx": 30
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 8,
+     "md": 16.67,
+     "mx": 30
     }
    ],
    "Foil": [
@@ -9539,6 +10700,12 @@
      "d": "2026-09-13",
      "mn": 7.67,
      "md": 36.65,
+     "mx": 62.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 9.9,
+     "md": 36.85,
      "mx": 62.99
     }
    ]
@@ -9550,6 +10717,12 @@
      "mn": 17.9,
      "md": 35.99,
      "mx": 49.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 17.9,
+     "md": 36.35,
+     "mx": 49.99
     }
    ]
   },
@@ -9560,6 +10733,20 @@
      "mn": 49.9,
      "md": 95.77,
      "mx": 169.99
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 50.5,
+     "md": 50.5,
+     "mx": 50.5
+    }
+   ],
+   "Foil": [
+    {
+     "d": "2026-09-18",
+     "mn": 49.9,
+     "md": 89.69,
+     "mx": 169.99
     }
    ]
   },
@@ -9567,6 +10754,12 @@
    "Normal": [
     {
      "d": "2026-09-13",
+     "mn": 29.95,
+     "md": 29.99,
+     "mx": 30
+    },
+    {
+     "d": "2026-09-18",
      "mn": 29.95,
      "md": 29.99,
      "mx": 30
@@ -9580,6 +10773,22 @@
      "mn": 40.41,
      "md": 82.24,
      "mx": 109.9
+    },
+    {
+     "d": "2026-09-18",
+     "mn": 40.41,
+     "md": 82.14,
+     "mx": 109.9
+    }
+   ]
+  },
+  "30/30": {
+   "Normal": [
+    {
+     "d": "2026-09-18",
+     "mn": 29.99,
+     "md": 29.99,
+     "mx": 29.99
     }
    ]
   }
