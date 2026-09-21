@@ -195,9 +195,20 @@ async function centralizar(el, p) {
 }
 
 async function clicar(p, texto, dica) {
-  const el = await achar(p, texto, dica);
-  await centralizar(el, p);
-  await el.click({ force: true });
+  /* a tela pode se refazer entre achar o botao e clicar nele (a de backup fecha e reabre o modal quando os pontos da nuvem chegam) e o clique
+     falha com "Element is not attached to the DOM" — 19/09/2026, no ensaio da publicacao. So ESSE erro e repetido (ate 3 tentativas, achando o
+     botao de novo); qualquer outro — botao que nao existe, coberto, invisivel — reprova na primeira, como sempre. */
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      const el = await achar(p, texto, dica);
+      await centralizar(el, p);
+      await el.click({ force: true });
+      break;
+    } catch (e) {
+      if (tentativa < 3 && /not attached to the DOM/i.test(String((e && e.message) || e))) { await p.waitForTimeout(250); continue; }
+      throw e;
+    }
+  }
   await p.waitForTimeout(180);
 }
 

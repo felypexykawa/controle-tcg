@@ -89,6 +89,14 @@ function t(nome, cond, detalhe){
   else { fail++; console.log('  FALHOU  ' + nome + (detalhe?'  ->  '+detalhe:'')); }
 }
 function reset(){ setg('movs',[]); setg('excluidos',{}); setg('pess',[]); }
+/* RELOGIO CONGELADO (19/09/2026). O app le "hoje" pelo relogio LOCAL (hojeISO) e, pela regra da parcela sem marca, parcela vencida conta como
+   paga: teste que precisa de parcela "a vencer" ou de um instante exato (20h59, 21h01...) congela o "agora" em vez de confiar em data fixa
+   no passado (que envelhecia: em 19/09 as compras de fevereiro deixaram de ser "a pagar"). Fuso: America/Sao_Paulo (definido no topo).
+   descongela() roda no finally de todo bloco das secoes 32 a 35. */
+function congela(ano, mes, dia, hora, min) {
+  vm.runInContext('(function(){const R=globalThis.__DataRealT||Date;globalThis.__DataRealT=R;const T=new R(' + [ano, mes - 1, dia, hora, min || 0, 0].join(',') + ').getTime();function F(...a){if(!new.target)return new R(T).toString();return a.length?new R(...a):new R(T);}F.prototype=R.prototype;F.now=()=>T;F.UTC=R.UTC;F.parse=R.parse;globalThis.Date=F;})()', ctx);
+}
+function descongela() { vm.runInContext('if(globalThis.__DataRealT){globalThis.Date=globalThis.__DataRealT;}', ctx); }
 const id = n => 'id'+n;
 
 /* cenario real: comprou 10 boosters por 100; vendeu 2 por 40 */
@@ -1806,6 +1814,11 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   t('31: so a compra com valor registrado diferente da soma das partes vai para conferir', R31.nConferir === 1, String(R31.nConferir));
   t('31: lucro real = o do Relatorios (receita de todas - custo das ligadas), com o das ligadas separado',
     R31.lucroReal === 1110 && R31.lucroVinculadas === 30 && R31.vendasSemVinculo === 2, JSON.stringify([R31.lucroReal, R31.lucroVinculadas, R31.vendasSemVinculo]));
+  const tituloLucro31 = aba31(P31, 'Resumo').linhas.filter(x => x && x.celulas && x.celulas[0]).map(x => String(x.celulas[0].v)).filter(x => /^Lucro real —/.test(x));
+  t('31h: o bloco Lucro real do Resumo diz "pela conta do Relatório" (não promete igualdade de centavo com o card, que arredonda grupo por grupo) e a linha explica a diferença de centavos',
+    JSON.stringify(tituloLucro31) === JSON.stringify(['Lucro real — pela conta do Relatório'])
+    && /não pela data da compra\. O card Lucro real do Relatório pode diferir em centavos: ele arredonda grupo por grupo \(coleção, jogo…\) e aqui o arredondamento é um só\.$/.test(res31(P31, 'Lucro real').t),
+    JSON.stringify([tituloLucro31, res31(P31, 'Lucro real').t]));
   t('31: despesa a pagar com data futura nao entra no Resumo', R31.despesas === 30, String(R31.despesas));
   t('31: todas as conferencias que a planilha escreve no Resumo fecham', R31.conferencia.every(c => c.ok), JSON.stringify(R31.conferencia.filter(c => !c.ok)));
   const u31 = P31.dados; let bin31 = ''; for (let i = 0; i < u31.length; i++) bin31 += String.fromCharCode(u31[i]);
@@ -1916,6 +1929,14 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   const hV31 = cap31.join('');
   t('31: o verLote soma a compra sem a caixa aberta e diz por que', hV31.indexOf('Custo total do lote: <b>' + fmt31(300) + '</b>') >= 0 && /a caixa aberta não soma de novo/.test(hV31),
     (hV31.match(/Custo total do lote:[^<]*<b>[^<]*/) || ['(verLote nao desenhou nada)'])[0]);
+  const capE31 = [];
+  ctx.document.body.insertAdjacentHTML = (pos, h) => { capE31.push(String(h)); };
+  try { A('verLote')('pE'); } finally { ctx.document.body.insertAdjacentHTML = _ins31; }
+  const hVE31 = capE31.join('');
+  t('31h: o verLote do item aberto SEM nada lançado dentro (Sleeved de R$ 23,09) diz que nada de dentro foi lançado e que o valor não entra no comprei do Painel, e soma no custo do lote; o aberto COM pedaços (ETB) segue "foi aberto em itens"',
+    hVE31.indexOf('foi aberto, mas nada de dentro foi lançado: esse valor não entra no comprei do Painel') >= 0 && hVE31.indexOf('foi aberto em itens') < 0
+    && hVE31.indexOf('Custo total do lote: <b>' + fmt31(23.09) + '</b>') >= 0 && hV31.indexOf('foi aberto em itens') >= 0 && hV31.indexOf('nada de dentro foi lançado') < 0,
+    JSON.stringify([(hVE31.match(/<div class="meta">[^<]*<\/div>/) || [''])[0], (hVE31.match(/Custo total do lote:[^<]*<b>[^<]*/) || [''])[0], (hV31.match(/<div class="meta">foi aberto[^<]*/) || [''])[0]]));
   const hT31 = telaCons31('TROCA', 'itens', ''), rT31 = rodape31(hT31);
   t('31: a aba Trocas soma tudo o que se movimentou (380), sem a conta do Painel e sem a frase',
     rT31.v === fmt31(380) && rT31.rot === 'movimentado em trocas (custo)' && !rT31.nota && hT31.indexOf('como no Painel') < 0, JSON.stringify(rT31));
@@ -2234,17 +2255,19 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('31b: o download espera o catalogo da Liga antes de montar a planilha (avisa, espera e so depois baixa)',
       toastsE31[0] === 'Buscando os preços da Liga…' && voltasE31 >= 3 && baixouE31 === 1, JSON.stringify([toastsE31, voltasE31, baixouE31]));
 
-    /* ---- 31e: "hoje" perto da meia-noite. A despesa com a data de hoje em UTC entra no Resumo pelo motor; a aba Despesas tem de
-       dizer o mesmo (no fuso de Sao Paulo, 23h30 ja e o dia seguinte em UTC) ---- */
+    /* ---- 31e: "hoje" perto da meia-noite. Um relogio so (o local, o de Sao Paulo): as 23h30 de 20/08 ainda e 20/08 — a despesa de hoje entra no
+       Resumo pelo motor, a de amanha (que o "hoje" em UTC deixava entrar) ainda nao, e a aba Despesas diz o mesmo ---- */
     relogio31(2026, 8, 20, 23, 30);
-    const hojeUTC31 = vm.runInContext('new Date().toISOString().slice(0,10)', ctx);
-    setg('movs', [{ id:'eT', tipo:'DESPESA', data:hojeUTC31, cat:'Luz', valor:40, status:'apagar', natureza:'ordinaria' }]);
+    const hojeL31 = vm.runInContext('(function(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})()', ctx);
+    setg('movs', [{ id:'eT', tipo:'DESPESA', data:hojeL31, cat:'Luz', valor:40, status:'apagar', natureza:'ordinaria' },
+      { id:'eA', tipo:'DESPESA', data:'2026-08-21', cat:'Agua', valor:15, status:'apagar', natureza:'ordinaria' }]);
     const Pe = A('montarPlanilhaTCG')();
-    t('31e: perto da meia-noite, a despesa de hoje (em UTC, como o motor) entra no Resumo e a aba Despesas diz o mesmo',
-      Pe.resumo.despesas === 40 && cel31(aba31(Pe, 'Despesas'), 'eT', 'Entra no Resumo?') === 'sim' && Pe.resumo.conferencia[4].ok,
-      JSON.stringify([hojeUTC31, Pe.resumo.despesas, cel31(aba31(Pe, 'Despesas'), 'eT', 'Entra no Resumo?')]));
-    t('31e: perto da meia-noite o motor ja conta a despesa de amanha, e a frase do A pagar diz "ate amanha", com o valor',
-      res31(Pe, 'A pagar (parcelas e despesas)').t === fmt31(40) + ' vence até o fim do mês. Já está descontado no caixa acima: as despesas com data até amanhã (' + fmt31(40) + '; depois das 21h o app já conta o dia seguinte).',
+    t('31e: perto da meia-noite (23h30 de 20/08) a despesa de HOJE entra no Resumo e a de amanha (que em UTC seria "hoje") nao — e a aba Despesas diz o mesmo',
+      hojeL31 === '2026-08-20' && Pe.resumo.despesas === 40 && cel31(aba31(Pe, 'Despesas'), 'eT', 'Entra no Resumo?') === 'sim'
+      && String(cel31(aba31(Pe, 'Despesas'), 'eA', 'Entra no Resumo?')).indexOf('não') === 0 && Pe.resumo.conferencia[4].ok,
+      JSON.stringify([hojeL31, Pe.resumo.despesas, cel31(aba31(Pe, 'Despesas'), 'eT', 'Entra no Resumo?'), cel31(aba31(Pe, 'Despesas'), 'eA', 'Entra no Resumo?')]));
+    t('31e: perto da meia-noite a frase do A pagar diz "ate hoje" (nunca "ate amanha"), com o valor das despesas de hoje, e a de amanha aparece como data futura',
+      res31(Pe, 'A pagar (parcelas e despesas)').t === fmt31(55) + ' vence até o fim do mês. Já está descontado no caixa acima: as despesas com data até hoje (' + fmt31(40) + '). ' + fmt31(15) + ' de despesas com data futura ainda não.',
       res31(Pe, 'A pagar (parcelas e despesas)').t);
     setg('movs', [Q31('pP', Object.assign({ cat:'Booster Box', qtd:1, valor:300, situacao:'Em estoque' }, PARC31))]);
     const Pp31 = A('montarPlanilhaTCG')();
@@ -2492,7 +2515,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         F31f('vL1', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'vL', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' })]));
       const tV = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
       t('31f: as 21h30 a despesa de hoje nao "ja passou da data" (a meia-noite e a local); as parcelas vencidas saem contadas por compra e por parcela (6 entradas de 2 pedacos de lote = 3 parcelas de 1 compra) e dizem o que isso muda no dinheiro',
-        tH === fmt31(10) + ' vence até o fim do mês. Já está descontado no caixa acima: as parcelas de compra que ainda vão vencer (' + fmt31(100) + ') e as despesas com data até amanhã (' + fmt31(10) + '; depois das 21h o app já conta o dia seguinte). As 2 parcelas já vencidas de 1 compra (' + fmt31(200) + ') não entram: o app as conta como pagas. Se alguma não foi paga, este A pagar está menor do que devia.'
+        tH === fmt31(10) + ' vence até o fim do mês. Já está descontado no caixa acima: as parcelas de compra que ainda vão vencer (' + fmt31(100) + ') e as despesas com data até hoje (' + fmt31(10) + '). As 2 parcelas já vencidas de 1 compra (' + fmt31(200) + ') não entram: o app as conta como pagas. Se alguma não foi paga, este A pagar está menor do que devia.'
         && tV === 'Nada vence este mês. As 3 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.',
         JSON.stringify([tH, tV]));
 
@@ -2662,6 +2685,29 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         eOk.alertas.length === 0 && eOk.toasts.some(x => /^Planilha baixada ✓ — \d abas$/.test(x)) && eSub.alertas.length === 0 && eSub.toasts.some(x => /^Planilha baixada ✓/.test(x))
         && e3.alertas.length === 1 && e3.alertas[0] === 'A planilha foi baixada, mas saiu com erro: veja a linha com ✗ no começo do Resumo.' && !e3.toasts.some(x => /baixada/.test(x)),
         JSON.stringify([eOk, eSub, e3]));
+      /* rodada 10 (revisor disco r10, M4 e L1): com UMA so conferencia que nao fecha a janela com OK tambem sai (Vendas, Despesas, Resultado bruto: com
+         `falhou>1` a planilha com erro saia com o balao verde); com 3 abas o topo junta "A, B e C" (com ', ' trocado por ' e ' no primeiro, saia "A e B, C");
+         e a soma do Vale que nao bate diz a causa, sozinha e no fim do motivo de celula (a mutacao soma:true do Vale ficava verde) */
+      const e1V = await exporta31(r1 => { r1.vendasLiq += 50; }), e1D = await exporta31(r1 => { r1.despTotal += 7; }), e1B = await exporta31(r1 => { r1.cmv -= 12; });
+      const janela1 = x => x.alertas.length === 1 && x.alertas[0] === 'A planilha foi baixada, mas saiu com erro: veja a linha com ✗ no começo do Resumo.' && !x.toasts.some(y => /baixada/.test(y));
+      t('31h: com UMA só conferência que não fecha (Vendas, Despesas ou o Resultado bruto) o aviso ao baixar é a janela com OK, uma vez, e não o balão verde',
+        janela1(e1V) && janela1(e1D) && janela1(e1B), JSON.stringify([e1V, e1D, e1B]));
+      const Pt3a = celP(ab => { ab.vendas[achaId(ab.vendas, 'fW')][9] += 1; ab.estoque[achaId(ab.estoque, 'fU')][0] = 'Na coleção'; ab.despesas[0][2] += 1; }), tp3a = topoDe(Pt3a);
+      t('31h: com 3 abas com erro (Vendas, Estoque e coleção com Custo e Vale, Despesas) o topo do Resumo junta os nomes "A, B e C"',
+        !!tp3a && tp3a.r === '✗ Conferências que não fecham'
+        && tp3a.t === 'aba Vendas, aba Estoque e coleção (Custo e Vale) e aba Despesas: a planilha saiu com erro nessas abas. Não some por elas nem use os valores delas: confira no app e avise o Felype. O motivo está em "Conferência das abas", no fim do Resumo.',
+        JSON.stringify(tp3a));
+      const _vmS31 = g('valorMercadoDe');
+      /* a 1a chamada de valorMercadoDe dentro da planilha e a do Painel (o "vale ~" do estoque); as outras sao uma por item, as que somam as celulas */
+      const comVale7 = mexe => { let P, n = 0; setg('valorMercadoDe', function () { const r0 = _vmS31.apply(this, arguments); if (n++ !== 0) return r0;
+          const r1 = Object.assign({}, r0); r1.val = (r1.val || 0) + 7; if (r1.bruto != null) r1.bruto += 7; return r1; });
+        try { P = mexe ? celP(mexe) : A('montarPlanilhaTCG')(); } finally { setg('valorMercadoDe', _vmS31); } return P; };
+      const PvS = comVale7(null), PvC = comVale7(ab => { ab.estoque[achaId(ab.estoque, 'fU')][6] += 1; });
+      t('31h: a soma do Vale que não bate com o Painel diz a causa do lado do app, sozinha e no fim do motivo de célula (a mesma frase da soma de Vendas, Estoque, Despesas e Compras)',
+        PvS.resumo.conferencia[3].ok === false
+        && PvS.resumo.conferencia[3].motivo === 'a coluna Vale das linhas No estoque e Na coleção soma ' + fmt31(7) + ' a menos que o Painel, e isso não é arredondamento de centavo' + causa31
+        && PvC.resumo.conferencia[3].motivo === 'a coluna Vale da linha ' + nU + ' não é o Vale que o app dá a esse item' + sufixo31,
+        JSON.stringify([PvS.resumo.conferencia[3], PvC.resumo.conferencia[3]]));
 
       setg('movs', copiaF([F31f('vL', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Em estoque', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
         F31f('vL1', { cat:'Booster Box', colecao:'V', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'vL', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
@@ -2684,8 +2730,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('movs', copiaF([F31f('oR1', { cat:'Booster Box', colecao:'O', qtd:2, valor:150, situacao:'Em estoque', loteOrigem:'compraApagada31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
         F31f('oR2', { cat:'Booster Box', colecao:'O', qtd:2, valor:150, situacao:'Vendido', loteOrigem:'compraApagada31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' })]));
       const tVO = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
-      t('31f: as vencidas contam os vencimentos de verdade (pedaço com outra 1ª parcela: 4 vencimentos de 1 compra) e os pedaços órfãos da mesma compra apagada como 1 compra',
-        tVD === 'Nada vence este mês. As 4 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
+      t('31f: as vencidas contam os vencimentos de verdade (pedaço do mesmo lote com outra 1ª parcela segue o plano do dono: 3 vencimentos de 1 compra) e os pedaços órfãos da mesma compra apagada como 1 compra',
+        tVD === 'Nada vence este mês. As 3 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
         && tVO === 'Nada vence este mês. As 3 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.',
         JSON.stringify([tVD, tVO]));
       /* o mes nao junta vencimentos de dias diferentes, e orfaos de compras apagadas diferentes sao compras diferentes (revisor disco r8, M1: E2 e
@@ -2696,8 +2742,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('movs', copiaF([F31f('oS1', { cat:'Booster Box', colecao:'S', qtd:2, valor:150, situacao:'Em estoque', loteOrigem:'compraApagadaA31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' }),
         F31f('oS2', { cat:'Booster Box', colecao:'S', qtd:2, valor:150, situacao:'Em estoque', loteOrigem:'compraApagadaB31', pgTipo:'Parcelado', nParc:3, venc1:'2026-05-10', data:'2026-05-01' })]));
       const tVS = res31(A('montarPlanilhaTCG')(), 'A pagar (parcelas e despesas)').t;
-      t('31f: vencimentos do mesmo mês em dias diferentes contam separados, e pedaços órfãos de compras apagadas diferentes contam como compras diferentes',
-        tVM === 'Nada vence este mês. As 6 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
+      t('31f: pedaços do mesmo lote com dias de vencimento diferentes seguem UM plano só (o do dono), e pedaços órfãos de compras apagadas diferentes contam como compras diferentes',
+        tVM === 'Nada vence este mês. As 3 parcelas já vencidas de 1 compra (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.'
         && tVS === 'Nada vence este mês. As 6 parcelas já vencidas de 2 compras (' + fmt31(300) + ') não entram: o app as conta como pagas, e o caixa acima já as descontou. Se alguma não foi paga, este A pagar está menor do que devia.',
         JSON.stringify([tVM, tVS]));
 
@@ -2743,8 +2789,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
           cmpGc.n.Conta === 3 && cmpGc.f === 'tudo' && hGcToque.indexOf('🛒 comprado <b>' + fmt31(450) + '</b> em 3 lançamentos') >= 0,
           JSON.stringify([cmpGc, comprado31g(hGcToque)]));
         const hGcI = telaCons31('COMPRA', 'itens', '');
-        t('31g: o cabeçalho do mês na aba Compras diz quantos do mês entram no total dele (4 lanç., 2 no total de R$ 400,00); o mês sem compra de fora e os cabeçalhos de Todos seguem como antes',
-          hGcI.indexOf('· 4 lanç., 2 no total</span></span><b>' + fmt31(400) + '</b>') >= 0 && hGcI.indexOf('· 1 lanç.</span></span><b>' + fmt31(50) + '</b>') >= 0
+        t('31g: o cabeçalho do mês na aba Compras diz quantos do mês entram no total dele (4 lanç., 2 entram no total de R$ 400,00); o mês sem compra de fora e os cabeçalhos de Todos seguem como antes',
+          hGcI.indexOf('· 4 lanç., 2 entram no total</span></span><b>' + fmt31(400) + '</b>') >= 0 && hGcI.indexOf('· 1 lanç.</span></span><b>' + fmt31(50) + '</b>') >= 0
           && hGcT.indexOf('· 5 lanç.</span>') >= 0 && hGcT.indexOf('no total</span>') < 0,
           JSON.stringify([hGcI.match(/· \d+ lanç\.[^<]*<\/span><\/span><b>[^<]*/g) || [], hGcT.match(/· \d+ lanç\.[^<]*<\/span>/g) || []]));
 
@@ -2769,6 +2815,47 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         t('31g: a linha Vendi do Relatório ("Liq") abre Vendas com o mesmo líquido dela e do Painel',
           fmt31(vendiLq.o.Liq) === fmt31(mLq.vendasLiq) && rLqToque.nota === 'líquido ' + fmt31(vendiLq.o.Liq) + ', sem a taxa do app',
           JSON.stringify([vendiLq, rLqToque]));
+
+        /* ---- 31h (rodada 10, 19/09; revisores disco r10 M2 e M3, superficie r10 L1, numero r10 L7): o cabecalho do grupo diz "entram / 1 entra / nenhum
+           entra no total" (era "0 no total" quando nenhuma entrava); a contagem em Todos aparece mesmo sem compra de fora quando a lista tem venda; e o
+           liquido de Vendas e o Vendido do Painel somam so as vendas da lista, do periodo e do filtro. Antes, 11 das mutacoes destes pontos passavam
+           com a secao 31 verde ---- */
+        setg('movs', copiaF([
+          F31f('h1', { cat:'ETB', colecao:'H', valor:100, situacao:'Em estoque', data:'2026-08-10', contraparte:'Forn A' }),
+          F31f('h2', { cat:'ETB', colecao:'H', valor:80, situacao:'Trocado', data:'2026-08-11', contraparte:'Forn A' }),
+          F31f('h3', { cat:'ETB', colecao:'H', valor:60, situacao:'Em estoque', data:'2026-09-10', contraparte:'Forn B' }),
+          F31f('h4', { cat:'ETB', colecao:'H', valor:40, situacao:'Aberto', data:'2026-09-12', contraparte:'Forn B' }),
+          F31f('h5', { cat:'ETB', colecao:'H', valor:20, situacao:'Em estoque', data:'2026-09-20', contraparte:'Forn B' }),
+          F31f('h6', { cat:'ETB', colecao:'H', valor:25, situacao:'Trocado', data:'2026-10-03', contraparte:'Forn C' }),
+          F31f('h7', { cat:'ETB', colecao:'H', valor:10, situacao:'Em estoque', data:'2026-07-04', contraparte:'Forn D' }),
+          F31f('h8', { cat:'ETB', colecao:'H', valor:15, situacao:'Em estoque', data:'2026-07-05', contraparte:'Forn D' })]));
+        const cabH = ord => { setg('consOrd', ord); try { return (telaCons31('COMPRA', 'itens', '').match(/· \d+ lanç\.[^<]*<\/span><\/span>/g) || []).sort(); } finally { setg('consOrd', 'emissao'); } };
+        const cabEsp = ['· 1 lanç., nenhum entra no total</span></span>', '· 2 lanç., 1 entra no total</span></span>', '· 2 lanç.</span></span>', '· 3 lanç., 2 entram no total</span></span>'];
+        const cabData = cabH('emissao'), cabPessoa = cabH('pessoa');
+        t('31h: o cabeçalho do grupo na aba Compras diz "entram" (2 de 3, exatamente 1 de fora), "1 entra", "nenhum entra" (nenhuma do grupo entra) e nada quando todas entram; por data e por cliente / fornecedor (a chave do grupo é a mesma da contagem)',
+          JSON.stringify(cabData) === JSON.stringify(cabEsp) && JSON.stringify(cabPessoa) === JSON.stringify(cabEsp), JSON.stringify([cabData, cabPessoa]));
+        setg('movs', copiaF([
+          F31f('z1', { cat:'ETB', colecao:'Zed', valor:100, situacao:'Em estoque' }),
+          F31f('z2', { cat:'ETB', colecao:'Zed', valor:50, situacao:'Em estoque' }),
+          { id:'zV', tipo:'VENDA', data:'2026-08-12', jogo:'Pokémon', cat:'ETB', colecao:'Zed', qtd:1, valor:70, canal:'Pix', taxa:0, contraparte:'Cli' }]));
+        const hZ = telaCons31('tudo', 'itens', 'Zed');
+        t('31h: em Todos, o comprado diz em quantos lançamentos mesmo quando nenhuma compra ficou de fora, se a lista tem venda (3 na lista, R$ 150,00 em 2)',
+          hZ.indexOf('<span style="color:var(--mut)">3 lançamentos</span>') >= 0 && hZ.indexOf('🛒 comprado <b>' + fmt31(150) + '</b> em 2 lançamentos · 💰 vendido <b>' + fmt31(70) + '</b>') >= 0,
+          JSON.stringify([comprado31g(hZ)]));
+        setg('movs', copiaF([['lq1', '2026-08-01', 238.34, 14, 'Liq'], ['lq2', '2026-08-02', 105.68, 15, 'Liq'], ['lq3', '2026-08-03', 209.61, 14, 'Liq'], ['lq4', '2026-08-04', 100, 10, 'Out'],
+          ['lq5', '2026-09-15', 50, 20, 'Liq']].map(([idm, data, valor, taxa, colecao]) =>
+          ({ id:idm, tipo:'VENDA', data, jogo:'Pokémon', cat:'Booster', colecao, qtd:1, valor, canal:'App', taxa, recDias:14, contraparte:'Cli' }))));
+        const somaGuardada31h = filtro => g('movs').filter(filtro).reduce((s, m) => s + liq31g(m), 0);
+        const rLiqBusca = rodape31(telaCons31('VENDA', 'itens', 'Liq'));
+        setg('perDe', '2026-08-01'); setg('perAte', '2026-08-31');
+        const mPer = A('motor')(false);
+        setg('perDe', ''); setg('perAte', ''); setg('relCol', 'Liq');
+        const mFil = A('motor')(true);
+        setg('relCol', '');
+        t('31h: o líquido de Vendas soma só as vendas da lista (a busca "Liq" deixa a "Out" de fora), e o Vendido do Painel só as do período (agosto, sem a de setembro) e as do filtro do Relatório',
+          rLiqBusca.nota === 'líquido ' + fmt31(somaGuardada31h(m => m.colecao === 'Liq')) + ', sem a taxa do app'
+          && Object.is(mPer.vendasLiq, somaGuardada31h(m => m.data <= '2026-08-31')) && Object.is(mFil.vendasLiq, somaGuardada31h(m => m.colecao === 'Liq')),
+          JSON.stringify([rLiqBusca.nota, mPer.vendasLiq, mFil.vendasLiq]));
       } finally {
         setg('render', ant31g.render); setg('consOrd', ant31g.ord); setg('tela', ant31g.tela); setg('perSel', ant31g.sel); setg('perDe', ant31g.de); setg('perAte', ant31g.ate);
         setg('tabelaComp', _tcF31); setg('relCompView', 'lista'); setg('relDimAll', 'colecao'); setg('consF', 'tudo'); setg('consCol', ''); setg('consQ', ''); setg('consJogo', 'todos');
@@ -2906,6 +2993,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     catch (e) { t('32' + rot + ': o bloco explodiu antes de terminar (o que vinha depois dele NAO foi provado)', false, String((e && e.stack) || e).slice(0, 700)); }
     finally {
       ctx.prompt = orig.prompt; ctx.confirm = orig.confirm; ctx.alert = orig.alert; ctx.document.getElementById = orig.geb;
+      descongela();
       salvos.forEach(([n, v]) => setg(n, v));
       reset();
     }
@@ -3322,6 +3410,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
 
   /* ---------- 32g: serieDinheiro (curva cumulativa do caixa, convencao emissao) ---------- */
   await bloco32('g', async () => {
+    congela(2026, 1, 2, 10, 0);   /* antes de todas as datas do bloco: as parcelas sao "a vencer" (a regra da parcela vencida sem marca e provada na secao 34) */
     const s0 = A('serieDinheiro')();
     t('32g: sem lancamentos a curva e um array vazio com semPagar e semPagarValor zerados', Array.isArray(s0) && s0.length === 0 && s0.semPagar === 0 && s0.semPagarValor === 0);
     /* regras basicas */
@@ -3348,32 +3437,41 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     s = A('serieDinheiro')();
     t('32g: formato LEGADO da parcela paga (so a data, string) tambem conta, pelo valor da parcela (300/3 = 100)',
       S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2, S32([s, s.semPagar]));
-    /* pedacos fracionados com plano PROPRIO */
+    /* pedacos fracionados: o pagamento e da COMPRA (19/09/2026, decisao de desenho v3) — um plano so, e as marcas ficam no dono */
     reset();
     M().push(compra32('gp', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-05' }));
     const gpf = A('baixarLote')('gp', 1, 'Coleção', { dataSaida: '2026-03-01' });      /* pai 200 (2 un.), filho 100 (1 un.) */
     const gpp = M().find(m => m.id === 'gp');
-    gpp.pgParcelas = { 1: { d: '2026-02-01', v: 66.67 } };
-    gpf.pgParcelas = { 1: { d: '2026-02-01', v: 33.33 } };
     s = A('serieDinheiro')();
-    t('32g: dois pedacos fracionados com objetos pgParcelas DISTINTOS (cada um com a parcela 1 paga) contam OS DOIS: -100 em 01/02 (66,67 + 33,33)',
-      gpp.pgParcelas !== gpf.pgParcelas && S32(s) === S32([{ data: '2026-02-01', total: -100 }]), S32([s, gpp.pgParcelas === gpf.pgParcelas]));
-    t('32g: cada pedaco tem plano PROPRIO (valor do pedaco / nParc): 2 parcelas abertas de 200/3 no pai + 2 de 100/3 no filho = 4 parcelas, R$ 200',
-      s.semPagar === 4 && s.semPagarValor === 200, S32([s.semPagar, s.semPagarValor]));
-    /* MESMA sessao: pagamento registrado ANTES do fracionamento — pai e filho compartilham o MESMO objeto */
+    t('32g: o pedaco nasce SEM pgParcelas (o pagamento e da compra, nao do pedaco) e a compra dividida em 2 pedacos tem UM plano so: 3 parcelas de 300/3 = 100 (nao 4 parcelas de pedacos), semPagar 3 e R$ 300',
+      gpf.id !== 'gp' && gpf.pgParcelas === undefined && s.semPagar === 3 && s.semPagarValor === 300 && s.length === 0, S32([gpf.pgParcelas, s.semPagar, s.semPagarValor]));
+    gpp.pgParcelas = { 1: { d: '2026-02-01', v: 100 } };
+    s = A('serieDinheiro')();
+    t('32g: a marca fica inteira no dono da compra: a parcela 1 paga (100) sai UMA vez na curva (-100 em 01/02) e restam 2 parcelas (R$ 200)',
+      S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2 && s.semPagarValor === 200, S32([s, s.semPagar, s.semPagarValor]));
+    /* dado ANTIGO: a mesma marca copiada nos dois pedacos (o fracionamento compartilhava o objeto e, depois de recarregar, viravam dois objetos iguais) */
+    gpf.pgParcelas = { 1: { d: '2026-02-01', v: 100 } };
+    s = A('serieDinheiro')();
+    t('32g: marca DUPLICADA nos dois pedacos (dado antigo, depois de recarregar o app) conta UMA vez: -100 em 01/02, nao -200 (a mesma parcela em varios pedacos e o MESMO pagamento)',
+      S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2, S32([s, s.semPagar]));
+    gpf.pgParcelas = { 1: { d: '2026-02-01', v: 60 } };
+    s = A('serieDinheiro')();
+    t('32g: marcas DIFERENTES da mesma parcela em dois pedacos (aparelho antigo + novo, merge por registro): vale a de maior valor (100), nunca a soma (160) nem a menor',
+      S32(s) === S32([{ data: '2026-02-01', total: -100 }]), S32(s));
+    /* MESMA sessao: pagamento registrado ANTES do fracionamento — o pedaco nasce sem marca e o dono guarda a inteira */
     reset();
     M().push(compra32('gq', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-05' }));
     const gqp = M().find(m => m.id === 'gq');
     gqp.pgParcelas = { 1: { d: '2026-02-01', v: 100 } };
     const gqf = A('baixarLote')('gq', 1, 'Coleção', { dataSaida: '2026-03-01' });
     s = A('serieDinheiro')();
-    t('32g: pagamento registrado ANTES do fracionamento (pai e filho apontam pro MESMO objeto pgParcelas, na mesma sessao) conta UMA vez so: -100, e nao -200',
-      gqf.pgParcelas === gqp.pgParcelas && S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2, S32([gqf.pgParcelas === gqp.pgParcelas, s, s.semPagar]));
-    /* CONHECIDO: G-1 — depois de JSON.parse(JSON.stringify(movs)) o objeto compartilhado vira dois objetos iguais e o pagamento passa a contar
-       em dobro. Raiz em baixarLote (copia rasa do pai pro filho); cura adiada pra proxima sessao (mexe tambem em contasPagas e saldoConta).
-       Sem asserçao de proposito: teste vermelho hoje nao seria regressao, seria o defeito ja conhecido.
-       Medido em 19/09 (sonda, nao teste): na MESMA sessao, com o objeto compartilhado, so a curva dedupa — saldoFisicoConta desconta o
-       pagamento 2x (saldo 800 em vez de 900) e contasPagas lista 2 linhas pagas de 100, contra -100 da curva. */
+    t('32g: pagamento registrado ANTES do fracionamento fica inteiro no dono (o pedaco nasce sem pgParcelas; nenhum objeto compartilhado): -100 em 01/02, o total pago se conserva e a compra segue com 2 parcelas abertas (R$ 200)',
+      gqf.pgParcelas === undefined && gqp.pgParcelas[1].v === 100 && S32(s) === S32([{ data: '2026-02-01', total: -100 }]) && s.semPagar === 2 && s.semPagarValor === 200,
+      S32([gqp.pgParcelas, gqf.pgParcelas, s, s.semPagar, s.semPagarValor]));
+    setg('movs', JSON.parse(JSON.stringify(M())));
+    const s2 = A('serieDinheiro')();
+    t('32g: e depois de RECARREGAR o app (JSON.parse) a curva e o aviso sao os mesmos — o pagamento contado em dobro depois de recarregar (G-1) nao existe mais',
+      S32(s2) === S32(s) && s2.semPagar === 2 && s2.semPagarValor === 200, S32([s2, s2.semPagar, s2.semPagarValor]));
     /* a chave de dedupe e POR COMPRA: duas parceladas solo diferentes, sem nenhum pagamento, nunca se confundem */
     reset();
     M().push(compra32('gx1', { data: '2026-01-05', valor: 300, qtd: 3, pgTipo: 'Parcelado', nParc: 3 }));
@@ -3434,6 +3532,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
 
   /* ---------- 32h: graficoLinhaEstoque (o HTML da curva, nas 4 combinacoes das chaves dinheiro/colecao) ---------- */
   await bloco32('h', async () => {
+    congela(2026, 1, 2, 10, 0);   /* as 3 parcelas do h4 sao "a vencer"; o h8 (2 parcelas em nov e dez/2025) e "vencida sem marca" */
     /* fixture com TODOS os contadores acima de zero */
     M().push(compra32('h1', { data: '2026-01-10', valor: 100 }));
     M().push(compra32('h2', { data: '2026-02-01', valor: 40, situacao: 'Trocado', dataSaida: '2026-03-01' }));
@@ -3442,10 +3541,12 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     M().push(compra32('h5', { data: '2026-02-05', valor: 35, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção', origemPedido: true })); /* coleção: 1 sem chegada (35) */
     M().push(compra32('h6', { data: '2026-02-15', valor: 15, situacao: 'Vendido', destIni: 'Coleção' }));                  /* coleção: 1 saida sem data (15) */
     M().push(compra32('h7', { data: '2026-01-30', valor: 20, situacao: 'Coleção', destino: 'Coleção', destIni: 'Coleção' }));
+    M().push(compra32('h8', { data: '2025-11-10', valor: 100, pgTipo: 'Parcelado', nParc: 2 }));                            /* dinheiro: 2 parcelas vencidas sem marca (100), contadas como pagas */
     const sE = A('serieEstoque')(), sD = A('serieDinheiro')(), sC = A('serieColecao')();
-    t('32h: [fixture] os quatro contadores estao acima de zero (senao o teste dos avisos nao prova nada)',
-      sE.semData === 1 && sE.semDataValor === 25 && sD.semPagar === 3 && sD.semPagarValor === 300 && sC.semChegada === 1 && sC.semChegadaValor === 35 && sC.semData === 1 && sC.semDataValor === 15,
-      S32([sE.semData, sE.semDataValor, sD.semPagar, sD.semPagarValor, sC.semChegada, sC.semChegadaValor, sC.semData, sC.semDataValor]));
+    t('32h: [fixture] os cinco contadores estao acima de zero (senao o teste dos avisos nao prova nada)',
+      sE.semData === 1 && sE.semDataValor === 25 && sD.semPagar === 3 && sD.semPagarValor === 300 && sD.presumidas === 2 && sD.presumidasValor === 100
+      && sC.semChegada === 1 && sC.semChegadaValor === 35 && sC.semData === 1 && sC.semDataValor === 15,
+      S32([sE.semData, sE.semDataValor, sD.semPagar, sD.semPagarValor, sD.presumidas, sD.presumidasValor, sC.semChegada, sC.semChegadaValor, sC.semData, sC.semDataValor]));
     const legenda = html => { const m = html.match(/<div class="legend"[^>]*>([\s\S]*?)<\/div>/); return m ? m[1].replace(/<[^>]*>/g, '') : null; };
     [[false, false], [true, false], [false, true], [true, true]].forEach(([vc, vk]) => {
       const rot = '[dinheiro ' + (vc ? 'ligado' : 'desligado') + ', colecao ' + (vk ? 'ligada' : 'desligada') + ']';
@@ -3465,8 +3566,11 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         html.indexOf((vc ? '● ' : '○ ') + '💰 dinheiro') >= 0 && html.indexOf((vk ? '● ' : '○ ') + '⭐ coleção') >= 0);
       t('32h: ' + rot + ' o aviso de baixa de estoque sem data (semData) aparece SEMPRE (contador 1) e traz o valor (R$ 25,00)',
         html.indexOf('de estoque sem data de saída registrada') >= 0 && html.indexOf(fmt32(25)) >= 0);
-      t('32h: ' + rot + ' o aviso de parcelas de compra ainda nao pagas (semPagar) so aparece com o dinheiro LIGADO, com o valor (R$ 300,00)',
-        (html.indexOf('de compra ainda não paga') >= 0) === vc && (!vc || html.indexOf(fmt32(300)) >= 0));
+      t('32h: ' + rot + ' o aviso de parcelas de compra ainda a vencer (semPagar) so aparece com o dinheiro LIGADO, com o valor (R$ 300,00)',
+        (html.indexOf('de compra ainda a vencer') >= 0) === vc && (!vc || html.indexOf(fmt32(300)) >= 0));
+      t('32h: ' + rot + ' o aviso das parcelas vencidas sem marca (contadas como pagas no vencimento) so aparece com o dinheiro LIGADO, com o valor (R$ 100,00) e diz que estao sem conta cadastrada',
+        (html.indexOf('já vencidas sem marca de paga estão contadas como pagas no dia do vencimento') >= 0) === vc
+        && (!vc || (html.indexOf('(' + fmt32(100) + ')') >= 0 && html.indexOf('delas sem conta cadastrada') >= 0)));
       t('32h: ' + rot + ' os avisos da colecao (semChegada e saida sem data) so aparecem com a colecao LIGADA, com os valores (R$ 35,00 e R$ 15,00)',
         (html.indexOf('como chegada') >= 0) === vk && (html.indexOf('da coleção sem data registrada') >= 0) === vk && (!vk || (html.indexOf(fmt32(35)) >= 0 && html.indexOf(fmt32(15)) >= 0)));
     });
@@ -3702,7 +3806,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   const alem33 = () => A('contasPagas')().filter(x => x.alem);
   const totPagas33 = () => r2_33(A('contasPagas')().reduce((s, x) => s + x.valor, 0));
   const proj33 = () => A('projecaoCaixa')().atual;
-  const exc33 = () => A('excessoPagoAlemDoPlano')();
+  const exc33 = () => { throw new Error('exc33: excessoPagoAlemDoPlano saiu do app (a projecao parte do saldo fisico); reescrever este teste'); };
   /* a tela do Fluxo de caixa com todos os grupos abertos, como o "expandir tudo" faz */
   const telaContas33 = () => { A('vContas')(); const ex = {}; g('_ctKeys').forEach(k => { ex[k] = true; }); setg('ctExp', ex); return A('vContas')(); };
   /* pre-venda = o que salvar() faz numa venda de item 'Pedido' (mesmo helper da 32, que mora dentro do closure dela) */
@@ -3724,7 +3828,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   const neutro33 = () => ({ contasBanc: banco33(), ctExp: {}, ctSec: {}, ctPess: '', ctJogo: '', ctConta: '', ctCat: '', perDe: '', perAte: '', perSel: 'tudo',
     fxSelMode: false, fxSel: {}, ctAgrupo: 'mes', _psec: { pagar: true, receber: true, saldo: false, pagas: false, extrato: false },
     render: () => {}, toast: () => {}, diarioReg: () => {}, imprimir: () => {} });
-  const FUNCS33 = ['parcelasAlemDoPlano', 'excessoPagoAlemDoPlano', 'projecaoCaixa', 'contasPagas', 'saldoFisicoConta', 'serieDinheiro', 'serieEstoque', 'serieColecao',
+  const FUNCS33 = ['parcelasAlemDoPlano', 'gruposParcelados', 'projecaoCaixa', 'contasPagas', 'saldoFisicoConta', 'serieDinheiro', 'serieEstoque', 'serieColecao',
     'provaReal', 'vContas', 'voltaDe', 'desmarcarParcela', 'graficoLinhaEstoque', 'imprimirFluxoGo', 'execExcl', 'execDev', 'desvincular', 'chegouPeca', 'baixarLote', 'motor', 'sitDe', 'aPagar',
     'marcaEntraNoSaldo', 'salvar', 'salvarNota'];
   const faltam33 = FUNCS33.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
@@ -3743,6 +3847,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     } catch (e) { t('33' + rot + ': o bloco explodiu antes de terminar (o que vinha depois dele NAO foi provado)', false, String((e && e.stack) || e).slice(0, 700)); }
     finally {
       ctx.confirm = orig.confirm; ctx.prompt = orig.prompt; ctx.alert = orig.alert; ctx.document.getElementById = orig.geb; ctx.document.body.insertAdjacentHTML = orig.ins;
+      descongela();
       salvos.forEach(([n, v]) => { try { setg(n, v); } catch (e) { /* idem */ } });
       reset();
     }
@@ -3898,25 +4003,29 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
 
   /* ---- 33h: a Projecao do caixa (por conta, no mesmo escopo do saldo por emissao) ---- */
   await bloco33('h', () => {
-    /* (R) 4x virou 3x com as 4 pagas e o valor igual: o valor cobre tudo — nao ha excedente e as duas telas batem */
+    /* A projecao parte do saldo FISICO (a soma de saldoFisicoConta das contas) e so soma o que ainda vai acontecer. Sem parcela a vencer, venda a receber
+       nem despesa a pagar ela e IGUAL a ele, por construcao (19/09/2026: o "excedente" que a projecao abatia, e a reconstrucao "por emissao" que o
+       exigia, deixaram de existir). Os cenarios do M-1 (parcela paga alem do plano, valor corrigido, duas contas, data-base, troca, nota) provam isso:
+       o "hoje" da Projecao e o numero do card Saldo por conta em todos eles. */
+    const ig = (rot, esperado) => t('33h: ' + rot + ' — saldo fisico e projecao batem em ' + esperado, r2_33(sfis33()) === esperado && r2_33(proj33()) === esperado, S33([sfis33(), proj33()]));
+    /* (R) 4x virou 3x com as 4 pagas e o valor igual */
     M().push(compra33('r1', { valor: 400, pgParcelas: marcas33(4) }));
-    t('33h: 4x virou 3x, 4 pagas, valor igual (400): saldo fisico e projecao batem em 600 e o excedente e zero', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600 && exc33() === 0, S33([sfis33(), proj33(), exc33()]));
-    /* (O) valor corrigido pra baixo depois de pagar: saiu 100 alem do valor, e so o saldo fisico enxerga; a projecao desconta o excedente */
+    ig('4x virou 3x, 4 pagas, valor igual (400)', 600);
+    /* (O) valor corrigido pra baixo depois de pagar: saiu 100 alem do valor, e as duas telas enxergam o mesmo dinheiro que saiu */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('o1', { valor: 300, pgParcelas: marcas33(4) }));
-    t('33h: valor corrigido pra 300 depois de pagar 400: o excedente e 100, e saldo fisico e projecao batem em 600', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600 && r2_33(exc33()) === 100, S33([sfis33(), proj33(), exc33()]));
-    /* (P) o valor cobre so uma parte do que passou: o excedente e a diferenca (100 pagos alem do plano - 50 que o valor ainda cobre) */
+    ig('valor corrigido pra 300 depois de pagar 400', 600);
     reset(); setg('contasBanc', banco33());
     M().push(compra33('p2', { valor: 350, pgParcelas: marcas33(4) }));
-    t('33h: valor 350 com 4 pagas de 100: o valor cobre 50 do que passou do plano, o excedente e 50 e as duas telas batem em 600', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600 && r2_33(exc33()) === 50, S33([sfis33(), proj33(), exc33()]));
-    /* duas contas: cada excedente fica na conta da compra */
+    ig('valor 350 com 4 pagas de 100', 600);
+    /* duas contas: cada compra debita a conta dela */
     reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }, { nome: 'Y', saldoIni: 500, saldoData: '' }]);
     M().push(compra33('x1', { valor: 400, conta: 'X', pgParcelas: marcas33(4) }));
     M().push(compra33('y1', { valor: 300, conta: 'Y', pgParcelas: marcas33(4) }));
     const cbX = { nome: 'X', saldoIni: 1000, saldoData: '' }, cbY = { nome: 'Y', saldoIni: 500, saldoData: '' };
-    t('33h: duas contas: so a compra da conta Y passou do valor (excedente 100; a de X fecha), o saldo fisico total e a projecao batem em 700 (600 em X + 100 em Y)',
-      r2_33(exc33()) === 100 && r2_33(A('saldoFisicoConta')(cbX) + A('saldoFisicoConta')(cbY)) === 700 && r2_33(proj33()) === 700,
-      S33([exc33(), A('saldoFisicoConta')(cbX), A('saldoFisicoConta')(cbY), proj33()]));
+    t('33h: duas contas: o saldo fisico total e a projecao batem em 700 (600 em X + 100 em Y)',
+      r2_33(A('saldoFisicoConta')(cbX) + A('saldoFisicoConta')(cbY)) === 700 && r2_33(proj33()) === 700,
+      S33([A('saldoFisicoConta')(cbX), A('saldoFisicoConta')(cbY), proj33()]));
     /* compra SEM conta: nao entra em saldo nenhum, entao nao pode mexer na projecao */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('c0', { valor: 300, conta: '', pgParcelas: marcas33(4) }));
@@ -3931,66 +4040,65 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     let com, sem, msg = '';
     try { com = proj33(); delete M()[0].pgParcelas; sem = proj33(); } catch (e) { msg = String((e && e.message) || e); }
     t('33h: sem nenhuma conta cadastrada a projecao nao lanca e e a mesma com ou sem a marca alem do plano', !msg && com === sem, S33([msg, com, sem]));
-    /* sem marca alem do plano o excedente e zero e a projecao e a conta de sempre */
+    /* sem marca alem do plano */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('p1', { valor: 300, pgParcelas: marcas33(3) }));
-    t('33h: sem marca alem do plano o excedente e zero e projecao e saldo fisico seguem iguais (700)', exc33() === 0 && r2_33(proj33()) === 700 && r2_33(sfis33()) === 700, S33([exc33(), proj33(), sfis33()]));
+    t('33h: sem marca alem do plano projecao e saldo fisico seguem iguais (700)', r2_33(proj33()) === 700 && r2_33(sfis33()) === 700, S33([proj33(), sfis33()]));
     /* nota: o valor que cobre e a soma dos itens parcelados */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('n1', { valor: 200, notaId: 'N9', nParc: 2, pgParcelas: { 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-04-01', v: 100 } } }));
     M().push(compra33('n2', { valor: 100, notaId: 'N9', nParc: 2 }));
-    t('33h: nota de 300 com 3 pagas de 100 (uma alem do plano): o valor da nota cobre, o excedente e zero e as duas telas batem em 700', exc33() === 0 && r2_33(sfis33()) === 700 && r2_33(proj33()) === 700, S33([exc33(), sfis33(), proj33()]));
-    /* o excedente nunca fica negativo: se as marcas somam MENOS que o valor, nada e "pago a mais" (o resto e o m-1 conhecido, que a marca alem do plano nao cria) */
+    t('33h: nota de 300 com 3 pagas de 100 (uma alem do plano): as duas telas batem em 700', r2_33(sfis33()) === 700 && r2_33(proj33()) === 700, S33([sfis33(), proj33()]));
+    /* marcas que somam MENOS que o valor */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('f1', { valor: 500, pgParcelas: marcas33(4) }));
-    t('33h: valor 500 com 4 pagas de 100 (o valor cobre mais do que foi pago): o excedente e zero, nunca negativo', exc33() === 0, S33([exc33(), proj33(), sfis33()]));
-    /* compra de troca: o saldo fisico a ignora (nao entra em conta nenhuma), entao o excedente tambem */
+    t('33h: valor 500 com 4 pagas de 100 (o valor cobre mais do que foi pago): as duas telas batem em 600', r2_33(sfis33()) === 600 && r2_33(proj33()) === 600, S33([sfis33(), proj33()]));
+    /* compra de troca: o saldo fisico a ignora (nao entra em conta nenhuma) */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('k9', { origem: 'TROCA', valor: 300, pgParcelas: marcas33(4) }));
-    t('33h: compra de troca com parcela alem do plano: nao mexe no saldo fisico nem na projecao (ficam em 1000 e 1000) e o excedente e zero', exc33() === 0 && r2_33(sfis33()) === 1000 && r2_33(proj33()) === 1000, S33([exc33(), sfis33(), proj33()]));
-    /* "Parcelado" com nParc 0 (dado antigo): as telas o tratam como a vista, e o excedente tambem */
+    t('33h: compra de troca com parcela alem do plano: nao mexe no saldo fisico nem na projecao (ficam em 1000 e 1000)', r2_33(sfis33()) === 1000 && r2_33(proj33()) === 1000, S33([sfis33(), proj33()]));
+    /* "Parcelado" com nParc 0 (dado antigo): as telas o tratam como a vista */
     reset(); setg('contasBanc', banco33());
     M().push(compra33('j9', { nParc: 0, valor: 100, pgParcelas: marcas33(2) }));
-    t('33h: compra "Parcelado" com nParc 0 (dado antigo, tratada como a vista): o excedente e zero e saldo fisico e projecao batem em 900', exc33() === 0 && r2_33(sfis33()) === 900 && r2_33(proj33()) === 900, S33([exc33(), sfis33(), proj33()]));
+    t('33h: compra "Parcelado" com nParc 0 (dado antigo, tratada como a vista): saldo fisico e projecao batem em 900', r2_33(sfis33()) === 900 && r2_33(proj33()) === 900, S33([sfis33(), proj33()]));
     /* a parcela alem do plano paga de OUTRA conta sai dessa conta (saldo fisico), e o total das duas contas segue batendo com a projecao */
     reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }, { nome: 'Y', saldoIni: 500, saldoData: '' }]);
     const pgY = marcas33(4); pgY[4].conta = 'Y';
     M().push(compra33('x2', { valor: 300, conta: 'X', pgParcelas: pgY }));
     const sX = A('saldoFisicoConta')({ nome: 'X', saldoIni: 1000, saldoData: '' }), sY = A('saldoFisicoConta')({ nome: 'Y', saldoIni: 500, saldoData: '' });
     t('33h: parcela alem do plano paga da conta Y: sai de Y (X 700, Y 400) e o total das duas contas bate com a projecao (1100)', r2_33(sX) === 700 && r2_33(sY) === 400 && r2_33(proj33()) === 1100, S33([sX, sY, proj33()]));
-    /* ESCOPO PELA MARCA (3a rodada, achado grave dos dois revisores): quem decide se a parcela alem do plano saiu do saldo fisico e a conta de quem
-       pagou + a data do PAGAMENTO, nao a conta/data da compra. Tres jeitos de a compra e a marca cairem em escopos diferentes: */
+    /* ESCOPO PELA MARCA (3a rodada do M-1): quem decide se a parcela alem do plano saiu do saldo fisico e a conta de quem pagou + a data do PAGAMENTO */
     const alvo = (contas, mov, rot, sfEsperado) => {
       reset(); setg('contasBanc', contas.map(c => Object.assign({}, c))); M().push(mov);
       const sf = r2_33(contas.reduce((a, c) => a + A('saldoFisicoConta')(Object.assign({}, c)), 0)), pj = r2_33(proj33());
-      t('33h: ' + rot + ' — saldo fisico ' + sfEsperado + ' e a projecao bate com ele', sf === sfEsperado && pj === sfEsperado, S33([sf, pj, exc33()]));
+      t('33h: ' + rot + ' — saldo fisico ' + sfEsperado + ' e a projecao bate com ele', sf === sfEsperado && pj === sfEsperado, S33([sf, pj]));
     };
     alvo([{ nome: 'X', saldoIni: 1000, saldoData: '2026-03-15' }], compra33('g1', { data: '2026-01-10', venc1: '2026-02-01', pgParcelas: { 4: { d: '2026-05-01', v: 100 } } }),
-      'compra ANTES da data-base da conta, parcela alem do plano paga DEPOIS dela (o saldo debita, a compra nao entrou no saldo por emissao)', 900);
+      'compra ANTES da data-base da conta, so a parcela 4 (alem do plano) marcada, paga DEPOIS dela: as parcelas 1 e 2 (01/02 e 01/03) ficam dentro do saldo inicial, a 3 (01/04, vencida sem marca) conta como paga e debita, e a 4 debita', 800);
     alvo([{ nome: 'X', saldoIni: 1000, saldoData: '' }], compra33('g2', { pgParcelas: Object.assign(marcas33(3), { 4: { d: '2026-05-01', v: 100, conta: 'Z' } }) }),
       'parcela alem do plano paga de uma conta EXCLUIDA depois (Z fora do cadastro: nenhum saldo a debita)', 700);
     alvo([{ nome: 'X', saldoIni: 1000, saldoData: '2026-05-01' }], compra33('g3', { data: '2026-05-10', venc1: '2026-05-10', pgParcelas: { 1: { d: '2026-05-10', v: 100 }, 2: { d: '2026-06-10', v: 100 }, 3: { d: '2026-07-10', v: 100 }, 4: { d: '2026-04-01', v: 100 } } }),
       'parcela alem do plano paga ANTES da data-base da conta, compra depois dela (a marca ja esta no saldo inicial)', 700);
     alvo([{ nome: 'X', saldoIni: 1000, saldoData: '2026-04-01' }], compra33('g4', { data: '2026-01-10', valor: 500, venc1: '2026-02-01',
       pgParcelas: { 1: { d: '2026-02-01', v: 100 }, 2: { d: '2026-03-01', v: 100 }, 3: { d: '2026-03-20', v: 100 }, 4: { d: '2026-05-01', v: 100 } } }),
-      'compra ANTES da data-base cujo valor nao foi todo pago (as 3 do plano ficaram dentro do saldo inicial e sobram 200 do valor): a parcela alem do plano paga depois da data-base sai do saldo fisico e a projecao a desconta INTEIRA, sem abater a folga do valor', 900);
-    /* dois cadastros com o MESMO nome (o app nao barra): saldoFisicoConta e saldoConta debitam nos dois; a projecao acompanha em vez de piorar o numero (4a rodada) */
+      'compra ANTES da data-base cujo valor nao foi todo pago (as 3 do plano ficaram dentro do saldo inicial): a parcela alem do plano paga depois da data-base sai do saldo fisico', 900);
+    /* dois cadastros com o MESMO nome (o app nao barra dado antigo): saldoFisicoConta debita nos dois, e a projecao e a soma deles */
     reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }, { nome: 'X', saldoIni: 0, saldoData: '' }]);
     M().push(compra33('dup', { valor: 300, pgParcelas: marcas33(4) }));
     const sfDup = r2_33(g('contasBanc').reduce((a, c) => a + A('saldoFisicoConta')(Object.assign({}, c)), 0));
-    t('33h: dois cadastros de conta com o mesmo nome: a projecao acompanha o saldo fisico (que debita nos dois) — 200 e 200', sfDup === 200 && r2_33(proj33()) === 200, S33([sfDup, proj33(), exc33()]));
+    t('33h: dois cadastros de conta com o mesmo nome: a projecao e a soma do saldo fisico dos dois — 200 e 200', sfDup === 200 && r2_33(proj33()) === 200, S33([sfDup, proj33()]));
   });
 
   /* ---- 33i: chave herdada de Object.prototype e custo ---- */
   await bloco33('i', () => {
     M().push(compra33('k1', { notaId: 'constructor', pgParcelas: marcas33(4) }));
     let msg = '';
-    try { exc33(); A('serieDinheiro')(); } catch (e) { msg = String((e && e.message) || e); }
-    t('33i: nota cujo id e "constructor" (chave herdada de Object.prototype) nao quebra o calculo do excedente nem a curva', !msg, msg);
+    try { A('projecaoCaixa')(); A('serieDinheiro')(); A('contasPagas')(); A('aPagar')(); } catch (e) { msg = String((e && e.message) || e); }
+    t('33i: nota cujo id e "constructor" (chave herdada de Object.prototype) nao quebra a projecao, a curva nem as listas', !msg, msg);
     reset(); setg('contasBanc', banco33());
     for (let i = 0; i < 4000; i++) M().push(compra33('q' + i, { valor: 30, notaId: 'NT' + Math.floor(i / 3), nParc: 3, pgParcelas: (i % 3 === 0) ? marcas33(4) : undefined }));
-    const t0 = Date.now(), ex = exc33(), ms = Date.now() - t0;
-    t('33i: o excedente numa base de 4.000 itens em notas de 3 roda numa passada so, com folga (menos de 1 s), e devolve um numero', ms < 1000 && typeof ex === 'number' && !isNaN(ex), ms + ' ms, excedente ' + ex);
+    const t0 = Date.now(); A('projecaoCaixa')(); A('serieDinheiro')(); A('contasPagas')(); const ms = Date.now() - t0;
+    t('33i: a projecao, a curva e a lista de pagas numa base de 4.000 itens em notas de 3 rodam com folga (menos de 2 s no total) e nao lancam', ms < 2000, ms + ' ms');
   });
 
   /* ---- 33j: o Diagnostico so afirma o que o codigo faz ---- */
@@ -3999,12 +4107,12 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     const casos = [
       ['V1 parcelada + chave canonica + data ISO: diz que JA ESTA CONTADA e como acertar', compra33('d1', { pgParcelas: marcas33(4) }),
         x => /^Parcela paga a mais do que o plano da compra: /.test(x.titulo) && /já está contada \(Fluxo de caixa › pagas, saldos e gráfico de dinheiro\)/.test(x.detalhe)
-          && /Se ela foi paga de verdade, acerte o nº de parcelas da compra: o botão abaixo leva até ela, e é só tocar em ✏️ editar/.test(x.detalhe)
+          && /Se ela foi paga de verdade, acerte o nº de parcelas da compra: o botão abaixo abre o lançamento/.test(x.detalhe)
           && /Só desmarque a parcela se esse pagamento nunca aconteceu \(Fluxo de caixa › pagas, com o período em "tudo"\)/.test(x.detalhe) && x.detalhe.indexOf(' ou desmarque') < 0,
         () => r2_33(sfis33()) === 600 && alem33().length === 1],
-      ['V1 sem data na compra: nao promete a lista de pagas (ela exige a data) e o saldo e o grafico contam de fato', compra33('d1', { data: '', pgParcelas: marcas33(4) }),
-        x => /já está contada \(saldos e gráfico de dinheiro\)/.test(x.detalhe) && x.detalhe.indexOf('pagas') < 0 && x.detalhe.indexOf('desmarque') < 0,
-        () => r2_33(sfis33()) === 600 && alem33().length === 0 && r2_33(ultimo33(A('serieDinheiro')())) === -400],
+      ['V1 sem data na compra: a lista de pagas nao exige mais a data da compra (o 1o vencimento manda), entao o texto promete as tres telas e elas contam de fato', compra33('d1', { data: '', pgParcelas: marcas33(4) }),
+        x => /já está contada \(Fluxo de caixa › pagas, saldos e gráfico de dinheiro\)/.test(x.detalhe),
+        () => r2_33(sfis33()) === 600 && alem33().length === 1 && r2_33(ultimo33(A('serieDinheiro')())) === -400],
       ['V2 parcelada com a marca invalida (data torta): diz que NAO entra nas contas e o saldo confirma (so as 3 do plano)', compra33('d1', { pgParcelas: Object.assign(marcas33(3), { 4: { d: '01/05/2026', v: 100 } }) }),
         x => /^Parcela paga a mais do que o plano da compra: /.test(x.titulo) && /não entra nas contas \(data inválida ou número fora do padrão\)/.test(x.detalhe) && x.detalhe.indexOf('já está contada') < 0,
         () => r2_33(sfis33()) === 700 && alem33().length === 0],
@@ -4012,9 +4120,9 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         compra33('d1', { pgTipo: 'À vista', nParc: 0, pgParcelas: marcas33(2) }),
         x => /^Parcela marcada numa compra que hoje é à vista: /.test(x.titulo) && /essa compra não é mais parcelada/.test(x.detalhe) && /não entra em conta nenhuma/.test(x.detalhe) && x.detalhe.indexOf('0×') < 0,
         () => r2_33(sfis33()) === 700 && totPagas33() === 300 && alem33().length === 0],
-      ['V4 compra de troca que virou parcelada: diz que so a lista de pagas mostra (saldos e grafico nao contam)', compra33('d1', { origem: 'TROCA', pgParcelas: marcas33(4) }),
-        x => /^Parcela marcada numa compra de troca ou de caixa aberta: /.test(x.titulo) && /Só a lista de pagas a mostra/.test(x.detalhe) && /os saldos e o gráfico de dinheiro não a contam/.test(x.detalhe),
-        () => r2_33(sfis33()) === 1000 && alem33().length === 1 && r2_33(ultimo33(A('serieDinheiro')())) === 0],
+      ['V4 compra de troca que virou parcelada: diz que NENHUMA tela de dinheiro conta a marca (M-A, 19/09/2026: aPagar e contasPagas passaram a ignorar `origem`, como os saldos e a curva)', compra33('d1', { origem: 'TROCA', pgParcelas: marcas33(4) }),
+        x => /^Parcela marcada numa compra de troca ou de caixa aberta: /.test(x.titulo) && /Nenhuma tela de dinheiro conta essa marca/.test(x.detalhe),
+        () => r2_33(sfis33()) === 1000 && alem33().length === 0 && totPagas33() === 0 && A('aPagar')().length === 0 && r2_33(ultimo33(A('serieDinheiro')())) === 0],
     ];
     /* a marca que nenhum saldo debita (pagamento antes da data-base da conta; conta de quem pagou fora do cadastro): o texto NAO promete "saldos" */
     const cbBase51 = { nome: 'X', saldoIni: 1000, saldoData: '2026-05-01' };
@@ -4050,13 +4158,18 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('33k: nenhum dos dois traz NaN ou undefined', !/NaN|undefined/.test(ligado + desligado), '');
   });
 
-  /* ---- 33l: mesma sessao, pai e filho de baixarLote compartilham o objeto pgParcelas — a marca alem do plano conta uma vez na curva ---- */
+  /* ---- 33l: lote fracionado (G-1): a marca alem do plano e REPARTIDA entre pai e filho, sem objeto compartilhado ---- */
   await bloco33('l', () => {
     M().push(compra33('p1', { qtd: 3, pgParcelas: marcas33(4) }));
     const filho = A('baixarLote')('p1', 1, 'Vendido', { dataVenda: '2026-06-01', dataSaida: '2026-06-01' });
     const sd = A('serieDinheiro')();
-    t('33l: lote fracionado na mesma sessao (pai e filho com a mesma marca alem do plano): a curva conta a marca UMA vez (1 parcela, R$ 100)',
-      sd.pagasAlem === 1 && r2_33(sd.pagasAlemValor) === 100, S33([filho.id !== 'p1', filho.pgParcelas === M()[0].pgParcelas, sd.pagasAlem, sd.pagasAlemValor]));
+    t('33l: lote fracionado (G-1, 19/09/2026): o pedaco nasce SEM pgParcelas e a marca alem do plano fica inteira no dono da compra — R$ 100 de parcela paga a mais, contados UMA vez, nem 1 centavo a mais nem a menos',
+      filho.id !== 'p1' && filho.pgParcelas === undefined && r2_33(M()[0].pgParcelas[4].v) === 100 && sd.pagasAlem === 1 && r2_33(sd.pagasAlemValor) === 100 && r2_33(ultimo33(sd)) === -400,
+      S33([filho.pgParcelas, M()[0].pgParcelas[4], sd.pagasAlem, sd.pagasAlemValor, ultimo33(sd)]));
+    setg('movs', JSON.parse(JSON.stringify(M())));
+    const sd2 = A('serieDinheiro')(), al2 = alem33();
+    t('33l: e depois de RECARREGAR o app (JSON.parse) o resultado e o mesmo: a parcela alem do plano conta uma vez na curva (-400), na lista de pagas (1 linha) e no saldo (600)',
+      sd2.pagasAlem === 1 && r2_33(sd2.pagasAlemValor) === 100 && r2_33(ultimo33(sd2)) === -400 && al2.length === 1 && r2_33(sfis33()) === 600, S33([sd2.pagasAlem, ultimo33(sd2), al2.length, sfis33()]));
   });
 
   /* ---- 33m: o texto do desmarcar diz o que de fato acontece ---- */
@@ -4206,7 +4319,1461 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('33o: nota com "3,5" parcelas e recusada com o mesmo aviso e nada e salvo', avisos.length === 1 && /inteiro, de 1 a 120/.test(avisos[0]) && M().length === 0, S33([avisos, M().length]));
     setg('notaItens', []);
   });
-}).catch(e=>{fail++;console.log('  FALHOU  secao 33 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
+}).catch(e=>{fail++;console.log('  FALHOU  secao 33 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
+  /* ===== 34. O PAGAMENTO E DA COMPRA (a nota, ou a familia do lote); PARCELA VENCIDA SEM MARCA CONTA COMO PAGA; UM RELOGIO SO (19/09/2026) =====
+     Pedido do Felype ("pode auditar e revisar e entao resolver as pendencias que restaram"). Desenho em handoffs/anexos-tcg/design-resolucao-
+     pendencias-20260919.md (secoes 10 e 11). O que esta secao prova:
+       - G-1: dividir o lote (baixarLote, baixarBoosters) NAO cria nem some dinheiro pago: o pedaco nasce sem pgParcelas, as marcas ficam no dono da compra,
+         a compra dividida tem UM cronograma (uma linha por parcela, com o total da compra) e tudo segue igual depois de recarregar (JSON.parse);
+       - apagar o pedaco que guarda o pagamento passa o pagamento pra quem fica (execExcl, compraSobra reparte por valor entre as compras que sobram);
+       - M-C: tirar um item da nota leva a parte dele do pagamento; M-A: abertura/troca nunca entra no cronograma;
+       - R1: parcela vencida SEM marca conta como paga no dia do vencimento em TODAS as telas (saldo fisico, curva, projecao, pagas, a pagar);
+         vencimento HOJE ainda e a pagar; a marca, quando existe, manda (data, valor e conta reais); marca sem data legivel vale no vencimento;
+       - R2: a Projecao parte do saldo FISICO e so soma o que ainda vai acontecer, com escopo (contas cadastradas; o resto vai pra "fora das contas");
+       - R3: venda no App com repasse HOJE ainda e "a receber" e o saldo fisico ainda nao a credita;
+       - um relogio so (hojeISO, local): 10h, 20h59, 21h01 e 22h30 de Sao Paulo dao o mesmo "hoje" em todas as telas e em quem grava "hoje";
+       - vencimento (dia 29-31, data invalida, sem data), plano editado num pedaco vale pra compra inteira, nome de conta repetido, valor gravado que o
+         select nao conhece, dica dos pagamentos que o periodo esconde, Diagnostico por compra.
+     Cada bloco monta o PROPRIO fixture, congela o relogio quando a data importa e devolve o app ao estado em que o achou (mesmo padrao das secoes 32 e 33). */
+  console.log('');
+  console.log('=== 34. o pagamento e da compra; parcela vencida sem marca conta como paga; um relogio so ===');
+  const S34 = s => JSON.stringify(s);
+  const r34 = x => Math.round(x * 100) / 100;
+  const fmt34 = g('fmt');
+  const compra34 = (idc, extra) => Object.assign({ id: idc, tipo: 'COMPRA', data: '2026-01-10', jogo: 'Pokémon', cat: 'ETB', colecao: '151', qtd: 1, valor: 300,
+    situacao: 'Em estoque', destino: 'Vender', contraparte: 'Loja', conta: 'X', pgTipo: 'Parcelado', nParc: 3, venc1: '2026-02-01' }, extra || {});
+  const banco34 = nomes => (nomes || ['X']).map(n => ({ nome: n, saldoIni: 1000, saldoData: '' }));
+  const sf34 = cb => A('saldoFisicoConta')(Object.assign({}, cb));
+  const totSf34 = () => r34(g('contasBanc').reduce((s, cb) => s + sf34(cb), 0));
+  const soma34 = L => r34(L.reduce((s, x) => s + x.valor, 0));
+  const telaContas34 = () => { A('vContas')(); const ex = {}; g('_ctKeys').forEach(k => { ex[k] = true; }); setg('ctExp', ex); return A('vContas')(); };
+  /* a foto dos numeros de dinheiro: dividir, recarregar e apagar/repassar pedaco tem de deixar TUDO igual */
+  const foto34 = () => {
+    const ap = A('aPagar')().filter(x => x.pi), av = A('aPagar')(true), pg = A('contasPagas')().filter(x => x.pi), sd = A('serieDinheiro')(), pj = A('projecaoCaixa')();
+    return { aPagarN: ap.length, aPagar: soma34(ap), vencN: av.length, venc: soma34(av), pagasN: pg.length, pagas: soma34(pg),
+      saldos: g('contasBanc').map(cb => r34(sf34(cb))), emissao: g('contasBanc').map(cb => r34(A('saldoConta')(Object.assign({}, cb)))),
+      curva: sd.length ? r34(sd[sd.length - 1].total) : 0, semPagar: sd.semPagar, semPagarValor: sd.semPagarValor, pres: sd.presumidas, presValor: sd.presumidasValor, alem: sd.pagasAlem,
+      proj: [pj.atual, pj.d30, pj.d60, pj.d90] };
+  };
+  const vendeu34 = (idPai, qtd, quem, extras) => {
+    const ex = Object.assign({ dataVenda: '2026-09-01', dataSaida: '2026-09-01' }, extras || {});
+    const peca = A('baixarLote')(idPai, qtd, 'Vendido', ex);
+    const venda = { id: 'V_' + peca.id, tipo: 'VENDA', data: ex.dataVenda, valor: 99, origemId: idPai, vendaDe: 'estoque', contraparte: quem || 'Cli', qtd: peca.qtd, custoOrigem: peca.valor };
+    M().push(venda);
+    if (peca.id !== idPai) peca.vendaRef = venda.id;
+    return { peca, venda };
+  };
+  const G34 = ['contasBanc', 'ctExp', 'ctSec', 'ctPess', 'ctJogo', 'ctConta', 'ctCat', 'perDe', 'perAte', 'perSel', 'fxSelMode', 'fxSel', 'ctAgrupo', '_psec',
+    'render', 'toast', 'diarioReg', 'imprimir', 'tela', 'editId', 'tipoSel', 'pgTipo', '_fotosPend', '_db', '_syncReady', '_restaurando', '_baseH', 'excluidos',
+    'navHist', '_pendVolta', '_lancarDirty', 'notaItens', 'notaHead', 'pgs'];
+  const PLANOS34 = new Set(['ctExp', 'ctSec', 'fxSel', '_psec', '_baseH', 'excluidos', 'notaHead']);
+  const copia34 = (v, n) => Array.isArray(v) ? v.slice() : ((PLANOS34.has(n) && v && typeof v === 'object') ? Object.assign({}, v) : v);
+  const neutro34 = () => ({ contasBanc: banco34(), ctExp: {}, ctSec: {}, ctPess: '', ctJogo: '', ctConta: '', ctCat: '', perDe: '', perAte: '', perSel: 'tudo',
+    fxSelMode: false, fxSel: {}, ctAgrupo: 'mes', _psec: { pagar: true, receber: true, saldo: false, pagas: false, extrato: false },
+    render: () => {}, toast: () => {}, diarioReg: () => {}, imprimir: () => {} });
+  const FUNCS34 = ['gruposParcelados', 'vencParcelaISO', 'hojeISO', 'dataOk', 'marcasDoGrupo', 'repassaMarcas', 'repartirPagamentos', 'repartePagamentoDaNota', 'separarDaNotaFaz',
+    'aPagar', 'aReceber', 'contasPagas', 'saldoFisicoConta', 'saldoConta', 'serieDinheiro', 'projecaoCaixa', 'execExcl', 'baixarLote', 'baixarBoosters', 'desmarcarParcela',
+    'confirmarPagarParcela', 'marcarPago', 'salvar', 'salvarConta', 'selOpts', 'provaReal', 'vContas', 'imprimirFluxoGo', 'graficoLinhaEstoque'];
+  const faltam34 = FUNCS34.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('34a: [pre-requisito] o app carregado tem as ' + FUNCS34.length + ' funcoes desta secao', faltam34.length === 0, 'FALTAM no app: ' + faltam34.join(', '));
+  const bloco34 = async (rot, corpo, pre) => {
+    if (faltam34.length) return;
+    const salvos = [];
+    const orig = { confirm: ctx.confirm, prompt: ctx.prompt, alert: ctx.alert, geb: ctx.document.getElementById, ins: ctx.document.body.insertAdjacentHTML };
+    try {
+      G34.forEach(n => { try { salvos.push([n, copia34(g(n), n)]); } catch (e) { /* nome que este build nao tem */ } });
+      reset();
+      const nz = neutro34();
+      Object.keys(nz).forEach(n => { try { setg(n, nz[n]); } catch (e) { /* idem */ } });
+      await corpo();
+    } catch (e) { t((pre || '34') + rot + ': o bloco explodiu antes de terminar (o que vinha depois dele NAO foi provado)', false, String((e && e.stack) || e).slice(0, 700)); }
+    finally {
+      ctx.confirm = orig.confirm; ctx.prompt = orig.prompt; ctx.alert = orig.alert; ctx.document.getElementById = orig.geb; ctx.document.body.insertAdjacentHTML = orig.ins;
+      descongela();
+      salvos.forEach(([n, v]) => { try { setg(n, v); } catch (e) { /* idem */ } });
+      reset();
+    }
+  };
+  const campos34 = {};
+  const elCampo34 = idc => ({
+    get value() { return (idc in campos34) ? campos34[idc] : ''; }, set value(v) { campos34[idc] = v; },
+    checked: false, textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, children: [],
+    appendChild() {}, remove() {}, addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; }, scrollIntoView() {}, focus() {},
+    insertAdjacentHTML() {}, getAttribute() { return null; }, setAttribute() {}, removeAttribute() {}, closest() { return null; }, cloneNode() { return elCampo34(idc); }
+  });
+
+  /* ---- 34a: R1 — a parcela vencida SEM marca conta como paga no dia do vencimento, em todas as telas ---- */
+  await bloco34('a', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('a1', { valor: 300, nParc: 3, venc1: '2026-08-15' }));      /* 15/08 e 15/09 vencidas sem marca; 15/10 a vencer */
+    const av = A('aPagar')(true), ap = A('aPagar')().filter(x => x.pi), pg = A('contasPagas')(), sd = A('serieDinheiro')(), pj = A('projecaoCaixa')();
+    t('34a: as 2 parcelas vencidas sem marca (15/08 e 15/09, R$ 100) ficam em aPagar(true) e a que vence em 15/10 em aPagar(): toda parcela sem marca esta em UMA das duas listas',
+      av.length === 2 && ap.length === 1 && S34(av.map(x => x.pi)) === '[1,2]' && ap[0].pi === 3 && r34(ap[0].valor) === 100 && av.every(x => r34(x.valor) === 100), S34([av.map(x => x.pi), ap.map(x => x.pi)]));
+    t('34a: a lista de pagas mostra as 2 vencidas como parcela SEM MARCA (presumida), sem o desmarcar — e nao mostra a que ainda vai vencer',
+      pg.filter(x => x.presumida).length === 2 && pg.filter(x => x.pagaManual).length === 0 && pg.filter(x => x.pi).length === 2, S34(pg.map(x => [x.pi, x.presumida, x.pagaManual])));
+    t('34a: o saldo fisico debita as 2 vencidas (1000 - 200 = 800)', r34(sf34(g('contasBanc')[0])) === 800, String(sf34(g('contasBanc')[0])));
+    t('34a: a curva sai -100 em 15/08 e -200 em 15/09, avisa 1 a vencer (R$ 100) e 2 contadas como pagas (R$ 200, com conta cadastrada: nenhuma "sem conta")',
+      S34(sd) === S34([{ data: '2026-08-15', total: -100 }, { data: '2026-09-15', total: -200 }]) && sd.semPagar === 1 && sd.semPagarValor === 100 && sd.presumidas === 2 && sd.presumidasValor === 200 && sd.presSemConta === 0,
+      S34([sd, sd.semPagar, sd.presumidas, sd.presumidasValor, sd.presSemConta]));
+    t('34a: a projecao parte de 800 (o saldo fisico) e so a parcela de 15/10 entra nos horizontes: +30 dias = 700',
+      pj.atual === 800 && pj.d30 === 700 && pj.d60 === 700 && pj.d90 === 700 && pj.temContas === true, S34(pj));
+    /* sem contas cadastradas: a curva conta quantas das vencidas estao "sem conta" */
+    setg('contasBanc', []);
+    const sd2 = A('serieDinheiro')();
+    t('34a: sem conta cadastrada as 2 vencidas contadas como pagas dizem que estao sem conta (R$ 200 que nao entram em saldo nenhum)', sd2.presumidas === 2 && sd2.presSemConta === 2 && sd2.presSemContaValor === 200, S34([sd2.presumidas, sd2.presSemConta, sd2.presSemContaValor]));
+  });
+
+  /* ---- 34b: o dia do vencimento (hoje = a pagar) e o dia do repasse (R3) ---- */
+  await bloco34('b', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('b1', { valor: 200, nParc: 2, venc1: '2026-09-21', data: '2026-09-01' }));       /* a 1a vence HOJE, a 2a em 21/10 */
+    const cb = g('contasBanc')[0];
+    t('34b: a parcela que vence HOJE ainda e "a pagar" (as 2 estao em aPagar(), nenhuma em aPagar(true)) e nao entra no saldo fisico (1000) nem na curva (semPagar 2, R$ 200)',
+      A('aPagar')().filter(x => x.pi).length === 2 && A('aPagar')(true).length === 0 && sf34(cb) === 1000 && A('serieDinheiro')().semPagar === 2 && A('serieDinheiro')().length === 0
+      && A('contasPagas')().filter(x => x.pi).length === 0,
+      S34([A('aPagar')().filter(x => x.pi).length, sf34(cb), A('serieDinheiro')(), A('contasPagas')().filter(x => x.pi).length]));
+    M().push({ id: 'b2', tipo: 'VENDA', data: '2026-09-07', valor: 100, taxa: 10, canal: 'App', recDias: 14, conta: 'X', contraparte: 'Cli', qtd: 1 });     /* repasse: 21/09 = hoje */
+    t('34b: venda no App com repasse HOJE ainda e "a receber" e o saldo fisico ainda NAO a credita (1000) — os dois lados do dia concordam',
+      A('aReceber')().length === 1 && sf34(cb) === 1000, S34([A('aReceber')().length, sf34(cb)]));
+    congela(2026, 9, 22, 10, 0);
+    t('34b: no dia seguinte o repasse ja caiu (sai do a receber, o saldo credita o liquido 90) e a parcela de 21/09 virou vencida sem marca (-100): 1000 + 90 - 100 = 990',
+      A('aReceber')().length === 0 && sf34(cb) === 990 && A('aPagar')(true).length === 1, S34([A('aReceber')().length, sf34(cb), A('aPagar')(true).length]));
+  });
+
+  /* ---- 34c: a marca manda (data, valor e conta reais) e marcar com os valores presumidos nao muda nada ---- */
+  await bloco34('c', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X', 'Y']));
+    M().push(compra34('c1', { valor: 300, nParc: 3, venc1: '2026-08-15' }));
+    /* a lista de "vencidas sem marca" e os contadores dela encolhem por definicao (a parcela agora TEM marca); todo o resto do dinheiro fica igual */
+    const semVenc = f => { const c = Object.assign({}, f); ['vencN', 'venc', 'pres', 'presValor'].forEach(k => delete c[k]); return c; };
+    const antes = foto34();
+    M()[0].pgParcelas = { 1: { d: '2026-08-15', v: 100, conta: 'X' } };
+    t('34c: marcar a parcela vencida com os valores que o app ja presumia (dia do vencimento, R$ 100, conta da compra) nao muda NENHUM numero de dinheiro (saldos, curva, pagas, a vencer, projecao); so a lista de vencidas sem marca encolhe (2 -> 1)',
+      S34(semVenc(foto34())) === S34(semVenc(antes)) && antes.vencN === 2 && foto34().vencN === 1, S34([foto34(), antes]));
+    M()[0].pgParcelas = { 1: { d: '2026-09-01', v: 90, conta: 'Y' } };
+    const cbX = g('contasBanc')[0], cbY = g('contasBanc')[1], sd = A('serieDinheiro')(), pg = A('contasPagas')().filter(x => x.pi);
+    t('34c: a marca manda: parcela 1 paga de Y em 01/09 por R$ 90 — X debita so a vencida sem marca (1000 - 100), Y debita os 90 (910)',
+      r34(sf34(cbX)) === 900 && r34(sf34(cbY)) === 910, S34([sf34(cbX), sf34(cbY)]));
+    t('34c: a curva pos a marca na data dela (-90 em 01/09) e a vencida sem marca no vencimento (-190 em 15/09); a lista de pagas traz a marcada com o valor pago (90) e o desmarcar',
+      S34(sd) === S34([{ data: '2026-09-01', total: -90 }, { data: '2026-09-15', total: -190 }]) && pg.filter(x => x.pagaManual && r34(x.valor) === 90).length === 1 && pg.length === 2,
+      S34([sd, pg.map(x => [x.pi, x.valor, x.pagaManual, x.presumida])]));
+  });
+
+  /* ---- 34d: marca sem data legivel: o saldo e a curva contam JUNTOS, no dia do vencimento (antes o saldo debitava e a curva nao) ---- */
+  await bloco34('d', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('d1', { valor: 300, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { v: 100 }, 2: 'lixo' } }));
+    let msg = '';
+    try { A('contasPagas')(); A('aPagar')(); telaContas34(); A('projecaoCaixa')(); } catch (e) { msg = String((e && e.message) || e); }
+    const sd = A('serieDinheiro')(), cb = g('contasBanc')[0];
+    t('34d: marca sem data (parcela 1) e marca com "data" que nao e data (parcela 2) valem no dia do vencimento: curva -100 em 15/08 e -200 em 15/09, saldo 800 — e nenhuma tela lanca',
+      !msg && S34(sd) === S34([{ data: '2026-08-15', total: -100 }, { data: '2026-09-15', total: -200 }]) && sf34(cb) === 800, S34([msg, sd, sf34(cb)]));
+  });
+
+  /* ---- 34e: o vencimento de cada parcela ---- */
+  await bloco34('e', () => {
+    congela(2026, 9, 21, 10, 0);
+    const v = (b, i, extra) => A('vencParcelaISO')(Object.assign({ venc1: b, data: '2026-01-05' }, extra || {}), i);
+    t('34e: dia 31 cai no ultimo dia do mes mais curto (31/01 -> 28/02 -> 31/03 -> 30/04) em vez de pular pro mes seguinte, e em ano bissexto vale 29/02',
+      S34([1, 2, 3, 4].map(i => v('2026-01-31', i))) === S34(['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30']) && v('2028-01-31', 2) === '2028-02-29' && v('2026-01-29', 2) === '2026-02-28' && v('2026-01-30', 2) === '2026-02-28',
+      S34([1, 2, 3, 4].map(i => v('2026-01-31', i))));
+    t('34e: a virada do ano (30/11 -> 30/12 -> 30/01 do ano seguinte; 31/12 -> 31/01 -> 28/02)', v('2026-11-30', 3) === '2027-01-30' && v('2026-12-31', 2) === '2027-01-31' && v('2026-12-31', 3) === '2027-02-28', S34([v('2026-11-30', 3), v('2026-12-31', 2), v('2026-12-31', 3)]));
+    t('34e: 1o vencimento invalido cai na data da compra; sem nenhuma data legivel devolve vazio', v('2026-13-45', 2, { data: '2026-05-10' }) === '2026-06-10' && v('2026-02-30', 1, { data: '2026-05-10' }) === '2026-05-10' && v('', 1, { data: '' }) === '' && v('lixo', 1, { data: '' }) === '',
+      S34([v('2026-13-45', 2, { data: '2026-05-10' }), v('2026-02-30', 1, { data: '2026-05-10' }), v('', 1, { data: '' })]));
+    let mono = true;
+    ['2026-01-29', '2026-01-30', '2026-01-31', '2026-03-31', '2026-08-31', '2026-12-31', '2028-02-29'].forEach(b => { for (let i = 1; i < 36; i++) if (v(b, i) > v(b, i + 1)) mono = false; });
+    t('34e: o vencimento nunca anda pra tras: a parcela i+1 vence no mesmo dia ou depois da i (36 parcelas, 7 datas-base de borda)', mono, '');
+    M().push(compra34('e1', { valor: 300, nParc: 3, data: '', venc1: '' }));
+    const ap = A('aPagar')(), av = A('aPagar')(true);
+    t('34e: compra sem nenhuma data legivel NUNCA some: as 3 parcelas ficam em "a pagar" com vencimento hoje, nao entram como vencidas e nao lancam',
+      ap.filter(x => x.pi).length === 3 && av.length === 0 && ap.every(x => !x.pi || (r34(x.valor) === 100 && isFinite(x.venc.getTime()))), S34([ap.length, av.length]));
+    M().push(compra34('e2', { valor: 300, nParc: 3, data: '2026-08-01', venc1: '2026-13-45' }));
+    const diag = A('provaReal')().A.filter(x => /^Vencimento inválido em compra parcelada/.test(x.titulo));
+    t('34e: e o Diagnostico acusa o vencimento invalido — sem nenhuma data (e1) e com o 1o vencimento torto mas a data da compra boa (e2) — dizendo o que o app faz (conta a partir da data da compra, ou como "a vencer hoje")',
+      diag.length === 2 && diag.every(x => /a vencer hoje/.test(x.detalhe)), S34(diag.map(x => [x.titulo, x.detalhe])));
+    t('34e: a compra com o 1o vencimento torto (e2) usa a data da compra: 3 parcelas 01/08, 01/09 (vencidas sem marca) e 01/10 (a vencer)', A('aPagar')(true).filter(x => x.m.id === 'e2').length === 2 && A('aPagar')().filter(x => x.pi && x.m.id === 'e2').length === 1, S34([A('aPagar')(true).length, A('aPagar')().length]));
+  });
+
+  /* ---- 34f: G-1 — dividir o lote nao muda nenhum numero de dinheiro; um cronograma por compra ---- */
+  await bloco34('f', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('f1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-14', v: 100 } } }));
+    const f0 = foto34();
+    const p1 = A('baixarLote')('f1', 1, 'Vendido', { dataVenda: '2026-09-01', dataSaida: '2026-09-01' });
+    const p2 = A('baixarLote')('f1', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    const pai = M().find(m => m.id === 'f1');
+    t('34f: os pedacos nascem SEM pgParcelas (nenhum objeto compartilhado) e o pai guarda a marca inteira', p1.pgParcelas === undefined && p2.pgParcelas === undefined && pai.pgParcelas[1].v === 100 && pai.qtd === 1, S34([p1.pgParcelas, p2.pgParcelas, pai.pgParcelas]));
+    t('34f: dividir o lote em 3 pedacos nao muda NENHUM numero: a pagar, vencidas, pagas, saldos, por emissao, curva, avisos e projecao', S34(foto34()) === S34(f0), S34([foto34(), f0]));
+    const ap = A('aPagar')().filter(x => x.pi), pg = A('contasPagas')().filter(x => x.pi);
+    t('34f: a compra dividida tem UMA linha por parcela (nao uma por pedaco), com o valor da parcela da compra inteira (100), o total (300) e a marca "3 pedacos da mesma compra"',
+      ap.length === 1 && pg.length === 2 && ap[0].tot === 300 && r34(ap[0].valor) === 100 && ap[0].fam && ap[0].fam.n === 3 && ap[0].m.id === 'f1', S34([ap.length, pg.length, ap[0] && ap[0].fam]));
+    const html = telaContas34();
+    t('34f: a tela do Fluxo de caixa diz "3 pedacos da mesma compra" e o total 300 na linha da parcela; e a lista de Pagas nao chama de "atrasado" o que ja foi pago (a de a pagar so chama o que de fato passou da data)',
+      html.indexOf('3 pedaços da mesma compra') >= 0 && html.indexOf(fmt34(300)) >= 0 && html.indexOf('atrasado') < 0, (html.match(/.{40}atrasado.{20}/) || [''])[0]);
+    setg('movs', JSON.parse(JSON.stringify(M())));
+    t('34f: e depois de RECARREGAR o app (JSON.parse) tudo segue igual — o pagamento nao passa a contar em dobro', S34(foto34()) === S34(f0), S34([foto34(), f0]));
+    /* boosters: a caixa vira pedaco de 3 boosters + booster solto + o resto da caixa (divisao em 3) */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('f2', { valor: 800, qtd: 2, cat: 'Booster Box', boosters: 4, nParc: 4, venc1: '2026-07-10', pgParcelas: { 1: { d: '2026-07-10', v: 200 }, 2: { d: '2026-08-11', v: 200 } } }));
+    const b0 = foto34();
+    const pb = A('baixarBoosters')('f2', 3, 'Vendido', { dataVenda: '2026-09-01', dataSaida: '2026-09-01' });
+    const filhos = M().filter(m => m.loteOrigem === 'f2');
+    t('34f: divisao de boosters em 3 (3 vendidos + 1 solto + o resto da caixa): os dois filhos nascem sem pgParcelas e nenhum numero de dinheiro muda',
+      filhos.length === 2 && filhos.every(x => x.pgParcelas === undefined) && M().find(m => m.id === 'f2').pgParcelas[2].v === 200 && S34(foto34()) === S34(b0), S34([filhos.length, foto34(), b0]));
+    setg('movs', JSON.parse(JSON.stringify(M())));
+    t('34f: e depois de recarregar, os boosters seguem iguais', S34(foto34()) === S34(b0), S34([foto34(), b0]));
+  });
+
+  /* ---- 34g: desmarcar tira a marca de TODOS os pedacos (dado antigo com a mesma marca em dois) ---- */
+  await bloco34('g', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('g1', { valor: 300, qtd: 2, nParc: 3, venc1: '2026-10-10', pgParcelas: { 1: { d: '2026-09-10', v: 100 } } }));
+    const g2 = A('baixarLote')('g1', 1, 'Coleção', { dataSaida: '2026-09-11' });
+    g2.pgParcelas = { 1: { d: '2026-09-10', v: 100 } };            /* dado antigo: a mesma marca copiada no pedaco */
+    t('34g: a marca duplicada em dois pedacos conta UMA vez (pagas 1 linha de 100, curva -100)', A('contasPagas')().filter(x => x.pagaManual).length === 1 && r34(ultimoCurva34()) === -100, S34([A('contasPagas')().filter(x => x.pagaManual).length, ultimoCurva34()]));
+    A('desmarcarParcela')('g1', 1);
+    t('34g: desmarcar tira a marca dos DOIS pedacos (senao a que sobrasse reapareceria) e a parcela 1 volta pro a pagar, uma vez so',
+      !('1' in (M().find(m => m.id === 'g1').pgParcelas || {})) && !('1' in (g2.pgParcelas || {})) && A('aPagar')().filter(x => x.pi === 1).length === 1 && A('contasPagas')().filter(x => x.pagaManual).length === 0,
+      S34([M().find(m => m.id === 'g1').pgParcelas, g2.pgParcelas, A('aPagar')().filter(x => x.pi).length]));
+    function ultimoCurva34() { const s = A('serieDinheiro')(); return s.length ? s[s.length - 1].total : 0; }
+  });
+
+  /* ---- 34h: pagar a parcela de uma compra dividida marca o dono UMA vez, com o "hoje" LOCAL (22h30 ainda e o mesmo dia) ---- */
+  await bloco34('h', () => {
+    congela(2026, 9, 21, 22, 30);                     /* em UTC ja e 22/09 01h30 */
+    M().push(compra34('h1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-09-25' }));
+    A('baixarLote')('h1', 1, 'Vendido', { dataVenda: '2026-09-01', dataSaida: '2026-09-01' });
+    A('baixarLote')('h1', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    const linha = A('aPagar')().filter(x => x.pi === 1)[0];
+    ctx.document.getElementById = idc => elCampo34(idc);
+    campos34.pp_conta = 'X';
+    A('confirmarPagarParcela')(linha.m.id, 1, 3, 100);
+    const marcados = M().filter(m => m.pgParcelas && m.pgParcelas[1]);
+    t('34h: pagar a parcela 1 da compra dividida marca UM pedaco (o dono da linha), com a data de HOJE local (21/09, nao 22/09 do UTC), R$ 100 e a conta escolhida',
+      marcados.length === 1 && marcados[0].id === linha.m.id && marcados[0].pgParcelas[1].d === '2026-09-21' && marcados[0].pgParcelas[1].v === 100 && marcados[0].pgParcelas[1].conta === 'X', S34(marcados.map(m => [m.id, m.pgParcelas])));
+    t('34h: a parcela sai do a pagar (2 restam), entra em pagas uma vez, e o saldo fisico debita 100 hoje', A('aPagar')().filter(x => x.pi).length === 2 && A('contasPagas')().filter(x => x.pagaManual).length === 1 && sf34(g('contasBanc')[0]) === 900,
+      S34([A('aPagar')().filter(x => x.pi).length, A('contasPagas')().filter(x => x.pagaManual).length, sf34(g('contasBanc')[0])]));
+    /* o dono da compra e quem ja guarda as marcas, mesmo que nao seja o primeiro pedaco: o pagamento novo vai pro MESMO pedaco (senao as marcas se espalham) */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('h3', { valor: 300, qtd: 2, nParc: 3, venc1: '2026-10-10' }));
+    const h3f = A('baixarLote')('h3', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    h3f.pgParcelas = { 1: { d: '2026-09-10', v: 100 } };                 /* quem guarda o pagamento e o pedaco (nao o primeiro registro) */
+    const l2 = A('aPagar')().filter(x => x.pi === 2)[0];
+    A('confirmarPagarParcela')(l2.m.id, 2, 3, 100);
+    t('34h: o dono e o pedaco que ja guarda a marca (mesmo nao sendo o primeiro): a linha aponta pra ele e o pagamento novo vai pro MESMO pedaco (as marcas nao se espalham)',
+      l2.m.id === h3f.id && M().filter(m => m.pgParcelas && m.pgParcelas[2]).length === 1 && h3f.pgParcelas[2] && h3f.pgParcelas[2].v === 100 && M().find(m => m.id === 'h3').pgParcelas === undefined,
+      S34(M().map(m => [m.id, m.pgParcelas])));
+    /* marcarPago (despesa) grava o mesmo "hoje" local */
+    M().push({ id: 'h2', tipo: 'DESPESA', data: '2026-09-20', valor: 10, status: 'apagar', natureza: 'ordinaria', cat: 'Frete', conta: 'X' });
+    A('marcarPago')('h2');
+    t('34h: marcar uma despesa como paga grava a data de hoje LOCAL (22h30 de 21/09 -> 2026-09-21)', M().find(m => m.id === 'h2').dataPagamento === '2026-09-21', M().find(m => m.id === 'h2').dataPagamento);
+  });
+
+  /* ---- 34i: apagar o pedaco que guarda o pagamento NAO apaga o pagamento ---- */
+  await bloco34('i', () => {
+    congela(2026, 9, 21, 10, 0);
+    const soma = () => r34(M().filter(m => m.pgParcelas).reduce((s, m) => s + Object.keys(m.pgParcelas).reduce((a, k) => a + (+(m.pgParcelas[k].v) || 0), 0), 0));
+    /* (1) apagar (venda + pedaco) o pedaco que guarda a marca, sobrando outros pedacos */
+    M().push(compra34('i1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15' }));
+    const va = vendeu34('i1', 1, 'A'), vb = vendeu34('i1', 1, 'B');
+    va.peca.pgParcelas = { 1: { d: '2026-08-15', v: 100, conta: 'X' } };          /* o pedaco A guarda o pagamento (dado antigo ou 2a divisao) */
+    const antes = foto34().pagas, pagoAntes = soma();
+    A('execExcl')(va.venda.id, 'vendaTudo');
+    const sobra = M().filter(m => m.tipo === 'COMPRA');
+    t('34i: apagar (venda + peca) o pedaco que guardava a marca passa a marca pra um pedaco que fica: o total PAGO se conserva (R$ 100) e a parcela 1 segue paga uma vez',
+      !M().some(m => m.id === va.peca.id) && sobra.length === 2 && soma() === pagoAntes && A('contasPagas')().filter(x => x.pagaManual).length === 1 && r34(A('contasPagas')().filter(x => x.pagaManual)[0].valor) === 100,
+      S34([sobra.map(m => [m.id, m.pgParcelas]), soma(), pagoAntes]));
+    /* (2) o pedaco apagado nao guardava marca: nada muda no pagamento */
+    const vb2 = vb;
+    const p0 = soma();
+    A('execExcl')(vb2.venda.id, 'vendaTudo');
+    t('34i: apagar um pedaco que NAO guardava marca nao mexe no pagamento (mesmo total pago, a marca segue na compra)', soma() === p0 && M().filter(m => m.tipo === 'COMPRA').length === 1 && A('contasPagas')().filter(x => x.pagaManual).length === 1, S34([soma(), p0]));
+    /* (3) apagar so o que nao vendeu: os pedacos vendidos viram compras proprias e o pagamento e REPARTIDO por valor entre elas */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('i2', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 100, conta: 'X' } } }));
+    const sa = vendeu34('i2', 1, 'A'), sb = vendeu34('i2', 1, 'B');
+    const p1 = soma();
+    A('execExcl')('i2', 'compraSobra');
+    const vivos = M().filter(m => m.tipo === 'COMPRA');
+    t('34i: apagar so o que nao vendeu (as 2 pecas vendidas viram compras proprias): o pagamento de R$ 100 e repartido por valor entre elas (50 + 50) e o total pago se conserva',
+      vivos.length === 2 && vivos.every(x => !x.loteOrigem && x.pgParcelas && x.pgParcelas[1].v === 50) && soma() === p1 && p1 === 100, S34([vivos.map(m => [m.id, m.loteOrigem, m.pgParcelas]), soma(), p1]));
+    t('34i: cada compra que sobrou fecha sozinha: 2 linhas pagas da parcela 1 (50 cada) e 1 vencida sem marca da parcela 2 de cada uma (33,33)', A('contasPagas')().filter(x => x.pagaManual).length === 2 && A('contasPagas')().filter(x => x.presumida).length === 2, S34(A('contasPagas')().map(x => [x.pi, x.valor, x.pagaManual, x.presumida])));
+    /* (3b) dado antigo: a marca copiada em varios pedacos (G-1); ao repartir o pagamento entre as compras que sobram, a copia velha (valor cheio) nao pode voltar a valer */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('i4', { valor: 600, qtd: 6, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 200, conta: 'X' } } }));
+    const c1 = vendeu34('i4', 2, 'A'), c2 = vendeu34('i4', 1, 'B');
+    const gnt = vendeu34(c1.peca.id, 1, 'A2');                                   /* neto: pedaco de um pedaco vendido */
+    c1.peca.pgParcelas = { 1: { d: '2026-08-15', v: 200, conta: 'X' } }; gnt.peca.pgParcelas = { 1: { d: '2026-08-15', v: 200, conta: 'X' } };   /* copias velhas, valor cheio */
+    const p4 = soma();
+    A('execExcl')('i4', 'compraSobra');
+    const gs4 = A('gruposParcelados')();
+    const sub1 = gs4.find(x => x.membros.some(m => m.id === c1.peca.id)), sub2 = gs4.find(x => x.membros.some(m => m.id === c2.peca.id));
+    t('34i: apagar so o que nao vendeu com COPIAS VELHAS da marca dentro da mesma subfamilia: o pagamento de R$ 200 e repartido por valor (subfamilia do pedaco de 2 un. com o neto = 200 de 300 -> 133,33; a do outro pedaco = 66,67) e a copia de valor cheio nao volta a valer',
+      sub1 && sub2 && sub1.membros.length === 2 && r34(sub1.marcas[1].v) === 133.33 && r34(sub2.marcas[1].v) === 66.67 && r34(sub1.marcas[1].v + sub2.marcas[1].v) === 200, S34(gs4.map(x => [x.chave, x.membros.map(m => m.id), x.marcas])));
+    /* (4) apagar a compra inteira leva o pagamento junto */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('i3', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 100 } } }));
+    vendeu34('i3', 1, 'A');
+    A('execExcl')('i3', 'compraTudo');
+    t('34i: apagar a compra inteira leva tudo, inclusive o pagamento (nada sobra em movs)', M().filter(m => m.tipo === 'COMPRA').length === 0 && soma() === 0, S34(M().length));
+    /* (5) nota: apagar o item que e a cabeca (guarda as marcas) passa as marcas pro proximo item */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('n1', { valor: 100, notaId: 'N1', nParc: 2, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 150, conta: 'X' } } }));
+    M().push(compra34('n2', { valor: 200, notaId: 'N1', nParc: 2, venc1: '2026-08-15' }));
+    M().push({ id: 'vn1', tipo: 'VENDA', data: '2026-09-01', valor: 99, origemId: 'n1', vendaDe: 'estoque', contraparte: 'Cli', qtd: 1, custoOrigem: 100 });
+    M().find(m => m.id === 'n1').vendaRef = 'vn1'; M().find(m => m.id === 'n1').situacao = 'Vendido';
+    A('execExcl')('vn1', 'vendaTudo');
+    t('34i: nota: apagar o item que era a cabeca (e guardava a marca de R$ 150) passa a marca pro item que fica — a nota segue com a parcela 1 paga (150)',
+      !M().some(m => m.id === 'n1') && M().find(m => m.id === 'n2').pgParcelas && M().find(m => m.id === 'n2').pgParcelas[1].v === 150 && A('contasPagas')().filter(x => x.pagaManual).length === 1, S34(M().map(m => [m.id, m.pgParcelas])));
+  });
+
+  /* ---- 34j: M-C — tirar um item da nota leva a parte dele do pagamento; pedacos do mesmo lote que saem da nota se somam ---- */
+  await bloco34('j', () => {
+    congela(2026, 9, 21, 10, 0);
+    const somaV = () => r34(M().filter(m => m.pgParcelas).reduce((s, m) => s + Object.keys(m.pgParcelas).reduce((a, k) => a + (+(m.pgParcelas[k].v) || 0), 0), 0));
+    const nota = () => { reset(); setg('contasBanc', banco34());
+      M().push(compra34('n1', { valor: 100, notaId: 'N1', nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 200, conta: 'X' } } }));
+      M().push(compra34('n2', { valor: 200, notaId: 'N1', nParc: 3, venc1: '2026-08-15' }));
+      M().push(compra34('n3', { valor: 300, notaId: 'N1', nParc: 3, venc1: '2026-08-15' })); };
+    nota();
+    A('separarDaNotaFaz')('n2');
+    const n2 = M().find(m => m.id === 'n2'), n1 = M().find(m => m.id === 'n1'), n3 = M().find(m => m.id === 'n3');
+    t('34j: tirar o item de 200 da nota de 600 (marca de 200 na cabeca) leva 1/3 do pagamento: o item fica com R$ 66,67, a nota com R$ 133,33 e o total pago se conserva (200)',
+      !n2.notaId && n2.pgParcelas[1].v === 66.67 && r34((n1.pgParcelas || {})[1] ? n1.pgParcelas[1].v : (n3.pgParcelas || {})[1].v) === 133.33 && somaV() === 200, S34(M().map(m => [m.id, m.notaId, m.pgParcelas])));
+    t('34j: o item solto e a nota seguem cada um com o proprio cronograma: linha da nota 3x de 133,33... e a do item 3x de 66,67, sem marca de ninguem sumida',
+      A('contasPagas')().filter(x => x.pagaManual).length === 2, S34(A('contasPagas')().map(x => [x.m.id, x.pi, x.valor, x.pagaManual])));
+    /* tirar a CABECA: o resto da nota continua com a sua parte */
+    nota();
+    A('separarDaNotaFaz')('n1');
+    const c1 = M().find(m => m.id === 'n1'), r2 = M().filter(m => m.notaId === 'N1');
+    t('34j: tirar a cabeca da nota (n1, R$ 100 de 600 = 1/6 do pagamento de 200): ela leva 33,33 e o resto da nota fica com 166,67 num item so (o total pago se conserva)',
+      !c1.notaId && c1.pgParcelas[1].v === 33.33 && r2.length === 2 && r2.filter(m => m.pgParcelas).length === 1 && r34(r2.filter(m => m.pgParcelas)[0].pgParcelas[1].v) === 166.67 && somaV() === 200, S34(M().map(m => [m.id, m.notaId, m.pgParcelas])));
+    /* dois pedacos do MESMO lote saem da nota, um de cada vez: as partes se SOMAM na compra deles (nao vale a maior) */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('m1', { valor: 300, qtd: 3, notaId: 'N2', nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 90, conta: 'X' } } }));
+    M().push(compra34('m9', { valor: 300, notaId: 'N2', nParc: 3, venc1: '2026-08-15' }));       /* outro item da nota: 300 */
+    const q1 = A('baixarLote')('m1', 1, 'Coleção', { dataSaida: '2026-09-02' }), q2 = A('baixarLote')('m1', 1, 'Coleção', { dataSaida: '2026-09-03' });
+    A('separarDaNotaFaz')(q1.id); A('separarDaNotaFaz')(q2.id);
+    const alone = M().filter(m => !m.notaId), noteLeft = M().filter(m => m.notaId === 'N2');
+    const parteSolta = alone.reduce((s, m) => s + (m.pgParcelas && m.pgParcelas[1] ? m.pgParcelas[1].v : 0), 0);
+    t('34j: dois pedacos do mesmo lote (100 cada, de uma nota de 600 com marca de 90) saem da nota um de cada vez: a parte deles SOMA em vez de valer so a maior — 15 + 15 = 30 na compra deles, 60 fica na nota',
+      alone.length === 2 && r34(parteSolta) === 30 && r34(noteLeft.filter(m => m.pgParcelas).reduce((s, m) => s + m.pgParcelas[1].v, 0)) === 60 && somaV() === 90
+      && A('gruposParcelados')().find(x => !x.nota && x.chave === 'F:m1').marcas[1].v === 30 && A('gruposParcelados')().find(x => x.nota).marcas[1].v === 60, S34([alone.map(m => [m.id, m.pgParcelas]), noteLeft.map(m => [m.id, m.pgParcelas]), somaV()]));
+    /* juntar em nota: compras DIFERENTES com a mesma parcela marcada somam; pedacos do mesmo lote com a marca duplicada (dado antigo) valem uma vez so */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('ja', { valor: 100, nParc: 2, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 50, conta: 'X' } } }));
+    M().push(compra34('jb', { valor: 200, nParc: 2, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-16', v: 100, conta: 'X' } } }));
+    ctx.prompt = () => '7';
+    A('juntarNotaCore')(['ja', 'jb']);
+    const gn = A('gruposParcelados')().find(x => x.nota);
+    t('34j: juntar em nota duas compras DIFERENTES que ja tinham a parcela 1 marcada (50 e 100) soma o pagamento na nota (150) — o total pago se conserva',
+      gn && gn.membros.length === 2 && gn.marcas[1].v === 150 && somaV() === 150, S34(M().map(m => [m.id, m.notaId, m.pgParcelas])));
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('jc', { valor: 300, qtd: 3, nParc: 2, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 150, conta: 'X' } } }));
+    const jcp = A('baixarLote')('jc', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    jcp.pgParcelas = { 1: { d: '2026-08-15', v: 150, conta: 'X' } };                     /* copia antiga do mesmo pagamento */
+    M().push(compra34('jd', { valor: 100, nParc: 2, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 50, conta: 'X' } } }));   /* tambem marcada: sem isso a parcela 1 dela, vencida, sumia dentro da marca da outra (revisao de 21/09) */
+    const pagoAntes = soma34(A('contasPagas')().filter(x => x.pagaManual));
+    A('juntarNotaCore')(['jc', jcp.id, 'jd']);
+    const gn2 = A('gruposParcelados')().find(x => x.nota);
+    t('34j: juntar em nota pedacos do MESMO lote com a marca duplicada (dado antigo) conta o pagamento UMA vez (150 + os 50 da outra compra = 200, nao 350) e o total pago se conserva',
+      gn2 && gn2.membros.length === 3 && gn2.marcas[1].v === 200 && M().filter(m => m.pgParcelas).length === 1 && pagoAntes === 200 && soma34(A('contasPagas')().filter(x => x.pagaManual)) === 200, S34([pagoAntes, M().map(m => [m.id, m.notaId, m.pgParcelas])]));
+    /* desfazer a nota reparte o pagamento por valor entre os itens */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('da', { valor: 100, notaId: 'ND', nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 100, conta: 'X' } } }));
+    M().push(compra34('db', { valor: 200, notaId: 'ND', nParc: 3, venc1: '2026-08-15' }));
+    A('desfazerNotaFaz')('ND');
+    const gs = A('gruposParcelados')();
+    t('34j: desfazer a nota (100 + 200 com R$ 100 pagos) reparte o pagamento por valor: 33,33 no item de 100 e 66,67 no de 200, e o total pago se conserva; nenhum item fica devendo o que a nota ja pagou',
+      gs.length === 2 && r34(gs.find(x => x.dono.id === 'da').marcas[1].v) === 33.33 && r34(gs.find(x => x.dono.id === 'db').marcas[1].v) === 66.67 && somaV() === 100 && M().every(m => !m.notaId),
+      S34(M().map(m => [m.id, m.notaId, m.pgParcelas])));
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('ea', { valor: 200, qtd: 2, notaId: 'NE', nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 100, conta: 'X' } } }));
+    M().push(compra34('eb', { valor: 100, notaId: 'NE', nParc: 3, venc1: '2026-08-15' }));
+    A('baixarLote')('ea', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    A('desfazerNotaFaz')('NE');
+    const gs2 = A('gruposParcelados')();
+    t('34j: desfazer a nota com um item dividido em 2 pedacos: os pedacos seguem UMA compra so e recebem a parte do lote inteiro (200 de 300 -> 66,67 num pedaco so), o outro item 33,33',
+      gs2.length === 2 && r34(gs2.find(x => x.membros.length === 2).marcas[1].v) === 66.67 && r34(gs2.find(x => x.membros.length === 1).marcas[1].v) === 33.33 && somaV() === 100 && M().filter(m => m.pgParcelas).length === 2,
+      S34(M().map(m => [m.id, m.loteOrigem, m.pgParcelas])));
+  });
+
+  /* ---- 34k: M-A — abertura e troca dentro do cronograma nao contam ---- */
+  await bloco34('k', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('k1', { valor: 300, notaId: 'NA', nParc: 3, venc1: '2026-08-15' }));
+    M().push(compra34('k2', { valor: 50, notaId: 'NA', nParc: 3, venc1: '2026-08-15', origem: 'ABERTURA', loteOrigem: 'k1' }));
+    M().push(compra34('k3', { valor: 80, origem: 'TROCA', nParc: 2, venc1: '2026-08-15', data: '2026-08-01' }));
+    const sd = A('serieDinheiro')();
+    t('34k: a abertura dentro da nota (50) e a troca marcada como parcelada (80) nao entram no cronograma: a nota e 300 (parcela 100), as listas so tem a nota e a curva soma so as vencidas dela',
+      A('aPagar')(true).length === 2 && A('aPagar')().length === 1 && A('aPagar')().concat(A('aPagar')(true)).every(x => r34(x.valor) === 100) && A('contasPagas')().filter(x => x.pi).length === 2
+      && S34(sd) === S34([{ data: '2026-08-15', total: -100 }, { data: '2026-09-15', total: -200 }]) && sf34(g('contasBanc')[0]) === 800, S34([A('aPagar')(true).length, A('aPagar')().length, sd, sf34(g('contasBanc')[0])]));
+  });
+
+  /* ---- 34l: o plano de pagamento editado num pedaco vale pra compra inteira ---- */
+  await bloco34('l', () => {
+    congela(2026, 9, 21, 10, 0);
+    const avisos = [], perguntas = [];
+    ctx.alert = m => { avisos.push(String(m)); };
+    ctx.confirm = m => { perguntas.push(String(m)); return true; };
+    const editar = (id, campos) => {
+      const rec = M().find(m => m.id === id);
+      setg('editId', id); setg('tipoSel', 'COMPRA'); setg('tela', 'lancar'); setg('pgTipo', 'Parcelado'); setg('_fotosPend', []);
+      setg('_db', null); setg('_syncReady', false); setg('_restaurando', false); setg('_baseH', {});
+      Object.keys(campos34).forEach(k => delete campos34[k]);
+      Object.assign(campos34, { f_val: String(rec.valor), f_data: rec.data, f_jogo: 'Pokémon', f_cat: 'ETB', f_col: '151', f_idi: '—', f_qtd: String(rec.qtd), f_cp: 'Loja',
+        f_sit: 'Em estoque', f_nparc: String(rec.nParc), f_venc1: rec.venc1, f_conta: rec.conta, f_taxa: '0', f_pg: 'Parcelado' }, campos || {});
+      ctx.document.getElementById = elCampo34;
+      avisos.length = 0; perguntas.length = 0;
+      A('salvar')();
+    };
+    M().push(compra34('l1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15' }));
+    const ped = A('baixarLote')('l1', 1, 'Coleção', { dataSaida: '2026-09-02' });      /* o pedaco (nao e o dono da compra) */
+    editar(ped.id, { f_nparc: '6' });
+    t('34l: mudar o nº de parcelas no PEDACO (3 -> 6) vale pra compra inteira: os dois registros ficam em 6x e a lista tem 6 parcelas de 50 (nao 3)',
+      M().filter(m => m.tipo === 'COMPRA').every(m => m.nParc === 6) && A('aPagar')(true).length + A('aPagar')().length === 6 && A('aPagar')().concat(A('aPagar')(true)).every(x => r34(x.valor) === 50),
+      S34([M().map(m => [m.id, m.nParc]), A('aPagar')().length, A('aPagar')(true).length]));
+    editar(ped.id, { f_venc1: '2026-09-25' });
+    t('34l: mudar o 1o vencimento no pedaco tambem vale pra compra inteira (as 6 parcelas passam a vencer a partir de 25/09: nenhuma vencida sem marca)',
+      M().filter(m => m.tipo === 'COMPRA').every(m => m.venc1 === '2026-09-25') && A('aPagar')(true).length === 0 && A('aPagar')().length === 6, S34([M().map(m => [m.id, m.venc1]), A('aPagar')(true).length]));
+    editar(ped.id, { f_conta: 'Y' });
+    t('34l: mudar a conta no pedaco vale pra compra inteira; editar so a observacao NAO mexe no plano dos outros pedacos', M().filter(m => m.tipo === 'COMPRA').every(m => m.conta === 'Y'), S34(M().map(m => [m.id, m.conta])));
+    /* a pergunta ao REDUZIR o parcelamento olha o pagamento da compra (que mora no dono), mesmo editando um pedaco que nao o guarda */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('l2', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 100 }, 2: { d: '2026-09-15', v: 100 }, 3: { d: '2026-09-16', v: 100 } } }));
+    const ped2 = A('baixarLote')('l2', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    editar(ped2.id, { f_nparc: '2' });
+    t('34l: reduzir de 3x pra 2x editando o PEDACO (que nao guarda a marca) pergunta antes, porque a parcela 3 da compra ja esta paga',
+      perguntas.length === 2 && /a parcela 3 já está marcada como paga/.test(perguntas[0]) && /o plano de pagamento é um só/.test(perguntas[1]) && /o número de parcelas/.test(perguntas[1]) && M().filter(m => m.tipo === 'COMPRA').every(m => m.nParc === 2), S34([perguntas, M().map(m => [m.id, m.nParc])]));
+    /* editar sem mexer no plano nao propaga: o dono tem plano diferente e a edicao de outro campo do pedaco nao o sobrescreve */
+    reset(); setg('contasBanc', banco34());
+    M().push(compra34('l1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15' }));
+    A('baixarLote')('l1', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    const pedN = M().find(m => m.loteOrigem === 'l1');
+    M().find(m => m.id === 'l1').nParc = 4;
+    editar(pedN.id, { f_obs: 'so a observacao', f_nparc: String(M().find(m => m.id === pedN.id).nParc) });
+    t('34l: editar so a observacao do pedaco nao propaga o plano dele (o dono continua em 4x)', M().find(m => m.id === 'l1').nParc === 4, S34(M().map(m => [m.id, m.nParc])));
+    /* [revisao de 21/09/2026, disco M5] mudar o plano de UM pedaco mexe nos outros: pergunta antes, e o Cancelar deixa tudo como estava */
+    reset(); setg('contasBanc', banco34(['X', 'Y']));
+    M().push(compra34('l3', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15' }));
+    const ped3 = A('baixarLote')('l3', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    ctx.confirm = m => { perguntas.push(String(m)); return false; };
+    editar(ped3.id, { f_conta: 'Y' });
+    t('34l: mudar a CONTA num pedaco pergunta antes (a compra inteira muda de conta, no saldo e no extrato) e o Cancelar nao muda nada',
+      perguntas.length === 1 && /a conta/.test(perguntas[0]) && /de uma conta para a outra/.test(perguntas[0]) && /inclusive nos que já foram vendidos/.test(perguntas[0]) && M().filter(m => m.tipo === 'COMPRA').every(m => m.conta === 'X'), S34([perguntas, M().map(m => [m.id, m.conta])]));
+    ctx.confirm = m => { perguntas.push(String(m)); return true; };
+    editar(ped3.id, { f_conta: 'Y', f_nparc: '6' });
+    t('34l: mudar conta E parcelas juntas e UMA pergunta so, que diz as duas coisas; o OK muda a compra inteira',
+      perguntas.length === 1 && /o número de parcelas e a conta/.test(perguntas[0]) && M().filter(m => m.tipo === 'COMPRA').every(m => m.conta === 'Y' && m.nParc === 6), S34([perguntas, M().map(m => [m.id, m.conta, m.nParc])]));
+    /* os outros pedacos JA tem o valor novo: a edicao nao mexe em ninguem, entao nao pergunta */
+    reset(); setg('contasBanc', banco34(['X', 'Y']));
+    M().push(compra34('l5', { valor: 200, qtd: 2, nParc: 6, venc1: '2026-08-15' }));
+    M().push(compra34('l6', { valor: 100, qtd: 1, nParc: 3, venc1: '2026-08-15', loteOrigem: 'l5' }));
+    editar('l6', { f_nparc: '6' });
+    t('34l: se os outros pedacos JA estao no valor novo (o dono ja e 6×) a edicao nao mexe em ninguem e nao pergunta', perguntas.length === 0 && M().every(m => m.nParc === 6), S34([perguntas, M().map(m => [m.id, m.nParc])]));
+    /* compra sem pedacos e edicao que nao mexe nos outros nao perguntam */
+    reset(); setg('contasBanc', banco34(['X', 'Y']));
+    M().push(compra34('l4', { valor: 300, qtd: 1, nParc: 3, venc1: '2026-08-15' }));
+    editar('l4', { f_conta: 'Y', f_nparc: '6' });
+    t('34l: compra sem pedacos muda o plano sem perguntar nada', perguntas.length === 0 && M()[0].conta === 'Y' && M()[0].nParc === 6, S34([perguntas, M().map(m => [m.id, m.conta, m.nParc])]));
+  });
+
+  /* ---- 34m: UM relogio so: 10h, 20h59, 21h01 e 22h30 de Sao Paulo dao o mesmo "hoje" em todas as telas de dinheiro ---- */
+  await bloco34('m', () => {
+    const inst = [[10, 0], [20, 59], [21, 1], [22, 30]];
+    inst.forEach(([h, mi]) => {
+      const rot = ('0' + h).slice(-2) + 'h' + ('0' + mi).slice(-2);
+      congela(2026, 9, 21, h, mi);
+      reset(); setg('contasBanc', banco34());
+      M().push({ id: 'dH', tipo: 'DESPESA', data: '2026-09-21', valor: 40, status: 'apagar', natureza: 'ordinaria', cat: 'Luz', conta: 'X' });      /* hoje */
+      M().push({ id: 'dA', tipo: 'DESPESA', data: '2026-09-22', valor: 15, status: 'apagar', natureza: 'ordinaria', cat: 'Agua', conta: 'X' });     /* amanha */
+      M().push(compra34('mP', { valor: 100, nParc: 2, venc1: '2026-09-21', data: '2026-09-01' }));                                                      /* 1a vence hoje */
+      const cb = g('contasBanc')[0], pj = A('projecaoCaixa')();
+      t('34m: ' + rot + ' — hoje e 21/09 em todo lugar: a despesa de HOJE ja esta no saldo e no por emissao (960), a de amanha nao (960), a parcela que vence hoje ainda e a pagar',
+        A('hojeISO')() === '2026-09-21' && sf34(cb) === 960 && r34(A('saldoConta')(cb)) === 960 - 100 && A('aPagar')().filter(x => x.pi).length === 2 && A('aPagar')(true).length === 0, S34([A('hojeISO')(), sf34(cb), A('saldoConta')(cb)]));
+      const ext = A('extratoRows')();
+      t('34m: ' + rot + ' — o extrato de caixa (por emissao) traz a despesa de hoje e a compra, e nunca a despesa de amanha',
+        ext.length === 2 && ext.every(r => r.id !== 'dA') && ext.some(r => r.id === 'dH'), S34(ext.map(r => [r.id, r.v])));
+      t('34m: ' + rot + ' — a projecao nao conta a despesa de hoje duas vezes: parte de 960 (o saldo) e so a de amanha (15) e as 2 parcelas (100) entram: +30 dias = 960 - 15 - 100 = 845',
+        pj.atual === 960 && pj.d30 === 845, S34(pj));
+    });
+    /* quem GRAVA "hoje": a data gravada e a de Sao Paulo, mesmo depois das 21h */
+    congela(2026, 9, 21, 22, 30);
+    reset(); setg('contasBanc', banco34());
+    M().push({ id: 'dZ', tipo: 'DESPESA', data: '2026-09-21', valor: 10, status: 'apagar', natureza: 'ordinaria', cat: 'Luz', conta: 'X' });
+    A('marcarPago')('dZ');
+    t('34m: as 22h30 marcar despesa como paga grava 2026-09-21 (o "hoje" de Sao Paulo), nao 2026-09-22 (o do UTC)', M()[0].dataPagamento === '2026-09-21' && A('hojeISO')() === '2026-09-21', M()[0].dataPagamento);
+  });
+
+  /* ---- 34n: R2 — a projecao parte do saldo fisico e so soma o que ainda vai acontecer, com escopo ---- */
+  await bloco34('n', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X']));                                   /* so X esta no cadastro */
+    M().push(compra34('n1', { valor: 300, nParc: 3, venc1: '2026-10-05', conta: 'X', data: '2026-09-10' }));                        /* 3 parcelas a vencer em X: 05/10, 05/11, 05/12 */
+    M().push(compra34('n2', { valor: 200, nParc: 2, venc1: '2026-10-06', conta: 'Z', data: '2026-09-10' }));                        /* 2 a vencer em Z (fora do cadastro) */
+    M().push({ id: 'vX', tipo: 'VENDA', data: '2026-09-15', valor: 100, taxa: 10, canal: 'App', recDias: 14, conta: 'X', contraparte: 'Cli', qtd: 1 });       /* repasse 29/09: +90 em X */
+    M().push({ id: 'vS', tipo: 'VENDA', data: '2026-09-15', valor: 50, taxa: 0, canal: 'App', recDias: 14, conta: '', contraparte: 'Cli', qtd: 1 });           /* sem conta: fora */
+    M().push({ id: 'dF', tipo: 'DESPESA', data: '2026-10-10', valor: 30, status: 'apagar', natureza: 'ordinaria', cat: 'Luz', conta: 'X' });        /* futura em X */
+    M().push({ id: 'dH', tipo: 'DESPESA', data: '2026-09-20', valor: 20, status: 'apagar', natureza: 'ordinaria', cat: 'Agua', conta: 'X' });       /* a pagar com data ja passada em X: ja esta no saldo */
+    M().push({ id: 'dZ', tipo: 'DESPESA', data: '2026-09-20', valor: 25, status: 'apagar', natureza: 'ordinaria', cat: 'Gas', conta: 'Z' });        /* idem, mas em Z (fora do cadastro) */
+    const cb = g('contasBanc')[0], pj = A('projecaoCaixa')();
+    t('34n: a projecao parte do saldo FISICO da conta cadastrada (1000 - 20 da despesa de X com data passada = 980) e "hoje" e o mesmo numero do card Saldo por conta',
+      pj.atual === 980 && pj.atual === totSf34() && sf34(cb) === 980, S34([pj.atual, totSf34(), sf34(cb)]));
+    /* +30 dias (21/10): entra +90 (X, 29/09); saem 100 (parcela 05/10 de X) e 30 (despesa 10/10 de X) */
+    t('34n: +30 dias so soma o que e de conta cadastrada: +90 da venda de X, -100 da parcela de X, -30 da despesa futura de X = 940 (a despesa de X com data passada NAO sai de novo)',
+      pj.d30 === 940, S34(pj));
+    t('34n: +90 dias (20/12): mais as parcelas de 05/11 e 05/12 de X (-200): 740', pj.d90 === 740, S34(pj));
+    t('34n: o que e de conta fora do cadastro ou sem conta vai pra linha "fora das contas", nao pros numeros: entra 50 (venda sem conta), sai 200 (2 parcelas de Z) + 25 (despesa de Z ja vencida) = 225',
+      pj.fora.entra === 50 && pj.fora.sai === 225 && pj.fora.n === 4, S34(pj.fora));
+    const html = telaContas34();
+    t('34n: a tela mostra a linha "Fora das contas cadastradas ... entra R$ 50,00 · sai R$ 225,00"', html.indexOf('Fora das contas cadastradas') >= 0 && html.indexOf('entra ' + fmt34(50)) >= 0 && html.indexOf('sai ' + fmt34(225)) >= 0, '');
+    /* sem NENHUMA conta cadastrada: tudo entra e a projecao parte de zero, avisando */
+    setg('contasBanc', []);
+    const p0 = A('projecaoCaixa')();
+    t('34n: sem nenhuma conta cadastrada todos os fluxos entram e a projecao parte de R$ 0,00 (temContas falso, nada em "fora")', p0.atual === 0 && p0.temContas === false && p0.fora.n === 0 && p0.d30 < 0, S34(p0));
+    /* I9: nada some — o que esta a pagar (parcelas + despesas) e a receber e a soma do que esta dentro + fora dos numeros */
+    setg('contasBanc', banco34(['X']));
+    const ap = A('aPagar')(), ar = A('aReceber')(), pj2 = A('projecaoCaixa')();
+    const dentroPag = r34(ap.filter(x => (x.m.conta || '') === 'X' && !(x.m.tipo === 'DESPESA' && x.m.data <= '2026-09-21')).reduce((s, x) => s + x.valor, 0));
+    t('34n: conservacao: tudo o que esta em A pagar e A receber aparece na projecao (dentro) ou na linha fora — a projecao +90 = saldo - a pagar de X + a receber de X',
+      pj2.d90 === r34(980 - dentroPag + r34(ar.filter(x => (x.m.conta || '') === 'X').reduce((s, x) => s + x.valor, 0))), S34([pj2.d90, dentroPag]));
+  });
+
+  /* ---- 34o: Diagnostico do pagamento fora do plano, por COMPRA (e nao por pedaco) ---- */
+  await bloco34('o', () => {
+    congela(2026, 9, 21, 10, 0);
+    M().push(compra34('o1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 100 }, 2: { d: '2026-09-15', v: 100 }, 3: { d: '2026-09-16', v: 100 }, 4: { d: '2026-09-17', v: 100 } } }));
+    A('baixarLote')('o1', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    A('baixarLote')('o1', 1, 'Coleção', { dataSaida: '2026-09-03' });
+    const a = A('provaReal')().A.filter(x => /^Parcela paga a mais do que o plano/.test(x.titulo));
+    t('34o: compra dividida em 3 pedacos com uma parcela alem do plano gera UM achado (nao um por pedaco), e o botao abre o formulario de edicao do dono',
+      a.length === 1 && /fecharModal\(\);abrir\('o1'\)/.test(a[0].acao || a[0].onclick || JSON.stringify(a[0])), S34(a));
+    t('34o: o texto nao manda mais "tocar em editar" (o botao ja abre a edicao) e ainda diz onde a parcela esta contada', !/tocar em/.test(a[0].detalhe) && /já está contada \(Fluxo de caixa › pagas, saldos e gráfico de dinheiro\)/.test(a[0].detalhe), a[0].detalhe);
+  });
+
+  /* ---- 34p: conta com nome repetido; valor gravado que o select nao conhece; dica dos pagamentos que o periodo esconde; papel e Painel ---- */
+  await bloco34('p', () => {
+    congela(2026, 9, 21, 10, 0);
+    const avisos = [];
+    ctx.alert = m => { avisos.push(String(m)); };
+    ctx.document.getElementById = elCampo34;
+    setg('contasBanc', []); setg('pgs', ['Pix']);
+    const grava = (idConta, nome) => { Object.keys(campos34).forEach(k => delete campos34[k]); Object.assign(campos34, { cb_nome: nome, cb_saldoIni: '0', cb_saldoData: '' }); avisos.length = 0; A('salvarConta')(idConta); };
+    grava(null, 'Nubank');
+    t('34p: criar a conta "Nubank" funciona', g('contasBanc').length === 1 && g('contasBanc')[0].nome === 'Nubank', S34(g('contasBanc')));
+    grava(null, '  nubank ');
+    t('34p: criar outra com o mesmo nome (sem diferenciar maiuscula nem espacos) e barrado, com o aviso, e nada e salvo', g('contasBanc').length === 1 && avisos.length === 1 && /Já existe uma conta chamada/.test(avisos[0]), S34([g('contasBanc').length, avisos]));
+    grava(null, 'Inter');
+    const idInter = g('contasBanc').find(c => c.nome === 'Inter').id;
+    grava(idInter, 'NUBANK');
+    t('34p: renomear uma conta pra um nome que ja existe tambem e barrado (e a conta segue com o nome de antes)', g('contasBanc').find(c => c.id === idInter).nome === 'Inter' && avisos.length === 1, S34([g('contasBanc').map(c => c.nome), avisos]));
+    grava(idInter, 'Inter');
+    t('34p: editar a conta sem trocar o nome nao acusa nada (so barra ao criar ou renomear)', avisos.length === 0 && g('contasBanc').length === 2, S34(avisos));
+    /* dado antigo com nome repetido segue editavel sem trocar o nome */
+    setg('contasBanc', [{ id: 'c1', nome: 'Dup', saldoIni: 0, saldoData: '' }, { id: 'c2', nome: 'dup', saldoIni: 0, saldoData: '' }]);
+    grava('c2', 'dup');
+    t('34p: conta antiga com nome repetido pode ser editada sem trocar o nome (nao trava o cadastro)', avisos.length === 0, S34(avisos));
+    /* o select do formulario de edicao guarda o valor gravado que a lista nao tem */
+    const so = A('selOpts');
+    t('34p: o select de edicao mantem SELECIONADO o valor gravado que nao esta na lista (conta fora de "formas de pagamento"): salvar nao zera; valor da lista e valor vazio ficam como sempre',
+      so(['Pix', 'Cartão'], 'Nubank').indexOf('<option selected>Nubank</option>') >= 0 && so(['Pix'], 'Pix').indexOf('<option selected>Pix</option>') >= 0 && so(['Pix'], 'Pix').split('selected').length === 2
+      && so(['Pix'], '').indexOf('selected') < 0 && so(['Pix'], undefined).indexOf('selected') < 0, so(['Pix', 'Cartão'], 'Nubank'));
+  });
+
+  await bloco34('q', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34());
+    setg('perSel', 'd30'); setg('perDe', '2026-08-22'); setg('perAte', '');
+    M().push(compra34('q1', { valor: 300, nParc: 3, venc1: '2026-06-10', pgParcelas: { 1: { d: '2026-06-10', v: 100 }, 2: { d: '2026-09-15', v: 100 }, 3: { d: '2026-07-10', v: 100 } } }));
+    const html = telaContas34();
+    t('34q: quando o periodo escondeu pagamentos marcados como pagos (2 de junho e julho), a lista de Pagas diz "2 pagamentos marcados como pagos fora do periodo escolhido — toque pra ver tudo"',
+      html.indexOf('2 pagamentos marcados como pagos fora do período escolhido — toque pra ver tudo') >= 0 && html.indexOf("setPer('tudo')") >= 0, (html.match(/pagamento[^<]{0,90}/) || [''])[0]);
+    setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', '');
+    t('34q: com o periodo em tudo a dica some', telaContas34().indexOf('fora do período escolhido') < 0, '');
+    /* Painel e papel: o saldo por emissao vem rotulado; o papel imprime o FISICO com o por emissao ao lado */
+    M().push(compra34('q2', { valor: 200, nParc: 2, venc1: '2026-10-10', data: '2026-09-10' }));       /* a vencer: sai da conta "por emissao" hoje, do fisico so no vencimento */
+    let tabela = '';
+    const geb0 = ctx.document.getElementById, ins0 = ctx.document.body.insertAdjacentHTML;
+    ctx.document.getElementById = idc => ({ checked: idc === 'ps_saldo', value: '', style: {}, classList: { add() {}, remove() {}, toggle() {} }, remove() {}, dataset: {} });
+    ctx.document.body.insertAdjacentHTML = (pos, h) => { tabela += h; };
+    setg('imprimir', () => {});
+    A('imprimirFluxoGo')();
+    ctx.document.getElementById = geb0; ctx.document.body.insertAdjacentHTML = ins0;
+    const cb = g('contasBanc')[0];
+    t('34q: o papel do Fluxo imprime o saldo FISICO da conta (' + fmt34(sf34(cb)) + ') e, como difere, o "por emissao" (' + fmt34(A('saldoConta')(cb)) + ') ao lado; o Caixa projetado diz que e o saldo fisico',
+      sf34(cb) === 700 && r34(A('saldoConta')(cb)) === 500 && tabela.indexOf('por emissão ' + fmt34(500)) >= 0 && tabela.indexOf('>' + fmt34(700) + '<') >= 0 && tabela.indexOf('Caixa projetado hoje (= saldo físico das contas)') >= 0, tabela.slice(150, 700));
+  });
+  /* ===== 36. REVISAO DE 21/09/2026 (tres faces: substancia, numero e limite) — o que a secao 35 nao exercitava =====
+     As tres faces (confere-no-disco, confere-o-numero, confere-o-limite) atacaram a entrega de 19-21/09 e acharam o que o oraculo da secao 35 nao
+     enxerga (ele so divide, recarrega, paga e desmarca): marca gravada por pedaco pelo app antigo, restaurar da Lixeira, juntar compras de plano
+     diferente, parcela fracionada, dono do grupo que muda com a ordem da lista, `__proto__` no JSON, despesa com data de pagamento, valor de
+     marca em texto. Cada bloco abaixo prova UM achado no caminho do usuario (a mesma funcao que a tela chama) e tem a mutacao correspondente
+     no vacina (checks-suite.py, prefixo `rev7-`). */
+  console.log('');
+  console.log('=== 36. revisao de 21/09: uniao das marcas, restaurar da lixeira, juntar com plano diferente, fracao de parcela, dono estavel, __proto__ ===');
+  const FUNCS36 = ['melhorMarca', 'juntaMudaODinheiro', 'resolveJunta', 'aplicaJunta', 'retratoJunta', 'textoJuntaBarrada', 'juntaOk', 'juntarNotaCore', 'desfazerNotaFaz', 'separarDaNotaFaz', 'valorOfertaParcela', 'parcelaTxt', 'pagarParcela',
+    'confirmarPagarParcela', 'pgValor', 'verFicha', 'graficoLinhaEstoque', 'lixeiraGuarda', 'okCtG', 'dataDeISO', 'vConsultar', 'copiaMarcas', 'difsRetrato', 'causasJunta', 'idsComLote', 'juntarFx', 'juntarNota', 'abrirProvaReal', 'parcelasAlemDoPlano'];
+  const faltam36 = FUNCS36.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('36a: [pre-requisito] o app carregado tem as ' + FUNCS36.length + ' funcoes desta secao', faltam36.length === 0, 'FALTAM no app: ' + faltam36.join(', '));
+  const bloco36 = (rot, corpo) => faltam36.length ? Promise.resolve() : bloco34(rot, corpo, '36');
+  const n36 = s => String(s).replace(/ /g, ' ');
+  /* o retrato do dinheiro: o que uma operacao de estrutura (dividir, juntar, separar, desfazer) nunca pode mexer */
+  const dinheiro36 = () => { const f = foto34(); return { saldos: f.saldos, emissao: f.emissao, curva: f.curva, pagas: f.pagas, aPagar: f.aPagar, venc: f.venc, proj: f.proj }; };
+  const semVenc36 = o => ({ saldos: o.saldos, curva: o.curva, pagas: o.pagas, aPagar: o.aPagar });   /* "vencidas sem marca" muda por definicao quando a parcela passa a ter marca */
+  const diag36 = re => A('provaReal')().A.filter(x => re.test(x.titulo));
+  const modal36 = fn => { let html = ''; const geb = ctx.document.getElementById, ins = ctx.document.body.insertAdjacentHTML;
+    ctx.document.body.insertAdjacentHTML = (pos, h) => { html += h; }; ctx.document.getElementById = idc => elCampo34(idc);
+    try { fn(); } finally { ctx.document.getElementById = geb; ctx.document.body.insertAdjacentHTML = ins; } return n36(html); };
+
+  /* ---- 36b: a mesma parcela marcada em dois pedacos (o app ANTIGO marcava pedaco por pedaco): valores diferentes nao somem calados ---- */
+  await bloco36('b', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34());
+    M().push(compra34('r1', { valor: 200, qtd: 2, nParc: 3, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 66.67, conta: 'X' } } }));
+    M().push(compra34('r2', { valor: 100, qtd: 1, nParc: 3, venc1: '2026-08-15', loteOrigem: 'r1', situacao: 'Vendido', pgParcelas: { 1: { d: '2026-08-15', v: 33.33, conta: 'X' } } }));
+    const gr = A('gruposParcelados')(), aviso = diag36(/marcada como paga mais de uma vez/);
+    t('36b: a MESMA parcela marcada em dois pedacos com valores diferentes conta a maior (66,67) e o Diagnostico avisa, com os dois valores e a soma (100,00)',
+      gr.length === 1 && r34(gr[0].marcas[1].v) === 66.67 && aviso.length === 1 && /33,33/.test(n36(aviso[0].detalhe)) && /66,67/.test(n36(aviso[0].detalhe)) && /100,00/.test(n36(aviso[0].detalhe)),
+      S34([gr.length, gr[0] && gr[0].marcas, aviso]));
+    /* [rodada 6] pela TELA: o Diagnóstico aberto de verdade (antes só o dado era lido, e a tela nunca teve guarda) */
+    const htmlP = modal36(() => A('abrirProvaReal')());
+    t('36b: pela TELA (o Diagnóstico aberto de verdade, não só o dado): o aviso da marca duplicada chega ao modal com os dois valores, o que o app conta, a soma e o botão de abrir o lançamento',
+      /marcada como paga mais de uma vez, com valores diferentes/.test(htmlP) && /33,33/.test(htmlP) && /66,67/.test(htmlP) && /O app conta só a maior/.test(htmlP) && /Se elas eram partes do MESMO pagamento/.test(htmlP) && /abrir o lançamento/.test(htmlP), htmlP.slice(0, 500));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { d: '2026-08-15', v: 66.67, conta: 'X' } };
+    t('36b: marcas IGUAIS da mesma parcela (o mesmo pagamento duplicado pelo fracionamento antigo) contam UMA vez e nao geram aviso',
+      diag36(/marcada como paga mais de uma vez/).length === 0 && soma34(A('contasPagas')().filter(x => x.pagaManual)) === 66.67, S34([diag36(/mais de uma vez/), soma34(A('contasPagas')().filter(x => x.pagaManual))]));
+    /* [revisao de 21/09] o desempate deixou de ser "a do 1º pedaco" (mudava conta e data de um pagamento so por atualizar): qualquer diferenca entre as marcas e aviso */
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { d: '2026-08-15', v: 66.66, conta: 'X' } };
+    t('36b: 1 CENTAVO de diferenca entre as duas marcas (66,67 e 66,66) ja e aviso "valores diferentes" (a tolerancia e meio centavo, nao 50)', diag36(/marcada como paga mais de uma vez, com valores diferentes/).length === 1, S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { d: '2026-08-15', v: 66.67, conta: 'Z' } };
+    const avC = diag36(/marcada como paga mais de uma vez, com contas diferentes/);
+    t('36b: mesmo valor mas CONTAS diferentes (X e Z): aviso "contas diferentes" que diz qual o app conta (a conta "X", a primeira em ordem) e nao inventa aviso de valor',
+      avC.length === 1 && /"X"/.test(n36(avC[0].detalhe)) && /contas diferentes \(X e Z\)/.test(n36(avC[0].detalhe)) && diag36(/valores diferentes/).length === 0, S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { d: '2026-08-10', v: 66.67, conta: 'X' } };
+    const avD = diag36(/marcada como paga mais de uma vez, com datas diferentes/);
+    t('36b: mesmo valor e conta mas DATAS diferentes (15/08 e 10/08): aviso "datas diferentes" e o app conta a mais antiga (10/08)',
+      avD.length === 1 && /em 10\/08\/2026/.test(n36(avD[0].detalhe)) && /datas diferentes \(15\/08\/2026 e 10\/08\/2026\)/.test(n36(avD[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { d: '2026-08-10', v: 66.67, conta: 'Z' } };
+    t('36b: conta E data diferentes: um aviso so, que diz as duas coisas', diag36(/com contas e datas diferentes/).length === 1, S34(diag36(/mais de uma vez/)));
+    /* [rodada 3] o aviso compara a data que o DINHEIRO usa (sem data legivel = o vencimento), nao a crua: marca sem data, marca legada em texto e texto solto nao geram aviso falso */
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { v: 66.67, conta: 'X' } };
+    t('36b: marca SEM data (o dinheiro a conta no vencimento, 15/08) e marca com d = 15/08 sao o mesmo pagamento: nenhum aviso de datas', diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: '2026-08-15' };
+    t('36b: marca no formato antigo (so a data, em texto) igual a data da outra: nenhum aviso', diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: '100' };
+    t('36b: texto solto no lugar da marca ("100") nao vira "data" no aviso (o dinheiro o le como o vencimento): nenhum aviso e nenhum "100" impresso', diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r2').pgParcelas = { 1: { v: 66.67, conta: 'X', d: '2026-08-16' } };
+    const avD2 = diag36(/com datas diferentes/);
+    t('36b: e data DE VERDADE diferente (15/08 e 16/08) continua avisando', avD2.length === 1 && /datas diferentes \(15\/08\/2026 e 16\/08\/2026\)/.test(n36(avD2[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    /* [rodada 4] parcela ALEM do plano: o dinheiro so conta marca com data ISO valida e nunca inventa vencimento — o aviso tambem nao */
+    const alem = (m1, m2) => { M().find(m => m.id === 'r1').pgParcelas = { 4: m1 }; M().find(m => m.id === 'r2').pgParcelas = { 4: m2 }; };
+    alem({ d: '2026-11-15', v: 100, conta: 'X' }, { v: 100, conta: 'X' });
+    t('36b: parcela 4 (alem do plano de 3×): marca datada + marca SEM data: silencio — o dinheiro só conta a datada e o aviso não inventa o vencimento (15/11) pra sem-data', diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+    alem({ d: '2026-08-10', v: 100, conta: 'X' }, { d: '2026-11-15', v: 100, conta: 'X' });
+    const avA = diag36(/marcada como paga mais de uma vez, com datas diferentes/);
+    t('36b: parcela 4 com DUAS datas válidas diferentes: avisa com as datas que existem (10/08 e 15/11) e diz a que o app conta (10/08)', avA.length === 1 && /datas diferentes \(10\/08\/2026 e 15\/11\/2026\)/.test(n36(avA[0].detalhe)) && /em 10\/08\/2026/.test(n36(avA[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    alem({ d: 'lixo', v: 100, conta: 'X' }, { d: '2026-02-30', v: 100, conta: 'X' });
+    t('36b: parcela 4 com datas inválidas nas duas: silêncio (o dinheiro não conta nenhuma; o item 9 do Diagnóstico é quem fala dela)', diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+    /* [rodada 5] o aviso de VALOR não some além do plano só porque uma marca está sem data (o revisor: 100 e 100 datadas + 500 sem data calavam) e o texto só promete o que o dinheiro faz */
+    alem({ d: '2026-11-15', v: 100, conta: 'X' }, { v: 500, conta: 'X' });
+    const avV = diag36(/marcada como paga mais de uma vez, com valores diferentes/);
+    t('36b: parcela 4 (além do plano): uma marca datada de R$ 100 e outra SEM data de R$ 500 — o aviso de VALORES DIFERENTES aparece e diz que o app não conta nenhuma delas (a de maior valor não tem data legível)',
+      avV.length === 1 && /R\$ 100,00 e R\$ 500,00/.test(n36(avV[0].detalhe)) && /O app não conta nenhuma delas/.test(n36(avV[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    t('36b: e além do plano o texto NÃO promete "no vencimento" (a parcela nem existe no plano): manda acertar o nº de parcelas da compra',
+      !/no vencimento/.test(n36(avV[0] ? avV[0].detalhe : '')) && /acerte o nº de parcelas da compra/.test(n36(avV[0] ? avV[0].detalhe : '')), S34(diag36(/mais de uma vez/)));
+    alem({ d: '2026-11-15', v: 100, conta: 'X' }, { d: '2026-11-20', v: 300, conta: 'X' });
+    const avV2 = diag36(/marcada como paga mais de uma vez, com valores diferentes/);
+    t('36b: parcela 4 com DUAS marcas datadas de valores diferentes (R$ 100 e R$ 300): avisa e diz que o app conta a maior (R$ 300,00)',
+      avV2.length === 1 && /O app conta só a maior \(R\$ 300,00\)/.test(n36(avV2[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    alem({ d: '2026-12-01', v: 100, conta: 'X' }, { v: 100, conta: 'X' });
+    t('36b: parcela 4: marca datada (01/12) + marca SEM data, mesmo valor e mesma conta: silêncio — a sem-data não ganha um "vencimento" inventado (15/11) que a faria parecer outra data',
+      diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+    /* [rodada 6] o aviso usa a MESMA regra do dinheiro (parcelasAlemDoPlano), não uma reescrita: o revisor achou o Diagnóstico se contradizendo em dois itens vizinhos (ano fora de 1900–2200) */
+    alem({ d: '3000-01-01', v: 500, conta: 'X' }, { d: '3000-02-01', v: 100, conta: 'X' });
+    const g3000 = A('gruposParcelados')()[0], avY = diag36(/marcada como paga mais de uma vez, com valores diferentes/);
+    t('36b: parcela 4 (além do plano) com data de ANO 3000 — o dinheiro a CONTA (a regra dele é só "AAAA-MM-DD válida") —: o aviso diz que o app conta a maior (R$ 500,00) e NÃO diz que não conta nenhuma (o Diagnóstico não pode se contradizer com o item da parcela paga a mais)',
+      A('parcelasAlemDoPlano')(g3000.marcas, g3000.nP).some(e => e.k === 4) && avY.length === 1 && /O app conta só a maior \(R\$ 500,00\)/.test(n36(avY[0].detalhe)) && !/não conta nenhuma/.test(n36(avY[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    alem({ d: '3000-01-01', v: 100, conta: 'X' }, { d: '3000-02-01', v: 100, conta: 'X' });
+    const avY2 = diag36(/marcada como paga mais de uma vez, com datas diferentes/);
+    t('36b: e duas marcas de ano 3000 com o MESMO valor e datas diferentes avisam "datas diferentes (01/01/3000 e 01/02/3000)" — a data que o aviso compara é a que o dinheiro usa, não o vencimento inventado',
+      avY2.length === 1 && /datas diferentes \(01\/01\/3000 e 01\/02\/3000\)/.test(n36(avY2[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    M().find(m => m.id === 'r1').pgParcelas = { '4.0': { d: '2026-11-15', v: 500, conta: 'X' } }; M().find(m => m.id === 'r2').pgParcelas = { '4.0': { d: '2026-11-15', v: 100, conta: 'X' } };
+    t('36b: chave de parcela fora do padrão ("4.0") em dois pedaços com valores diferentes: o aviso de marca duplicada CALA (o dinheiro nem lê essa marca) e quem fala dela é o de "número fora do padrão"',
+      diag36(/marcada como paga mais de uma vez/).length === 0 && diag36(/número fora do padrão/).length >= 1, S34(A('provaReal')().A.map(x => x.titulo)));
+    M().find(m => m.id === 'r1').pgParcelas = { 1: '2026-08-15' }; M().find(m => m.id === 'r2').pgParcelas = { 1: '2026-08-20' };
+    const avL = diag36(/marcada como paga mais de uma vez, com datas diferentes/);
+    t('36b: duas marcas no formato antigo (só a data, em texto) com datas diferentes: o aviso diz o valor que o app conta (R$ 100,00, o da parcela) e nunca "R$ -∞"',
+      avL.length === 1 && /O app conta um pagamento só: R\$ 100,00/.test(n36(avL[0].detalhe)) && !/∞/.test(n36(avL[0].detalhe)), S34(diag36(/mais de uma vez/)));
+    alem({ d: '2026-11-15', v: 100, conta: 'X' }, { v: 100, conta: 'Z' });
+    t('36b: parcela 4 (além do plano): marca datada da conta X + marca SEM data da conta Z: silêncio — conta e data só se comparam entre marcas que o dinheiro conta (a sem-data nem entra)',
+      diag36(/marcada como paga mais de uma vez/).length === 0, S34(diag36(/mais de uma vez/)));
+  });
+
+  /* ---- 36c: restaurar da Lixeira o lote apagado por "so o que nao vendeu" nao duplica o pagamento ---- */
+  await bloco36('c', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34());
+    M().push(compra34('K', { valor: 300, qtd: 3, nParc: 3, venc1: '2027-02-10', pgParcelas: { 1: { d: '2026-06-01', v: 100, conta: 'X' } } }));
+    vendeu34('K', 1, 'Cli');
+    setg('movs', JSON.parse(JSON.stringify(M())));                                   /* recarregou o app */
+    const pagoManual = () => soma34(A('contasPagas')().filter(x => x.pagaManual)), guardados = [];
+    const orig = g('lixeiraGuarda');
+    setg('lixeiraGuarda', r => { (r || []).forEach(x => guardados.push(JSON.parse(JSON.stringify(x)))); });   /* o que o PROPRIO app manda pra Lixeira */
+    try {
+      const antes = pagoManual();
+      A('execExcl')('K', 'compraSobra');
+      const durante = pagoManual();
+      guardados.forEach(m => { if (!M().some(x => x.id === m.id)) M().push(m); });      /* "restaurar" da Lixeira */
+      const depois = pagoManual();
+      t('36c: apagar so o que nao vendeu passa a marca pro pedaco que fica (100 -> 100) e RESTAURAR o lote apagado da Lixeira nao duplica o pagamento (continua 100, nao 200)',
+        antes === 100 && durante === 100 && depois === 100 && guardados.length >= 1 && guardados.every(m => !m.pgParcelas), S34([antes, durante, depois, guardados.map(m => [m.id, m.pgParcelas])]));
+    } finally { setg('lixeiraGuarda', orig); }
+  });
+
+  /* ---- 36d: a dica das Pagas conta as vencidas sem marca que o periodo escondeu ---- */
+  await bloco36('d', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34());
+    setg('perSel', 'd30'); setg('perDe', '2026-08-22'); setg('perAte', '');
+    M().push(compra34('h1', { valor: 300, nParc: 3, venc1: '2026-05-10' }));           /* as 3 parcelas venceram (10/05, 10/06, 10/07) e ninguem marcou: contam como pagas, fora do periodo */
+    const html = n36(telaContas34());
+    t('36d: a dica das Pagas conta tambem as parcelas VENCIDAS SEM MARCA que o periodo escondeu (sao o grosso do historico), com o valor, e nao inventa "pagamentos marcados"',
+      html.indexOf('3 parcelas vencidas sem marca (contadas como pagas no vencimento · R$ 300,00) fora do período escolhido — toque pra ver tudo') >= 0
+      && html.indexOf('marcado como pago') < 0 && html.indexOf('marcados como pagos') < 0, (html.match(/parcela[^<]{0,120}fora do per[^<]{0,40}/) || [''])[0]);
+    setg('perSel', 'tudo'); setg('perDe', '');
+    t('36d: com o periodo em tudo a dica some', n36(telaContas34()).indexOf('fora do período escolhido') < 0, '');
+  });
+
+  /* ---- 36e: a parcela do pedaco e a da COMPRA (ficha, Consulta) ---- */
+  await bloco36('e', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34());
+    M().push(compra34('f1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15' }));
+    const p1 = A('baixarLote')('f1', 1, 'Coleção', { dataSaida: '2026-09-02' });          /* pedaco de R$ 100 (1/3 do lote): 100/3 = 33,33 NAO e a parcela dele */
+    const gr = A('gruposParcelados')().find(x => x.membros.length === 2);
+    t('36e: o texto da parcela de um pedaco de lote diz a parcela da COMPRA ("3× de R$ 100,00 (a compra toda: R$ 300,00)"), nao o valor do pedaco dividido por 3',
+      n36(A('parcelaTxt')(p1, gr)) === '3× de R$ 100,00 (a compra toda: R$ 300,00)' && n36(A('parcelaTxt')(p1, gr, true)) === '3× de R$ 100,00 (a compra toda: R$ 300,00)', n36(A('parcelaTxt')(p1, gr)));
+    M().push(compra34('f2', { valor: 150, qtd: 1, nParc: 3, venc1: '2026-08-15' }));
+    const gs = A('gruposParcelados')().find(x => x.membros.length === 1);
+    t('36e: compra sem pedacos: "3× de R$ 50,00" (e curto "3× R$ 50,00"); compra de troca (sem grupo) cai no valor/parcelas; a vista nao diz nada',
+      n36(A('parcelaTxt')(gs.dono, gs)) === '3× de R$ 50,00' && n36(A('parcelaTxt')(gs.dono, gs, true)) === '3× R$ 50,00' && n36(A('parcelaTxt')({ pgTipo: 'Parcelado', nParc: 2, valor: 90 }, undefined)) === '2× de R$ 45,00'
+      && A('parcelaTxt')({ pgTipo: 'À vista', nParc: 0, valor: 90 }, undefined) === '', S34([A('parcelaTxt')(gs.dono, gs), A('parcelaTxt')(gs.dono, gs, true)]));
+    const ficha = modal36(() => A('verFicha')(p1.id));
+    t('36e: a ficha do pedaco mostra a parcela da compra e nao "3× de R$ 33,33"', ficha.indexOf('3× de R$ 100,00 (a compra toda: R$ 300,00)') >= 0 && ficha.indexOf('3× de R$ 33,33') < 0, ficha.slice(0, 300));
+    setg('consF', 'COMPRA'); setg('consVer', 'itens'); setg('consQ', ''); setg('consOrd', 'emissao'); setg('consJogo', 'todos'); setg('consCol', ''); setg('consCat', ''); setg('consPess', ''); setg('consConta', ''); setg('consGrupoFech', {}); setg('consMenu', false); setg('expandId', null);
+    const lista = n36(A('vConsultar')());
+    t('36e: a lista da Consulta tambem (o pedaco de R$ 100 mostra a parcela da compra, 3× de R$ 100,00, e nao 3× R$ 33,33)', lista.indexOf('3× de R$ 100,00 (a compra toda: R$ 300,00)') >= 0 && lista.indexOf('3× R$ 33,33') < 0, (lista.match(/3× [^<]{0,60}/g) || []).join(' | '));
+  });
+
+  /* ---- 36f: "de fora das contas" agora e de verdade; data do pagamento = vencimento quando ja venceu ---- */
+  await bloco36('f', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X', 'Y']));
+    M().push(compra34('m1', { valor: 300, nParc: 3, venc1: '2026-08-15', conta: 'X' }));    /* 1 e 2 vencidas (sem marca), 3 vence em 15/10 */
+    const sx = () => g('contasBanc').map(cb => r34(sf34(cb)));
+    const antes = sx();
+    const modal = modal36(() => A('pagarParcela')('m1', 3, 3, 100));
+    t('36f: o modal do "✓ paguei" oferece "de fora das contas cadastradas" com valor proprio (—) e a data de HOJE (parcela ainda nao vencida), sem passar de hoje',
+      modal.indexOf('<option value="—">(de fora das contas cadastradas — não mexe em saldo nenhum)</option>') >= 0 && modal.indexOf('id="pp_data" type="date" value="2026-09-21" max="2026-09-21"') >= 0, modal.slice(0, 700));
+    const modalVenc = modal36(() => A('pagarParcela')('m1', 1, 3, 100));
+    t('36f: parcela JA VENCIDA: a data padrao do "Pago em" e o dia do vencimento (confirmar nao move o dinheiro no tempo)', modalVenc.indexOf('id="pp_data" type="date" value="2026-08-15" max="2026-09-21"') >= 0, modalVenc.slice(0, 700));
+    Object.keys(campos34).forEach(k => delete campos34[k]);
+    ctx.document.getElementById = elCampo34;
+    campos34.pp_conta = '—'; campos34.pp_data = '';
+    A('confirmarPagarParcela')('m1', 3, 3, 100);
+    const mk = M()[0].pgParcelas[3];
+    t('36f: escolher "de fora das contas" grava conta "—" e NAO debita conta nenhuma (antes o marcador caia na conta da compra: X ficava 100 a menos); a data vazia vira hoje',
+      mk.conta === '—' && mk.d === '2026-09-21' && S34(sx()) === S34(antes) && A('marcaEntraNoSaldo')(M()[0], 3, mk) === 0, S34([mk, antes, sx()]));
+    t('36f: o Diagnostico nao chama o "de fora das contas" de "conta excluida"', diag36(/conta excluída/).length === 0, S34(diag36(/conta exclu/)));
+    campos34.pp_conta = 'Y'; campos34.pp_data = '2099-01-01';
+    A('confirmarPagarParcela')('m1', 2, 3, 100);
+    const mk2 = M()[0].pgParcelas[2];
+    t('36f: "Pago em" no futuro (2099) volta pra hoje; a conta escolhida (Y) e a que fica gravada', mk2.d === '2026-09-21' && mk2.conta === 'Y', S34(mk2));
+    campos34.pp_conta = 'X'; campos34.pp_data = '2026-08-16';
+    A('confirmarPagarParcela')('m1', 1, 3, 100);
+    t('36f: data valida no passado e respeitada', M()[0].pgParcelas[1].d === '2026-08-16', S34(M()[0].pgParcelas[1]));
+    delete campos34.pp_conta; delete campos34.pp_data;
+  });
+
+  /* ---- 36g: confirmar as parcelas vencidas com o valor que o app oferece nao move o dinheiro (a ultima leva o residuo) ---- */
+  await bloco36('g', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X']));
+    M().push(compra34('c3', { valor: 1000, nParc: 3, venc1: '2026-07-15', conta: 'X' }));  /* 15/07, 15/08 e 15/09: as 3 vencidas, nenhuma marcada; cada parcela 333,3333… */
+    const gr0 = A('gruposParcelados')()[0], antes = dinheiro36(), datasAntes = A('serieDinheiro')().map(p => p.data);
+    t('36g: o valor oferecido: 333,33 · 333,33 · 333,34 (a ultima leva o residuo) e nunca a soma passa de 1000,00',
+      A('valorOfertaParcela')(gr0, 1) === 333.33 && A('valorOfertaParcela')(gr0, 2) === 333.33 && A('valorOfertaParcela')(gr0, 3) === 333.34
+      && r34(A('valorOfertaParcela')(gr0, 1) + A('valorOfertaParcela')(gr0, 2) + A('valorOfertaParcela')(gr0, 3)) === 1000, S34([1, 2, 3].map(i => A('valorOfertaParcela')(gr0, i))));
+    ctx.document.getElementById = elCampo34;
+    [1, 2, 3].forEach(i => {
+      const html = modal36(() => A('pagarParcela')('c3', i, 3, gr0.vP));
+      const dt = (html.match(/id="pp_data" type="date" value="([^"]+)"/) || [])[1], vl = (html.match(/confirmarPagarParcela\('c3',\d,3,([^)]+)\)/) || [])[1];
+      Object.keys(campos34).forEach(k => delete campos34[k]); ctx.document.getElementById = elCampo34;
+      campos34.pp_conta = 'X'; campos34.pp_data = dt;                                    /* o usuario aceita o que o app ofereceu */
+      A('confirmarPagarParcela')('c3', i, 3, +vl);
+    });
+    const depois = dinheiro36(), marcas = M()[0].pgParcelas;
+    t('36g: confirmar as 3 parcelas vencidas com o padrao do app (valor e data) NAO move o dinheiro: fisico, curva, pagas e a pagar ficam iguais, e as datas da curva tambem',
+      S34(semVenc36(depois)) === S34(semVenc36(antes)) && S34(A('serieDinheiro')().map(p => p.data)) === S34(datasAntes) && r34(marcas[1].v + marcas[2].v + marcas[3].v) === 1000 && marcas[1].d === '2026-07-15' && marcas[3].d === '2026-09-15', S34([antes, depois, marcas]));
+    delete campos34.pp_conta; delete campos34.pp_data;
+  });
+
+  /* ---- 36h: "vencido ou a vencer" e a curva diz quanto de venda no app ainda nao caiu ---- */
+  await bloco36('h', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X']));
+    M().push(compra34('o1', { valor: 300, nParc: 3, venc1: '2026-10-10', conta: 'W' }));  /* conta que NAO esta no cadastro: vai pra "fora das contas" */
+    const tela = n36(telaContas34());
+    t('36h: a linha "fora das contas cadastradas" diz que conta o que ja venceu tambem ("vencido ou a vencer até +90 dias")', tela.indexOf('vencido ou a vencer até +90 dias: entra') >= 0, (tela.match(/Fora das contas[^<]{0,160}/) || [''])[0]);
+    reset();
+    M().push({ id: 'va', tipo: 'VENDA', data: '2026-09-10', valor: 200, taxa: 10, canal: 'App', recDias: 30, conta: 'X', qtd: 1, contraparte: 'Cli', vendaDe: 'avulsa' });
+    M().push({ id: 'vb', tipo: 'VENDA', data: '2026-09-15', valor: 100, taxa: 0, canal: 'App', recDias: 20, conta: 'X', qtd: 1, contraparte: 'Cli', vendaDe: 'avulsa' });
+    M().push({ id: 'vc', tipo: 'VENDA', data: '2026-08-01', valor: 50, taxa: 0, canal: 'App', recDias: 10, conta: 'X', qtd: 1, contraparte: 'Cli', vendaDe: 'avulsa' });   /* ja caiu em 11/08 */
+    const sd = A('serieDinheiro')();
+    t('36h: a curva conta as vendas no app na data da VENDA, e diz quantas ainda nao cairam na conta e quanto (2 vendas, R$ 280,00 liquidos; a de agosto ja caiu)', sd.naoRepassadas === 2 && r34(sd.naoRepassadasValor) === 280, S34([sd.naoRepassadas, sd.naoRepassadasValor]));
+    const serieVazia = Object.assign([], { semData: 0, semDataValor: 0 });
+    const html = n36(A('graficoLinhaEstoque')(serieVazia, sd, serieVazia, true, false));
+    t('36h: o aviso da curva diz "2 vendas no app (R$ 280,00) ainda nao cairam na conta: a curva as conta na data da venda, e o saldo por conta so depois do repasse"',
+      html.indexOf('2 vendas no app (R$ 280,00) ainda não caíram na conta: a curva as conta na data da venda, e o saldo por conta só depois do repasse') >= 0, (html.match(/venda[^<]{0,160}/) || [''])[0]);
+    M().splice(1, 2);
+    const html1 = n36(A('graficoLinhaEstoque')(serieVazia, A('serieDinheiro')(), serieVazia, true, false));
+    t('36h: uma venda so, no singular ("1 venda no app (R$ 180,00) ainda nao caiu na conta: a curva a conta")', html1.indexOf('1 venda no app (R$ 180,00) ainda não caiu na conta: a curva a conta na data da venda') >= 0, (html1.match(/venda[^<]{0,160}/) || [''])[0]);
+  });
+
+  /* ---- 36i: juntar compras NAO pode mexer no dinheiro — a juncao e ensaiada numa copia e barrada quando o dinheiro mexe (revisao de 21/09: a 1a trava so olhava "marca + plano diferente") ---- */
+  await bloco36('i', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X']));
+    const avisos = []; ctx.alert = m => { avisos.push(String(m)); }; ctx.confirm = () => true; ctx.prompt = () => '';
+    const mkc = (id, valor, nP, marcas, extra) => compra34(id, Object.assign({ valor, qtd: 1, nParc: nP, venc1: '2026-08-15', conta: 'X', pgParcelas: marcas }, extra || {}));
+    const m100 = () => ({ 1: { d: '2026-08-15', v: 100, conta: 'X' } });
+    const estado = () => S34(M().map(m => [m.id, m.notaId, m.nParc, m.venc1, m.conta, m.pgParcelas]));
+    const barrado = (rot, ids) => {
+      const e0 = estado(), d0 = dinheiro36(); avisos.length = 0;
+      const ok = A('juntarNotaCore')(ids);
+      t('36i: ' + rot + ' — BARRADO, o aviso mostra os numeros do que mexeria, e nada muda (nem plano, nem nota, nem dinheiro)',
+        ok === false && avisos.length === 1 && /Não deu pra juntar: juntar mudaria o dinheiro/.test(n36(avisos[0])) && /R\$ [\d.-]+,\d\d → R\$ [\d.-]+,\d\d/.test(n36(avisos[0])) && estado() === e0 && S34(dinheiro36()) === S34(d0), S34([ok, avisos, estado() === e0]));
+      return avisos[0];
+    };
+    /* G — o caso da mensagem: 3× e 6×, a marca so na cabeca */
+    M().push(mkc('ja', 300, 3, m100())); M().push(mkc('jb', 600, 6, undefined));
+    barrado('3× e 6×, parcela paga so na 1ª (a cabeça)', ['ja', 'jb']);
+    /* E e F — MESMO plano (3× e 3×), a marca so numa das duas: o dinheiro mexia mesmo assim (antes a trava nem olhava) */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ea', 300, 3, m100())); M().push(mkc('eb', 600, 3, undefined));
+    barrado('MESMO plano (3× e 3×) com a parcela paga só na cabeça', ['ea', 'eb']);
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('fa', 300, 3, undefined)); M().push(mkc('fb', 600, 3, m100()));
+    barrado('MESMO plano (3× e 3×) com a parcela paga só na segunda', ['fa', 'fb']);
+    /* so o 1º vencimento difere (mesmo nº de parcelas), as duas com a parcela 1 marcada */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('pa', 300, 3, m100())); M().push(mkc('pb', 300, 3, m100(), { venc1: '2026-09-15' }));
+    barrado('só o 1º VENCIMENTO difere', ['pa', 'pb']);
+    /* contas diferentes: o dinheiro presumido passaria de uma conta pra outra (o total nao mexe, o saldo de cada conta sim) */
+    reset(); setg('contasBanc', banco34(['X', 'Y']));
+    M().push(mkc('ca', 300, 3, undefined)); M().push(mkc('cb', 300, 3, undefined, { conta: 'Y' }));
+    const msgConta = barrado('contas diferentes (X e Y) cadastradas', ['ca', 'cb']);
+    t('36i: e o aviso diz QUAL conta mexeria', /conta "X"/.test(n36(msgConta || '')) && /conta "Y"/.test(n36(msgConta || '')), n36(msgConta || ''));
+    /* sem conta cadastrada o texto da conta nao mexe em saldo nenhum: juntar passa */
+    reset(); setg('contasBanc', []);
+    M().push(mkc('ca', 300, 3, undefined)); M().push(mkc('cb', 300, 3, undefined, { conta: 'Y' }));
+    avisos.length = 0;
+    t('36i: sem nenhuma conta cadastrada, "conta" é só texto (nenhum saldo mexe): juntar passa', A('juntarNotaCore')(['ca', 'cb']) === true && avisos.length === 0 && M().every(m => m.notaId), S34([avisos, estado()]));
+    /* as outras duas portas: soltas + 1 nota, e fundir 2 notas */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('na', 300, 3, m100(), { notaId: 'N1', notaNum: '1' })); M().push(mkc('nb', 300, 3, undefined));
+    barrado('compra solta SEM marca entrando numa nota que tem parcela paga (porta "soltas + 1 nota")', ['na', 'nb']);
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ma', 300, 3, m100(), { notaId: 'N1', notaNum: '1' })); M().push(mkc('mb', 600, 3, undefined, { notaId: 'N2', notaNum: '2' }));
+    barrado('FUNDIR 2 notas de mesmo plano com a parcela paga só numa (porta "fundir notas")', ['ma', 'mb']);
+    /* plano diferente que NAO mexe no dinheiro (tudo ja venceu nos dois planos): passa — a trava mede o dinheiro, nao o cadastro */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('la', 300, 3, undefined, { venc1: '2026-03-15' })); M().push(mkc('lb', 600, 6, undefined, { venc1: '2026-01-15' }));
+    avisos.length = 0;
+    const antesL = dinheiro36(), okL = A('juntarNotaCore')(['la', 'lb']);
+    t('36i: planos DIFERENTES que não mexem no dinheiro (tudo já venceu, pago 900 antes e depois) juntam: a nota fica com o plano da primeira (3×)',
+      okL === true && avisos.length === 0 && M().every(m => m.nParc === 3 && m.notaId) && S34(dinheiro36()) === S34(antesL), S34([okL, avisos, M().map(m => [m.id, m.nParc]), antesL, dinheiro36()]));
+    /* mesmo plano: as duas com a parcela 1 marcada — juntar, desfazer e separar nao mexem no dinheiro */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ka', 300, 3, { 1: { d: '2026-08-15', v: 100, conta: 'X' } }));
+    M().push(mkc('kb', 600, 3, { 1: { d: '2026-08-16', v: 200, conta: 'X' } }));
+    avisos.length = 0;
+    const a0 = dinheiro36(), ok5 = A('juntarNotaCore')(['ka', 'kb']), nid = M().find(m => m.id === 'ka').notaId, a1 = dinheiro36();
+    A('desfazerNotaFaz')(nid);
+    const a2 = dinheiro36();
+    t('36i: juntar duas compras de MESMO plano (uma parcela marcada em cada) numa nota não muda o dinheiro, e desfazer a nota também não', ok5 === true && !!nid && avisos.length === 0 && S34(a1) === S34(a0) && S34(a2) === S34(a0), S34([a0, a1, a2, avisos]));
+    A('juntarNotaCore')(['ka', 'kb']);
+    const b0 = dinheiro36(); A('separarDaNotaFaz')('kb'); const b1 = dinheiro36();
+    t('36i: separar um item da nota (que tem parcela marcada) também não muda o dinheiro, e o item leva a parte dele do pagamento (200) e a nota fica com o resto (100)',
+      S34(b1) === S34(b0) && S34(b1) === S34(a0) && r34(M().find(m => m.id === 'kb').pgParcelas[1].v) === 200 && r34(M().find(m => m.id === 'ka').pgParcelas[1].v) === 100, S34([b0, b1, M().map(m => [m.id, m.pgParcelas])]));
+    /* se o ensaio quebrar por dentro, BARRA (melhor que juntar sem conferir) e os lancamentos voltam intactos */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('qa', 300, 3, undefined)); M().push(mkc('qb', 300, 3, undefined));
+    const serieOrig = g('serieDinheiro'), e1 = estado();
+    setg('serieDinheiro', () => { throw new Error('quebrou de proposito'); });
+    avisos.length = 0;
+    let okQ; try { okQ = A('juntarNotaCore')(['qa', 'qb']); } finally { setg('serieDinheiro', serieOrig); }
+    t('36i: se o ensaio quebra por dentro a junção é BARRADA com o aviso "Não consegui conferir" (fail-closed) e nada foi juntado', okQ === false && avisos.length === 1 && /Não consegui conferir se juntar mexe no dinheiro/.test(avisos[0]) && estado() === e1, S34([okQ, avisos, estado() === e1]));
+    t('36i: e passado o problema o ensaio não deixou rastro: a mesma junção agora passa e junta', A('juntarNotaCore')(['qa', 'qb']) === true && M().every(m => m.notaId), estado());
+    /* ===== rodada 3 (revisor de substancia): projecao e "por emissao" tambem contam; o aviso diz a causa certa; o Fluxo leva o lote inteiro; a cabeca da fusao e uma so ===== */
+    /* H — mesmo plano, mesma data, tudo no futuro, uma com conta cadastrada e a outra sem conta: o saldo de hoje nao mexe, mas a projecao (e o "por emissao") moviam R$ 900 calados */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ha', 300, 3, undefined, { venc1: '2026-10-15' })); M().push(mkc('hb', 300, 3, undefined, { venc1: '2026-10-15', conta: '' }));
+    const msgH = barrado('uma compra com conta cadastrada e a outra SEM conta (a projecao do caixa mexeria)', ['ha', 'hb']);
+    t('36i: e o aviso diz que o que mexe e a PROJECAO do caixa (nao o saldo de hoje) e aponta a conta como o que difere', /projeção do caixa/.test(n36(msgH || '')) && /contas diferentes \(X · sem conta\)/.test(n36(msgH || '')), n36(msgH || ''));
+    t('36i: o aviso e uma LISTA (uma mudanca por linha, com "• ") e nao imprime "R$ -0,00" (o zero negativo da projecao "fora das contas")', /\n• conta "X" \(por emissão\)/.test(n36(msgH || '')) && !/-0,00/.test(n36(msgH || '')), n36(msgH || ''));
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ha', 300, 3, undefined, { venc1: '2026-10-15', conta: '' })); M().push(mkc('hb', 300, 3, undefined, { venc1: '2026-10-15' }));
+    barrado('o mesmo, com a compra SEM conta na frente (a nota ficaria sem conta e a projecao tambem mexe)', ['ha', 'hb']);
+    /* sem conta cadastrada, "conta" e so texto: junta, e a nota fica com a conta da cabeca nos itens que nao tinham */
+    reset(); setg('contasBanc', []);
+    M().push(mkc('ga', 300, 3, undefined, { venc1: '2026-10-15', conta: 'X' })); M().push(mkc('gb', 300, 3, undefined, { venc1: '2026-10-15', conta: '' }));
+    avisos.length = 0;
+    t('36i: sem conta cadastrada a junção passa e o item que estava sem conta herda a da cabeça (X)', A('juntarNotaCore')(['ga', 'gb']) === true && avisos.length === 0 && M().find(m => m.id === 'gb').conta === 'X', S34([avisos, M().map(m => [m.id, m.conta, m.notaId])]));
+    /* a tolerancia e cada dimensao do retrato, provadas SEM montar mundo: o retrato falso devolve dois numeros e so um muda */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('qa', 300, 3, undefined)); M().push(mkc('qb', 300, 3, undefined));
+    const retratoOrig = g('retratoJunta'), base36 = () => ({ pago: 100, pagar: 200, saldos: [50], emissao: [40], curva: -100, proj: [10, 20, 30, 40], fora: [1, 2] });
+    const com = mod => { let i = 0; const seq = [base36(), Object.assign(base36(), mod)]; setg('retratoJunta', () => seq[Math.min(i++, 1)]);
+      try { return A('juntaMudaODinheiro')(['qa', 'qb']); } finally { setg('retratoJunta', retratoOrig); } };
+    t('36i: a tolerancia e de 1 centavo e meio: 2 centavos de diferenca barram e meio centavo passa (o ruido do arredondamento nao barra junção honesta)',
+      !!com({ pago: 100.02 }) && !com({ pago: 100.005 }) && !!com({ pago: 100.02 }) === true, S34([com({ pago: 100.02 }), com({ pago: 100.005 })]));
+    const dims = { pago: { pago: 101 }, pagar: { pagar: 201 }, 'saldo fisico': { saldos: [51] }, 'saldo por emissao': { emissao: [41] }, curva: { curva: -101 }, 'projecao hoje': { proj: [11, 20, 30, 40] },
+      'projecao +30': { proj: [10, 21, 30, 40] }, 'projecao +60': { proj: [10, 20, 31, 40] }, 'projecao +90': { proj: [10, 20, 30, 41] }, 'fora entra': { fora: [2, 2] }, 'fora sai': { fora: [1, 3] } };
+    Object.keys(dims).forEach(k => t('36i: o ensaio olha ' + k + ' (basta ele mexer pra barrar)', !!com(dims[k]) && (com(dims[k]).difs || []).length >= 1, S34(com(dims[k]))));
+    t('36i: e sem NENHUMA diferenca, junta (retrato igual)', com({}) === null, S34(com({})));
+    /* a causa certa no aviso: quando o retrato falso mexe e nada de "diferente" se acha entre as compras, o texto diz isso em vez de inventar uma causa */
+    let iG = 0; const seqG = [base36(), Object.assign(base36(), { pago: 101 })]; setg('retratoJunta', () => seqG[Math.min(iG++, 1)]);
+    avisos.length = 0; try { A('juntarNotaCore')(['qa', 'qb']); } finally { setg('retratoJunta', retratoOrig); }
+    t('36i: quando nada de diferente se acha entre as compras o aviso diz pra conferir o plano, a conta e as parcelas pagas (e nao inventa causa)', avisos.length === 1 && /Confira o plano, a conta e as parcelas pagas/.test(avisos[0]) && !/O que achei de diferente/.test(avisos[0]), S34(avisos));
+    /* o aviso por causa */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ja', 300, 3, m100())); M().push(mkc('jb', 600, 6, undefined));
+    avisos.length = 0; A('juntarNotaCore')(['ja', 'jb']);
+    t('36i: 3× e 6× com parcela paga: o aviso diz "planos de pagamento diferentes (3× a partir de 15/08/2026 · 6× a partir de 15/08/2026)" e que, se de fato diferem, não são a mesma nota',
+      /planos de pagamento diferentes \(3× a partir de 15\/08\/2026 · 6× a partir de 15\/08\/2026\)/.test(n36(avisos[0] || '')) && /não são a mesma nota: deixe separadas/.test(avisos[0] || ''), n36(avisos[0] || ''));
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ea', 300, 3, m100())); M().push(mkc('eb', 600, 3, undefined));
+    avisos.length = 0; A('juntarNotaCore')(['ea', 'eb']);
+    t('36i: mesmo plano, parcela paga só numa: o aviso diz "parcelas pagas diferentes (… tem paga a parcela 1 · … não tem parcela paga)" e ensina a desmarcar', /parcelas pagas diferentes \(.*tem paga a parcela 1 · .*não tem parcela paga\)/.test(avisos[0] || '') && /desmarque em Fluxo de caixa › Pagas/.test(avisos[0] || '') && !/planos de pagamento diferentes/.test(avisos[0] || ''), n36(avisos[0] || ''));
+    /* LOTE DIVIDIDO: no Fluxo de caixa a linha e a COMPRA (o dono no lugar do lote inteiro): juntar leva o lote todo; pelo Consulta, com 1 pedaço só, o aviso diz a causa */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('lr', 300, 3, m100(), { qtd: 3 }));
+    const pedL = A('baixarLote')('lr', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    M().push(mkc('ls', 300, 3, m100()));
+    const dL0 = dinheiro36();
+    avisos.length = 0;
+    const okParcial = A('juntarNotaCore')(['lr', 'ls']);
+    t('36i: juntar SO o dono do lote dividido (o pedaço fica pra trás) com a outra compra: barrado, e o aviso diz que o lote tem 2 pedaços, 1 ficaria de fora, e manda selecionar o lote inteiro',
+      okParcial === false && /faz parte de um lote dividido em 2 pedaços, e 1 ficaria de fora da seleção/.test(avisos[0] || '') && /Selecione o lote inteiro/.test(avisos[0] || '') && S34(dinheiro36()) === S34(dL0), n36(avisos[0] || ''));
+    t('36i: com mais de 6 mudancas o aviso mostra as 6 primeiras e diz quantas ficaram de fora ("• …e mais N mudanças")', /\n• …e mais \d+ mudanças?/.test(avisos[0] || '') && (avisos[0].match(/\n• /g) || []).length === 7, n36(avisos[0] || ''));
+    t('36i: idsComLote leva os pedaços do lote inteiro (o dono e o pedaço) e deixa a compra solta como está', S34(A('idsComLote')(['ls']).sort()) === S34(['ls']) && A('idsComLote')(['lr']).sort().join() === ['lr', pedL.id].sort().join(), S34([A('idsComLote')(['lr']), pedL.id]));
+    setg('fxSelMode', true); setg('fxSel', { lr: 1, ls: 1 }); avisos.length = 0;
+    A('juntarFx')();
+    t('36i: pelo Fluxo de caixa a MESMA seleção leva o lote inteiro (o pedaço vai junto): junta, o dinheiro não mexe e a seleção do Fluxo se limpa',
+      avisos.length === 0 && M().every(m => m.notaId) && M().length === 3 && S34(dinheiro36()) === S34(dL0) && S34(g('fxSel')) === '{}' && g('fxSelMode') === false, S34([avisos, M().map(m => [m.id, m.notaId]), dinheiro36(), dL0]));
+    /* a cabeca da fusao e UMA so: a nota de maior total dá o plano e o número; a do menor entra nela */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('fa', 300, 3, undefined, { notaId: 'N1', notaNum: '1' })); M().push(mkc('fb', 600, 3, undefined, { notaId: 'N2', notaNum: '2' }));
+    avisos.length = 0;
+    t('36i: FUNDIR duas notas de mesmo plano e pé de pagamento igual: junta, e a nota de MAIOR total (N2, 600) fica com o número e os itens da menor',
+      A('juntarNotaCore')(['fa', 'fb']) === true && avisos.length === 0 && M().every(m => m.notaId === 'N2' && m.notaNum === '2'), S34([avisos, M().map(m => [m.id, m.notaId, m.notaNum])]));
+    /* o cenario do 34j que o teste antigo encodava errado: uma compra marcada na parcela 1 e outra NAO marcada (vencida) — os R$ 50 dela sumiam dentro da marca da outra */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(compra34('jc', { valor: 300, qtd: 3, nParc: 2, venc1: '2026-08-15', pgParcelas: { 1: { d: '2026-08-15', v: 150, conta: 'X' } } }));
+    const jcp2 = A('baixarLote')('jc', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    jcp2.pgParcelas = { 1: { d: '2026-08-15', v: 150, conta: 'X' } };
+    M().push(compra34('jd', { valor: 100, nParc: 2, venc1: '2026-08-15' }));
+    avisos.length = 0;
+    t('36i: o cenario antigo do 34j (uma compra com a parcela 1 marcada e a outra sem marca, já vencida) é BARRADO: pago R$ 400,00 → R$ 350,00 (os R$ 50 da outra sumiam)',
+      A('juntarNotaCore')(['jc', jcp2.id, 'jd']) === false && /pago R\$ 400,00 → R\$ 350,00/.test(n36(avisos[0] || '')), n36(avisos[0] || ''));
+    /* ===== rodada 4 (revisor de substancia): a linha unica do Fluxo, "a pagar" sozinha, causa sem conselho, zero negativo, explicar nao derruba o aviso ===== */
+    /* G-1: no Fluxo o lote dividido e UMA linha; expandido nos pedacos, uma linha so abria uma nota de uma compra so */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('sl', 300, 3, undefined, { qtd: 3 }));
+    A('baixarLote')('sl', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    setg('fxSelMode', true); setg('fxSel', { sl: 1 }); avisos.length = 0;
+    A('juntarFx')();
+    t('36i: UMA linha só marcada no Fluxo (o lote dividido em 2 pedaços) NÃO abre nota de uma compra: "Marque pelo menos 2 compras", nada é criado e a seleção continua',
+      avisos.length === 1 && /Marque pelo menos 2 compras pra juntar numa nota/.test(avisos[0]) && M().every(m => !m.notaId) && g('fxSelMode') === true && S34(g('fxSel')) === S34({ sl: 1 }), S34([avisos, M().map(m => [m.id, m.notaId]), g('fxSel')]));
+    /* M-2/M-3: um mundo em que SO "a pagar" mexe (mesmo plano, parcelas pagas DIFERENTES, vencimentos alem de +90 dias): prova que o retrato MEDE "a pagar", nao so que o comparador compara */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('xa', 300, 3, { 1: { d: '2026-09-01', v: 100, conta: 'X' } }, { venc1: '2027-01-15' }));
+    M().push(mkc('xb', 300, 3, { 2: { d: '2026-09-01', v: 100, conta: 'X' } }, { venc1: '2027-01-15' }));
+    const dx = A('juntaMudaODinheiro')(['xa', 'xb']);
+    t('36i: a conferência olha "a pagar" SOZINHA (2 compras no mesmo plano, parcelas pagas DIFERENTES, vencimentos além de +90 dias): a pagar R$ 400,00 → R$ 200,00 e nenhuma outra dimensão mexe',
+      !!dx && dx.difs.length === 1 && /^a pagar R\$ 400,00 → R\$ 200,00$/.test(n36(dx.difs[0])), S34(dx));
+    avisos.length = 0; A('juntarNotaCore')(['xa', 'xb']);
+    t('36i: e o aviso diz a causa — "parcelas pagas diferentes" (a 1 numa, a 2 na outra) —, ensina o que fazer e NÃO cai no "avise o Felype"',
+      /parcelas pagas diferentes/.test(avisos[0] || '') && /tem paga a parcela 1/.test(avisos[0] || '') && /tem paga a parcela 2/.test(avisos[0] || '') && /Junte só compras no mesmo pé de pagamento/.test(avisos[0] || '') && !/avise o Felype/.test(avisos[0] || ''), n36(avisos[0] || ''));
+    /* M-4: causa de conta com conselho, e sem o rodape generico que se contradiz */
+    t('36i: causa de CONTA tem o seu conselho ("não são a mesma nota… se uma conta foi digitada errada, corrija") e o aviso não se contradiz com o "confira o plano, a conta…"',
+      /contas diferentes \(X · Y\)/.test(n36(msgConta || '')) && /não são a mesma nota\. Se uma conta foi digitada errada/.test(msgConta || '') && !/Confira o plano/.test(msgConta || ''), n36(msgConta || ''));
+    /* L-1: valor pequeno negativo */
+    const A1 = base36(), D1 = Object.assign(base36(), { curva: -0.004 }); A1.curva = 0.5;
+    const dif1 = A('difsRetrato')(A1, D1);
+    t('36i: um valor pequeno negativo (−0,004) sai "R$ 0,00" e nunca "R$ -0,00"', dif1.length === 1 && /gráfico de dinheiro R\$ 0,50 → R\$ 0,00$/.test(n36(dif1[0])) && !/-0,00/.test(n36(dif1[0])), S34(dif1));
+    /* L-2: explicar a causa e enfeite — se quebrar, o aviso sai so com os numeros e a junção segue barrada */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ha', 300, 3, undefined, { venc1: '2026-10-15' })); M().push(mkc('hb', 300, 3, undefined, { venc1: '2026-10-15', conta: '' }));
+    const causasOrig = g('causasJunta'); setg('causasJunta', () => { throw new Error('quebrou de proposito'); });
+    avisos.length = 0; let okC; try { okC = A('juntarNotaCore')(['ha', 'hb']); } finally { setg('causasJunta', causasOrig); }
+    t('36i: se explicar a causa quebra, o aviso ainda sai (só com os números) e a junção segue barrada — o dono nunca fica sem resposta',
+      okC === false && avisos.length === 1 && /Não deu pra juntar/.test(avisos[0]) && /O que mudaria/.test(avisos[0]) && !/O que achei de diferente/.test(avisos[0]), S34([okC, avisos]));
+    const causasOrig2 = g('causasJunta'); setg('causasJunta', () => ({ causas: ['uma diferença qualquer'], conselhos: [] }));
+    avisos.length = 0; try { A('juntarNotaCore')(['ha', 'hb']); } finally { setg('causasJunta', causasOrig2); }
+    t('36i: quando há causa mas nenhum conselho, o aviso NÃO cai no rodapé "avise o Felype" (o rodapé é só para quando nada de diferente se acha)', /O que achei de diferente entre elas: uma diferença qualquer/.test(avisos[0] || '') && !/avise o Felype/.test(avisos[0] || ''), n36(avisos[0] || ''));
+    /* ===== rodada 5 (revisor de substancia): a projeção "de fora das contas" também é dinheiro; rótulos que se distinguem; o botão do Fluxo não cala ===== */
+    /* A-1: duas compras na MESMA conta que não é cadastrada; uma cai nos próximos 90 dias e a outra só em 2027. Juntar traz a segunda pra dentro da janela: só o "de fora" mexe */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('fa', 300, 3, undefined, { venc1: '2026-10-05', conta: 'Z' })); M().push(mkc('fb', 300, 3, undefined, { venc1: '2027-06-01', conta: 'Z' }));
+    const dF = A('juntaMudaODinheiro')(['fa', 'fb']);
+    t('36i: a conferência olha o "de fora das contas" SOZINHO (mesma conta não cadastrada; uma compra nos próximos 90 dias e a outra só em 2027): só "sai de fora das contas" mexe, R$ 300,00 → R$ 600,00',
+      !!dF && dF.difs.length === 1 && /^projeção: sai de fora das contas R\$ 300,00 → R\$ 600,00$/.test(n36(dF.difs[0])), S34(dF));
+    avisos.length = 0; const okF = A('juntarNotaCore')(['fa', 'fb']);
+    t('36i: e a junção é barrada com esse número no aviso, e nada foi juntado', okF === false && avisos.length === 1 && /projeção: sai de fora das contas R\$ 300,00 → R\$ 600,00/.test(n36(avisos[0] || '')) && M().every(m => !m.notaId), S34([okF, avisos]));
+    /* A-5: duas compras de mesmo nome (mesmo jogo, categoria e coleção) se distinguem no aviso pelo valor e pela data */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('la1', 300, 3, m100())); M().push(mkc('lb1', 600, 3, undefined));
+    avisos.length = 0; A('juntarNotaCore')(['la1', 'lb1']);
+    const rotsP = n36(avisos[0] || '').match(/"([^"]+)" tem paga a parcela 1 · "([^"]+)" não tem parcela paga/) || [];
+    t('36i: o aviso de "parcelas pagas diferentes" distingue duas compras de MESMO nome pelo valor e pela data (uma "R$ 300,00", a outra "R$ 600,00", as duas de 10/01/2026)',
+      rotsP.length === 3 && rotsP[1] !== rotsP[2] && /R\$ 300,00/.test(rotsP[1]) && /R\$ 600,00/.test(rotsP[2]) && /10\/01\/2026/.test(rotsP[1]), S34([rotsP, n36(avisos[0] || '')]));
+    /* A-6: o botão do Fluxo também não pode calar — se ler a seleção estoura, avisa, nada é juntado e a seleção continua */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('qa', 300, 3, undefined)); M().push(mkc('qb', 300, 3, undefined));
+    const resolveOrig = g('resolveJunta'); setg('resolveJunta', () => { throw new Error('quebrou de proposito'); });
+    setg('fxSelMode', true); setg('fxSel', { qa: 1, qb: 1 }); avisos.length = 0;
+    try { A('juntarFx')(); } finally { setg('resolveJunta', resolveOrig); }
+    t('36i: se ler a seleção do Fluxo estoura, o botão AVISA ("Não consegui juntar agora… Nada foi juntado") em vez de calar; nada é juntado e a seleção continua marcada',
+      avisos.length === 1 && /Não consegui juntar agora/.test(avisos[0]) && /Nada foi juntado/.test(avisos[0]) && M().every(m => !m.notaId) && g('fxSelMode') === true && S34(g('fxSel')) === S34({ qa: 1, qb: 1 }), S34([avisos, g('fxSel')]));
+    /* ===== rodada 6 (revisor de substância): rótulo de compras IGUAIS, data impossível no rótulo, e o botão da aba Compras ===== */
+    /* item 4: mesmo nome, mesmo valor e mesmo dia — o caso comum de dois lançamentos do mesmo produto no mesmo pedido: nada na tela as distingue, vale a ordem da seleção */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('ta', 300, 3, m100())); M().push(mkc('tb', 300, 3, undefined));
+    avisos.length = 0; A('juntarNotaCore')(['ta', 'tb']);
+    const rotsQ = n36(avisos[0] || '').match(/"([^"]+)" tem paga a parcela 1 · "([^"]+)" não tem parcela paga/) || [];
+    t('36i: duas compras IGUAIS (mesmo nome, valor e dia): o aviso ainda as distingue pela ordem da seleção ("1ª de 2 iguais" e "2ª de 2 iguais"), em vez de dizer a mesma coisa duas vezes',
+      rotsQ.length === 3 && rotsQ[1] !== rotsQ[2] && /1ª de 2 iguais/.test(rotsQ[1]) && /2ª de 2 iguais/.test(rotsQ[2]), S34([rotsQ, n36(avisos[0] || '')]));
+    /* item 8: data impossível não vira "45/13/2026" no rótulo */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('da1', 300, 3, m100(), { data: '2026-13-45' })); M().push(mkc('db1', 600, 3, undefined));
+    avisos.length = 0; A('juntarNotaCore')(['da1', 'db1']);
+    t('36i: compra com data impossível ("2026-13-45") não vira "45/13/2026" no aviso: o rótulo fica só com o valor', !/45\/13\/2026/.test(n36(avisos[0] || '')) && /tem paga a parcela 1/.test(avisos[0] || ''), n36(avisos[0] || ''));
+    /* item 5: o botão irmão (aba Compras) também não pode calar — a leitura da seleção mora no juntarNotaCore, que os dois botões usam */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(mkc('wa', 300, 3, undefined)); M().push(mkc('wb', 300, 3, undefined));
+    const resolveOrig2 = g('resolveJunta'); setg('resolveJunta', () => { throw new Error('quebrou de proposito'); });
+    setg('selMode', true); setg('selIds', { wa: 1, wb: 1 }); avisos.length = 0;
+    try { A('juntarNota')(); } finally { setg('resolveJunta', resolveOrig2); }
+    t('36i: o botão "juntar" da aba COMPRAS também não cala: se ler a seleção estoura, avisa ("Não consegui juntar agora… Nada foi juntado"), nada é juntado e a seleção continua marcada',
+      avisos.length === 1 && /Não consegui juntar agora/.test(avisos[0]) && /Nada foi juntado/.test(avisos[0]) && M().every(m => !m.notaId) && g('selMode') === true && S34(g('selIds')) === S34({ wa: 1, wb: 1 }), S34([avisos, g('selIds')]));
+  });
+
+  /* ---- 36j: o que as mutacoes do revisor de medicao mostraram nao ter teste (conta do dono, empate, orfaos, fracao, teto de parcelas) ---- */
+  await bloco36('j', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X', 'Y']));
+    const sxy = () => g('contasBanc').map(cb => r34(sf34(cb)));
+    /* a conta que paga as parcelas da compra e a do DONO (o pedaco que guarda a marca), nao a do 1o pedaco da lista */
+    M().push(compra34('a1', { valor: 240, qtd: 2, nParc: 3, venc1: '2026-08-15', conta: 'X' }));
+    M().push(compra34('a2', { valor: 60, qtd: 1, nParc: 3, venc1: '2026-08-15', conta: 'Y', loteOrigem: 'a1', situacao: 'Vendido', pgParcelas: { 1: { d: '2026-08-15', v: 100, conta: 'Y' } } }));
+    t('36j: a conta que paga a compra dividida e a do DONO (o pedaco que guarda a marca), nao a do 1º pedaco da lista: X fica em 1000 e Y paga a marcada e a vencida (800)', S34(sxy()) === S34([1000, 800]) && A('gruposParcelados')()[0].conta === 'Y' && A('gruposParcelados')()[0].dono.id === 'a2', S34([sxy(), A('gruposParcelados')().map(x => [x.dono.id, x.conta])]));
+    /* empate de valor: a de data mais antiga, depois a conta em ordem — nunca a do 1º ou do ultimo pedaco */
+    const par = (id, marca) => compra34(id, { valor: 100, qtd: 1, nParc: 3, venc1: '2026-08-15', conta: 'X', loteOrigem: 'b0', situacao: 'Vendido', pgParcelas: marca ? { 1: marca } : undefined });
+    const raiz = () => compra34('b0', { valor: 100, qtd: 1, nParc: 3, venc1: '2026-08-15', conta: 'X' });
+    const m1 = { d: '2026-08-16', v: 100, conta: 'X' }, m2 = { d: '2026-08-15', v: 100, conta: 'Y' }, m3 = { d: '2026-08-15', v: 100, conta: 'Z' };
+    const uniao = L => { setg('movs', L.map(x => JSON.parse(JSON.stringify(x)))); return S34(A('gruposParcelados')()[0].marcas[1]); };
+    const esperado = S34({ d: '2026-08-15', v: 100, conta: 'Y' });
+    t('36j: empate de valor entre marcas da mesma parcela: vale a de data mais antiga, e com a mesma data a conta em ordem alfabetica — e isso NAO depende da ordem dos pedacos (4 ordens)',
+      uniao([raiz(), par('b1', m1), par('b2', m2)]) === esperado && uniao([raiz(), par('b2', m2), par('b1', m1)]) === esperado && uniao([raiz(), par('b3', m3), par('b2', m2)]) === esperado && uniao([raiz(), par('b2', m2), par('b3', m3)]) === esperado,
+      S34([uniao([raiz(), par('b1', m1), par('b2', m2)]), uniao([raiz(), par('b2', m2), par('b1', m1)]), uniao([raiz(), par('b3', m3), par('b2', m2)]), uniao([raiz(), par('b2', m2), par('b3', m3)])]));
+    /* dono estavel: excluir + restaurar da Lixeira reordena a lista, e o dono (com o plano e a conta dele) nao pode mudar */
+    const d1 = compra34('d1', { valor: 300, qtd: 3, nParc: 3, venc1: '2026-08-15', conta: 'X' }), d2 = compra34('d2', { valor: 300, qtd: 3, nParc: 6, venc1: '2026-08-15', conta: 'Y', loteOrigem: 'd1' });
+    const donoDe = L => { setg('movs', L.map(x => JSON.parse(JSON.stringify(x)))); const gg = A('gruposParcelados')()[0]; return S34([gg.dono.id, gg.nP, gg.conta, sxy()]); };
+    t('36j: sem marca nenhuma o dono e o de MENOR id, seja qual for a ordem dos pedacos (a ordem viaja no merge e muda com excluir + restaurar): mesmo dono, mesmo plano, mesma conta, mesmos saldos',
+      donoDe([d1, d2]) === donoDe([d2, d1]) && JSON.parse(donoDe([d2, d1]))[0] === 'd1', S34([donoDe([d1, d2]), donoDe([d2, d1])]));
+    const d2m = Object.assign({}, d2, { pgParcelas: { 1: { d: '2026-08-15', v: 50, conta: 'Y' } } });
+    t('36j: com marca, o dono e o pedaco que a guarda (d2) nas duas ordens', JSON.parse(donoDe([d1, d2m]))[0] === 'd2' && JSON.parse(donoDe([d2m, d1]))[0] === 'd2', S34([donoDe([d1, d2m]), donoDe([d2m, d1])]));
+    /* orfaos: pedacos do mesmo pai apagado sao UMA compra (o dado real tem 2 pedacos assim) */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(compra34('o1', { valor: 100, qtd: 1, nParc: 3, venc1: '2026-08-15', loteOrigem: 'morto' }));
+    M().push(compra34('o2', { valor: 200, qtd: 2, nParc: 3, venc1: '2026-08-15', loteOrigem: 'morto' }));
+    const go = A('gruposParcelados')();
+    t('36j: dois pedacos ORFAOS do mesmo pai apagado sao UMA compra de 3 parcelas (nao 2 compras nem 6 parcelas): 1 grupo, R$ 300, 3 linhas', go.length === 1 && go[0].nP === 3 && go[0].tot === 300 && A('aPagar')(true).length + A('aPagar')().length === 3, S34([go.length, A('aPagar')(true).length, A('aPagar')().length]));
+    /* fracao de parcela: as parcelas somam o total da compra, nunca mais (2,5× virava 3 parcelas de total/2,5 = 360 numa compra de 300) */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(compra34('fr', { valor: 300, nParc: 2.5, venc1: '2026-08-15' }));
+    const gf = A('gruposParcelados')()[0], lin = A('aPagar')(true).concat(A('aPagar')());
+    t('36j: nº de parcelas fracionado (2,5×) vira 3 parcelas IGUAIS de 100 — a compra de R$ 300 nunca passa de R$ 300 (antes: 3 × 120 = 360) — e o Diagnostico avisa',
+      gf.nP === 3 && r34(gf.vP) === 100 && soma34(lin) === 300 && diag36(/Número de parcelas fora do padrão/).length === 1, S34([gf.nP, gf.vP, soma34(lin), diag36(/parcelas fora/)]));
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(compra34('gg', { valor: 1200, nParc: 500, venc1: '2026-08-15' }));
+    const gg = A('gruposParcelados')()[0], ll = A('aPagar')(true).concat(A('aPagar')());
+    t('36j: nº de parcelas acima do teto (500; 999999 travava a tela) e cortado em 120 na leitura: nenhuma tela monta um milhao de linhas; parcela de 10, total 1200; o Diagnostico avisa', gg.nP === 120 && r34(gg.vP) === 10 && ll.length === 120 && diag36(/Número de parcelas fora do padrão/).length === 1, S34([gg.nP, gg.vP, ll.length]));
+  });
+
+  /* ---- 36k: chave "__proto__" no JSON de fora, marca torta, contas repetidas, valor de marca em texto, despesa paga, vencParcelaISO fora da faixa ---- */
+  await bloco36('k', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', banco34(['X']));
+    const base = { id: 'pr', tipo: 'COMPRA', data: '2026-01-10', jogo: 'Pokémon', cat: 'ETB', colecao: '151', qtd: 1, valor: 900, situacao: 'Em estoque', destino: 'Vender', contraparte: 'Loja', conta: 'X', pgTipo: 'Parcelado', nParc: 3, venc1: '2026-08-15' };
+    M().push(JSON.parse(JSON.stringify(base)));
+    const semChave = dinheiro36();
+    reset();
+    const marcasFalsas = '{"__proto__":{"1":{"d":"2026-08-15","v":900},"2":{"d":"2026-08-15","v":900},"3":{"d":"2026-08-15","v":900}}}';   /* um mapa de marcas escondido sob __proto__ */
+    M().push(Object.assign(JSON.parse(JSON.stringify(base)), { pgParcelas: JSON.parse(marcasFalsas) }));
+    const gp = A('gruposParcelados')()[0], cp = A('copiaMarcas')(M()[0].pgParcelas);
+    t('36k: JSON de fora com a chave "__proto__" em pgParcelas NAO inventa pagamento (antes trocava o prototipo das marcas: as parcelas 1 a 3 apareciam pagas sem ninguem pagar); o dinheiro e o mesmo do JSON sem a chave, e a copia das marcas nao herda nada',
+      Object.keys(gp.marcas).length === 0 && gp.marcas[1] === undefined && cp[1] === undefined && Object.keys(cp).length === 0 && S34(dinheiro36()) === S34(semChave), S34([Object.keys(gp.marcas), gp.marcas[1], cp[1], dinheiro36(), semChave]));
+    t('36k: e o Diagnostico mostra a marca com numero fora do padrao ("__proto__")', diag36(/número fora do padrão/).length === 1 && /__proto__/.test(diag36(/número fora do padrão/)[0].titulo), S34(diag36(/fora do padr/)));
+    reset();
+    M().push(Object.assign(JSON.parse(JSON.stringify(base)), { pgParcelas: { '2.0': { d: '2026-08-15', v: 100 }, ' 3': { d: '2026-08-15', v: 100 }, '0': { d: '2026-08-15', v: 100 }, 1: { d: '2026-08-15', v: 300 } } }));
+    const comLixo = dinheiro36(), avisos9h = diag36(/número fora do padrão/).length;
+    reset(); M().push(Object.assign(JSON.parse(JSON.stringify(base)), { pgParcelas: { 1: { d: '2026-08-15', v: 300 } } }));
+    t('36k: marca com numero de parcela fora do padrao ("2.0", " 3", "0") nao conta em tela nenhuma (o dinheiro e o de quem so tem a parcela 1 marcada) e o Diagnostico mostra cada uma (3 avisos)',
+      S34(comLixo) === S34(dinheiro36()) && avisos9h === 3, S34([comLixo, dinheiro36(), avisos9h]));
+    /* duas contas com o mesmo nome */
+    reset(); setg('contasBanc', [{ nome: 'K', saldoIni: 1000, saldoData: '' }, { nome: 'K', saldoIni: 1000, saldoData: '' }, { nome: 'Z', saldoIni: 5, saldoData: '' }]);
+    t('36k: duas contas cadastradas com o MESMO nome geram o aviso do Diagnostico (cada saldo debita nos dois cadastros); nomes diferentes nao', diag36(/Duas contas com o mesmo nome: "K"/).length === 1 && diag36(/Duas contas/).length === 1, S34(diag36(/Duas contas/)));
+    setg('contasBanc', [{ nome: 'K', saldoIni: 1000, saldoData: '' }, { nome: 'Z', saldoIni: 5, saldoData: '' }]);
+    t('36k: sem nome repetido, nenhum aviso', diag36(/Duas contas/).length === 0, '');
+    /* valor de marca em texto: nunca vira NaN no saldo */
+    reset(); setg('contasBanc', banco34(['X']));
+    M().push(Object.assign(JSON.parse(JSON.stringify(base)), { pgParcelas: { 1: { d: '2026-08-15', v: 'abc', conta: 'X' }, 2: { d: '2026-09-15', v: '300,00', conta: 'X' } } }));
+    const sfv = sf34(g('contasBanc')[0]);
+    t('36k: valor da marca em texto ("abc", "300,00") cai no valor da parcela (300): o saldo fica 400 (1000 - 300 - 300) e nunca vira R$ NaN', Number.isFinite(sfv) && r34(sfv) === 400 && A('pgValor')({ v: 'abc' }, 7) === 7 && A('pgValor')({ v: '' }, 7) === 7 && A('pgValor')({ v: 12.5 }, 7) === 12.5, S34([sfv]));
+    /* despesa paga: o corte pela data-base da conta olha o dia do PAGAMENTO */
+    reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '2026-09-01' }]);
+    M().push({ id: 'dp1', tipo: 'DESPESA', data: '2026-08-10', valor: 100, status: 'pago', conta: 'X', dataPagamento: '2026-09-10', natureza: 'ordinaria', cat: 'Frete' });
+    M().push({ id: 'dp2', tipo: 'DESPESA', data: '2026-09-10', valor: 40, status: 'pago', conta: 'X', dataPagamento: '2026-08-20', natureza: 'ordinaria', cat: 'Frete' });
+    t('36k: despesa paga: a data-base da conta corta pelo dia do PAGAMENTO — a emitida em agosto e paga em 10/09 (depois da data-base) DEBITA (900); a emitida em 10/09 mas paga em agosto (antes) nao', r34(sf34(g('contasBanc')[0])) === 900, S34([sf34(g('contasBanc')[0])]));
+    /* vencimento fora da faixa */
+    t('36k: vencimento da parcela 0 ou negativa nao existe ("" em vez de 2025-00-31), e a 1 continua sendo o 1º vencimento', A('vencParcelaISO')({ venc1: '2026-08-15' }, 0) === '' && A('vencParcelaISO')({ venc1: '2026-08-15' }, -1) === '' && A('vencParcelaISO')({ venc1: '2026-08-15' }, 1) === '2026-08-15', S34([A('vencParcelaISO')({ venc1: '2026-08-15' }, 0)]));
+  });
+
+  /* ---- 36l: o filtro de periodo do Fluxo usa a data LOCAL (em Lisboa/Toquio o dia 01/10 caia em 30/09) ---- */
+  await bloco36('l', () => {
+    const tz0 = process.env.TZ;
+    const src = A('okCtG').toString() + A('vContas').toString();
+    try {
+      process.env.TZ = 'Europe/Lisbon';
+      const x = { m: {}, venc: A('dataDeISO')('2026-10-01') };
+      setg('perDe', '2026-10-01'); setg('perAte', '2026-10-31'); setg('ctPess', ''); setg('ctJogo', ''); setg('ctConta', ''); setg('ctCat', '');
+      const lisboa = A('okCtG')(x);
+      process.env.TZ = 'Asia/Tokyo';
+      const toquio = A('okCtG')({ m: {}, venc: A('dataDeISO')('2026-10-31') });
+      t('36l: o filtro de periodo do Fluxo usa o dia LOCAL da parcela: em Lisboa a parcela de 01/10 entra no periodo 01-31/10 e em Toquio a de 31/10 tambem (antes UTC: caia em 30/09 e 30/10)', lisboa === true && toquio === true, S34([lisboa, toquio]));
+    } finally { process.env.TZ = tz0; setg('perDe', ''); setg('perAte', ''); }
+    t('36l: nem o filtro nem o agrupamento por mes do Fluxo leem a data em UTC (sem toISOString em okCtG e em vContas)', !/toISOString/.test(src), (src.match(/.{0,50}toISOString.{0,30}/) || [''])[0]);
+  });
+
+  /* ---- 36m: dividir o lote nao muda nem 1 centavo (a soma dos pedacos em ponto flutuante diferia da original no ultimo bit) ---- */
+  await bloco36('m', () => {
+    congela(2026, 9, 21, 10, 0);
+    setg('contasBanc', [{ nome: 'X', saldoIni: 500, saldoData: '' }]);
+    M().push(compra34('c0', { data: '2026-03-10', valor: 145.29, qtd: 2, nParc: 6, venc1: '2026-06-10', conta: 'X' }));
+    const f0 = foto34();
+    A('baixarLote')('c0', 1, 'Coleção', { dataSaida: '2026-09-02' });
+    const f1 = foto34();
+    t('36m: dividir o lote de R$ 145,29 (2 pedacos: 72,64 + 72,65) em 6 parcelas nao muda NENHUM numero ao centavo — antes a projecao de +30 dias saltava de 378,93 pra 378,92 so porque a soma dos pedacos diferia no ultimo bit',
+      S34(f0) === S34(f1) && f0.proj[1] === 378.93, S34([f0.proj, f1.proj]));
+    /* o total do grupo e em CENTAVOS: pedacos com fracao de centavo (dado importado) somam 20,008 e o total e 20,01 — arredondar em milesimos nao fecha em centavos */
+    reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 500, saldoData: '' }]);
+    M().push(compra34('sc', { data: '2026-03-10', valor: 10.004, qtd: 2, nParc: 2, venc1: '2026-06-10', conta: 'X' }));
+    M().push(compra34('sd', { data: '2026-03-10', valor: 10.004, qtd: 1, nParc: 2, venc1: '2026-06-10', conta: 'X', loteOrigem: 'sc' }));
+    t('36m: o total da compra dividida e em centavos (10,004 + 10,004 = 20,008 vira 20,01), nao 20,008 nem 20,0080', A('gruposParcelados')()[0].tot === 20.01, S34(A('gruposParcelados')().map(x => x.tot)));
+  });
+}).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
+  /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
+     A regra do dinheiro e escrita aqui DE NOVO, em cima da DESCRICAO das compras (valor, plano, marcas, conta) e sem chamar nenhuma tela do app:
+     cada parcela vira um evento (data, conta, valor) — marcada: na data/valor/conta da marca; vencida sem marca: no vencimento; a vencer:
+     ainda nao; alem do plano: na data da marca. Dai saem, por conta propria, o saldo fisico de cada conta, o ultimo ponto da curva, a
+     projecao (com o escopo) e as contagens de a pagar / vencidas / pagas. O app e montado a partir da MESMA descricao, mas depois de uma
+     sequencia aleatoria de operacoes que NAO podem mudar o dinheiro: dividir o lote (baixarLote, baixarBoosters), recarregar
+     (JSON.parse), pagar uma parcela pela tela e desmarcar. Se o app e o oraculo discordam, um dos dois esta errado — e a discordancia
+     aparece com a semente e o cenario. (O mesmo desenho do gerador de 2.500 cenarios que provou o M-1, agora sobre o pagamento por compra.) */
+  console.log('');
+  console.log('=== 35. oraculo por razao de eventos (cenarios aleatorios: dividir, recarregar, pagar, desmarcar) ===');
+  const S35 = s => JSON.stringify(s);
+  const r35 = x => Math.round(x * 100) / 100;
+  const HOJE35 = '2026-09-21';
+  const p2 = n => (n < 10 ? '0' : '') + n;
+  const addDias35 = (iso, n) => { const d = new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n)); return d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()); };
+  const somaMes35 = (iso, i) => {
+    const y = +iso.slice(0, 4), m = +iso.slice(5, 7) - 1, dia = +iso.slice(8, 10);
+    const alvo = new Date(Date.UTC(y, m + i, 1)), y2 = alvo.getUTCFullYear(), m2 = alvo.getUTCMonth();
+    const ult = new Date(Date.UTC(y2, m2 + 1, 0)).getUTCDate();
+    return y2 + '-' + p2(m2 + 1) + '-' + p2(Math.min(dia, ult));
+  };
+  const isoOk35 = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && (() => { const d = new Date(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10))); return d.getUTCFullYear() === +s.slice(0, 4) && d.getUTCMonth() === +s.slice(5, 7) - 1 && d.getUTCDate() === +s.slice(8, 10); })();
+  const mulberry35 = seed => { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+
+  /* ---------- gerador: a DESCRICAO das compras, vendas e despesas ---------- */
+  const gera35 = rnd => {
+    const pick = arr => arr[Math.floor(rnd() * arr.length)];
+    const int = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+    const dataEm = (de, ate) => addDias35(de, int(0, Math.max(0, Math.round((Date.UTC(+ate.slice(0, 4), +ate.slice(5, 7) - 1, +ate.slice(8, 10)) - Date.UTC(+de.slice(0, 4), +de.slice(5, 7) - 1, +de.slice(8, 10))) / 864e5))));
+    const nomes = ['X', 'Y', 'Z'];
+    const nc = int(0, 3);
+    const contas = nomes.slice(0, nc).map(n => ({ nome: n, saldoIni: int(0, 200) * 10, saldoData: rnd() < 0.3 ? dataEm('2026-05-01', '2026-08-31') : '' }));
+    const contaDe = () => pick(['X', 'X', 'Y', 'Z', '']);
+    const bordas = ['2026-03-31', '2026-05-31', '2026-07-29', '2026-07-30', '2026-08-31', '2026-01-31', '2026-06-30'];
+    const compras = [];
+    const nCompras = int(1, 5);
+    for (let i = 0; i < nCompras; i++) {
+      const parcelada = rnd() < 0.7;
+      const nP = parcelada ? int(1, 6) : 0;
+      const itens = rnd() < 0.25 ? int(2, 3) : 1;
+      const data = dataEm('2026-03-01', '2026-09-20');
+      const venc1 = !parcelada ? '' : (rnd() < 0.15 ? '' : (rnd() < 0.05 ? '2026-13-40' : (rnd() < 0.3 ? pick(bordas) : addDias35(data, int(-10, 70)))));
+      const c = { id: 'c' + i, conta: contaDe(), data, parcelada, nP, venc1, nota: itens > 1, itens: [], marcas: {} };
+      for (let k = 0; k < itens; k++) { const boo = itens === 1 && rnd() < 0.3; c.itens.push({ id: c.id + (itens > 1 ? '_' + k : ''), valor: int(100, 90000) / 100, qtd: itens > 1 ? 1 : int(1, 6), booster: boo, bpu: boo ? int(2, 6) : 0 }); }
+      const total = r35(c.itens.reduce((s, x) => s + x.valor, 0)), vP = total / (nP || 1);
+      if (parcelada) {
+        for (let k = 1; k <= nP; k++) {
+          if (rnd() >= 0.3) continue;
+          const sorte = rnd();
+          const m = { v: r35(vP + pick([0, 0, 0, -5, 5, 12])) };
+          if (sorte < 0.8) m.d = dataEm(data, addDias35(HOJE35, 10)); else if (sorte < 0.9) { /* marca sem data */ } else m.d = pick(['lixo', '2026-02-30', '']);
+          if (rnd() < 0.3) m.conta = pick(['X', 'Y', 'Z', 'W']);
+          if (sorte >= 0.95) c.marcas[k] = dataEm(data, HOJE35); else c.marcas[k] = m;      /* 5%: formato antigo (so a data, em texto) */
+        }
+        if (rnd() < 0.12) c.marcas[nP + 1] = { d: dataEm(data, HOJE35), v: r35(vP), conta: rnd() < 0.3 ? pick(['X', 'Y']) : undefined };
+      }
+      compras.push(c);
+    }
+    const vendas = [], despesas = [];
+    for (let i = 0; i < int(0, 3); i++) { const app = rnd() < 0.6; vendas.push({ id: 'v' + i, data: dataEm('2026-07-01', '2026-09-20'), valor: int(100, 50000) / 100, taxa: app ? pick([0, 10, 12.5]) : 0, canal: app ? 'App' : 'Pix', recDias: app ? int(1, 30) : 0, conta: contaDe() }); }
+    for (let i = 0; i < int(0, 3); i++) { const st = rnd() < 0.5 ? 'pago' : 'apagar'; despesas.push({ id: 'd' + i, data: dataEm('2026-08-15', '2026-10-30'), valor: int(100, 20000) / 100, status: st, conta: contaDe(), dataPagamento: st === 'pago' && rnd() < 0.4 ? dataEm('2026-08-15', '2026-09-20') : '' }); }
+    return { contas, compras, vendas, despesas };
+  };
+
+  /* ---------- o oraculo: eventos a partir da descricao (nenhuma tela do app) ---------- */
+  const oraculo35 = D => {
+    const fis = [], curva = [], fluxos = [], aPagarFut = [], venc = [], pagasParc = [];
+    const nomesC = D.contas.map(c => c.nome), temContas = D.contas.length > 0;
+    const dentro = conta => !temContas || nomesC.indexOf(conta) >= 0;
+    let semPagar = 0, semPagarValor = 0, pres = 0, presValor = 0, presSemConta = 0, presSemContaValor = 0;
+    D.compras.forEach(c => {
+      const total = r35(c.itens.reduce((s, x) => s + x.valor, 0));
+      if (!c.parcelada) { fis.push({ data: c.data, conta: c.conta, v: -total, corte: c.data }); curva.push({ data: c.data, v: -total }); return; }
+      const vP = total / c.nP;
+      const base = isoOk35(c.venc1) ? c.venc1 : (isoOk35(c.data) ? c.data : '');
+      for (let i = 1; i <= c.nP; i++) {
+        const due = base ? somaMes35(base, i - 1) : '';
+        const m = c.marcas[i];
+        if (m) {
+          const dm = typeof m === 'string' ? m : m.d;
+          const data = isoOk35(dm) ? dm : (due || HOJE35);
+          const conta = (m && typeof m === 'object' && m.conta) ? m.conta : c.conta;
+          const v = (m && typeof m === 'object' && m.v != null) ? m.v : vP;
+          fis.push({ data, conta, v: -v, corte: data }); curva.push({ data, v: -v }); pagasParc.push(v);
+        } else if (due && due < HOJE35) {
+          fis.push({ data: due, conta: c.conta, v: -vP, corte: due }); curva.push({ data: due, v: -vP }); pres++; presValor += vP; venc.push(vP); pagasParc.push(vP);
+          if (nomesC.indexOf(c.conta) < 0) { presSemConta++; presSemContaValor += vP; }
+        } else {
+          semPagar++; semPagarValor += vP; aPagarFut.push(vP);
+          fluxos.push({ data: due || HOJE35, v: -vP, conta: c.conta });
+        }
+      }
+      Object.keys(c.marcas).forEach(ks => {
+        const k = +ks; if (!(Number.isInteger(k) && String(k) === ks && k > c.nP)) return;
+        const m = c.marcas[ks]; const dm = typeof m === 'string' ? m : m && m.d; if (!isoOk35(dm)) return;
+        const conta = (m && typeof m === 'object' && m.conta) ? m.conta : c.conta;
+        const v = (m && typeof m === 'object' && m.v != null) ? m.v : vP;
+        fis.push({ data: dm, conta, v: -v, corte: dm }); curva.push({ data: dm, v: -v }); pagasParc.push(v);
+      });
+    });
+    D.vendas.forEach(v => {
+      const liq = v.valor * (1 - v.taxa / 100);
+      curva.push({ data: v.data, v: liq });
+      if (v.canal === 'App' && v.recDias > 0) {
+        const rep = addDias35(v.data, v.recDias);
+        if (rep < HOJE35) fis.push({ data: rep, conta: v.conta, v: liq, corte: rep }); else fluxos.push({ data: rep, v: liq, conta: v.conta });
+      } else fis.push({ data: v.data, conta: v.conta, v: liq, corte: v.data });
+    });
+    D.despesas.forEach(d => {
+      if (d.status === 'pago') { const dc = d.dataPagamento || d.data; curva.push({ data: dc, v: -d.valor }); fis.push({ data: dc, conta: d.conta, v: -d.valor, corte: dc }); }
+      else if (d.data <= HOJE35) { fis.push({ data: d.data, conta: d.conta, v: -d.valor, corte: d.data }); if (!temContas || false) fluxos.push({ data: d.data, v: -d.valor, conta: d.conta }); else if (nomesC.indexOf(d.conta) < 0) fluxos.push({ data: d.data, v: -d.valor, conta: d.conta }); }
+      else fluxos.push({ data: d.data, v: -d.valor, conta: d.conta });
+    });
+    const saldo = cb => r35(cb.saldoIni + fis.filter(e => e.conta === cb.nome && !(cb.saldoData && e.corte < cb.saldoData)).reduce((s, e) => s + e.v, 0));
+    const atual = r35(D.contas.reduce((s, cb) => s + saldo(cb), 0));
+    const ate = (L, n) => L.filter(f => f.data <= addDias35(HOJE35, n));
+    const dentroL = fluxos.filter(f => dentro(f.conta)), foraL = fluxos.filter(f => !dentro(f.conta));
+    const em = n => r35(atual + ate(dentroL, n).reduce((s, f) => s + f.v, 0));
+    const f90 = ate(foraL, 90);
+    return { saldos: D.contas.map(saldo), atual, d30: em(30), d60: em(60), d90: em(90), curva: r35(curva.reduce((s, e) => s + e.v, 0)),
+      fora: { entra: r35(f90.filter(f => f.v > 0).reduce((s, f) => s + f.v, 0)), sai: r35(-f90.filter(f => f.v < 0).reduce((s, f) => s + f.v, 0)), n: f90.length },
+      semPagar, semPagarValor: r35(semPagarValor), pres, presValor: r35(presValor), presSemConta, presSemContaValor: r35(presSemContaValor), nAPagar: aPagarFut.length, nVenc: venc.length,
+      pagasValor: r35(pagasParc.reduce((s, v) => s + v, 0)), pagasN: pagasParc.length };
+  };
+
+  /* ---------- monta o app a partir da descricao, com divisoes e recargas ---------- */
+  const monta35 = (D, rnd) => {
+    const movs = [];
+    D.compras.forEach(c => {
+      c.itens.forEach((it, idx) => {
+        const rec = { id: it.id, tipo: 'COMPRA', data: c.data, jogo: 'Pokémon', cat: it.booster ? 'Booster Box' : 'ETB', colecao: '151', qtd: it.qtd, valor: it.valor, situacao: 'Em estoque', destino: 'Vender',
+          contraparte: 'L', conta: c.conta, pgTipo: c.parcelada ? 'Parcelado' : 'À vista', nParc: c.parcelada ? c.nP : 0, venc1: c.parcelada ? c.venc1 : '' };
+        if (it.booster) rec.boosters = it.bpu;
+        if (c.nota) { rec.notaId = 'N_' + c.id; rec.notaNum = '1'; }
+        if (c.parcelada && idx === 0) rec.pgParcelas = JSON.parse(JSON.stringify(c.marcas));
+        movs.push(rec);
+      });
+    });
+    D.vendas.forEach(v => movs.push({ id: v.id, tipo: 'VENDA', data: v.data, valor: v.valor, taxa: v.taxa, canal: v.canal, recDias: v.recDias, conta: v.conta, contraparte: 'C', qtd: 1 }));
+    D.despesas.forEach(d => movs.push({ id: d.id, tipo: 'DESPESA', data: d.data, valor: d.valor, status: d.status, natureza: 'ordinaria', cat: 'Frete', conta: d.conta, dataPagamento: d.dataPagamento || undefined }));
+    return movs;
+  };
+  const divide35 = (rnd, log) => {
+    const alvos = M().filter(m => m.tipo === 'COMPRA' && (+m.qtd || 1) > 1);
+    if (!alvos.length) return;
+    const a = alvos[Math.floor(rnd() * alvos.length)];
+    const boo = a.cat === 'Booster Box' && a.boosters > 1;
+    if (boo && rnd() < 0.5) { const tot = (+a.qtd) * a.boosters, n = 1 + Math.floor(rnd() * (tot - 1)); A('baixarBoosters')(a.id, n, rnd() < 0.5 ? 'Vendido' : 'Coleção', { dataSaida: '2026-09-02' }); log.push('boo(' + a.id + ',' + n + ')'); }
+    else { const n = 1 + Math.floor(rnd() * ((+a.qtd) - 1)); A('baixarLote')(a.id, n, rnd() < 0.5 ? 'Vendido' : 'Coleção', { dataSaida: '2026-09-02' }); log.push('lote(' + a.id + ',' + n + ')'); }
+  };
+
+  const cmp35 = (rot, a, b, tol) => Math.abs(a - b) <= (tol == null ? 0.011 : tol);
+  const rodaSemente35 = async (semente, n) => {
+    const falhas = [];
+    let totalOps = 0, comDivisao = 0, comMarcaPaga = 0, comNota = 0;
+    for (let s = 0; s < n; s++) {
+      const rnd = mulberry35(semente * 100003 + s), D = gera35(rnd), log = [];
+      const hora = [[10, 0], [20, 59], [21, 1], [22, 30]][Math.floor(rnd() * 4)];
+      reset();
+      try {
+        congela(2026, 9, 21, hora[0], hora[1]);
+        setg('contasBanc', D.contas.map(c => Object.assign({}, c))); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', '');
+        setg('movs', monta35(D, rnd));
+        if (D.compras.some(c => c.nota)) comNota++;
+        /* sequencia aleatoria de operacoes que NAO mudam o dinheiro */
+        const nOps = Math.floor(rnd() * 6);
+        for (let k = 0; k < nOps; k++) {
+          const q = rnd(); totalOps++;
+          if (q < 0.4) { divide35(rnd, log); comDivisao++; }
+          else if (q < 0.65) { setg('movs', JSON.parse(JSON.stringify(M()))); log.push('recarrega'); }
+          else if (q < 0.85) {
+            /* pagar uma parcela a vencer pela tela: o app marca o dono UMA vez; na descricao vira uma marca de hoje */
+            const linhas = A('aPagar')().filter(x => x.pi);
+            if (linhas.length) {
+              const l = linhas[Math.floor(rnd() * linhas.length)], conta = ['X', 'Y', 'Z', ''][Math.floor(rnd() * 4)];
+              const donoDesc = D.compras.find(c => c.itens.some(it => it.id === l.m.id || M().some(m => m.id === l.m.id && (m.id === it.id || raizId35(m) === it.id))));
+              if (donoDesc && !donoDesc.marcas[l.pi]) {
+                ctx.document.getElementById = idc => ({ value: idc === 'pp_conta' ? conta : '', remove() {}, style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {} });
+                A('confirmarPagarParcela')(l.m.id, l.pi, l.pn, l.valor);
+                donoDesc.marcas[l.pi] = { d: HOJE35, v: r35(l.valor), conta };
+                log.push('paga(' + donoDesc.id + ',' + l.pi + ',' + conta + ')');
+              }
+            }
+          } else {
+            /* desmarcar uma parcela paga (a marca some de TODOS os pedacos) */
+            const marcadas = []; D.compras.forEach(c => { if (c.parcelada) Object.keys(c.marcas).forEach(k => marcadas.push([c, k])); });
+            if (marcadas.length) {
+              const [c, k] = marcadas[Math.floor(rnd() * marcadas.length)];
+              const dono = M().filter(m => m.tipo === 'COMPRA' && (c.itens.some(it => it.id === m.id || raizId35(m) === it.id))).find(m => m.pgParcelas && Object.prototype.hasOwnProperty.call(m.pgParcelas, k)) || M().find(m => c.itens.some(it => it.id === m.id));
+              ctx.confirm = () => true;
+              A('desmarcarParcela')(dono.id, +k);
+              delete c.marcas[k]; log.push('desmarca(' + c.id + ',' + k + ')');
+            }
+          }
+        }
+        if (D.compras.some(c => c.parcelada && Object.keys(c.marcas).length)) comMarcaPaga++;
+        const O = oraculo35(D);
+        const ap = A('aPagar')().filter(x => x.pi), av = A('aPagar')(true), pg = A('contasPagas')().filter(x => x.pi), sd = A('serieDinheiro')(), pj = A('projecaoCaixa')();
+        const cbs = g('contasBanc'), saldos = cbs.map(cb => r35(A('saldoFisicoConta')(Object.assign({}, cb))));
+        const erros = [];
+        saldos.forEach((v, i) => { if (!cmp35('saldo', v, O.saldos[i])) erros.push('saldo ' + cbs[i].nome + ': app ' + v + ' oraculo ' + O.saldos[i]); });
+        if (!cmp35('atual', pj.atual, r35(saldos.reduce((s, v) => s + v, 0)))) erros.push('I4 projecao.atual ' + pj.atual + ' != soma dos saldos ' + r35(saldos.reduce((s, v) => s + v, 0)));
+        /* os horizontes somam o saldo JA arredondado de cada conta a fluxos com fracao de centavo (parcela de 339,15 / 2 = 169,575) e arredondam de novo: um empate de meio centavo
+           numa conta e outro no horizonte podem somar 1 centavo cada — tolerancia de 1 centavo por arredondamento (contas + o proprio horizonte) */
+        const tolH = 0.011 * (D.contas.length + 1);
+        [['d30', pj.d30, O.d30], ['d60', pj.d60, O.d60], ['d90', pj.d90, O.d90]].forEach(([k, a, b]) => { if (!cmp35(k, a, b, tolH)) erros.push('projecao ' + k + ': app ' + a + ' oraculo ' + b); });
+        if (!cmp35('fora', pj.fora.entra, O.fora.entra) || !cmp35('fora', pj.fora.sai, O.fora.sai) || pj.fora.n !== O.fora.n) erros.push('fora: app ' + S35(pj.fora) + ' oraculo ' + S35(O.fora));
+        const ultima = sd.length ? sd[sd.length - 1].total : 0;
+        if (!cmp35('curva', ultima, O.curva)) erros.push('curva final: app ' + ultima + ' oraculo ' + O.curva);
+        if (sd.semPagar !== O.semPagar || !cmp35('semPagarValor', sd.semPagarValor, O.semPagarValor)) erros.push('semPagar: app ' + sd.semPagar + '/' + sd.semPagarValor + ' oraculo ' + O.semPagar + '/' + O.semPagarValor);
+        if (sd.presumidas !== O.pres || !cmp35('presValor', sd.presumidasValor, O.presValor) || sd.presSemConta !== O.presSemConta) erros.push('presumidas: app ' + sd.presumidas + '/' + sd.presumidasValor + '/' + sd.presSemConta + ' oraculo ' + O.pres + '/' + O.presValor + '/' + O.presSemConta);
+        if (ap.length !== O.nAPagar) erros.push('aPagar(): app ' + ap.length + ' linhas, oraculo ' + O.nAPagar);
+        if (av.length !== O.nVenc || !cmp35('vencValor', av.reduce((s, x) => s + x.valor, 0), O.presValor)) erros.push('aPagar(true): app ' + av.length + '/' + r35(av.reduce((s, x) => s + x.valor, 0)) + ' oraculo ' + O.nVenc + '/' + O.presValor);
+        if (pg.length !== O.pagasN || !cmp35('pagas', pg.reduce((s, x) => s + x.valor, 0), O.pagasValor)) erros.push('pagas: app ' + pg.length + '/' + r35(pg.reduce((s, x) => s + x.valor, 0)) + ' oraculo ' + O.pagasN + '/' + O.pagasValor);
+        /* I5: toda parcela sem marca esta em UMA das duas listas (a vencer ou vencida), nunca nas duas */
+        const chaves = new Set(); let dup = 0;
+        ap.concat(av).forEach(x => { const k = (x.nota ? 'N' + x.nota.id : 'F' + (x.fam ? x.m.id : x.m.id)) + '#' + x.pi; if (chaves.has(k)) dup++; chaves.add(k); });
+        if (dup) erros.push('I5: ' + dup + ' parcela(s) em aPagar() e aPagar(true) ao mesmo tempo ou repetidas');
+        if (process.env.DEBUG35 === semente + ':' + s) { console.log('DEBUG35 descricao:', S35(D)); console.log('DEBUG35 oraculo:', S35(O)); console.log('DEBUG35 movs:', S35(M().filter(m => m.tipo === 'COMPRA').map(m => [m.id, m.loteOrigem, m.qtd, m.valor, m.nParc, m.venc1, m.conta, m.pgParcelas]))); console.log('DEBUG35 projecao:', S35(pj), 'saldos', S35(saldos)); }
+        if (erros.length && falhas.length < 5) falhas.push({ semente, s, hora: hora.join('h'), log, erros: erros.slice(0, 4) });
+        else if (erros.length) falhas.push(null);
+      } catch (e) { falhas.push({ semente, s, log, excecao: String((e && e.stack) || e).slice(0, 400) }); }
+      finally { descongela(); reset(); setg('contasBanc', []); }
+    }
+    return { falhas, totalOps, comDivisao, comMarcaPaga, comNota };
+  };
+  function raizId35(m) { let x = m, n = 0; while (x && x.loteOrigem && n++ < 20) { const p = M().find(y => y.id === x.loteOrigem); if (!p) break; x = p; } return x.id; }
+
+  const O35 = { confirm: ctx.confirm, geb: ctx.document.getElementById, render: g('render'), toast: g('toast'), diarioReg: g('diarioReg'), contas: g('contasBanc'), perSel: g('perSel'), perDe: g('perDe'), perAte: g('perAte') };
+  setg('render', () => {}); setg('toast', () => {}); setg('diarioReg', () => {});
+  try {
+    for (const semente of [1, 2, 3, 4, 5]) {
+      const R = await rodaSemente35(semente, 350);
+      const ruins = R.falhas.filter(Boolean);
+      t('35: semente ' + semente + ' — 350 cenarios (com ' + R.comDivisao + ' divisoes de lote, ' + R.comMarcaPaga + ' com parcela marcada, ' + R.comNota + ' com nota): o saldo fisico de cada conta, a curva, a projecao (com o escopo), as listas e os avisos batem com o oraculo por eventos; projecao "hoje" = soma dos saldos; nenhuma parcela em duas listas',
+        R.falhas.length === 0, S35(ruins.slice(0, 3)) + ' | total de cenarios ruins: ' + R.falhas.length);
+    }
+  } finally {
+    ctx.confirm = O35.confirm; ctx.document.getElementById = O35.geb; setg('render', O35.render); setg('toast', O35.toast); setg('diarioReg', O35.diarioReg);
+    setg('contasBanc', O35.contas); setg('perSel', O35.perSel); setg('perDe', O35.perDe); setg('perAte', O35.perAte); descongela(); reset();
+  }
+
+  /* ---------- I15: apagar pedaco (venda + peca, ou o que nao vendeu) nunca muda o TOTAL pago da compra ---------- */
+  const R15 = { confirm: ctx.confirm, geb: ctx.document.getElementById, render: g('render'), toast: g('toast'), diarioReg: g('diarioReg'), contas: g('contasBanc') };
+  setg('render', () => {}); setg('toast', () => {}); setg('diarioReg', () => {});
+  const ruins15 = []; let casos15 = 0, comRepasse15 = 0;
+  try {
+    for (let s = 0; s < 400; s++) {
+      const rnd = mulberry35(777 + s * 31);
+      reset(); setg('contasBanc', [{ nome: 'X', saldoIni: 1000, saldoData: '' }]); congela(2026, 9, 21, 10, 0);
+      try {
+        const nP = 2 + Math.floor(rnd() * 4), qtd = 3 + Math.floor(rnd() * 4), valor = 300 + Math.floor(rnd() * 900);
+        const marcas = {}; for (let k = 1; k <= nP; k++) if (rnd() < 0.5) marcas[k] = { d: '2026-0' + (5 + Math.floor(rnd() * 4)) + '-10', v: r35(valor / nP), conta: 'X' };
+        if (!Object.keys(marcas).length) marcas[1] = { d: '2026-06-10', v: r35(valor / nP), conta: 'X' };
+        M().push({ id: 'r', tipo: 'COMPRA', data: '2026-05-01', jogo: 'Pokémon', cat: 'ETB', colecao: '151', qtd, valor, situacao: 'Em estoque', destino: 'Vender', contraparte: 'L', conta: 'X', pgTipo: 'Parcelado', nParc: nP, venc1: '2026-05-10', pgParcelas: marcas });
+        const vendas = [];
+        const nPed = 1 + Math.floor(rnd() * (qtd - 1));
+        for (let i = 0; i < nPed; i++) {
+          const peca = A('baixarLote')('r', 1, 'Vendido', { dataVenda: '2026-09-01', dataSaida: '2026-09-01' });
+          const venda = { id: 'V' + i, tipo: 'VENDA', data: '2026-09-01', valor: 50, origemId: 'r', vendaDe: 'estoque', contraparte: 'Cli', qtd: 1, custoOrigem: peca.valor };
+          M().push(venda); peca.vendaRef = venda.id; vendas.push(venda);
+          if (rnd() < 0.3) setg('movs', JSON.parse(JSON.stringify(M())));
+        }
+        const somaGr = gr => Object.keys(gr.marcas).reduce((a, k) => a + (isFinite(A('vMarca')(gr.marcas[k])) ? A('vMarca')(gr.marcas[k]) : 0), 0);
+        const somaMarcas = () => r35(A('gruposParcelados')().reduce((t0, gr) => t0 + somaGr(gr), 0));
+        let total0 = somaMarcas();
+        casos15++;
+        const passos = 1 + Math.floor(rnd() * 3), log = [];
+        for (let p = 0; p < passos; p++) {
+          const vivas = M().filter(m => m.tipo === 'VENDA' && M().some(x => x.vendaRef === m.id));
+          if (!vivas.length) break;
+          const gruposAntes = A('gruposParcelados')(), idsAntes = new Set(M().map(m => m.id));
+          const modo = rnd() < 0.7 ? 'vendaTudo' : 'compraSobra';
+          if (modo === 'vendaTudo') { const v = vivas[Math.floor(rnd() * vivas.length)]; A('execExcl')(v.id, 'vendaTudo'); log.push('vendaTudo ' + v.id); }
+          else { const alvo = M().find(m => m.tipo === 'COMPRA'); if (!alvo) break; A('execExcl')(alvo.id, 'compraSobra'); log.push('compraSobra ' + alvo.id); comRepasse15++; }
+          const removidos = new Set([...idsAntes].filter(id => !M().some(m => m.id === id)));
+          /* a compra que ficou SEM nenhum pedaco (o unico pedaco dela foi apagado) leva o pagamento junto; nas que ainda tem pedaco o total pago nao muda */
+          const somem = gruposAntes.filter(gr => gr.membros.every(m => removidos.has(m.id))).reduce((a, gr) => a + somaGr(gr), 0);
+          const esperado = r35(total0 - somem), total1 = somaMarcas();
+          if (Math.abs(total1 - esperado) > 0.02) { ruins15.push({ s, log, antes: total0, esperado, depois: total1 }); break; }
+          total0 = total1;
+        }
+      } catch (e) { ruins15.push({ s, excecao: String((e && e.stack) || e).slice(0, 300) }); }
+      finally { descongela(); reset(); }
+    }
+  } finally { ctx.confirm = R15.confirm; ctx.document.getElementById = R15.geb; setg('render', R15.render); setg('toast', R15.toast); setg('diarioReg', R15.diarioReg); setg('contasBanc', R15.contas); }
+  t('35: I15 — em ' + casos15 + ' compras divididas em pedacos vendidos (' + comRepasse15 + ' apagando so o que nao vendeu, o que reparte o pagamento entre as compras que sobram), apagar pedaco nunca muda o total PAGO da compra (a soma das marcas), ao centavo', ruins15.length === 0, S35(ruins15.slice(0, 3)) + ' | ruins: ' + ruins15.length);
+}).catch(e=>{fail++;console.log('  FALHOU  secao 35 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');
   console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
   process.exit(fail ? 1 : 0);

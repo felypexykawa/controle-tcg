@@ -201,7 +201,8 @@ print('RESUMO: %d/%d mutacoes pegas · %d/%d refatoracoes passam' % (len(DANO) -
 from concurrent.futures import ThreadPoolExecutor
 NUC = []
 NL = chr(10)
-def nucleo(nome, velho, novo):
+ESPERADO = {}   # 21/09/2026: nome -> blocos do testes-nucleo.js dos quais ALGUM tem de reprovar (a regra antiga, falha na secao 31, vale pro resto)
+def nucleo(nome, velho, novo, blocos=None):
     # [v2.6, revisor fiacao r6 L8] nome repetido: o arquivo N-<nome>.html da segunda sobrescrevia o da primeira antes de a fila rodar, e a
     # primeira nunca rodava (215 entradas, 214 nomes, e o placar dizia 215/215)
     if 'N-' + nome in NUC:
@@ -211,6 +212,7 @@ def nucleo(nome, velho, novo):
         raise SystemExit('MUTACAO MORTA (planilha): "%s" procura um trecho que aparece %d vez(es) no index.html, e devia ser 1. '
                          'Se o trecho mudou por refatoracao legitima, reaponte a mutacao. Se a regra foi COPIADA ou mudou de lugar, '
                          'conserte o app antes: a caixa aberta mora so em caixaRedistribuida e o comprei so em entraNoComprei.' % (nome, c))
+    if blocos: ESPERADO['N-' + nome] = blocos.split()
     NUC.append(sub('N-' + nome, S.replace(velho, novo)))
 # caixa aberta: a regra e quem soma compra
 nucleo('card-soma-caixa', "const tot=fam.reduce((s,x)=>caixaRedistribuida(x)?s:s+(+x.valor||0),0);", "const tot=fam.reduce((s,x)=>s+(+x.valor||0),0);")
@@ -302,11 +304,10 @@ nucleo('mais-antigo-em-cima', ".sort((a,b)=>desc(a.raiz.data,b.raiz.data)||", ".
 nucleo('apagar-sem-despesas', "const apT=_pl2(ap.reduce((s,x)=>s+x.valor,0))", "const apT=_pl2(ap.filter(x=>x.pi).reduce((s,x)=>s+x.valor,0))")
 nucleo('frase-apagar-sem-futura', "despFut>0?fmt(despFut)+' de despesas com data futura ainda não.':''", "''")
 nucleo('frase-apagar-sem-atrasada', "(despAtras>0?', inclusive '+fmt(despAtras)+' que já passaram da data e continuam como a pagar':'')", "''")
-nucleo('apagar-despesa-hoje-fora-do-caixa', "(x.m.data||'')<=hojeUTC", "(x.m.data||'')<hojeUTC")
+nucleo('apagar-despesa-hoje-fora-do-caixa', "(x.m.data||'')<=hojeL", "(x.m.data||'')<hojeL")
 nucleo('apagar-atrasada-inclui-hoje', "apDesp.filter(x=>x.venc<h0)", "apDesp.filter(x=>x.venc<=h0)")
 nucleo('apagar-sem-parcelas-no-caixa', "(parcT>0||despNoCaixa>0)?'Já está descontado no caixa acima: '", "(despNoCaixa>0)?'Já está descontado no caixa acima: '")
-nucleo('apagar-sempre-hoje', "hojeUTC===hojeLocal?'hoje ('+fmt(despNoCaixa)+')':", "true?'hoje ('+fmt(despNoCaixa)+')':")
-nucleo('apagar-amanha-sem-motivo', "'; depois das '+hVira+'h o app já conta o dia seguinte)'", "')'")
+nucleo('apagar-frase-em-utc', "const hojeL=hojeISO(),h0=new Date();", "const hojeL=new Date().toISOString().slice(0,10),h0=new Date();")   # 21/09/2026: um relogio so; a frase "ate amanha" deixou de existir
 nucleo('apagar-sem-valor-parcelas', "'as parcelas de compra que ainda vão vencer ('+fmt(parcT)+')'", "'todas as parcelas de compra ('+fmt(parcT)+')'")
 nucleo('apagar-mes-inclui-vencido', "ap.filter(x=>x.venc>=h0&&x.venc.getMonth()===hm", "ap.filter(x=>x.venc.getMonth()===hm")
 nucleo('receber-mes-errado', "menor do que devia.':'');" + NL + "  const arMes=ar.filter(x=>x.data.getMonth()===hm&&", "menor do que devia.':'');" + NL + "  const arMes=ar.filter(x=>x.data.getMonth()===hm+1&&")
@@ -408,9 +409,9 @@ nucleo('arredondamento-sem-limite', "if(c.col&&c.ok&&Math.abs(c.dif)>0.005*(c.n+
 nucleo('x-sem-motivo-demais', "('NÃO fecha — '+(c.motivo||(", "('NÃO fecha — '+((")
 nucleo('x-sem-motivo-compras', "('NÃO fecha — '+(conferencia[0].motivo||(", "('NÃO fecha — '+((")
 nucleo('comprei-ok-sem-limite', "lin((conferencia[0].ok?'✓':'✗')+' = comprei (mercadoria)',_pl2(r.investido),conferencia[0].ok?(", "lin((fechaCompras?'✓':'✗')+' = comprei (mercadoria)',_pl2(r.investido),fechaCompras?(")
-nucleo('apagar-nota-fora-da-vencida', "if((vencidas?d<hoje:d>=hoje)&&!pg[i+1])L.push({venc:d,valor:v,m:h,", "if((vencidas?false:d>=hoje)&&!pg[i+1])L.push({venc:d,valor:v,m:h,")
-nucleo('apagar-paga-como-vencida', "if((vencidas?d<hoje:d>=hoje)&&!pg[i+1])L.push({venc:d,valor:v,m,pi", "if((vencidas?d<hoje:d>=hoje)&&(vencidas||!pg[i+1]))L.push({venc:d,valor:v,m,pi")
-nucleo('apagar-hoje-nas-duas', "if((vencidas?d<hoje:d>=hoje)&&!pg[i+1])L.push({venc:d,valor:v,m,pi", "if((vencidas?d<=hoje:d>=hoje)&&!pg[i+1])L.push({venc:d,valor:v,m,pi")
+nucleo('apagar-vencidas-nunca-listadas', "if(!!vencidas!==!!(iso&&iso<hj))continue;", "if(vencidas||!!(iso&&iso<hj))continue;")
+nucleo('apagar-paga-como-vencida', "if(g.marcas[i])continue;", "if(g.marcas[i]&&!vencidas)continue;")
+nucleo('apagar-hoje-nas-duas', "if(!!vencidas!==!!(iso&&iso<hj))continue;", "if(!!vencidas!==!!(iso&&iso<=hj))continue;")
 nucleo('apagar-singular-trocado', "(nParcVenc===1?' A parcela já vencida", "(nParcVenc===0?' A parcela já vencida")
 # [v2.6g] o rodape soma pela somaLiqVendas, a conta do Painel: a mesma mutacao, reapontada para a chamada
 nucleo('rodape-liquido-so-com-taxa', "'líquido '+fmt(somaLiqVendas(ord))+', sem a taxa do app'", "'líquido '+fmt(somaLiqVendas(ord.filter(m=>(+m.taxa||0)>0)))+', sem a taxa do app'")
@@ -474,7 +475,7 @@ nucleo('codigo-carta-sem-digito', r"function _plCodigoCarta(c){return !!(c&&/\d/
 nucleo('todos-venc1-em-pedaco', "compra&&!semPag&&m.pgTipo==='Parcelado'?(m.venc1||'')", "compra&&m.pgTipo==='Parcelado'?(m.venc1||'')")
 nucleo('apagar-atras-pelo-utc', "apDesp.filter(x=>x.venc<h0)", "apDesp.filter(x=>(x.m.data||'')<hojeUTC)")
 nucleo('apagar-sem-vencidas', "+(nParcVenc?(nParcVenc===1?", "+(false?(nParcVenc===1?")
-nucleo('apagar-vencida-como-a-pagar', "if((vencidas?d<hoje:d>=hoje)&&!pg[i+1])L.push({venc:d,valor:v,m,pi:i+1,pn:+m.nParc,cobrar:true});", "if(d<hoje&&!pg[i+1])L.push({venc:d,valor:v,m,pi:i+1,pn:+m.nParc,cobrar:true});")
+nucleo('apagar-vencida-como-a-pagar', "if(!!vencidas!==!!(iso&&iso<hj))continue;", "if(vencidas&&!(iso&&iso<hj))continue;")
 nucleo('faixa-sem-escondido', "${vEscondido>0.004?", "${false?")
 nucleo('comparativo-comentario-engana', "o:agg(compComprei,relDimAll,false)[0]}", "o:agg( compPer,relDimAll,false)[0]/* o:agg(compComprei,relDimAll,false)[0] */}")
 # ---- v2.6, 3a onda (le-como-felype r6): periodo emprestado que volta ao sair da Consulta, parcelas vencidas contadas por compra e com o que
@@ -500,12 +501,12 @@ nucleo('limite-10-vezes', "Math.abs(c.dif)>0.005*(c.n+4)+1e-9", "Math.abs(c.dif)
 nucleo('lucro-pct-com-folga', "(_cel(l[7])-_cel(l[8]))/_cel(l[8]))>1e-9", "(_cel(l[7])-_cel(l[8]))/_cel(l[8]))>0.01")
 nucleo('vale-pct-com-folga', "(_cel(l[6])-_cel(l[4]))/_cel(l[4]))>1e-9", "(_cel(l[6])-_cel(l[4]))/_cel(l[4]))>0.01")
 nucleo('planilha-zera-emprestimo', "r=motor(false);}finally{perDe=_pd;perAte=_pa;}", "r=motor(false);}finally{perDe=_pd;perAte=_pa;_perEmprestado=null;}")
+# 21/09/2026: 'apagar-parcelas-por-pedaco', 'vencidas-parcela-por-numero', 'vencidas-orfa-por-pedaco' e 'vencidas-por-mes' deixaram de ter o que mutar: aPagar(true) devolve UMA linha por
+# parcela e por COMPRA (gruposParcelados), entao contar por (compra, data), por no da parcela, por mes ou juntar orfaos da o mesmo numero — mutantes EQUIVALENTES, nao teste fraco. A contagem
+# por compra segue guardada por 'apagar-vencidas-por-pedaco' abaixo e pelos 34f/31f.
 nucleo('apagar-vencidas-por-pedaco', "nCompVenc=new Set(apVenc.map(chaveVenc)).size", "nCompVenc=apVenc.length")
-nucleo('apagar-parcelas-por-pedaco', "nParcVenc=new Set(apVenc.map(x=>chaveVenc(x)+'#'+x.venc.getTime())).size", "nParcVenc=apVenc.length")
 # ---- v2.6d, revisor numero r7: vencidas pela familia da aba e pela data, limite da aba Compras pelos numeros arredondados, ✗ que avisa
 # quando ha mais ----
-nucleo('vencidas-parcela-por-numero', "chaveVenc(x)+'#'+x.venc.getTime()", "chaveVenc(x)+'#'+x.pi")
-nucleo('vencidas-orfa-por-pedaco', "?'F:ORFA:'+t.loteOrigem:'F:'+t.id;", "?'F:'+t.id:'F:'+t.id;")
 nucleo('limite-compras-uma-por-linha', "n:nArredC,", "n:comprasL.length,")
 nucleo('motivo-sem-outras-linhas', "([..._linErr[_abaK(k)]].some(j=>j!==_motI[k])?'; outras linhas dessa aba também têm erro':'')", "''")
 nucleo('apagar-vencidas-sem-o-que-muda', "'. Se '+(nParcVenc===1?'ela':'alguma')+' não foi paga, este A pagar está menor do que devia.'", "'.'")
@@ -538,7 +539,6 @@ nucleo('vazio-sem-tipo', "||v==='(sem tipo)'||", "||")
 nucleo('vazio-em-toda-aba', "const vazioSoCV=consF==='DESPESA'?", "const vazioSoCV=true?")
 nucleo('limite-compras-dois-por-compra', "nArredC+=1+(co.trocado?1:0)", "nArredC+=2+(co.trocado?1:0)")
 nucleo('limite-quase-1-centavo', "Math.abs(c.dif)>0.005*(c.n+4)+1e-9", "Math.abs(c.dif)>0.0095*(c.n+4)+1e-9")
-nucleo('vencidas-por-mes', "chaveVenc(x)+'#'+x.venc.getTime()", "chaveVenc(x)+'#'+x.venc.getMonth()")
 nucleo('vencidas-orfas-juntas', "?'F:ORFA:'+t.loteOrigem:", "?'F:ORFA':")
 nucleo('nome-vale-antigo', "col:'a coluna Vale das linhas No estoque e Na coleção'", "col:'a coluna Vale da aba Estoque e coleção'")
 nucleo('nome-estoque-trocado', "col:'a coluna Custo da aba Estoque e coleção'", "col:'a coluna Custo total da aba Estoque e coleção'")
@@ -580,11 +580,190 @@ nucleo('todos-sem-contagem', "${nNoComprei!==ord.length?' em '+nNoComprei", "${f
 nucleo('todos-plural-com-1', "(nNoComprei===1?' lançamento':' lançamentos')", "' lançamentos'")
 nucleo('cabecalho-compras-sem-contagem', "consF==='COMPRA'&&(gNC[gk]||0)!==gN[gk]?", "false?")
 nucleo('cabecalho-conta-as-de-fora', "if(entraNoComprei(m)){const k=gKey(m);gNC[k]=(gNC[k]||0)+1;}", "if(m.tipo==='COMPRA'){const k=gKey(m);gNC[k]=(gNC[k]||0)+1;}")
+# ---- rodada 10 (revisores disco r10 M2/M3/M4/L1, superficie r10 L1/L2/L3): o bloco 31h do testes-nucleo.js tem de reprovar cada um destes defeitos ----
+nucleo("liq-naLista-sempre", "m.tipo==='VENDA'&&naLista.has(m))s+=",
+       "m.tipo==='VENDA'&&true)s+=")   # disco M2
+nucleo("liq-motor-de-todas", "const vendasLiq=somaLiqVendas(vendas.map(x=>x.m));",
+       "const vendasLiq=somaLiqVendas(movs);")   # disco M2
+nucleo("liq-rodape-de-todas", "'líquido '+fmt(somaLiqVendas(ord))+', sem a taxa do app'",
+       "'líquido '+fmt(somaLiqVendas(movs))+', sem a taxa do app'")   # disco M2
+nucleo("cab-conta-pelo-mes", "if(entraNoComprei(m)){const k=gKey(m);gNC[k]=(gNC[k]||0)+1;}",
+       "if(entraNoComprei(m)){const k=(m.data||'').slice(0,7)||'—';gNC[k]=(gNC[k]||0)+1;}")   # disco M3
+nucleo("cab-so-com-duas-fora", "consF==='COMPRA'&&(gNC[gk]||0)!==gN[gk]?",
+       "consF==='COMPRA'&&gN[gk]-(gNC[gk]||0)>1?")   # disco M3
+nucleo("todos-so-com-compra-de-fora", "nNoComprei!==ord.length?' em '",
+       "foraComprei.length>0?' em '")   # disco M3
+nucleo("cab-sem-singular", "(gNC[gk]||0)===1?'1 entra':",
+       "(gNC[gk]||0)===1?'1 entram':")   # superficie L1
+nucleo("cab-zero-de-volta", "(gNC[gk]||0)===0?'nenhum entra'",
+       "(gNC[gk]||0)===0?'0 entram'")   # superficie L1 / numero L7
+nucleo("cab-texto-antigo", "', '+((gNC[gk]||0)===0?'nenhum entra':(gNC[gk]||0)===1?'1 entra':(gNC[gk]||0)+' entram')+' no total':''}",
+       "', '+(gNC[gk]||0)+' no total':''}")   # superficie L1 (o patch desfeito)
+nucleo("janela-so-com-duas", "if(falhou)alert('A planilha foi baixada",
+       "if(falhou>1)alert('A planilha foi baixada")   # disco M4
+nucleo("topo-e-no-primeiro", "_abasErro.join(', ').replace(/, ([^,]*)$/,' e $1')",
+       "_abasErro.join(', ').replace(/, /,' e ')")   # disco M4
+nucleo("soma-vale-sempre-certa", "soma:somaValeOk,",
+       "soma:true,")   # disco L1
+nucleo("resumo-titulo-antigo", "secao('Lucro real — pela conta do Relatório');",
+       "secao('Lucro real — igual ao Relatórios');")   # superficie L2 (o patch desfeito)
+nucleo("resumo-sem-nota-de-centavos", " O card Lucro real do Relatório pode diferir em centavos: ele arredonda grupo por grupo (coleção, jogo…) e aqui o arredondamento é um só.','negrito','sinalNegrito');",
+       "','negrito','sinalNegrito');")   # superficie L2 (a nota desfeita)
+nucleo("verLote-aberto-texto-antigo", "s==='Aberto'?(caixaRedistribuida(x)?'foi aberto em itens':'foi aberto, mas nada de dentro foi lançado: esse valor não entra no comprei do Painel')",
+       "s==='Aberto'?'foi aberto em itens'")   # superficie L3 (o patch desfeito)
+nucleo("verLote-aberto-sempre-sem-nada", "caixaRedistribuida(x)?'foi aberto em itens':",
+       "false?'foi aberto em itens':")   # superficie L3 (texto novo no aberto com pedaco)
+
+# ---- 21/09/2026: O PAGAMENTO E DA COMPRA (grupos, parcela vencida sem marca, um relogio so, projecao do saldo fisico) — as 141 mutacoes que provaram os testes 31e, 32g, 32h, 33h e as secoes 34/35/36 (mutar34.py = 49 da 1a rodada, mutar-r7.py = 49 da revisao de 21/09 pelas 3 faces; 6 da 1a foram reapontadas porque o codigo delas mudou). O 5o argumento diz de quais blocos do testes-nucleo.js ALGUM tem de reprovar ----
+nucleo('pagto-r1-saldo-sem-presumida', 'else if(iso&&iso<hj){if(g.conta!==cb.nome)continue;if(antesBase(iso))continue;s-=g.vP;}}', 'else if(false){if(g.conta!==cb.nome)continue;if(antesBase(iso))continue;s-=g.vP;}}', '34a 34b 34c 34d')
+nucleo('pagto-r1-saldo-hoje-conta-como-vencida', 'else if(iso&&iso<hj){if(g.conta!==cb.nome)continue;', 'else if(iso&&iso<=hj){if(g.conta!==cb.nome)continue;', '34b')
+nucleo('pagto-r1-curva-hoje-vira-vencida', 'if(!iso||iso>=hj){semPagar++;semPagarValor+=g.vP;continue;}', 'if(!iso||iso>hj){semPagar++;semPagarValor+=g.vP;continue;}', '34b')
+nucleo('pagto-r1-pagas-hoje-vira-vencida', 'else if(iso&&iso<hj)L.push(linhaDeParcela(g,i,dataDeISO(iso),{presumida:true}));}', 'else if(iso&&iso<=hj)L.push(linhaDeParcela(g,i,dataDeISO(iso),{presumida:true}));}', '34b')
+nucleo('pagto-r1-curva-sem-evento-presumido', 'evs.push({data:iso,delta:-g.vP});presumidas++;', 'presumidas++;', '34a 34d')
+nucleo('pagto-r1-pagas-sem-flag-presumida', '{presumida:true}', '{}', '34a')
+nucleo('pagto-r1-contador-sem-conta-desligado', 'if(!cadastrada(g.conta)){presSemConta++;presSemContaValor+=g.vP;}}', 'if(false){presSemConta++;presSemContaValor+=g.vP;}}', '34a 32h')
+nucleo('pagto-r3-repasse-hoje-ja-credita', 'if(d>=hoje)return;dRec=isoLocal(d);', 'if(d>hoje)return;dRec=isoLocal(d);', '34b')
+nucleo('pagto-clock-hojeiso-utc', 'function hojeISO(){return isoLocal(new Date());}', 'function hojeISO(){return new Date().toISOString().slice(0,10);}', '34m 34h')
+nucleo('pagto-clock-saldoconta-utc', 'function saldoConta(cb){const hoje=hojeISO();', 'function saldoConta(cb){const hoje=new Date().toISOString().slice(0,10);', '34m')
+nucleo('pagto-clock-saldofisico-utc', 'function saldoFisicoConta(cb){const hj=hojeISO(),hoje=dataDeISO(hj);', 'function saldoFisicoConta(cb){const hj=new Date().toISOString().slice(0,10),hoje=dataDeISO(hj);', '34m')
+nucleo('pagto-clock-extrato-utc', 'function extratoRows(){const rows=[],seen={},hoje=hojeISO();', 'function extratoRows(){const rows=[],seen={},hoje=new Date().toISOString().slice(0,10);', '34m')
+nucleo('pagto-clock-marcarpago-utc', 'm.dataPagamento=hojeISO();', 'm.dataPagamento=new Date().toISOString().slice(0,10);', '34h 34m')
+nucleo('pagto-clock-motor-utc', 'let despOrd=0,despMat=0;const hojeISO2=hojeISO();', 'let despOrd=0,despMat=0;const hojeISO2=new Date().toISOString().slice(0,10);', '31e')
+nucleo('pagto-clock-planilha-frase', 'const hojeL=hojeISO(),h0=new Date();', 'const hojeL=new Date().toISOString().slice(0,10),h0=new Date();', '31e')
+nucleo('pagto-venc-sem-clamp-dia-31', 'const dia=Math.min(+b.slice(8,10),new Date(y,mo+1,0).getDate());', 'const dia=+b.slice(8,10);', '34e')
+nucleo('pagto-venc-sem-fallback-para-a-data', "function vencBase(h){return dataOk(h.venc1)?h.venc1:(dataOk(h.data)?h.data:'');}", "function vencBase(h){return dataOk(h.venc1)?h.venc1:'';}", '34e')
+nucleo('pagto-venc-dataok-frouxa', 'return !isNaN(d.getTime())&&isoLocal(d)===s;}', 'return !isNaN(d.getTime());}', '34e')
+nucleo('pagto-marca-sem-data-vale-hoje', 'return dataOk(d)?d:(iso||hojeISO());}', 'return dataOk(d)?d:hojeISO();}', '34d')
+nucleo('pagto-grupo-por-pedaco', 'const k=chaveDeCompra(m,porId);', "const k='P:'+m.id;", '34f')
+nucleo('pagto-baixar-pedaco-leva-o-pagamento', 'if(extras)Object.assign(ped,extras);delete ped.pgParcelas;movs.push(ped);return ped;}', 'if(extras)Object.assign(ped,extras);movs.push(ped);return ped;}', '34f 32g')
+nucleo('pagto-boosters-solto-leva-o-pagamento', 'delete ped.pgParcelas;if(solto)delete solto.pgParcelas;', 'delete ped.pgParcelas;', '34f')
+nucleo('pagto-desmarcar-so-o-pedaco-tocado', "membros.forEach(x=>{if(x.pgParcelas&&typeof x.pgParcelas==='object')delete x.pgParcelas[pi];});", 'if(m.pgParcelas)delete m.pgParcelas[pi];', '34g')
+nucleo('pagto-repassa-desligado', 'repassaMarcas(antes0||gruposParcelados(),st);', '', '34i')
+nucleo('pagto-repassa-sem-reparticao', 'const partes=alvos.length===1?[copiaMarcas(M)]:repartirPagamentos(M,alvos.map(g=>T>0?g.tot/T:1/alvos.length));', 'const partes=alvos.map(()=>copiaMarcas(M));', '34i')
+nucleo('pagto-repassa-comprasobra-sem-os-grupos-de-antes', 'some(f.fam.filter(x=>!fica[x.id]).map(x=>x.id),antesG);', 'some(f.fam.filter(x=>!fica[x.id]).map(x=>x.id));', '34i')
+nucleo('pagto-repassa-nao-limpa-os-outros-pedacos', 'alvos.forEach((g,j)=>{g.membros.forEach(x=>{if(x!==g.dono)delete x.pgParcelas;});g.dono.pgParcelas=partes[j];});', 'alvos.forEach((g,j)=>{g.dono.pgParcelas=partes[j];});', '34i')
+nucleo('pagto-mc-sem-soma-com-o-irmao', 'const irmao=gruposParcelados().find(g=>!g.nota&&g.chave===chave&&g.membros.indexOf(m)<0);', 'const irmao=null;', '34j')
+nucleo('pagto-mc-soma-vira-maior', 'return Object.assign({},a,{v:Math.round((vMarca(a)+vMarca(b))*100)/100});', 'return Object.assign({},a,{v:Math.max(vMarca(a),vMarca(b))});', '34j')
+nucleo('pagto-mc-nao-leva-a-parte-do-item', 'const partes=repartirPagamentos(M,[f,1-f]);', 'const partes=repartirPagamentos(M,[0,1]);', '34j')
+nucleo('pagto-mc-fracao-por-item-e-nao-por-valor', 'f=T>0?Math.min(1,Math.max(0,(+m.valor||0)/T)):1/its.length;', 'f=1/its.length;', '34j')
+nucleo('pagto-ma-abertura-entra-no-grupo', "if(m.tipo!=='COMPRA'||m.origem||m.pgTipo!=='Parcelado'||!(+m.nParc>0))return;\n    const k=chaveDeCompra(m,porId);", "if(m.tipo!=='COMPRA'||m.pgTipo!=='Parcelado'||!(+m.nParc>0))return;\n    const k=chaveDeCompra(m,porId);", '34k')
+nucleo('pagto-edit-plano-nao-propaga', "if(grN)['nParc','venc1','conta'].forEach(", "if(false)['nParc','venc1','conta'].forEach(", '34l')
+nucleo('pagto-edit-pergunta-olha-so-o-pedaco', 'const pgE=grE?grE.marcas:(e&&e.pgParcelas);', 'const pgE=(e&&e.pgParcelas);', '34l')
+nucleo('pagto-proj-despesa-de-hoje-conta-de-novo', "    if(x.m.tipo==='DESPESA'&&(x.m.data||'')<=hj&&temContas&&cadastrada(x.m.conta||''))return; /* já está no saldo da conta dela */\n", '', '34n 34m')
+nucleo('pagto-proj-sem-escopo-de-conta', "const poe=(x,v)=>{((!temContas||cadastrada(x.m.conta||''))?dentro:fora).push({data:x.venc||x.data,v});};", 'const poe=(x,v)=>{dentro.push({data:x.venc||x.data,v});};', '34n')
+nucleo('pagto-proj-atual-nao-e-o-saldo-fisico', 'const atual=Math.round(contasBanc.reduce((s,cb)=>s+saldoFisicoConta(cb),0)*100)/100;', 'const atual=Math.round(contasBanc.reduce((s,cb)=>s+saldoConta(cb),0)*100)/100;', '34n 34m 33h')
+nucleo('pagto-proj-fora-invisivel-na-tela', '${(pj.fora&&(pj.fora.entra||pj.fora.sai))?`<div class="meta" style="margin-top:4px;color:var(--amber)">', '${(false&&(pj.fora.entra||pj.fora.sai))?`<div class="meta" style="margin-top:4px;color:var(--amber)">', '34n')
+nucleo('pagto-saldo-conta-do-pagamento-ignorada', "const pagouDe=p=>(p&&typeof p==='object'&&p.conta)?p.conta:g.conta;", 'const pagouDe=p=>g.conta;', '34c 33h')
+nucleo('pagto-saldo-marca-ignora-data-base', 'if(p){if(pagouDe(p)!==cb.nome)continue;if(antesBase(dataDaMarca(p,iso)))continue;s-=pgValor(p,g.vP);}', 'if(p){if(pagouDe(p)!==cb.nome)continue;s-=pgValor(p,g.vP);}', '33h')
+nucleo('pagto-saldo-presumida-ignora-data-base', 'else if(iso&&iso<hj){if(g.conta!==cb.nome)continue;if(antesBase(iso))continue;s-=g.vP;}}', 'else if(iso&&iso<hj){if(g.conta!==cb.nome)continue;s-=g.vP;}}', '33h')
+nucleo('pagto-selopts-sem-o-valor-gravado', "const fora=(val&&lista.indexOf(val)<0)?`<option selected>${val}</option>`:'';", "const fora='';", '34p')
+nucleo('pagto-conta-sem-barrar-nome-repetido', 'if((!id||chaveNome(antigo)!==chaveNome(nome))&&contasBanc.some(', 'if(false&&contasBanc.some(', '34p')
+nucleo('pagto-conta-barra-ate-sem-renomear', 'if((!id||chaveNome(antigo)!==chaveNome(nome))&&contasBanc.some(', 'if(contasBanc.some(', '34p')
+nucleo('pagto-pagas-sem-dica-do-periodo', 'const dicaPg=nPgEsc?', 'const dicaPg=false?', '34q')
+nucleo('pagto-papel-imprime-o-saldo-por-emissao', 'const s=saldoFisicoConta(cb),se=saldoConta(cb);return', 'const s=saldoConta(cb),se=saldoFisicoConta(cb);return', '34q')
+nucleo('pagto-diag-botao-volta-pra-consulta', "add('amarelo','Parcela paga a mais do que o plano da compra: '+rotDe(m),corpo,'abrir o lançamento',`fecharModal();abrir('${m.id}')`);", "add('amarelo','Parcela paga a mais do que o plano da compra: '+rotDe(m),corpo,'abrir o lançamento',`verMov('${m.id}')`);", '34o')
+nucleo('pagto-diag-texto-manda-tocar-em-editar', 'o botão abaixo abre o lançamento. Só desmarque', 'o botão abaixo leva até ela, e é só tocar em editar. Só desmarque', '34o 33j')
+nucleo('pagto-diag-vencimento-invalido-frouxo', 'if(!dataOk(m.venc1||m.data))', 'if(!(m.venc1||m.data))', '34e')
+nucleo('pagto-clock-confirmarpagarparcela-utc', "dIn=document.getElementById('pp_data')?.value||'',hj=hojeISO();", "dIn=document.getElementById('pp_data')?.value||'',hj=new Date().toISOString().slice(0,10);", '34h')
+nucleo('pagto-uniao-menor-vence', 'const va=vMarca(a),vb=vMarca(b);if(va!==vb)return vb>va?b:a;', 'const va=vMarca(a),vb=vMarca(b);if(va!==vb)return vb<va?b:a;', '32g')
+nucleo('pagto-uniao-soma', 'if(!Object.prototype.hasOwnProperty.call(u,k)||melhorMarca(u[k],p)===p)u[k]=p;', 'if(!Object.prototype.hasOwnProperty.call(u,k))u[k]=p;else if(isFinite(vMarca(p))&&isFinite(vMarca(u[k])))u[k]=Object.assign({},u[k],{v:vMarca(u[k])+vMarca(p)});', '32g 34g 34i 34j')
+nucleo('pagto-grupo-dono-sempre-o-primeiro', 'h=menorId(hs.length?hs:g.membros);', 'h=g.membros[0];', '34h 36j')
+nucleo('pagto-grupo-parcela-do-dono', 'g.vP=g.tot/g.nP;', 'g.vP=(+h.valor||0)/g.nP;', '34f')
+nucleo('pagto-grupo-total-so-do-dono', 'g.tot=Math.round(g.membros.reduce((s,x)=>s+(+x.valor||0),0)*100)/100;', 'g.tot=(+h.valor||0);', '34f')
+nucleo('pagto-rev7-pgvalor-frouxo', "(x&&typeof x==='object'&&x.v!=null&&x.v!==''&&isFinite(+x.v))?+x.v:fallback;", "(x&&typeof x==='object'&&x.v!=null)?+x.v:fallback;", '36k')
+nucleo('pagto-rev7-vencparcela-sem-guarda', "const b=vencBase(h);if(!b||!(i>=1))return '';", "const b=vencBase(h);if(!b)return '';", '36k')
+nucleo('pagto-rev7-copiamarcas-proto', "Object.keys(pg||{}).forEach(k=>{if(k==='__proto__')return;const p=pg[k];", 'Object.keys(pg||{}).forEach(k=>{const p=pg[k];', '36k')
+nucleo('pagto-rev7-uniao-proto', "Object.keys(pg).forEach(k=>{if(k==='__proto__')return;const p=pg[k];if(!p)return;", 'Object.keys(pg).forEach(k=>{const p=pg[k];if(!p)return;', '36k')
+nucleo('pagto-rev7-empate-ultimo-por-data', 'if(da!==db){if(!da)return b;if(!db)return a;return db<da?b:a;}', 'if(da!==db){return b;}', '36j')
+nucleo('pagto-rev7-empate-sem-conta', "return String((b&&b.conta)||'')<String((a&&a.conta)||'')?b:a;}", 'return a;}', '36j')
+nucleo('pagto-rev7-dono-ignora-quem-guarda-a-marca', 'h=menorId(hs.length?hs:g.membros);', 'h=menorId(g.membros);', '34h')
+nucleo('pagto-rev7-dono-maior-id', 'const menorId=ms=>ms.reduce((a,x)=>(String(x.id)<String(a.id)?x:a));', 'const menorId=ms=>ms.reduce((a,x)=>(String(x.id)>String(a.id)?x:a));', '36j')
+nucleo('pagto-rev7-np-sem-teto', 'g.nP=Math.min(120,Math.ceil(+h.nParc)||1);', 'g.nP=Math.ceil(+h.nParc)||1;', '36j')
+nucleo('pagto-rev7-vp-pela-fracao', 'g.vP=g.tot/g.nP;', 'g.vP=g.tot/(+h.nParc||1);', '36j')
+nucleo('pagto-rev7-tot-sem-arredondar', 'g.tot=Math.round(g.membros.reduce((s,x)=>s+(+x.valor||0),0)*100)/100;', 'g.tot=g.membros.reduce((s,x)=>s+(+x.valor||0),0);', '36m')
+nucleo('pagto-rev7-repassa-nao-limpa-quem-sai', '    saem.forEach(x=>{delete x.pgParcelas;});});}', '    });}', '36c')
+nucleo('pagto-rev7-oferta-sem-residuo', 'return (+pi===g.nP)?Math.round((g.tot-vp*(g.nP-1))*100)/100:vp;}', 'return vp;}', '36g')
+nucleo('pagto-rev7-oferta-nao-usada', 'if(gr&&Math.abs((+valor||0)-gr.vP)<1e-9)valor=valorOfertaParcela(gr,pi);', '', '36g')
+nucleo('pagto-rev7-data-padrao-hoje', 'dpad=(iso&&iso<hj)?iso:hj;', 'dpad=hj;', '36f 36g')
+nucleo('pagto-rev7-data-futura-aceita', 'const d=(dataOk(dIn)&&dIn<=hj)?dIn:hj;', 'const d=dataOk(dIn)?dIn:hj;', '36f')
+nucleo('pagto-rev7-data-do-modal-ignorada', 'const d=(dataOk(dIn)&&dIn<=hj)?dIn:hj;', 'const d=hj;', '36f 36g')
+nucleo('pagto-rev7-modal-sem-de-fora', '<option value="—">(de fora das contas cadastradas — não mexe em saldo nenhum)</option>', '<option value="">(sem conta — não aparece em saldo nenhum)</option>', '36f')
+nucleo('pagto-rev7-contasumiu-de-fora', "const contaSumiu=nome=>nome&&nome!=='—'&&!nomesContas.has(nome);", 'const contaSumiu=nome=>nome&&!nomesContas.has(nome);', '36f')
+nucleo('pagto-rev7-confirma-propaga-desligado', "      if(mexe.length){const n=grE.membros.length,que=grE.nota?'itens':'pedaços';", "      if(false){const n=grE.membros.length,que=grE.nota?'itens':'pedaços';", '34l')
+nucleo('pagto-rev7-confirma-propaga-so-nparc', "const mexe=['nParc','venc1','conta'].filter(", "const mexe=['nParc'].filter(", '34l')
+nucleo('pagto-rev7-confirma-propaga-sempre', 'grE.membros.some(x=>x!==e&&vz(x[f])!==vz(novo[f])))', 'true)', '34l')
+nucleo('pagto-rev7-juntar-guarda-desligada', 'function juntaOk(ids){const d=juntaMudaODinheiro(ids);if(!d)return true;alert(d.erro||textoJuntaBarrada(d,ids));return false;}', 'function juntaOk(ids){return true;}', '36i')
+nucleo('pagto-rev7-juntar-porta-soltas', '    if(!juntaOk(ids))return false;\n    const num=(prompt(', '    const num=(prompt(', '36i')
+nucleo('pagto-rev7-juntar-porta-nota', "    if(!juntaOk(ids))return false;\n    aplica(nid,h.notaNum||'',h,soltas);", "    aplica(nid,h.notaNum||'',h,soltas);", '36i')
+nucleo('pagto-rev7-juntar-porta-fusao', "  if(!juntaOk(ids))return false;\n  if(!confirm('Você marcou '", "  if(!confirm('Você marcou '", '36i')
+nucleo('pagto-rev7-juntar-fail-open', "}catch(e){return {erro:'Não consegui conferir", "}catch(e){return null&&{erro:'Não consegui conferir", '36i')
+nucleo('pagto-rev7-juntar-ensaio-sem-devolver-o-original', '  finally{movs=real;}\n  const difs=', '  finally{}\n  const difs=', '36i')
+nucleo('pagto-rev7-diag9e-desligado', '      if(ms.length<2)return;\n', '      return;\n', '36b')
+nucleo('pagto-rev7-diag9e-iguais-avisam', '      if(!difV&&cts.length<2&&dts.length<2)return;', '', '36b')
+nucleo('pagto-rev7-diag9e-so-valor', '      if(!difV&&cts.length<2&&dts.length<2)return;', '      if(!difV)return;', '36b')
+nucleo('pagto-rev7-diag9e-tolerancia-50-centavos', 'Math.max(...vs)-Math.min(...vs)>=0.005;', 'Math.max(...vs)-Math.min(...vs)>=0.5;', '36b')
+nucleo('pagto-rev7-tot-em-milesimos', 'g.tot=Math.round(g.membros.reduce((s,x)=>s+(+x.valor||0),0)*100)/100;', 'g.tot=Math.round(g.membros.reduce((s,x)=>s+(+x.valor||0),0)*1000)/1000;', '36m')
+nucleo('pagto-rev7-retrato-sem-projecao', 'curva:sd.length?sd[sd.length-1].total:0,proj:[pj.atual,pj.d30,pj.d60,pj.d90],fora:[pj.fora.entra,pj.fora.sai]};}', 'curva:sd.length?sd[sd.length-1].total:0,proj:[0,0,0,0],fora:[0,0]};}', '36i')
+nucleo('pagto-rev7-difs-sem-pagar', "f('pago',A.pago,D.pago);f('a pagar',A.pagar,D.pagar);", "f('pago',A.pago,D.pago);", '36i')
+nucleo('pagto-rev7-difs-sem-pago', "f('pago',A.pago,D.pago);f('a pagar',A.pagar,D.pagar);", "f('a pagar',A.pagar,D.pagar);", '36i')
+nucleo('pagto-rev7-difs-sem-saldos', '  A.saldos.forEach((v,i)=>f(\'conta "\'+contasBanc[i].nome+\'"\',v,D.saldos[i]));\n', '', '36i')
+nucleo('pagto-rev7-difs-sem-emissao', '  A.emissao.forEach((v,i)=>f(\'conta "\'+contasBanc[i].nome+\'" (por emissão)\',v,D.emissao[i]));\n', '', '36i')
+nucleo('pagto-rev7-difs-sem-curva', "  f('gráfico de dinheiro',A.curva,D.curva);\n", '', '36i')
+nucleo('pagto-rev7-difs-sem-projecao', "  ['hoje','em +30 dias','em +60 dias','em +90 dias'].forEach((r,i)=>f('projeção do caixa '+r,A.proj[i],D.proj[i]));\n", '', '36i')
+nucleo('pagto-rev7-difs-sem-fora', "  f('projeção: entra de fora das contas',A.fora[0],D.fora[0]);f('projeção: sai de fora das contas',A.fora[1],D.fora[1]);\n", '', '36i')
+nucleo('pagto-rev7-difs-tolerancia-frouxa', 'const tol=0.011,L=[],r2=x=>', 'const tol=1.1,L=[],r2=x=>', '36i')
+nucleo('pagto-rev7-junta-cabeca-invertida', 'const nid=notasSel.length===1?notasSel[0]:tots[0].nid;', 'const nid=notasSel.length===1?notasSel[0]:tots[tots.length-1].nid;', '36i')
+nucleo('pagto-rev7-junta-sem-fill-de-conta', "m.venc1=h.venc1||'';if(h.conta&&!m.conta)m.conta=h.conta;});", "m.venc1=h.venc1||'';});", '36i')
+nucleo('pagto-rev7-fluxo-sem-lote-inteiro', '  if(juntarNotaCore(ids2)){fxSelMode=false;fxSel={};}render();}', '  if(juntarNotaCore(ids)){fxSelMode=false;fxSel={};}render();}', '36i')
+nucleo('pagto-rev7-causa-lote-sem-conselho', "  if(lotes.length)conselhos.push('Selecione o lote inteiro (todos os pedaços). No Fluxo de caixa o lote já vai inteiro.');\n", '', '36i')
+nucleo('pagto-rev7-causa-plano-ignorada', '  if(planos.length>1){causas.push(', '  if(false){causas.push(', '36i')
+nucleo('pagto-rev7-causa-conta-ignorada', '  if(contas.length>1){causas.push(', '  if(false){causas.push(', '36i')
+nucleo('pagto-rev7-causa-generica-some', ":'\\n\\nConfira o plano, a conta e as parcelas pagas de cada compra; se estiverem iguais e ainda assim não juntar, avise o Felype.'));}", ":''));}", '36i')
+nucleo('pagto-rev7-diag9e-data-crua', 'dts=[...new Set(msC.map(efet))];', 'dts=[...new Set(msC.map(p=>pgData(p)))];', '36b')
+nucleo('pagto-rev7-aviso-sem-limite-de-linhas', '  const MAX=6,L=d.difs;', '  const MAX=99,L=d.difs;', '36i')
+nucleo('pagto-rev7-fluxo-sem-minimo-de-2', "  if(R.notasSel.length===0&&R.soltas.length<2){alert('Marque pelo menos 2 compras pra juntar numa nota.');render();return;}\n", '', '36i')
+nucleo('pagto-rev7-retrato-sem-pagar', 'pagar:soma(aPagar())+soma(aPagar(true)),', 'pagar:0,', '36i')
+nucleo('pagto-rev7-causa-marcas-diferentes-some', '  if(new Set(gsEnv.map(pagasDe)).size>1){\n', '  if(false){\n', '36i')
+nucleo('pagto-rev7-causa-conta-sem-conselho', "    conselhos.push('Se as compras foram pagas por contas diferentes, elas não são a mesma nota. Se uma conta foi digitada errada, corrija a compra (✏️ editar) e junte de novo.');}\n", '    }\n', '36i')
+nucleo('pagto-rev7-rodape-generico-com-causa', "(c.causas.length?'':'\\n\\nConfira o plano", "(false?'':'\\n\\nConfira o plano", '36i')
+nucleo('pagto-rev7-causas-sem-protecao', 'let c={causas:[],conselhos:[]};try{c=causasJunta(ids);}catch(e){}', 'const c=causasJunta(ids);', '36i')
+nucleo('pagto-rev7-aviso-zero-negativo-pequeno', "fmt(r2(a))+' → '+fmt(r2(b))", "fmt(a+0)+' → '+fmt(b+0)", '36i')
+nucleo('pagto-rev7-retrato-sem-fora', 'fora:[pj.fora.entra,pj.fora.sai]};}', 'fora:[0,0]};}', '36i')
+nucleo('pagto-rev7-9e-alem-filtra-valor', '?x.pgParcelas[k]:null).filter(p=>p);', '?x.pgParcelas[k]:null).filter(p=>p&&conta1(p));', '36b')
+nucleo('pagto-rev7-9e-alem-data-inventada', 'efet=p=>alem9?pgData(p):dataDaMarca(p,iso9)', 'efet=p=>dataDaMarca(p,iso9)', '36b')
+nucleo('pagto-rev7-9e-alem-contada-sempre', 'contada9=conta1(escolhida);', 'contada9=true;', '36b')
+nucleo('pagto-rev7-9e-alem-cauda-do-vencimento', "const saida9=alem9?'como a parcela está além do plano", "const saida9=false?'como a parcela está além do plano", '36b')
+nucleo('pagto-rev7-causa-rotulo-so-nome', "const rotG=g=>rotDe(g.dono)+' ('+fmt(g.tot)+(dataOk(g.dono.data)?', '+g.dono.data.split('-').reverse().join('/'):'')+')';", 'const rotG=g=>rotDe(g.dono);', '36i')
+nucleo('pagto-rev7-fluxo-leitura-sem-protecao', "try{R=resolveJunta(ids);ids2=idsComLote(ids);}catch(e){alert('Não consegui juntar agora (erro interno). Nada foi juntado — tente de novo e, se repetir, avise o Felype.');render();return;}", 'R=resolveJunta(ids);ids2=idsComLote(ids);', '36i')
+nucleo('pagto-rev7-9e-alem-contada-so-dataok', 'contada9=conta1(escolhida);', 'contada9=!alem9||dataOk(pgData(escolhida));', '36b')
+nucleo('pagto-rev7-9e-chave-fora-do-padrao-entra', 'if(/^[1-9]\\d*$/.test(k))ks.add(k);', "if(k!=='__proto__')ks.add(k);", '36b')
+nucleo('pagto-rev7-9e-valor-do-app-infinito', 'fmt(pgValor(escolhida,g.vP))', 'fmt(Math.max(...vs))', '36b')
+nucleo('pagto-rev7-9e-conta-data-tambem-das-nao-contadas', 'cts=[...new Set(msC.map(', 'cts=[...new Set(ms.map(', '36b')
+nucleo('pagto-rev7-causa-rotulos-iguais', 'const rs=rotsG(gsEnv);', 'const rs=gsEnv.map(rotG);', '36i')
+nucleo('pagto-rev7-rotulo-data-impossivel', "(dataOk(g.dono.data)?', '+g.dono.data.split", "(g.dono.data?', '+g.dono.data.split", '36i')
+nucleo('pagto-rev7-juntar-leitura-sem-protecao', "let R;try{R=resolveJunta(ids);}catch(e){alert('Não consegui juntar agora (erro interno). Nada foi juntado — tente de novo e, se repetir, avise o Felype.');return false;}", 'const R=resolveJunta(ids);', '36i')
+nucleo('pagto-rev7-diag9f-desligado', '&&!m.origem&&!nParcOk(m.nParc)).forEach(m=>{', '&&!m.origem&&false).forEach(m=>{', '36j')
+nucleo('pagto-rev7-diag9g-desligado', 'if(contaVista[nm].length<2)return;', 'return;', '36k')
+nucleo('pagto-rev7-diag9h-desligado', 'Object.keys(m.pgParcelas).forEach(k=>{if(/^[1-9]\\d*$/.test(k))return;', 'Object.keys(m.pgParcelas).forEach(k=>{return;', '36k')
+nucleo('pagto-rev7-dica-presumidas-desligada', 'const dicaPres=nPres?', 'const dicaPres=false?', '36d')
+nucleo('pagto-rev7-dica-presumidas-nao-entra', 'dicaPg+dicaPres+bloco(fPg,', 'dicaPg+bloco(fPg,', '36d')
+nucleo('pagto-rev7-fora-90-texto-antigo', 'que não está no cadastro), vencido ou a vencer até +90 dias: entra', 'que não está no cadastro), até +90 dias: entra', '36h')
+nucleo('pagto-rev7-curva-sem-contar-nao-repassadas', 'const arRep=aReceber();serie.naoRepassadas=arRep.length;', 'const arRep=[];serie.naoRepassadas=arRep.length;', '36h')
+nucleo('pagto-rev7-curva-aviso-nao-entra', 'avisoEst+avisoDin+avisoPres+avisoRep+avisoAlem', 'avisoEst+avisoDin+avisoPres+avisoAlem', '36h')
+nucleo('pagto-rev7-okctg-utc', 'function okCtG(x){return okCtBase(x)&&noPer(isoLocal(x.venc||x.data));}', 'function okCtG(x){return okCtBase(x)&&noPer((x.venc||x.data).toISOString().slice(0,10));}', '36l')
+nucleo('pagto-rev7-gk-utc', '(isoLocal(x.venc||x.data).slice(0,7));', '((x.venc||x.data).toISOString().slice(0,7));', '36l')
+nucleo('pagto-rev7-despesa-corte-pela-emissao', "const dc=m.status==='apagar'?(m.data||''):(m.dataPagamento||m.data||'');", "const dc=m.data||'';", '36k')
+nucleo('pagto-rev7-parcelatxt-do-pedaco', "return m.nParc+'× de '+fmt(gr.vP)+' (a compra toda: '+fmt(gr.tot)+')';}", "return m.nParc+'× de '+fmt((+m.valor||0)/m.nParc);}", '36e')
+nucleo('pagto-rev7-ficha-do-pedaco', 'parcelaTxt(m,gruposParcelados().find(x=>x.membros.indexOf(m)>=0))', 'parcelaTxt(m,undefined)', '36e')
+nucleo('pagto-rev7-consulta-do-pedaco', 'parcelaTxt(m,grDeCons.get(m.id),true)', 'parcelaTxt(m,undefined,true)', '36e')
 
 def roda_nucleo(n):
     r = subprocess.run(['node', os.path.join(REPO, 'testes-nucleo.js'), os.path.join(SP, n + '.html')], capture_output=True, cwd=SP)
     saida = (r.stdout + r.stderr).decode('utf-8', 'replace')
-    return n, r.returncode, [l.strip() for l in saida.split('\n') if l.strip().startswith('FALHOU') and '31' in l]
+    falhas = [l.strip() for l in saida.split('\n') if l.strip().startswith('FALHOU')]
+    if n in ESPERADO:   # mutacao do pagamento por compra: tem de reprovar num dos blocos que a provam, e nao em qualquer lugar
+        return n, r.returncode, [l for l in falhas if any(re.match(r'FALHOU\s+' + b + r'\b', l) for b in ESPERADO[n])]
+    return n, r.returncode, [l for l in falhas if '31' in l]
 print()
 print('MUTACOES DA PLANILHA (os testes do nucleo devem REPROVAR na secao 31, exit=1):')
 furou_nuc = 0
