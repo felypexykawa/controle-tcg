@@ -471,7 +471,7 @@ function juntaMudaODinheiro(ids){
 function causasJunta(ids){
   const R=resolveJunta(ids),causas=[],conselhos=[];if(!R.h)return {causas,conselhos};
   const rotG=g=>rotDe(g.dono)+' ('+fmt(g.tot)+(dataOk(g.dono.data)?', '+g.dono.data.split('-').reverse().join('/'):'')+')';   /* dois "Booster · ETB" se distinguem pelo valor e pela data */
-  const rotsG=gs=>{const L=gs.map(rotG),n={},v={};L.forEach(x=>{n[x]=(n[x]||0)+1;});return L.map(x=>{if(n[x]<2)return x;v[x]=(v[x]||0)+1;return x+' ['+v[x]+'ª de '+n[x]+' iguais]';});};   /* mesmo nome, valor e dia: nada na tela as distingue — vale a ordem da seleção */
+  const rotsG=gs=>{const L=gs.map(rotG),n={},v={};L.forEach(x=>{n[x]=(n[x]||0)+1;});return L.map(x=>{if(n[x]<2)return x;v[x]=(v[x]||0)+1;return x+' ['+v[x]+'ª de '+n[x]+' iguais]';});};   /* mesmo nome, valor e dia: nada na tela as distingue, então o rótulo numera pela ordem em que elas aparecem na LISTA DE COMPRAS (é a ordem de `movs` que chega aqui por `R.alvo`), não pela ordem em que o dono as marcou — corrigido em 22/09, o texto dizia "ordem da seleção" e era a única pista que o dono tinha pra achar qual é qual */
   const envolvidos=R.alvo.concat(movs.filter(m=>R.nid&&m.notaId===R.nid&&R.alvo.indexOf(m)<0)),dentro=new Set(envolvidos.map(x=>x.id)),gs=gruposParcelados();
   const lotes=[];envolvidos.forEach(x=>{if(x.notaId)return;const g=gs.find(q=>!q.nota&&q.membros.indexOf(x)>=0);
     if(g&&g.membros.some(m=>!dentro.has(m.id))&&lotes.indexOf(g)<0)lotes.push(g);});
@@ -497,6 +497,64 @@ function textoJuntaBarrada(d,ids){let c={causas:[],conselhos:[]};try{c=causasJun
     +(c.causas.length?'\n\nO que achei de diferente entre elas: '+c.causas.join('; ')+'.':'')
     +(c.conselhos.length?'\n\n'+c.conselhos.join('\n'):(c.causas.length?'':'\n\nConfira o plano, a conta e as parcelas pagas de cada compra; se estiverem iguais e ainda assim não juntar, avise o Felype.'));}
 function juntaOk(ids){const d=juntaMudaODinheiro(ids);if(!d)return true;alert(d.erro||textoJuntaBarrada(d,ids));return false;}
+/* ===== A EDIÇÃO DO PLANO MOSTRA OS NÚMEROS ANTES DE CONFIRMAR (2026-09-22) =====
+   Mesmo desenho do juntar: troca `movs` por uma cópia profunda, roda a MESMA função que grava (`aplicaEdicaoCompra` / `aplicaEdicaoNota`,
+   nunca uma reescrita), mede o retrato do dinheiro antes e depois, e devolve o original num `finally`. O que muda é o que se FAZ com o
+   resultado: juntar é BARRADO quando mexe no dinheiro (ninguém pediu para mexer), editar NÃO é — mexer no dinheiro é o efeito esperado de
+   trocar o 1º vencimento, o nº de parcelas ou a conta. Aqui o ensaio só MOSTRA os números, e a decisão é do dono.
+   Até 21/09 essa edição podia derrubar "pago R$ 1.000 → R$ 200" e tirar R$ 800 de um saldo com um confirm que não dizia número nenhum. */
+function ensaioEdicao(fn){
+  const real=movs;let antes,depois;
+  try{antes=retratoJunta();
+    movs=JSON.parse(JSON.stringify(real));
+    fn();
+    depois=retratoJunta();
+  }catch(e){return {erro:'Não consegui conferir o efeito no dinheiro (erro interno: '+((e&&e.message)||e)+').'};}
+  finally{movs=real;}   /* o original volta SEMPRE, inclusive se o ensaio explodir no meio */
+  return {antes,depois,difs:difsRetrato(antes,depois)};}
+/* devolve null (nada que importe mexeu), {antes,depois,difs} (mexeu) ou {erro} (o ensaio quebrou).
+   Mudança SÓ na projeção do caixa passa em silêncio: adiar uma parcela muda o horizonte e não muda nada do que já aconteceu — é rotina.
+   Para decidir isso o comparador roda DE NOVO com a projeção cega, em vez de uma segunda regra escrita à mão (filtrar o texto das linhas
+   seria reimplementar a regra do dinheiro dentro do aviso, que é exatamente o defeito que o Diagnóstico 9e já pagou). */
+function edicaoMudaODinheiro(fn){
+  const d=ensaioEdicao(fn);
+  if(!d||d.erro)return d;
+  const cego=R=>({pago:R.pago,pagar:R.pagar,saldos:R.saldos,emissao:R.emissao,curva:R.curva,proj:[0,0,0,0],fora:[0,0]});
+  if(!difsRetrato(cego(d.antes),cego(d.depois)).length)return null;
+  return d.difs.length?d:null;}
+function textoEdicaoDinheiro(d){
+  /* FAIL-OPEN DECLARADO: se o ensaio quebrar por dentro, o aviso NÃO some — ele diz que não deu para conferir e a decisão fica com o dono.
+     Barrar seria mais seguro no juntar (lá o dono não pediu para mexer no dinheiro e existe outro caminho: igualar o plano e juntar de novo);
+     aqui barrar tranca uma correção legítima — o dono quer mesmo mudar o vencimento — sem nenhuma saída que dependa dele. O que não pode
+     acontecer em nenhum dos dois é o aviso sumir calado. */
+  if(d.erro)return d.erro+'\n\nDá pra salvar assim mesmo, mas confira depois o saldo das contas e a lista "A pagar".';
+  const MAX=6,L=d.difs;
+  return 'Mudar o plano assim mexe no dinheiro:\n'+L.slice(0,MAX).map(x=>'• '+x).join('\n')+(L.length>MAX?'\n• …e mais '+(L.length-MAX)+(L.length-MAX>1?' mudanças':' mudança'):'');}
+/* a edição mexe no PLANO? (é o que dispara o ensaio: mudar valor, observação ou quantidade não é mudança de plano — o preço mexer no
+   dinheiro é a definição da coisa, e perguntar ali seria ruído em toda correção de preço) */
+function mudouOPlanoDaCompra(e,obj){
+  if(!e||!obj||e.tipo!=='COMPRA'||obj.tipo!=='COMPRA'||obj.origem)return false;
+  const vz=v=>String(v==null?'':v);
+  if(['nParc','venc1','conta','pgTipo'].some(f=>vz(e[f])!==vz(obj[f])))return true;
+  /* [achado da auto-revisão de 22/09] sem 1º vencimento legível, quem manda no calendário das parcelas é a DATA da compra
+     (`vencBase`: venc1 → data). Mudar a data ali move o plano inteiro com o `venc1` intocado — e essa porta ficaria muda, que é
+     exatamente o defeito que este aviso existe pra fechar. Com `venc1` legível dos dois lados, a data não mexe no calendário e
+     corrigir data não vira pergunta. */
+  return (!dataOk(e.venc1)||!dataOk(obj.venc1))&&vz(e.data)!==vz(obj.data);}
+/* na nota, a tela edita o 1º vencimento — e a data de emissão, que vira o calendário quando não há 1º vencimento legível (mesmo motivo acima) */
+function mudouOPlanoDaNota(h,venc1N,dataN){
+  if(!h||!((+h.nParc||0)>1))return false;
+  if(venc1N&&venc1N!==(h.venc1||''))return true;
+  return !dataOk(h.venc1)&&String(dataN==null?'':dataN)!==String(h.data==null?'':h.data);}
+/* A pergunta ÚNICA da edição: os números do dinheiro primeiro, depois o que já se perguntava antes (propagação pros pedaços, marca que fica
+   fora do plano, totais da nota). Dois avisos viravam duas perguntas seguidas e a segunda era respondida no automático. Sem corpo e sem
+   mudança no dinheiro, não pergunta nada. Cancelar deixa TUDO como estava: nada gravado, formulário aberto. */
+function perguntaEdicao(corpo,fnEnsaio){
+  const partes=[];
+  if(fnEnsaio){const d=edicaoMudaODinheiro(fnEnsaio);if(d)partes.push(textoEdicaoDinheiro(d));}
+  if(corpo)partes.push(corpo);   /* o corpo já termina com o próprio "OK = … Cancelar = …" */
+  if(!partes.length)return true;
+  return confirm(partes.join('\n\n———\n\n')+(corpo?'':'\n\nOK = salvar mesmo assim. Cancelar = voltar.'));}
 function juntarNotaCore(ids){
   let R;try{R=resolveJunta(ids);}catch(e){alert('Não consegui juntar agora (erro interno). Nada foi juntado — tente de novo e, se repetir, avise o Felype.');return false;}   /* ler a seleção também não pode calar o botão (Compras e Fluxo passam por aqui) */
   const notasSel=R.notasSel,soltas=R.soltas;   /* a MESMA leitura que o ensaio usa: quem é a cabeça e quem entra */
@@ -1389,7 +1447,7 @@ function provaReal(){
      (marcas iguais são o mesmo pagamento duplicado — dado antigo do fracionamento); valores diferentes podem ser duas partes do mesmo
      pagamento (o app antigo marcava pedaço por pedaço) e a diferença sumia sem aviso: aparece aqui, com o que foi contado. */
   grupos9.forEach(g=>{if(g.membros.length<2)return;
-    const ks=new Set();g.membros.forEach(x=>{if(x.pgParcelas&&typeof x.pgParcelas==='object')Object.keys(x.pgParcelas).forEach(k=>{if(/^[1-9]\d*$/.test(k))ks.add(k);});});   /* chave fora do padrão nunca conta em tela nenhuma: quem fala dela é o 9h */
+    const ks=new Set();g.membros.forEach(x=>{if(x.pgParcelas&&typeof x.pgParcelas==='object')Object.keys(x.pgParcelas).forEach(k=>{if(chaveParcelaOk(k))ks.add(k);});});   /* chave fora do padrão nunca conta em tela nenhuma: quem fala dela é o 9h (a MESMA função que as telas de dinheiro usam) */
     [...ks].sort((a,b)=>a-b).forEach(k=>{
       /* conta1: ESTA marca, sozinha, entra no dinheiro? Dentro do plano toda marca entra; além dele só a que a `parcelasAlemDoPlano` aceita (data ISO válida) — a MESMA função do item 9 e das telas, nunca uma regra reescrita aqui (reescrita, ela contradizia o item 9: ano fora de 1900–2200) */
       const alem9=+k>g.nP,conta1=p=>!alem9||parcelasAlemDoPlano({[k]:p},g.nP).length>0;
@@ -1397,7 +1455,11 @@ function provaReal(){
       if(ms.length<2)return;
       const msC=ms.filter(conta1);   /* conta e data só se comparam entre as marcas que o dinheiro conta; o valor, entre todas (a maior é a que vale) */
       const vs=ms.map(vMarca).filter(v=>isFinite(v)),difV=vs.length>1&&Math.max(...vs)-Math.min(...vs)>=0.005;
-      const iso9=vencParcelaISO(g.dono,+k),efet=p=>alem9?pgData(p):dataDaMarca(p,iso9),cts=[...new Set(msC.map(p=>(p&&typeof p==='object'&&p.conta)?p.conta:g.conta))],dts=[...new Set(msC.map(efet))];   /* a data que o dinheiro USA (dentro do plano, sem data legível = o vencimento; além dele, a da marca), não a crua */
+      /* [22/09] além do plano, o dia que o Diagnóstico IMPRIME é o mesmo que o Fluxo mostra. Uma marca em "30/02/2026" existe no dado e o
+         Fluxo a lista em 02/03 (é o que `dataDeISO` faz com um dia que não existe); o Diagnóstico imprimia a data crua e os dois se
+         contradiziam na tela do dono. Vazia ou ilegível devolve '' — nunca "NaN-NaN-NaN". */
+      const efetAlem=p=>{const d=pgData(p);if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d))return '';const dt=dataDeISO(d);return isFinite(+dt)?isoLocal(dt):'';};
+      const iso9=vencParcelaISO(g.dono,+k),efet=p=>alem9?efetAlem(p):dataDaMarca(p,iso9),cts=[...new Set(msC.map(p=>(p&&typeof p==='object'&&p.conta)?p.conta:g.conta))],dts=[...new Set(msC.map(efet))];   /* a data que o dinheiro USA (dentro do plano, sem data legível = o vencimento; além dele, a da marca), não a crua */
       if(!difV&&cts.length<2&&dts.length<2)return;   /* iguais em tudo = o mesmo pagamento duplicado pelo fracionamento antigo: nada a dizer */
       const escolhida=g.marcas[k],cE=(escolhida&&typeof escolhida==='object'&&escolhida.conta)?escolhida.conta:g.conta,contada9=conta1(escolhida);   /* a que a união escolheu entra no dinheiro? */
       const saida9=alem9?'como a parcela está além do plano, acerte o nº de parcelas da compra (o botão abaixo abre o lançamento) ou, só se esse pagamento nunca aconteceu, desmarque a parcela em Fluxo de caixa › Pagas (período em "tudo").'
@@ -1418,9 +1480,16 @@ function provaReal(){
     add('amarelo','Duas contas com o mesmo nome: "'+nm+'"','Cada saldo, a projeção e o Painel debitam nos DOIS cadastros — o dinheiro dessa conta conta duas vezes. Renomeie ou apague um deles (Consultar › Cadastros › Contas).','ver as contas',`fecharModal();consF='CADASTRO';cadTab='contas';go('consultar')`);});
   /* 9h. Marca de parcela com número fora do padrão ("2.0", " 2", "0", "__proto__"): nenhuma tela a conta e o "desmarcar" não a alcança — o dinheiro
      dela fica invisível. */
+  /* [22/09] UM aviso por COMPRA (a nota ou a família do lote), não um por chave e por pedaço: o mesmo lote dividido em 6 pedaços com 2
+     chaves tortas rendia 12 linhas iguais no Diagnóstico, e o dono não tem 12 lançamentos para consertar — tem um. */
+  const tortas9=new Map();
   movs.forEach(m=>{if(!m.pgParcelas||typeof m.pgParcelas!=='object')return;
-    Object.keys(m.pgParcelas).forEach(k=>{if(/^[1-9]\d*$/.test(k))return;
-      add('amarelo','Parcela marcada com número fora do padrão em '+rotDe(m)+': "'+k+'"','O número da parcela precisa ser inteiro (1, 2, 3…). Essa marca não entra em nenhuma conta e o "desmarcar" não a alcança. Se ela era um pagamento de verdade: a parcela que já venceu já conta como paga no vencimento, e a que ainda vai vencer você marca com "✓ paguei". A marca torta fica sem efeito.','abrir o lançamento',`fecharModal();abrir('${m.id}')`);});});
+    const ruins=Object.keys(m.pgParcelas).filter(k=>!chaveParcelaOk(k));if(!ruins.length)return;
+    const rz=raizDe(m)||m,ch=m.notaId?('N:'+m.notaId):('F:'+rz.id);
+    let e=tortas9.get(ch);if(!e){e={m:rz,chaves:new Set(),n:0};tortas9.set(ch,e);}
+    ruins.forEach(k=>e.chaves.add(k));e.n++;});
+  tortas9.forEach(e=>{const ks9=[...e.chaves];
+    add('amarelo','Parcela marcada com número fora do padrão em '+rotDe(e.m)+': '+ks9.map(k=>'"'+k+'"').join(', ')+(e.n>1?' (em '+e.n+' lançamentos da mesma compra)':''),'O número da parcela precisa ser inteiro (1, 2, 3…). '+(ks9.length>1?'Essas marcas não entram':'Essa marca não entra')+' em nenhuma conta e o "desmarcar" não '+(ks9.length>1?'as alcança':'a alcança')+'. Se '+(ks9.length>1?'eram pagamentos de verdade':'ela era um pagamento de verdade')+': a parcela que já venceu já conta como paga no vencimento, e a que ainda vai vencer você marca com "✓ paguei". A marca torta fica sem efeito.','abrir o lançamento',`fecharModal();abrir('${e.m.id}')`);});
   const n={vermelho:A.filter(x=>x.sev==='vermelho').length,amarelo:A.filter(x=>x.sev==='amarelo').length,info:A.filter(x=>x.sev==='info').length};
   _provaCache={A,n};
   return _provaCache;}
@@ -1961,6 +2030,39 @@ function entraNoComprei(m){if(!m||m.tipo!=='COMPRA')return false;const s=sitDe(m
    decide para que lado o centavo arredonda: o rodape somava na ordem da lista e dava 1 centavo diferente do Painel (41.190,47 x 41.190,48
    em 90 dias). A expressao e a ordem sao as do motor da v2.6f: o numero do Painel e o mesmo, bit a bit. */
 function somaLiqVendas(lista){const naLista=new Set(lista);let s=0;for(const m of movs)if(m.tipo==='VENDA'&&naLista.has(m))s+=(+m.valor||0)*(1-(+m.taxa||0)/100);return s;}
+/* AS DUAS CONVENÇÕES DE DESPESA, cada uma numa função — nenhuma tela reescreve a regra por conta própria.
+   POR QUE EXISTEM (22/09/2026): a mesma condição estava copiada à mão em 7 lugares. Em 21/09 a regra de CAIXA mudou (despesa
+   "a pagar" vencida parou de debitar) e só DOIS lugares foram religados; os outros cinco ficaram na regra velha sem ninguém
+   notar. Agora a convenção de cada tela se lê pelo NOME da função que ela chama:
+
+     caixaDaDespesa    → REGIME CAIXA: só o dinheiro que de fato SAIU do bolso. "A pagar" NUNCA debita, nem depois de vencer —
+       vencer não é pagar: a conta de luz atrasada continua no bolso até ser paga, e segue na lista "A pagar" e na projeção do
+       caixa (todos os horizontes). Antes de 21/09 a vencida era debitada no dia do vencimento, como se a presunção das
+       PARCELAS ("vencida sem marca = paga no vencimento") valesse também para despesa — e não vale: parcela de compra tem
+       débito automático/boleto agendado, despesa a pagar é justamente a que ele ainda não pagou. Quem paga muda a situação
+       para "Pago", e aí debita na data do PAGAMENTO, não na da emissão. É a regra do `saldoFisicoConta`, e por ele do card
+       "💼 Nas contas (físico hoje)" do Painel, do "Saldo por conta" do Fluxo de caixa e da projeção.
+
+     emissaoDaDespesa  → REGIME DE COMPETÊNCIA: conta na data em que a despesa foi LANÇADA. "A pagar" com data FUTURA fica
+       fora (ainda não é fato do período); vencida entra, mesmo sem ter sido paga. É a regra do Lucro (`motor`), do card
+       "💼 Saldo em contas (por emissão)", do `saldoConta` e do Extrato linha a linha. `hoje` vem de fora porque cada tela já
+       lê o relógio uma vez (`hojeISO`, local — um relógio só). `comPeriodo` liga a única variação legítima: quando o usuário
+       pediu um período que alcança o futuro (perAte), a "a pagar" futura entra; o saldo TOTAL da conta não usa isso, porque
+       não tem período.
+
+   As duas convivem de propósito, e o Painel mostra os dois números lado a lado: convenções diferentes SEMPRE rotuladas, nunca
+   misturadas. Devolvem null quando a despesa não entra, ou { data, valor } com a data que VALE naquela convenção. */
+function caixaDaDespesa(m){if(!m||m.tipo!=='DESPESA'||m.status==='apagar')return null;
+  return {data:m.dataPagamento||m.data||'',valor:+m.valor||0};}
+function emissaoDaDespesa(m,hoje,comPeriodo){if(!m||m.tipo!=='DESPESA')return null;
+  if(m.status==='apagar'&&!(comPeriodo&&perAte)&&(m.data||'')>hoje)return null;
+  return {data:m.data||'',valor:+m.valor||0};}
+/* LUCRO (motor) — CONVENÇÃO: reconhece despesa na EMISSÃO (regime de competência), não no pagamento. É uma pergunta diferente
+   da do saldo de caixa (`saldoFisicoConta`/`caixaDaDespesa`, que só debita quando o dinheiro sai de verdade), e está certo
+   assim: lucro do mês é o que aconteceu no mês, pago ou não. As duas convivem: rotuladas, nunca misturadas. A linha das
+   despesas aqui embaixo é a mesma regra de `emissaoDaDespesa`, mantida inline de propósito (o Lucro é o número de maior
+   consequência do app e não se mexe nele sem motivo) — o teste 37e confronta as duas a cada rodada, então divergir deixou de
+   ser possível em silêncio. */
 function motor(filtrar){
   const F=filtrar?mRel:null;
   const todasC=movs.filter(m=>m.tipo==='COMPRA'&&(!F||F(m)));
@@ -2021,7 +2123,10 @@ function aPagar(vencidas){const hj=hojeISO(),hoje=dataDeISO(hj);let L=[];
       const iso=vencParcelaISO(g.dono,i);
       if(!!vencidas!==!!(iso&&iso<hj))continue;
       L.push(linhaDeParcela(g,i,iso?dataDeISO(iso):hoje,{cobrar:true}));}});
-  if(!vencidas)movs.filter(m=>m.tipo==='DESPESA'&&m.status==='apagar').forEach(m=>{L.push({venc:new Date((m.data||'')+'T00:00:00'),valor:+m.valor||0,m});});
+  /* despesa sem data legível (campo vazio ou data torta) vence HOJE — a mesma convenção da parcela sem 1º vencimento logo acima: nunca
+     some. Passou a importar em 2026-09-22, quando a despesa "a pagar" saiu do saldo físico: sem este chão ela ficava com data inválida,
+     era descartada do filtro de horizonte da projeção e sumia dos dois lugares ao mesmo tempo. */
+  if(!vencidas)movs.filter(m=>m.tipo==='DESPESA'&&m.status==='apagar').forEach(m=>{const d=new Date((m.data||'')+'T00:00:00');L.push({venc:isFinite(+d)?d:hoje,valor:+m.valor||0,m});});
   return L.sort((a,b)=>a.venc-b.venc);}
 /* Parcela paga guarda DATA e VALOR do dia do pagamento — editar a nota depois não pode
    reescrever o histórico do que já saiu do bolso. Legado (só a data em string) segue válido. */
@@ -2036,9 +2141,15 @@ const pgValor=(x,fallback)=>(x&&typeof x==='object'&&x.v!=null&&x.v!==''&&isFini
    apaga) e data ISO válida AAAA-MM-DD (sem data não dá pra posicionar no tempo; data torta
    derrubaria a tela do Fluxo de caixa, e a parcela de fora do plano sempre foi imune a isso).
    Devolve [{k,p}] ordenado por k; k é inteiro > nP. */
+/* A CHAVE de uma marca de parcela é canônica? ("4" sim; "4.0", " 4", "0", "-1", "__proto__" e "12345678901234567890" não.)
+   Uma função só, usada pelas telas de dinheiro (`parcelasAlemDoPlano`) E pelo Diagnóstico (9e e 9h) — até 21/09 eram DUAS regras: as
+   telas exigiam ida-e-volta pelo número (`String(+k)===k`) e o 9h só olhava o formato (`/^[1-9]\d*$/`). Uma chave de 20 dígitos passava
+   no formato e falhava na ida-e-volta (vira 12345678901234570000), então NINGUÉM falava dela: o dinheiro a ignorava calado e o 9h
+   também. Agora as duas pontas leem a mesma função, e quem não é canônica é assunto do 9h. */
+function chaveParcelaOk(k){return typeof k==='string'&&/^[1-9]\d*$/.test(k)&&String(+k)===k;}
 function parcelasAlemDoPlano(pg,nP){
   const L=[];if(!pg||typeof pg!=='object')return L;
-  Object.keys(pg).forEach(ks=>{const k=+ks;if(!Number.isInteger(k)||String(k)!==ks||!(k>nP))return;
+  Object.keys(pg).forEach(ks=>{const k=+ks;if(!chaveParcelaOk(ks)||!(k>nP))return;
     const p=pg[ks];if(!p)return;const d=pgData(p);
     if(typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)||isNaN(new Date(d+'T00:00:00')))return;
     L.push({k,p});});
@@ -2134,10 +2245,40 @@ function gruposParcelados(lista){
   const menorId=ms=>ms.reduce((a,x)=>(String(x.id)<String(a.id)?x:a));
   L.forEach(g=>{const hs=g.membros.filter(temPg),h=menorId(hs.length?hs:g.membros);
     g.dono=h;g.nP=Math.min(120,Math.ceil(+h.nParc)||1);g.tot=Math.round(g.membros.reduce((s,x)=>s+(+x.valor||0),0)*100)/100;g.vP=g.tot/g.nP;g.conta=h.conta||'';
-    g.marcas=marcasDoGrupo(g.membros);});
+    g.marcas=marcasDoGrupo(g.membros);g.fut=valoresFuturosDoGrupo(g);});
   return L;}
+/* O VALOR DA PARCELA QUE AINDA VAI VENCER (2026-09-22). `g.vP` é o valor do PLANO (total ÷ nº de parcelas): continua sendo o que a ficha
+   mostra ("3× de R$ 100") e o que a parcela paga ou presumida vale. Mas depois de EDITAR o plano de uma compra que já tem parcela paga, o
+   plano deixa de fechar com a realidade — R$ 300 em 3× com R$ 100 já pagos, editada para 6×, dava 6 × R$ 50, ou seja "pago R$ 100 + a pagar
+   R$ 300" = R$ 350 numa compra de R$ 300. A parcela futura passa a valer o que FALTA dividido por quantas faltam: (total − o que está
+   marcado − o que a regra presume pago por ter vencido − o que foi pago além do plano) ÷ nº de futuras, com a ÚLTIMA levando o resíduo de
+   centavos, para a soma fechar no total.
+   É calculado UMA vez por grupo (aqui, em gruposParcelados) e lido por todo o resto pela função `valorFuturaParcela` — a regra não se repete
+   em lugar nenhum. Sem marca nenhuma (o caso de toda a base de hoje) devolve null e NADA muda: a futura vale `g.vP`, como sempre valeu. */
+function valoresFuturosDoGrupo(g){
+  if(!g.marcas||!Object.keys(g.marcas).length)return null;   /* atalho barato: sem marca nenhuma nada muda — e é o caso da base real, que não pode se mexer */
+  const hj=hojeISO(),fut=[];let pagoExp=0,nPres=0,temMarca=false;
+  for(let i=1;i<=g.nP;i++){
+    const p=g.marcas[i];
+    if(p){temMarca=true;pagoExp+=pgValor(p,g.vP);continue;}
+    const iso=vencParcelaISO(g.dono,i);
+    if(iso&&iso<hj)nPres++;            /* vencida sem marca: a regra a conta paga no vencimento, pelo valor do PLANO e sem arredondar, como no resto do app */
+    else fut.push(i);}
+  const alem=parcelasAlemDoPlano(g.marcas,g.nP);
+  let pagoAlem=0;alem.forEach(({p})=>{pagoAlem+=pgValor(p,g.vP);});
+  if(!temMarca&&!alem.length)return null;   /* só chave torta (nenhum pagamento que o dinheiro conte): nada muda */
+  if(!fut.length)return {};                 /* nenhuma futura pra receber o resto */
+  const resto=Math.max(0,Math.round((g.tot-pagoExp-nPres*g.vP-pagoAlem)*100)/100);   /* marcas que somam mais que o total → futuras valem 0, nunca negativo */
+  const v=Math.round(resto/fut.length*100)/100,M={};
+  fut.forEach((i,j)=>{M[i]=(j===fut.length-1)?Math.round((resto-v*(fut.length-1))*100)/100:v;});
+  return M;}
+/* o valor da parcela `i` do grupo `g` QUANDO ELA AINDA VAI VENCER. Para parcela paga, presumida ou além do plano devolve o valor do PLANO —
+   quem lê essas usa `pgValor(marca,g.vP)`, que já manda no valor. Única porta: ninguém mais calcula valor de parcela futura. */
+function valorFuturaParcela(g,i){
+  if(!g)return 0;
+  return (g.fut&&Object.prototype.hasOwnProperty.call(g.fut,i))?g.fut[i]:g.vP;}
 /* a linha de UMA parcela do grupo, no formato que as telas já leem (nota e compra dividida = uma linha por parcela, com o total da compra) */
-function linhaDeParcela(g,i,venc,extra){const h=g.dono,L={venc,valor:g.vP,m:h,pi:i,pn:g.nP,tot:g.tot};
+function linhaDeParcela(g,i,venc,extra){const h=g.dono,L={venc,valor:valorFuturaParcela(g,i),m:h,pi:i,pn:g.nP,tot:g.tot};
   if(g.nota)L.nota={id:h.notaId,num:h.notaNum||'',n:g.membros.length,tot:g.tot,parcela:i,nP:g.nP};
   else if(g.membros.length>1)L.fam={n:g.membros.length,tot:g.tot};
   return Object.assign(L,extra||{});}
@@ -2160,11 +2301,17 @@ function repassaMarcas(antes,st){
     saem.forEach(x=>{delete x.pgParcelas;});});}
 /* o que o "✓ paguei" oferece pra parcela pi: a parcela em centavos e a ÚLTIMA leva o resíduo — as parcelas confirmadas somam EXATAMENTE
    o total da compra (antes cada uma arredondava sozinha: confirmar as 66 vencidas movia 9 centavos no saldo e na curva — revisão de 21/09/2026) */
-function valorOfertaParcela(g,pi){const vp=Math.round(g.vP*100)/100;
+function valorOfertaParcela(g,pi){
+  /* parcela que ainda vai vencer: o valor já vem fechado de `valorFuturaParcela` (o resíduo de centavos está lá dentro, e ele já desconta
+     o que foi pago). Só a parcela vencida sem marca ainda passa pela regra do resíduo sobre o valor do plano, logo abaixo. */
+  if(g&&g.fut&&Object.prototype.hasOwnProperty.call(g.fut,pi))return g.fut[pi];
+  const vp=Math.round(g.vP*100)/100;
   return (+pi===g.nP)?Math.round((g.tot-vp*(g.nP-1))*100)/100:vp;}
 function pagarParcela(id,pi,pn,valor){const m=movs.find(x=>x.id===id);if(!m)return;
   const gr=gruposParcelados().find(x=>x.membros.indexOf(m)>=0),hj=hojeISO();
-  if(gr&&Math.abs((+valor||0)-gr.vP)<1e-9)valor=valorOfertaParcela(gr,pi);
+  /* "o dono não mexeu no valor sugerido?" — compara com o MESMO valor que a tela ofereceu (para a futura, o de `valorFuturaParcela`;
+     para a vencida sem marca, `g.vP`, que é o que ela sempre valeu) */
+  if(gr&&Math.abs((+valor||0)-valorFuturaParcela(gr,pi))<1e-9)valor=valorOfertaParcela(gr,pi);
   /* parcela JÁ VENCIDA: o padrão é o dia do vencimento — confirmar o que a regra já contava como pago no vencimento não pode mover o
      dinheiro no tempo (antes carimbava hoje e as 66 saídas de meses atrás viravam um degrau só, em 21/09; revisão de 21/09/2026) */
   const iso=gr?vencParcelaISO(gr.dono,+pi):'',dpad=(iso&&iso<hj)?iso:hj;
@@ -3140,7 +3287,7 @@ function vContas(){
     <button class="btn g" style="margin-top:8px" onclick="ctFOpen=false;render()">fechar filtros</button>`:'';
   const controles=`<div style="margin-top:8px">${fBtnMini(ctFOpen,resCt,'ctFOpen=!ctFOpen;render()')}</div>${fPanel}
     <div style="display:flex;gap:8px;align-items:center;margin:8px 0 0"><select style="flex:1" onchange="ctAgrupo=this.value;ctExp={};render()">${[['mes','Agrupar por: mês de vencimento'],['pessoa','Agrupar por: fornecedor / cliente']].map(([v,l])=>`<option value="${v}" ${ctAgrupo===v?'selected':''}>${l}</option>`).join('')}</select><span class="lnk" style="flex:none" onclick="fxSelMode=!fxSelMode;fxSel={};if(fxSelMode){ctExp={};_ctKeys.forEach(k=>ctExp[k]=true);}render()">${fxSelMode?'✕ cancelar':'🧾 juntar'}</span><span class="lnk" style="flex:none" onclick="togTodosCt()">${Object.keys(ctExp).length?'recolher tudo':'expandir tudo'}</span></div>
-    <div style="margin-top:8px"><span class="lnk" onclick="extConta='';relExtrato=true;go('relatorios')">📜 extrato de caixa — saldo linha a linha →</span></div>`;
+    <div style="margin-top:8px"><span class="lnk" onclick="extConta='';relExtrato=true;go('relatorios')">📜 extrato da conta (por emissão) — saldo linha a linha →</span></div>`;
   const filtrado=(ctPess||ctJogo||ctConta||ctCat||perDe||perAte)?' (filtrado)':'';
   const fxBar=fxSelMode?`<div class="soon" style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--infobg);color:var(--blue)"><span>${Object.keys(fxSel).length} marcada(s) — soltas + 1 nota: entram nela · 2+ notas: fundem</span><button class="x" style="color:var(--blue);font-weight:700;flex:none" onclick="juntarFx()">🧾 juntar</button></div>`:'';
   const fPgT=fPg.reduce((s,x)=>s+x.valor,0);
@@ -3292,7 +3439,7 @@ function serieDinheiro(){
     for(let i=1;i<=g.nP;i++){
       const p=g.marcas[i],iso=vencParcelaISO(g.dono,i);
       if(p){evs.push({data:dataDaMarca(p,iso),delta:-pgValor(p,g.vP)});continue;}
-      if(!iso||iso>=hj){semPagar++;semPagarValor+=g.vP;continue;}
+      if(!iso||iso>=hj){semPagar++;semPagarValor+=valorFuturaParcela(g,i);continue;}   /* a vencer: pelo valor que ela vale HOJE, já descontado o que foi pago */
       evs.push({data:iso,delta:-g.vP});presumidas++;presumidasValor+=g.vP;
       if(!cadastrada(g.conta)){presSemConta++;presSemContaValor+=g.vP;}}
     /* marca de parcela paga ALÉM do plano (sobra de edição do nº de parcelas): o dinheiro saiu de verdade, então conta na curva —
@@ -3591,30 +3738,40 @@ function editarNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.le
     <button class="btn" style="margin-top:12px" onclick="salvarEdicaoNota('${nid}')">Salvar alterações</button>
     <button class="btn g" style="margin-top:8px" onclick="abrirNota('${nid}')">cancelar — voltar pra nota</button></div></div>`;
   document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+/* TUDO o que a edição de uma NOTA muda nos lançamentos, numa função só (2026-09-22) — o par de `aplicaEdicaoCompra`, pelo mesmo motivo:
+   o ENSAIO tem de rodar ESTE código numa cópia. Acha os itens por ID (nunca por referência de objeto), porque na cópia os objetos são
+   outros. Não grava, não avisa, não mexe em tela. */
+function aplicaEdicaoNota(D){
+  const todos=movs.filter(m=>m.notaId===D.nid);if(!todos.length)return;
+  if(D.itens)D.itens.forEach(x=>{const m=movs.find(z=>z.id===x.id);if(!m)return;
+    m.qtd=x.q;m.valorProduto=x.p;m.freteRateio=x.rF;m.taxaRateio=x.rT;
+    m.valor=Math.round((x.p+x.rF+x.rT)*100)/100;m.vUnit=Math.round(m.valor/x.q*100)/100;
+    /* obs: substitui SÓ o prefixo padrão "nota · +R$X frete/taxa"; obs de item juntado
+       (que não segue o padrão) é preservada inteira com separador — nunca colada/comida */
+    const pref=((x.rF+x.rT)>0?`nota · +${fmt(x.rF+x.rT)} frete/taxa`:'nota');
+    const mObs=(m.obs||'').match(/^nota( · \+R\$ [\d.,]+ frete\/taxa)?(?=( · )|$)/);
+    const resto=mObs?(m.obs||'').slice(mObs[0].length):((m.obs||'')?' · '+(m.obs||''):'');
+    m.obs=pref+resto;});
+  todos.forEach(m=>{m.data=D.dataN;m.notaNum=D.numN;if(D.venc1N&&(+m.nParc||0)>1)m.venc1=D.venc1N;});}
 function salvarEdicaoNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.length)return;
   const itens=todos.filter(m=>!m.loteOrigem);
   const temPedacos=notaTemSaidas(todos,itens);
   const g=id=>document.getElementById(id);
   const dataN=g('ne_data')?.value||itens[0].data,numN=(g('ne_num')?.value||'').trim();
   const venc1N=g('ne_venc1')?.value||'';
+  const D={nid,dataN,numN,venc1N,itens:null};
+  let pergunta='';
   if(!temPedacos){
     const frete=Math.max(0,+g('ne_frete')?.value||0),taxa=Math.max(0,+g('ne_taxa')?.value||0);
     const novos=itens.map(m=>({m,q:Math.max(1,+g('ne_q_'+m.id)?.value||1),p:Math.round((+g('ne_p_'+m.id)?.value||0)*100)/100}));
     if(novos.some(x=>x.p<=0)){alert('Todo item precisa de um valor de produto maior que zero.');return;}
     const rF=ratearExato(frete,novos.map(x=>x.p)),rT=ratearExato(taxa,novos.map(x=>x.p));
     const totN=Math.round((novos.reduce((s,x)=>s+x.p,0)+frete+taxa)*100)/100;
-    if(!confirm('Salvar a nota corrigida?\n\nProduto '+fmt(novos.reduce((s,x)=>s+x.p,0))+' + frete '+fmt(frete)+' + taxa '+fmt(taxa)+' = TOTAL '+fmt(totN)+'\n\nO rateio refaz proporcional; parcelas já marcadas como pagas, fotos e vínculos não mudam.'+((venc1N&&(+itens[0].nParc||0)>1&&venc1N!==(itens[0].venc1||''))?'\n\nO 1º vencimento mudou: as parcelas ainda sem marca de paga mudam de data (e as que já venceram contam como pagas no dia do vencimento).':'')))return;
-    novos.forEach((x,i)=>{const m=x.m;
-      m.qtd=x.q;m.valorProduto=x.p;m.freteRateio=rF[i];m.taxaRateio=rT[i];
-      m.valor=Math.round((x.p+rF[i]+rT[i])*100)/100;m.vUnit=Math.round(m.valor/x.q*100)/100;
-      /* obs: substitui SÓ o prefixo padrão "nota · +R$X frete/taxa"; obs de item juntado
-         (que não segue o padrão) é preservada inteira com separador — nunca colada/comida */
-      const pref=((rF[i]+rT[i])>0?`nota · +${fmt(rF[i]+rT[i])} frete/taxa`:'nota');
-      const mObs=(m.obs||'').match(/^nota( · \+R\$ [\d.,]+ frete\/taxa)?(?=( · )|$)/);
-      const resto=mObs?(m.obs||'').slice(mObs[0].length):((m.obs||'')?' · '+(m.obs||''):'');
-      m.obs=pref+resto;});
+    D.itens=novos.map((x,i)=>({id:x.m.id,q:x.q,p:x.p,rF:rF[i],rT:rT[i]}));
+    pergunta='Salvar a nota corrigida?\n\nProduto '+fmt(novos.reduce((s,x)=>s+x.p,0))+' + frete '+fmt(frete)+' + taxa '+fmt(taxa)+' = TOTAL '+fmt(totN)+'\n\nO rateio refaz proporcional; parcelas já marcadas como pagas, fotos e vínculos não mudam.'+((venc1N&&(+itens[0].nParc||0)>1&&venc1N!==(itens[0].venc1||''))?'\n\nO 1º vencimento mudou: as parcelas ainda sem marca de paga mudam de data (e as que já venceram contam como pagas no dia do vencimento).':'');
   }
-  todos.forEach(m=>{m.data=dataN;m.notaNum=numN;if(venc1N&&(+m.nParc||0)>1)m.venc1=venc1N;});
+  if(!perguntaEdicao(pergunta,mudouOPlanoDaNota(itens[0],venc1N,dataN)?(()=>aplicaEdicaoNota(D)):null))return;
+  aplicaEdicaoNota(D);
   save();diarioReg('corrigiu a nota',todos.length+' itens');toast('Nota corrigida ✓');fecharModal();abrirNota(nid);render();}
 function excluirNotaInteira(nid){const its=movs.filter(m=>m.notaId===nid);if(!its.length)return;
   const tot=its.reduce((s,x)=>s+(+x.valor||0),0);
@@ -3699,11 +3856,17 @@ function rotuloPer(k,g){if(g==='ano')return k;const p=k.split('-');if(g==='mes')
    conta 'Pedido'. Pra um mesmo item, as duas telas podem discordar sobre "quando o estoque
    mudou" — cada uma está certa pra pergunta que faz. Se algum dia precisarem bater, é troca de
    regra aqui, não em serieEstoque(). */
+/* CONVENÇÃO DESTE GRÁFICO (Relatórios → 📈 Linha do tempo) — decidida lendo o código e os rótulos em 22/09, não por analogia: é "por
+   EMISSÃO", não fluxo de caixa, apesar de os rótulos dizerem "dinheiro entrou/saiu". As três pontas já eram por emissão antes desta
+   conferência: a compra entra inteira no dia da compra (parcela paga não move nada aqui), a venda no dia da venda (sem esperar o repasse do
+   app) e a despesa na emissão. Logo, religar SÓ a despesa à regra de caixa deixaria a tela metade num regime e metade no outro, que é pior
+   que as duas conviverem rotuladas — então a despesa segue `emissaoDaDespesa`, com `comPeriodo` (se o usuário pediu um período que alcança o
+   futuro, a "a pagar" futura entra). Quem quer caixa olha o Fluxo de caixa: "Saldo por conta" e projeção, que são `saldoFisicoConta`. */
 function fluxoBuckets(){const B={},hoje=hojeISO();
   const add=(dt,s,v)=>{if(!dt||!noPer(dt)||!(v>0))return;const k=chavePer(dt,relGran);(B[k]=B[k]||{})[s]=(B[k][s]||0)+v;};
   const dIni=m=>m.destIni||((sitDe(m)==='Coleção'&&!m.loteOrigem)?'Coleção':'Em estoque');
   movs.forEach(m=>{const v=+m.valor||0;
-    if(m.tipo==='DESPESA'){if(relJogo||relCol)return;if(relPess&&(m.contraparte||'')!==relPess)return;if(m.status==='apagar'&&!perAte&&m.data>hoje)return;add(m.data,'din_out',v);return;}
+    if(m.tipo==='DESPESA'){if(relJogo||relCol)return;if(relPess&&(m.contraparte||'')!==relPess)return;const de=emissaoDaDespesa(m,hoje,true);if(!de)return;add(de.data,'din_out',de.valor);return;}
     if(m.tipo==='VENDA'){if(!mRel(m))return;add(m.data,'din_in',v*(1-(+m.taxa||0)/100));const co=+m.custoOrigem||0;if(co)add(m.data,m.vendaTipo==='colecao'?'col_out':'est_out',co);return;}
     if(m.tipo!=='COMPRA'||!mRel(m))return;
     if(!m.origem)add(m.data,'din_out',v);
@@ -3729,36 +3892,63 @@ function timelineHtml(){const B=fluxoBuckets();
     ${on.map(([s,l,c])=>{const v=b[s]||0;return `<div style="display:flex;align-items:center;gap:7px;margin-top:3px;cursor:pointer" onclick="irPer('${k}','${FC[s]||'tudo'}')"><span style="width:112px;flex:none;font-size:11px;color:var(--mut)">${l}</span><div style="flex:1;height:5px;background:var(--card2);border-radius:3px"><div style="height:5px;border-radius:3px;background:${c};width:${v>0?Math.max(2,Math.round(v/mx*100)):0}%"></div></div><span style="width:86px;flex:none;text-align:right;font-size:11px">${v?fmt(v):'—'}</span></div>`;}).join('')}</div>`;}).join('');}
 function raizDe(m){let x=m,g=0;while(x&&x.loteOrigem&&g++<20){const p=movs.find(y=>y.id===x.loteOrigem);if(!p)break;x=p;}return x;}
 function extDimFiltrado(){return !!(relJogo||relCol||relPess||relCat);} /* recorte por dimensão: saldo inicial não se aplica */
-function antesDaBase(m){const cb=contasBanc.find(c=>c.nome===(m.conta||''));return !!(cb&&cb.saldoData&&(m.data||'')<cb.saldoData);} /* movimento anterior à data-base da conta: já está dentro do saldo inicial dela */
-function saldoBaseExtrato(){/* saldo REAL antes do início do período: saldos iniciais + movimentos anteriores a perDe */
+/* movimento anterior à data-base da conta: já está dentro do saldo inicial dela. [2026-09-22] a versão por NOME existe porque transferência e
+   dinheiro de troca não guardam a conta em `m.conta` (usam contaDe/contaPara/dinConta): resolvendo pelo campo errado, o corte virava no-op
+   justamente nos dois tipos, e o extrato mostrava/descontava movimento que o `saldoConta` já tinha absorvido no saldo inicial. `saldoConta`
+   corta pela saldoData da conta que está sendo somada — é essa regra que a versão por nome reproduz, com o campo que cada tipo de fato usa. */
+function antesDaBaseDe(nome,data){const cb=contasBanc.find(c=>c.nome===(nome||''));return !!(cb&&cb.saldoData&&(data||'')<cb.saldoData);}
+function antesDaBase(m){return antesDaBaseDe(m.conta,m.data);}
+function saldoBaseExtrato(){/* saldo POR EMISSÃO antes do início do período: saldos iniciais + movimentos anteriores a perDe. [22/09] dizia "saldo REAL",
+    palavra que fazia esta função parecer o saldo de CAIXA e não é: ela é a base do Extrato, que é o detalhe do `saldoConta` (por emissão) — a despesa
+    segue a regra de `emissaoDaDespesa`, e sem `comPeriodo` porque a base só olha o que é ANTERIOR a perDe (período futuro nunca cai aqui). */
   const hoje=hojeISO();let base=0;
   contasBanc.filter(cb=>!extConta||cb.nome===extConta).forEach(cb=>{base+=(+cb.saldoIni||0);});
   if(perDe)movs.forEach(m=>{
-    if(extConta&&(m.conta||'')!==extConta)return;
     if(antesDaBase(m))return;
     if((m.data||'')>=perDe)return;
+    /* [2026-09-22] transferência/aporte e o dinheiro dado em troca guardam a conta em campos PRÓPRIOS (contaDe/contaPara, dinConta), então os
+       dois ramos vêm ANTES do filtro por `m.conta` — a mesma ordem de `saldoConta` e de `extratoRows`. Faltavam aqui: a base só tinha VENDA,
+       COMPRA à vista e despesa, e a linha do extrato só entra quando está DENTRO do período — logo um movimento desses ANTERIOR a perDe não
+       era ignorado, era APAGADO da conta, e o saldo final do extrato errava pelo valor exato dele. Disparava no período padrão de 30 dias. */
+    if(m.tipo==='TRANSF'){const v=+m.valor||0;
+      if(extConta){if(antesDaBaseDe(extConta,m.data))return;if(m.contaDe===extConta)base-=v;if(m.contaPara===extConta)base+=v;}
+      else if(!m.contaDe&&m.contaPara){if(!antesDaBaseDe(m.contaPara,m.data))base+=v;}
+      else if(m.contaDe&&!m.contaPara){if(!antesDaBaseDe(m.contaDe,m.data))base-=v;} /* em "todas as contas", transferência interna soma zero */
+      return;}
+    if(m.tipo==='COMPRA'&&m.origem==='TROCA'&&+m.din>0&&m.dinConta){if((!extConta||m.dinConta===extConta)&&!antesDaBaseDe(m.dinConta,m.data))base-=(+m.din);return;}
+    if(extConta&&(m.conta||'')!==extConta)return;
     if(m.tipo==='VENDA')base+=(+m.valor||0)*(1-(+m.taxa||0)/100);
     else if(m.tipo==='COMPRA'&&!m.origem)base-=(+m.valor||0);
-    else if(m.tipo==='DESPESA'){if(m.status==='apagar'&&m.data>hoje)return;base-=(+m.valor||0);}});
+    else if(m.tipo==='DESPESA'){const de=emissaoDaDespesa(m,hoje);if(!de)return;base-=de.valor;}});
   return Math.round(base*100)/100;}
+/* EXTRATO linha a linha — CONVENÇÃO (medida, não suposta, em 22/09): é o detalhe do saldo POR EMISSÃO (`saldoConta`), NÃO do saldo de caixa.
+   Num fixture com os três casos — despesa "a pagar" vencida, compra parcelada 3× com 1 paga e venda no app sem repasse — o saldo final do
+   extrato bateu com `saldoConta` nos três (850 / 700 / 1.200) e diferiu do `saldoFisicoConta` nos três (1.000 / 800 / 1.000). Não é bug: a
+   compra fracionada aparece "reunida no valor original" e a venda do app entra no dia da venda, o que a própria tela declara ao usuário, e o
+   teste 34m já fixava isso. Aplicar a regra de CAIXA só na despesa deixaria a tela metade num regime e metade no outro — misturar é pior que
+   as duas conviverem rotuladas. Quem quer o dinheiro que já saiu olha o card "físico hoje"; o rodapé do extrato mostra esse número ao lado
+   quando os dois diferem, para nenhum dos dois ser lido como o outro. */
 function extratoRows(){const rows=[],seen={},hoje=hojeISO();
   movs.forEach(m=>{
     /* transferência/aporte e dinheiro de troca têm conta em campos próprios */
-    if(m.tipo==='TRANSF'){if(antesDaBase(m)||!noPer(m.data))return;const v=+m.valor||0;
+    /* [2026-09-22] o corte pela data-base olha a conta que cada tipo de fato usa (extConta / contaPara / contaDe / dinConta), não `m.conta`,
+       que nestes dois é vazio — ver `antesDaBaseDe`. A linha informativa da transferência interna em "todas as contas" vale 0 e segue aparecendo. */
+    if(m.tipo==='TRANSF'){if(!noPer(m.data))return;const v=+m.valor||0;
       const rotDe=m.contaDe||'fora do app',rotPara=m.contaPara||'fora do app';
-      if(extConta){if(m.contaDe===extConta)rows.push({data:m.data,v:-v,desc:'↔ Transferência → '+rotPara+(m.obs?' · '+m.obs:''),quem:'',conta:extConta,id:m.id});
+      if(extConta){if(antesDaBaseDe(extConta,m.data))return;
+        if(m.contaDe===extConta)rows.push({data:m.data,v:-v,desc:'↔ Transferência → '+rotPara+(m.obs?' · '+m.obs:''),quem:'',conta:extConta,id:m.id});
         if(m.contaPara===extConta)rows.push({data:m.data,v:v,desc:'↔ Transferência ← '+rotDe+(m.obs?' · '+m.obs:''),quem:'',conta:extConta,id:m.id});}
-      else{if(!m.contaDe&&m.contaPara)rows.push({data:m.data,v:v,desc:'↔ Aporte externo → '+rotPara+(m.obs?' · '+m.obs:''),quem:'',conta:m.contaPara,id:m.id});
-        else if(m.contaDe&&!m.contaPara)rows.push({data:m.data,v:-v,desc:'↔ Retirada de '+rotDe+(m.obs?' · '+m.obs:''),quem:'',conta:m.contaDe,id:m.id});
+      else{if(!m.contaDe&&m.contaPara){if(antesDaBaseDe(m.contaPara,m.data))return;rows.push({data:m.data,v:v,desc:'↔ Aporte externo → '+rotPara+(m.obs?' · '+m.obs:''),quem:'',conta:m.contaPara,id:m.id});}
+        else if(m.contaDe&&!m.contaPara){if(antesDaBaseDe(m.contaDe,m.data))return;rows.push({data:m.data,v:-v,desc:'↔ Retirada de '+rotDe+(m.obs?' · '+m.obs:''),quem:'',conta:m.contaDe,id:m.id});}
         else rows.push({data:m.data,v:0,desc:'↔ '+rotDe+' → '+rotPara+' ('+fmt(v)+')'+(m.obs?' · '+m.obs:''),quem:'',conta:'',id:m.id});}
       return;}
-    if(m.tipo==='COMPRA'&&m.origem==='TROCA'&&+m.din>0&&m.dinConta){if(antesDaBase(m)||!noPer(m.data))return;
-      if(!extConta||m.dinConta===extConta)rows.push({data:m.data,v:-(+m.din),desc:'Troca — dinheiro dado',quem:m.contraparte||'',conta:m.dinConta,id:m.id});
+    if(m.tipo==='COMPRA'&&m.origem==='TROCA'&&+m.din>0&&m.dinConta){if(!noPer(m.data))return;
+      if((!extConta||m.dinConta===extConta)&&!antesDaBaseDe(m.dinConta,m.data))rows.push({data:m.data,v:-(+m.din),desc:'Troca — dinheiro dado',quem:m.contraparte||'',conta:m.dinConta,id:m.id});
       if(extConta&&m.dinConta!==extConta)return;}
     if(extConta&&(m.conta||'')!==extConta)return;
     if(antesDaBase(m))return;
     if(m.tipo==='VENDA'){if(!mRel(m)||!noPer(m.data))return;rows.push({data:m.data,v:(+m.valor||0)*(1-(+m.taxa||0)/100),desc:'Venda — '+([m.cat,m.colecao].filter(Boolean).join(' ')||'item'),quem:m.contraparte||'',conta:m.conta||'',id:m.id});return;}
-    if(m.tipo==='DESPESA'){if(relJogo||relCol||relCat)return;if(relPess&&(m.contraparte||'')!==relPess)return;if(!noPer(m.data))return;if(m.status==='apagar'&&!perAte&&m.data>hoje)return;rows.push({data:m.data,v:-(+m.valor||0),desc:'Despesa — '+(m.cat||''),quem:m.contraparte||'',conta:m.conta||'',id:m.id});return;}
+    if(m.tipo==='DESPESA'){if(relJogo||relCol||relCat)return;if(relPess&&(m.contraparte||'')!==relPess)return;if(!noPer(m.data))return;const de=emissaoDaDespesa(m,hoje,true);if(!de)return;rows.push({data:de.data,v:-de.valor,desc:'Despesa — '+(m.cat||''),quem:m.contraparte||'',conta:m.conta||'',id:m.id});return;}
     if(m.tipo!=='COMPRA'||m.origem)return;if(!mRel(m)||!noPer(m.data))return;
     const rz=raizDe(m),key=m.notaId||rz.id;
     if(seen[key]){seen[key].v-=(+m.valor||0);seen[key].n++;return;}
@@ -3776,9 +3966,27 @@ function extratoHtml(){const rows=extratoRows();
   const fim=(extOrdem==='asc'?rows[rows.length-1]:rows[0]).saldo;
   const cabSaldo=dim?`<div class="meta" style="margin-bottom:6px">Filtro por jogo/coleção/tipo/pessoa ativo — mostrando o <b>movimento do recorte</b> (saldo real da conta só sem esses filtros).</div>`
     :`<div class="item" style="justify-content:space-between;padding:8px 12px"><b>💼 Saldo inicial${perDe?' (antes do período)':''}</b><b>${fmt(base)}</b></div>`;
-  const rodape=`<div class="item" style="justify-content:space-between;padding:8px 12px;border-top:2px solid var(--line)"><div><b>${dim?'Resultado do recorte':'💰 Saldo final'}</b><div class="meta">entrou ${fmt(entrou)} · saiu ${fmt(saiu)} no período</div></div><b style="color:${(dim?entrou-saiu:fim)>=0?'var(--green)':'var(--red)'}">${fmt(dim?entrou-saiu:fim)}</b></div>`;
+  /* [22/09] o rodapé diz QUAL dos dois números ele é e, quando o de caixa difere, mostra os dois. Este extrato é o detalhe do saldo POR
+     EMISSÃO, e ele é aberto justamente pelo card cujo título é o saldo FÍSICO ("💼 Saldo por conta"): sem esta linha, a mesma conta no mesmo
+     dia aparecia como dois valores diferentes em duas telas, sem nada dizendo por quê — foi o que um revisor leu como bug. Só aparece quando
+     a comparação é honesta: sem recorte por dimensão (aí o rodapé é "resultado do recorte", não saldo), sem "até" (com perAte o final é o
+     saldo de uma data passada, não o de hoje) e com UMA conta CADASTRADA escolhida — em "todas as contas" o extrato inclui conta fora do
+     cadastro, que o saldo físico não soma, e a linha mentiria pelo escopo. Chama `saldoFisicoConta`: a tela que fala de dinheiro chama a
+     função do dinheiro, nunca reimplementa. */
+  const cbExt=(!dim&&!perAte&&extConta)?contasBanc.find(c=>c.nome===extConta):null;
+  const fisico=cbExt?saldoFisicoConta(cbExt):null;
+  /* [2026-09-22] as 3 causas nomeadas explicam a diferença ENTRE AS DUAS CONVENÇÕES — ou seja, exatamente `saldoConta - saldoFisicoConta`.
+     A diferença que a TELA mostra é `fim - fisico`. Quando as duas batem, a frase pode nomear as causas; quando NÃO batem, sobra diferença
+     que não vem da convenção, e cravar uma das 3 seria dar um número errado E uma explicação errada junto. Foi o que esta linha fazia até
+     hoje: com o buraco de TRANSF/TROCA na base, a tela culpava "parcela a vencer" por dinheiro que ela mesma havia apagado. Compara CHAMANDO
+     as duas funções de dinheiro, sem reimplementar regra nenhuma — e é justamente por isso que o guarda pega bug futuro da mesma classe. */
+  const difConv=cbExt?Math.round((saldoConta(cbExt)-fisico)*100)/100:0;
+  const difTela=cbExt?Math.round((fim-fisico)*100)/100:0;
+  const soDaConvencao=Math.abs(difTela-difConv)<0.01;
+  const parCaixa=(fisico!==null&&Math.abs(fisico-fim)>0.01)?`<div class="meta" style="padding:2px 12px 8px">Este é o saldo <b>por emissão</b>. Dinheiro <b>físico hoje</b> nesta conta: <b>${fmt(fisico)}</b> — ${soDaConvencao?'a diferença é o que já foi lançado mas ainda não saiu nem entrou de verdade (despesa a pagar, parcela a vencer, venda no app sem repasse).':`dessa diferença, ${fmt(difConv)} é o que já foi lançado e ainda não saiu nem entrou de verdade (despesa a pagar, parcela a vencer, venda no app sem repasse); o resto (${fmt(difTela-difConv)}) <b>não é</b> de nenhuma dessas 3 causas conhecidas — é diferença que o app ainda não sabe explicar.`}</div>`:'';
+  const rodape=`<div class="item" style="justify-content:space-between;padding:8px 12px;border-top:2px solid var(--line)"><div><b>${dim?'Resultado do recorte':'💰 Saldo final (por emissão)'}</b><div class="meta">entrou ${fmt(entrou)} · saiu ${fmt(saiu)} no período</div></div><b style="color:${(dim?entrou-saiu:fim)>=0?'var(--green)':'var(--red)'}">${fmt(dim?entrou-saiu:fim)}</b></div>${parCaixa}`;
   const lin=rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer;align-items:center" onclick="${r.notaId?`abrirNota('${r.notaId}')`:`abrir('${r.id}')`}"><div style="flex:1;min-width:0"><div style="font-size:12px"><b>${dBR(new Date(r.data+'T00:00:00'))}</b> · ${r.desc}</div><div class="meta">${r.quem||'—'}</div></div><div style="text-align:right;white-space:nowrap"><div style="font-weight:700;color:${r.v>=0?'var(--green)':'var(--red)'}">${r.v>=0?'+':'−'} ${fmt(Math.abs(r.v))}</div><div class="meta">saldo ${fmt(r.saldo)}</div></div></div>`).join('');
-  return `${ctl}<div class="meta" style="margin-bottom:6px">Dinheiro que entrou e saiu, na data de emissão, com <b>saldo acumulado</b>${dim?'':' partindo do saldo inicial das contas'}. Compras fracionadas e notas aparecem <b>reunidas</b> no valor original.</div>${cabSaldo}${lin}${rodape}<button class="btn g" style="margin-top:10px" onclick="relExtrato=false;render()">ocultar extrato</button>`;}
+  return `${ctl}<div class="meta" style="margin-bottom:6px">Dinheiro que entrou e saiu <b>na data de emissão</b> — é o detalhe do card "Saldo em contas (por emissão)", não do saldo físico —, com <b>saldo acumulado</b>${dim?'':' partindo do saldo inicial das contas'}. Compras fracionadas e notas aparecem <b>reunidas</b> no valor original.</div>${cabSaldo}${lin}${rodape}<button class="btn g" style="margin-top:10px" onclick="relExtrato=false;render()">ocultar extrato</button>`;}
 function tabelaFluxo(entDesc,on){if(!entDesc.length)return '<div class="meta">Sem lançamentos no período (com esses filtros).</div>';
   if(!on.length)return '<div class="meta">Ligue ao menos um fluxo acima.</div>';
   const td='padding:7px 8px;border-bottom:1px solid var(--line);font-size:12px;white-space:nowrap';
@@ -3857,7 +4065,7 @@ function vRelatorios(){
   const fResumo=filtroResumoTxt();
   const barra=`<div style="position:sticky;top:var(--hh,0px);z-index:4;display:flex;gap:7px;margin-bottom:10px;background:var(--bg);padding-top:2px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35)">
     <div class="mini click" style="flex:1.2;padding:9px 10px;${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render();${relFOpen?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtros ${relFOpen?'▾':'▸'}</div><div class="s">${fResumo}</div></div>
-    <div class="mini click" style="flex:1;padding:9px 10px;${relExtrato?'outline:1.5px solid var(--blue)':''}" onclick="relExtrato=!relExtrato;render();${relExtrato?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🧾 Extrato ${relExtrato?'▾':'▸'}</div><div class="s">caixa, tipo banco</div></div>
+    <div class="mini click" style="flex:1;padding:9px 10px;${relExtrato?'outline:1.5px solid var(--blue)':''}" onclick="relExtrato=!relExtrato;render();${relExtrato?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🧾 Extrato ${relExtrato?'▾':'▸'}</div><div class="s">por emissão, tipo banco</div></div>
     <div class="mini click" style="flex:1;padding:9px 10px;${relDet?'outline:1.5px solid var(--blue)':''}" onclick="relDet=!relDet;render();${relDet?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">📊 ${relDet?'Detalhado':'Resumido'}</div><div class="s">${relDet?'lançamento a lançamento':'só os totais'}</div></div>
   </div>`;
   /* "—" num filtro se le como "nenhum filtro": o vazio de pessoa tem nome, igual ao da Consulta (le-como-felype r5) */
@@ -3903,7 +4111,7 @@ function vRelatorios(){
     ${tabelaLucro(lucroAgg.o)}</div>`;
   return `${barra}
     ${relFOpen?filtros:''}
-    ${relExtrato?`<div class="card"><div class="sec" style="margin-top:0">🧾 Extrato de caixa <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— tipo extrato bancário</span></div>${extratoHtml()}</div>`:''}
+    ${relExtrato?`<div class="card"><div class="sec" style="margin-top:0">🧾 Extrato da conta <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— linha a linha, por emissão (tipo extrato bancário)</span></div>${extratoHtml()}</div>`:''}
     <div class="card"><div class="sec" style="margin-top:0">📈 Linha do tempo <span style="text-transform:none;font-weight:400;color:var(--mut);font-size:11px">— toque nos fluxos pra escolher · toque no período pra abrir</span></div>${granSel}${timelineHtml()}</div>
     <div class="card" style="padding:12px 14px"><label style="margin-top:0">Ver os quadros abaixo por</label><select onchange="relDimAll=this.value;render()">${[['colecao','coleção'],['pessoa','fornecedor / cliente'],['jogo','jogo'],['cat','tipo de produto']].map(([v,l])=>`<option value="${v}" ${relDimAll===v?'selected':''}>${l}</option>`).join('')}</select>
     <div class="seg" style="margin-top:8px">${[['lista','☰ lista'],['graf','📊 gráfico'],['tab','▦ tabela']].map(([k,l])=>`<button class="${relCompView===k?'on':''}" onclick="relCompView='${k}';render()">${l}</button>`).join('')}</div></div>
@@ -3916,6 +4124,58 @@ function vRelatorios(){
       +cardComp('📤','Vendi','no período · líquido',vendPer,'var(--green)',true,'VENDA')}
     <div class="acoes"><button class="btn g" onclick="imprimir()">🖨 Imprimir</button><button class="btn g" onclick="exportarPlanilha()">⬇ Planilha completa (Excel)</button><button class="btn g" onclick="baixarBackup()">⬇ Backup</button></div>`;
 }
+/* TUDO o que a edição de uma COMPRA/VENDA muda nos lançamentos, numa função só (2026-09-22). Extraída de `salvar()` para que o ENSAIO
+   rode EXATAMENTE este código numa cópia — o mesmo princípio de `aplicaJunta`: ensaio que reescreve a operação mede outra coisa.
+   Não grava, não avisa, não mexe em tela: só muta `movs`. */
+function aplicaEdicaoCompra(i,obj,e){
+  /* Edição NUNCA recomeça o registro do zero: parte do antigo e sobrescreve só o que o
+     formulário realmente edita — senão vínculo (origemId/custoOrigem), venda multi-item
+     (vendaId), nota (notaId), parcelas pagas (pgParcelas), lote (loteOrigem) e fotos
+     (nFotos/fotoThumb) somem em silêncio a cada edição (aconteceu de verdade).
+     Exceções do merge: tipo TROCADO na edição = relançamento (objeto limpo, senão a compra
+     herda canal/origemId da venda antiga — quimera); destIni só sobrevive se a SITUAÇÃO não
+     mudou (mudar situação em edição é corrigir lançamento errado, o histórico recalcula). */
+  movs[i]=(e&&e.tipo===obj.tipo)?Object.assign({},e,obj):obj;
+  if(e&&e.destIni&&(e.situacao||'')===(obj.situacao||''))movs[i].destIni=e.destIni;
+  /* o plano de pagamento é da COMPRA: mudar o nº de parcelas, o 1º vencimento ou a conta de UM pedaço vale pros outros pedaços da
+     mesma compra (senão o grupo lê o plano de outro pedaço e a edição não faz efeito nenhum) */
+  if(e&&e.tipo==='COMPRA'&&obj.tipo==='COMPRA'&&!obj.origem&&movs[i].pgTipo==='Parcelado'&&+movs[i].nParc>0){
+    const grN=gruposParcelados().find(x=>x.membros.indexOf(movs[i])>=0);
+    if(grN)['nParc','venc1','conta'].forEach(f=>{if((e[f]==null?'':e[f])!==(movs[i][f]==null?'':movs[i][f]))grN.membros.forEach(x=>{if(x!==movs[i])x[f]=movs[i][f];});});}
+  /* [CORRIGIDO 2026-09-15, 3ª rodada de revisão] achado da rodada anterior: eu tinha corrigido
+     a limpeza de `origemPedido`/gravação de `dataChegada` dentro de `mudarSit` — só que
+     `mudarSit` é código morto (0 chamadores no app; confirmado por grep). A porta REAL por
+     onde 'Coleção'/'Pedido' vira 'Em estoque' é esta edição pelo formulário (o botão "✓ chegou"
+     já grava dataChegada certo pelos caminhos próprios — chegouPedido/chegouPeca — só a edição
+     manual da Situação não gravava). Sem isto: a peça desaparecia de "Pedidos a caminho" sem
+     nunca ter sido confirmada, E como `baixarLote` copia todo campo do pai pro filho, um
+     `origemPedido` que sobrasse aqui reaparecia fantasma no próximo fracionamento (CONSUMO,
+     venda parcial etc.) — mesmo depois de já ter passado por estoque real. */
+  if(e&&obj.situacao==='Em estoque'&&(sitDe(e)==='Pedido'||sitDe(e)==='Coleção')){
+    /* [CORRIGIDO 2026-09-15, 4ª rodada — M-2] "hoje" só é a data certa de chegada quando vem de
+       'Pedido' (é literalmente a confirmação de que chegou agora). Vindo de 'Coleção', o item já
+       existe fisicamente há tempos — só mudou de destino — carimbar "hoje" reescrevia a história
+       da curva de estoque (uma entrada de meses atrás pulava pra hoje). */
+    if(sitDe(e)==='Pedido'&&!movs[i].dataChegada)movs[i].dataChegada=hojeISO();
+    delete movs[i].origemPedido;
+  }
+  /* corrigir preço de propósito NÃO pode virar alarme de conservação: o delta da edição
+     acompanha a referência da família (raiz.valorOrig) */
+  if(e&&e.tipo===obj.tipo&&obj.tipo==='COMPRA'&&Math.abs((+obj.valor||0)-(+e.valor||0))>0.001){
+    const delta=Math.round(((+obj.valor||0)-(+e.valor||0))*100)/100;
+    const rzE=movs[i].loteOrigem?(raizDe(movs[i])||movs[i]):movs[i];
+    if(rzE&&rzE.valorOrig!=null)rzE.valorOrig=Math.round((rzE.valorOrig+delta)*100)/100;}
+  /* venda VINCULADA: custoOrigem é o custo TOTAL congelado no momento do vínculo (unit ×
+     qtd de então) — editar a quantidade sem reajustar isso deixa o lucro mentindo em
+     silêncio (achado do Felype 2026-08-10). "Valor" (o que o cliente pagou) não precisa
+     de ajuste aqui — o lucro já lê m.valor direto, então uma correção nele já se reflete
+     sozinha. Mesma filosofia do bloco de COMPRA acima: corrigir registro é diferente de
+     reabrir a operação física do lote — não mexe em baixarLote/loteOrigem. */
+  if(e&&e.tipo===obj.tipo&&obj.tipo==='VENDA'&&e.origemId&&e.custoOrigem!=null){
+    const qAntiga=+e.qtd||1,qNova=+obj.qtd||1;
+    if(Math.abs(qNova-qAntiga)>0.0001){
+      const custoUnit=(+e.custoOrigem||0)/qAntiga;
+      movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}}
 function salvar(){
   const g=id=>document.getElementById(id)?.value;
   const e=editId?movs.find(m=>m.id===editId):null;
@@ -3961,6 +4221,10 @@ function salvar(){
      custo por unidade é que devia ficar fixo (o total muda). Só pergunta quando a quantidade
      MUDOU e o valor ficou exatamente como estava — se o dono também editou o valor, a intenção
      já está explícita nos dois campos e perguntar de novo seria ruído. */
+  /* [22/09] as perguntas da EDIÇÃO param de disparar cada uma na hora que são descobertas e viram UMA só, no fim, junto com os números do
+     dinheiro (que só dá pra medir depois que `obj` existe). Efeito colateral bom: se a edição for abortada por um alerta mais adiante
+     (categoria faltando, por exemplo), o dono não terá respondido pergunta nenhuma à toa. */
+  let _perguntaEd='';
   if(tipoSel==='COMPRA'&&pgTipo==='Parcelado'){
     if(!nParcOk(g('f_nparc'))){alert('O número de parcelas precisa ser inteiro, de 1 a 120 (ex.: 3).');return;}
     /* [19/09/2026, 3ª auditoria do M-1] REDUZIR o parcelamento de uma compra que já tem parcela paga com número maior deixa
@@ -3975,7 +4239,7 @@ function salvar(){
          a edição. Compra de troca/caixa aberta (origem) nunca entra: as telas de dinheiro não a tratam como parcelada. */
       const nNovo=+g('f_nparc')||1,antes=grE?parcelasAlemDoPlano(pgE,grE.nP).map(x=>x.k):((e.pgTipo==='Parcelado'&&+e.nParc>0)?parcelasAlemDoPlano(pgE,+e.nParc).map(x=>x.k):[]),
         alem=parcelasAlemDoPlano(pgE,nNovo).map(x=>x.k).filter(k=>antes.indexOf(k)<0);
-      if(alem.length&&!confirm('Você está mudando o parcelamento para '+nNovo+'×, mas '+(alem.length>1?'as parcelas '+alem.join(', ')+' já estão marcadas como pagas':'a parcela '+alem[0]+' já está marcada como paga')+'.\n\nO dinheiro continua contado, mas '+(alem.length>1?'elas passam':'ela passa')+' a ficar FORA do plano da compra. Se '+(alem.length>1?'foram pagas':'foi paga')+' de verdade, o mais certo é manter o número de parcelas.\n\nOK = salvar com '+nNovo+'×. Cancelar = voltar e corrigir.'))return;}
+      if(alem.length)_perguntaEd='Você está mudando o parcelamento para '+nNovo+'×, mas '+(alem.length>1?'as parcelas '+alem.join(', ')+' já estão marcadas como pagas':'a parcela '+alem[0]+' já está marcada como paga')+'.\n\nO dinheiro continua contado, mas '+(alem.length>1?'elas passam':'ela passa')+' a ficar FORA do plano da compra. Se '+(alem.length>1?'foram pagas':'foi paga')+' de verdade, o mais certo é manter o número de parcelas.\n\nOK = salvar com '+nNovo+'×. Cancelar = voltar e corrigir.';}
     /* [revisão de 21/09/2026] o plano (nº de parcelas, 1º vencimento e conta) é da COMPRA: mudar um deles num pedaço muda em todos — inclusive nos que já
        foram vendidos — e a conta mexe no saldo e no extrato das duas contas. Pergunta quando a edição de fato vai mexer nos outros pedaços. */
     if(grE&&grE.membros.length>1){
@@ -3983,7 +4247,9 @@ function salvar(){
       const rotF={nParc:'o número de parcelas',venc1:'o 1º vencimento',conta:'a conta'},vz=v=>String(v==null?'':v);
       const mexe=['nParc','venc1','conta'].filter(f=>vz(e[f])!==vz(novo[f])&&grE.membros.some(x=>x!==e&&vz(x[f])!==vz(novo[f])));
       if(mexe.length){const n=grE.membros.length,que=grE.nota?'itens':'pedaços';
-        if(!confirm((grE.nota?'Essa nota tem ':'Essa compra tem ')+n+' '+que+' e o plano de pagamento é um só.\n\nMudar '+mexe.map(f=>rotF[f]).join(' e ')+' aqui muda nos '+n+' '+que+(grE.nota?'':' — inclusive nos que já foram vendidos')+(mexe.indexOf('conta')>=0?', e o dinheiro passa de uma conta para a outra no saldo e no extrato':'')+'.\n\nOK = mudar a compra inteira. Cancelar = voltar.'))return;}}
+        /* [22/09] junta com a pergunta acima em vez de virar um segundo confirm: duas perguntas seguidas sobre a MESMA edição viram
+           "OK, OK" no automático — e a segunda é justamente a que mexe em mais pedaço */
+        _perguntaEd=(_perguntaEd?_perguntaEd+'\n\n———\n\n':'')+(grE.nota?'Essa nota tem ':'Essa compra tem ')+n+' '+que+' e o plano de pagamento é um só.\n\nMudar '+mexe.map(f=>rotF[f]).join(' e ')+' aqui muda nos '+n+' '+que+(grE.nota?'':' — inclusive nos que já foram vendidos')+(mexe.indexOf('conta')>=0?', e o dinheiro passa de uma conta para a outra no saldo e no extrato':'')+'.\n\nOK = mudar a compra inteira. Cancelar = voltar.';}}
   }
   if(tipoSel==='COMPRA'&&editId&&e&&e.tipo==='COMPRA'){
     const qtdNova=+g('f_qtd')||1,qtdAntiga=+e.qtd||1;
@@ -4017,54 +4283,10 @@ function salvar(){
     const temF=_fotosPend.length>0||(og&&(((+og.nFotos)||0)>0||og.fotoThumb));
     if(!temF&&!confirm('📷 Essa venda vai ficar SEM foto (e o item de origem também não tem).\n\nOK = salvar sem foto · Cancelar = voltar pra anexar em "📷 fotos do lançamento".'))return;}
   if(editId){const i=movs.findIndex(m=>m.id===editId);
-    /* Edição NUNCA recomeça o registro do zero: parte do antigo e sobrescreve só o que o
-       formulário realmente edita — senão vínculo (origemId/custoOrigem), venda multi-item
-       (vendaId), nota (notaId), parcelas pagas (pgParcelas), lote (loteOrigem) e fotos
-       (nFotos/fotoThumb) somem em silêncio a cada edição (aconteceu de verdade).
-       Exceções do merge: tipo TROCADO na edição = relançamento (objeto limpo, senão a compra
-       herda canal/origemId da venda antiga — quimera); destIni só sobrevive se a SITUAÇÃO não
-       mudou (mudar situação em edição é corrigir lançamento errado, o histórico recalcula). */
-    movs[i]=(e&&e.tipo===obj.tipo)?Object.assign({},e,obj):obj;
-    if(e&&e.destIni&&(e.situacao||'')===(obj.situacao||''))movs[i].destIni=e.destIni;
-    /* o plano de pagamento é da COMPRA: mudar o nº de parcelas, o 1º vencimento ou a conta de UM pedaço vale pros outros pedaços da
-       mesma compra (senão o grupo lê o plano de outro pedaço e a edição não faz efeito nenhum) */
-    if(e&&e.tipo==='COMPRA'&&obj.tipo==='COMPRA'&&!obj.origem&&movs[i].pgTipo==='Parcelado'&&+movs[i].nParc>0){
-      const grN=gruposParcelados().find(x=>x.membros.indexOf(movs[i])>=0);
-      if(grN)['nParc','venc1','conta'].forEach(f=>{if((e[f]==null?'':e[f])!==(movs[i][f]==null?'':movs[i][f]))grN.membros.forEach(x=>{if(x!==movs[i])x[f]=movs[i][f];});});}
-    /* [CORRIGIDO 2026-09-15, 3ª rodada de revisão] achado da rodada anterior: eu tinha corrigido
-       a limpeza de `origemPedido`/gravação de `dataChegada` dentro de `mudarSit` — só que
-       `mudarSit` é código morto (0 chamadores no app; confirmado por grep). A porta REAL por
-       onde 'Coleção'/'Pedido' vira 'Em estoque' é esta edição pelo formulário (o botão "✓ chegou"
-       já grava dataChegada certo pelos caminhos próprios — chegouPedido/chegouPeca — só a edição
-       manual da Situação não gravava). Sem isto: a peça desaparecia de "Pedidos a caminho" sem
-       nunca ter sido confirmada, E como `baixarLote` copia todo campo do pai pro filho, um
-       `origemPedido` que sobrasse aqui reaparecia fantasma no próximo fracionamento (CONSUMO,
-       venda parcial etc.) — mesmo depois de já ter passado por estoque real. */
-    if(e&&obj.situacao==='Em estoque'&&(sitDe(e)==='Pedido'||sitDe(e)==='Coleção')){
-      /* [CORRIGIDO 2026-09-15, 4ª rodada — M-2] "hoje" só é a data certa de chegada quando vem de
-         'Pedido' (é literalmente a confirmação de que chegou agora). Vindo de 'Coleção', o item já
-         existe fisicamente há tempos — só mudou de destino — carimbar "hoje" reescrevia a história
-         da curva de estoque (uma entrada de meses atrás pulava pra hoje). */
-      if(sitDe(e)==='Pedido'&&!movs[i].dataChegada)movs[i].dataChegada=hojeISO();
-      delete movs[i].origemPedido;
-    }
-    /* corrigir preço de propósito NÃO pode virar alarme de conservação: o delta da edição
-       acompanha a referência da família (raiz.valorOrig) */
-    if(e&&e.tipo===obj.tipo&&obj.tipo==='COMPRA'&&Math.abs((+obj.valor||0)-(+e.valor||0))>0.001){
-      const delta=Math.round(((+obj.valor||0)-(+e.valor||0))*100)/100;
-      const rzE=movs[i].loteOrigem?(raizDe(movs[i])||movs[i]):movs[i];
-      if(rzE&&rzE.valorOrig!=null)rzE.valorOrig=Math.round((rzE.valorOrig+delta)*100)/100;}
-    /* venda VINCULADA: custoOrigem é o custo TOTAL congelado no momento do vínculo (unit ×
-       qtd de então) — editar a quantidade sem reajustar isso deixa o lucro mentindo em
-       silêncio (achado do Felype 2026-08-10). "Valor" (o que o cliente pagou) não precisa
-       de ajuste aqui — o lucro já lê m.valor direto, então uma correção nele já se reflete
-       sozinha. Mesma filosofia do bloco de COMPRA acima: corrigir registro é diferente de
-       reabrir a operação física do lote — não mexe em baixarLote/loteOrigem. */
-    if(e&&e.tipo===obj.tipo&&obj.tipo==='VENDA'&&e.origemId&&e.custoOrigem!=null){
-      const qAntiga=+e.qtd||1,qNova=+obj.qtd||1;
-      if(Math.abs(qNova-qAntiga)>0.0001){
-        const custoUnit=(+e.custoOrigem||0)/qAntiga;
-        movs[i].custoOrigem=Math.round(custoUnit*qNova*100)/100;}}
+    /* ENSAIO ANTES DE GRAVAR: a MESMA `aplicaEdicaoCompra` roda numa cópia (com uma cópia rasa de `obj`, que nunca é tocada) e o dono vê
+       os números antes de decidir. Cancelar não grava nada e deixa o formulário aberto. */
+    if(!perguntaEdicao(_perguntaEd,mudouOPlanoDaCompra(e,obj)?(()=>aplicaEdicaoCompra(i,Object.assign({},obj),e)):null))return;
+    aplicaEdicaoCompra(i,obj,e);
     save();diarioReg('editou',rotDe(movs[i]),movs[i].tipo);
     if(_fotosPend.length)aplicarFotosPend(movs[i].id);   /* [revisor F2c, G-edicao] a foto do leitor na EDICAO ia pro balde e morria no voltarDaEdicao (que zera _fotosPend) — com toast dizendo "guardada ✓". Agora a edicao consome o balde igual ao lancamento novo */
     editId=null;toast('Alteração salva');voltarDaEdicao();return;}
@@ -4375,6 +4597,10 @@ function salvarConta(id){const g=k=>document.getElementById('cb_'+k)?.value;cons
     save();}
   else if(!pgs.includes(nome))pgs.push(nome);
   salvarCB();saveL();fecharModal();render();}
+/* Saldo POR EMISSÃO da conta (regime de competência): compra parcelada conta inteira no dia da compra, venda no app no dia da venda e
+   despesa na emissão (a "a pagar" futura fica fora) — a regra da despesa é a de `emissaoDaDespesa`. É o card "💼 Saldo em contas (por
+   emissão)" do Painel e o número que o Extrato linha a linha detalha. O irmão de CAIXA é `saldoFisicoConta`, logo abaixo, que só conta o
+   que já saiu/entrou de verdade: convenções diferentes SEMPRE rotuladas, nunca misturadas. */
 function saldoConta(cb){const hoje=hojeISO();let s=+cb.saldoIni||0;
   movs.forEach(m=>{
     if(cb.saldoData&&(m.data||'')<cb.saldoData)return;
@@ -4384,7 +4610,7 @@ function saldoConta(cb){const hoje=hojeISO();let s=+cb.saldoIni||0;
     if((m.conta||'')!==cb.nome)return;
     if(m.tipo==='VENDA')s+=(+m.valor||0)*(1-(+m.taxa||0)/100);
     else if(m.tipo==='COMPRA'&&!m.origem)s-=(+m.valor||0);
-    else if(m.tipo==='DESPESA'){if(m.status==='apagar'&&m.data>hoje)return;s-=(+m.valor||0);}});
+    else if(m.tipo==='DESPESA'){const de=emissaoDaDespesa(m,hoje);if(!de)return;s-=de.valor;}});
   return Math.round(s*100)/100;}
 /* Saldo FÍSICO por conta — o dinheiro que JÁ saiu/entrou de verdade: compra parcelada só debita as parcelas PAGAS (a marcada,
    na conta de quem pagou) e as JÁ VENCIDAS sem marca (no dia do vencimento, na conta da compra — regra da parcela sem marca);
@@ -4405,10 +4631,12 @@ function saldoFisicoConta(cb){const hj=hojeISO(),hoje=dataDeISO(hj);
       if(antesBase(dRec))return;
       s+=(+m.valor||0)*(1-(+m.taxa||0)/100);return;}
     if(m.tipo==='DESPESA'){if((m.conta||'')!==cb.nome)return;
-      /* despesa paga: o corte pela data-base da conta olha o dia do PAGAMENTO (o que a curva e a lista de pagas já liam), não o da emissão; a que
-         ainda está "a pagar" com data depois de hoje não saiu */
-      const dc=m.status==='apagar'?(m.data||''):(m.dataPagamento||m.data||'');
-      if(antesBase(dc))return;if(m.status==='apagar'&&dc>hj)return;s-=(+m.valor||0);return;}
+      /* [2026-09-22] a decisão "essa despesa debita o caixa, e em que data" mora em `caixaDaDespesa` — UMA função, para qualquer outra
+         tela de dinheiro CHAMAR em vez de reescrever a regra. Foi reescrevendo que 5 lugares ficaram na regra velha quando esta mudou
+         em 21/09. Em uma linha: "a pagar" não debita nem depois de vencer; paga debita na data do pagamento. O porquê está lá em cima. */
+      const cx=caixaDaDespesa(m);if(!cx)return;
+      /* o corte pela data-base da conta olha o dia em que o dinheiro MEXEU (o pagamento), não o da emissão — é o que a curva e a lista de pagas já liam */
+      if(antesBase(cx.data))return;s-=cx.valor;return;}
     if(m.tipo!=='COMPRA'||m.origem)return;
     if(m.pgTipo==='Parcelado'&&+m.nParc>0)return; /* compra parcelada: pelos grupos, logo abaixo */
     if((m.conta||'')!==cb.nome)return;
@@ -5052,7 +5280,14 @@ function montarPlanilhaTCG(){
     .sort((a,b)=>(ORD_EST[a.st]-ORD_EST[b.st])||desc(a.data,b.data));
   const estoqueL=estO.map(x=>x.lin),estoqueB=estO.map(x=>x.b);
 
-  /* "entra no Resumo" das despesas = a regra do motor (a pagar com data futura fica fora; "hoje" em UTC como la) */
+  /* "entra no Resumo" das despesas = a MESMA CONVENÇÃO do Lucro (motor): regime de COMPETÊNCIA — a despesa conta na EMISSÃO, a "a pagar"
+     com data futura fica fora, a vencida entra mesmo sem ter sido paga. É diferente de propósito do saldo de CAIXA
+     (`saldoFisicoConta`/`caixaDaDespesa`), que só debita quando o dinheiro sai: as duas convivem, rotuladas, nunca misturadas — e a coluna
+     ao lado diz, em português, por que uma linha não entrou. Duas correções de 22/09 nesta frase: (a) ela dizia "hoje em UTC como lá", e
+     não é mais verdade desde que o app passou a ter um relógio só (`hojeISO`, local); (b) a regra aqui não é idêntica à do motor num
+     detalhe — o motor solta a "a pagar" futura quando o usuário pede um período que a alcança (perAte), e a planilha exporta TODAS as
+     despesas, não tem período, então não consulta perAte. Mantida inline (o Lucro e a exportação não se mexem sem motivo); o teste 37e
+     confronta esta expressão com `emissaoDaDespesa` a cada rodada, então divergir deixou de ser possível em silêncio. */
   const hojeISO2=hojeISO();let somaDespEntra=0;const despB=[];
   const despL=Dp.slice().sort((a,b)=>desc(a.data,b.data)).map(m=>{const entra=!(m.status==='apagar'&&m.data>hojeISO2);if(entra)somaDespEntra+=+m.valor||0;despB.push({valor:+m.valor||0,entra});
     return [m.data,m.cat||'',_pl2(m.valor),m.status==='apagar'?'A pagar':'Pago',entra?'sim':'não — a pagar com data futura',m.dataPagamento||'',m.natureza==='material'?'Material':'Ordinária',m.contraparte||'',m.conta||'',m.obs||'',m.id];});
@@ -5278,9 +5513,10 @@ function projecaoCaixa(){const hj=hojeISO(),hoje=dataDeISO(hj);
   const temContas=contasBanc.length>0,cadastrada=n=>contasBanc.some(c=>c.nome===n);
   const dentro=[],fora=[];
   const poe=(x,v)=>{((!temContas||cadastrada(x.m.conta||''))?dentro:fora).push({data:x.venc||x.data,v});};
-  aPagar().forEach(x=>{
-    if(x.m.tipo==='DESPESA'&&(x.m.data||'')<=hj&&temContas&&cadastrada(x.m.conta||''))return; /* já está no saldo da conta dela */
-    poe(x,-x.valor);});
+  /* [2026-09-22] a despesa "a pagar" JÁ VENCIDA entra aqui, em todos os horizontes — antes ela era pulada com o comentário "já está no
+     saldo da conta dela", que deixou de ser verdade quando o saldo físico parou de debitar despesa a pagar. Ela vence no passado, então
+     `f.data <= limite` a inclui em +30, +60 e +90 igual: é dinheiro que ainda vai sair e o horizonte tem de mostrar. */
+  aPagar().forEach(x=>poe(x,-x.valor));
   aReceber().forEach(x=>poe(x,x.valor));
   const ate=(L,d)=>{const lim=new Date(hoje);lim.setDate(lim.getDate()+d);return L.filter(f=>f.data<=lim);};
   const em=d=>Math.round((atual+ate(dentro,d).reduce((s,f)=>s+f.v,0))*100)/100;
@@ -6070,11 +6306,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='21/09 16h12';
+const BUILD_TAG='22/09 00h17';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1790017926524;
+const BUILD_TS=1790047067103;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

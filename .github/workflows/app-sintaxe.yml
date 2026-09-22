@@ -44,7 +44,12 @@ jobs:
     runs-on: ubuntu-latest
     # v2.6f (revisores disco e fiacao r9): a suite com 300 mutacoes leva de 97 a 131 s nesta maquina; estourar o tempo daria vermelho falso
     # depois de o Pages ja ter servido o app
-    timeout-minutes: 10
+    # [2026-09-22] 10 -> 30. Em 21/09 a vacina ja tinha 485 mutacoes e levou 9m46s de um limite de 10:
+    # sobravam 14 segundos. Qualquer teste ou mutacao a mais daria vermelho FALSO — e falso justamente
+    # depois de o Pages ja ter servido o app, que e quando o vermelho mais confunde. O tempo de parede
+    # do job nao custa nada; o limite existe so para job pendurado, entao 30 min protege disso e para
+    # de brigar com o crescimento normal da bateria.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:

@@ -2,6 +2,7 @@
  "Painel": [
   "button:Consultar",
   "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
   "button:Lançar",
   "button:Painel",
   "button:Relatório",
@@ -27,6 +28,7 @@
  "Consultar": [
   "button:Consultar",
   "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
   "button:Lançar",
   "button:Painel",
   "button:Relatório",
@@ -46,13 +48,14 @@
  "Fluxo de caixa": [
   "button:Consultar",
   "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
   "button:Lançar",
   "button:Painel",
   "button:Relatório",
   "button:Simular",
   "button:‹",
   "button:🖨 Imprimir",
-  "div:▸ ago/# · # conta R$ #,#",
+  "div:▸ mês/# · # conta R$ #,#",
   "div:▾ A PAGAR — toque no grupo pra abrir",
   "div:▾ A RECEBER — VENDAS NO APP",
   "div:▾ ✓ PAGAS — HISTÓRICO (FILTRADO) (à vista na emissão · parce",
@@ -61,14 +64,27 @@
   "div:💼 Nenhuma conta cadastrada ainda — toque pra criar (Nubank,",
   "div:🔎 Filtros ▸ # dias",
   "span:expandir tudo",
-  "span:📜 extrato de caixa — saldo linha a linha →",
+  "span:📜 extrato da conta (por emissão) — saldo linha a linha →",
   "span:🧾 juntar"
+ ],
+ "Fluxo de estoque": [
+  "button:Consultar",
+  "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
+  "button:Lançar",
+  "button:Painel",
+  "button:Relatório",
+  "button:Simular",
+  "button:‹",
+  "span:● ⭐ coleção",
+  "span:● 💰 dinheiro"
  ],
  "Relatório": [
   "button:Ano",
   "button:Consultar",
   "button:Dia",
   "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
   "button:Lançar",
   "button:Mês",
   "button:Painel",
@@ -83,7 +99,7 @@
   "button:📊 gráfico",
   "button:🖨 Imprimir",
   "div:(sem coleção) → R$ #,# #%",
-  "div:ago/# → R$ -#,#",
+  "div:mês/# → R$ -#,#",
   "div:⭐ coleção entrou",
   "div:⭐ coleção saiu",
   "div:💰 dinheiro entrou",
@@ -94,12 +110,13 @@
   "div:📦 estoque entrou",
   "div:📦 estoque saiu",
   "div:🔎 Filtros ▸ # dias",
-  "div:🧾 Extrato ▸ caixa, tipo banco"
+  "div:🧾 Extrato ▸ por emissão, tipo banco"
  ],
  "Simular": [
   "button:Consultar",
   "button:Explicar essa conta",
   "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
   "button:Lançar",
   "button:Oficializar como troca →",
   "button:Painel",
@@ -120,6 +137,7 @@
  "Lançar": [
   "button:Consultar",
   "button:Fluxo de caixa",
+  "button:Fluxo de estoque",
   "button:Lançar",
   "button:Painel",
   "button:Relatório",
