@@ -5947,11 +5947,24 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         && A('emissaoDaDespesa')({ tipo: 'DESPESA', data: '2026-11-10', valor: 25, status: 'apagar' }, '2026-09-21') === null
         && (function () { setg('perAte', '2026-12-31'); const r = A('emissaoDaDespesa')({ tipo: 'DESPESA', data: '2026-11-10', valor: 25, status: 'apagar' }, '2026-09-21', true); setg('perAte', ''); return !!r; })(),
         'ver caixaDaDespesa/emissaoDaDespesa');
-      const cSolta = src.split("m.status==='apagar'&&m.data>hoje)").length - 1, cSoltaP = src.split("m.status==='apagar'&&!perAte&&m.data>hoje)").length - 1;
-      const cMotor = src.split("m.status==='apagar'&&!perAte&&m.data>hojeISO2)").length - 1, cPlan = src.split("m.status==='apagar'&&m.data>hojeISO2)").length - 1;
+      /* 22/09 (P2 do handoff): a contagem casava so a forma LITERAL (zero espaco, igual o resto do
+         arquivo sai hoje) — uma reescrita com espaco extra ("m.status === 'apagar' && ...") passava
+         batido. `srcCompacto` remove todo espaco/quebra de linha dos DOIS lados antes de comparar,
+         entao a forma com espaco cai na mesma contagem. O que isto NAO pega, de proposito, porque
+         casamento de texto nao resolve: reescrita pelo COMPLEMENTO LOGICO (ex.: inverter a condicao
+         e trocar o retorno) muda o texto por completo — quem protege contra essa e o teste (5) logo
+         abaixo, que compara RESULTADO contra `emissaoDaDespesa` numa matriz, nao o texto do fonte. */
+      const srcCompacto = src.replace(/\s+/g, '');
+      const cSolta = srcCompacto.split("m.status==='apagar'&&m.data>hoje)").length - 1, cSoltaP = srcCompacto.split("m.status==='apagar'&&!perAte&&m.data>hoje)").length - 1;
+      const cMotor = srcCompacto.split("m.status==='apagar'&&!perAte&&m.data>hojeISO2)").length - 1, cPlan = srcCompacto.split("m.status==='apagar'&&m.data>hojeISO2)").length - 1;
       t('37e: o fonte do app tem ZERO copias soltas da condicao (eram 5 antes desta rodada) e exatamente 3 inline declaradas — 1 no Lucro e 2 na planilha, ambas comentadas como regime de competencia; uma 4a copia reprova aqui',
         cSolta === 0 && cSoltaP === 0 && cMotor === 1 && cPlan === 2
-        && src.split('caixaDaDespesa(m)').length - 1 === 2 && src.split('emissaoDaDespesa(m,').length - 1 === 5,
+        /* 3, nao 2, desde 22/09 (P2 do handoff): `contasPagas` reimplementava a mesma condicao de
+           `caixaDaDespesa` em vez de chamar a funcao (2 copias da regra de CAIXA, risco de divergir);
+           o conserto trocou a copia solta por uma 2a chamada real, entao o total de "caixaDaDespesa(m)"
+           no fonte sobe de 1 (definicao) + 1 (chamada antiga) para 1 + 2 — subir esse numero de novo
+           SEM remover uma copia solta e que reprova. */
+        && src.split('caixaDaDespesa(m)').length - 1 === 3 && src.split('emissaoDaDespesa(m,').length - 1 === 5,
         S34({ soltas: cSolta + cSoltaP, motor: cMotor, planilha: cPlan, caixaDaDespesa: src.split('caixaDaDespesa(m)').length - 1, emissaoDaDespesa: src.split('emissaoDaDespesa(m,').length - 1 }));
 
       /* (5) a matriz: as copias inline (Lucro e planilha) tem de dar a MESMA resposta que `emissaoDaDespesa`. E o que impede a divergencia
@@ -5975,6 +5988,38 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('perAte', '');
       t('37e: nas ' + (casos37.length * 2) + ' combinacoes (vencida/hoje/futura/sem data x a pagar/paga x com e sem "ate"), o Lucro e a aba Despesas da planilha dao a MESMA resposta que `emissaoDaDespesa` — as copias inline nao podem divergir da funcao em silencio',
         ruins37.length === 0, S34(ruins37.slice(0, 6)) + ' | divergencias: ' + ruins37.length);
+
+      /* (6) a mesma logica pro lado CAIXA: `contasPagas()` (a lista de "contas pagas", que o P2 de
+         22/09 passou a montar chamando `caixaDaDespesa` em vez de reimplementar a condicao) tem de
+         bater com `caixaDaDespesa` — presenca, data E valor. Antes desta rodada o UNICO guardiao do
+         lado caixa era a contagem de texto da linha 5967 acima: um mutante que troca a data de
+         PAGAMENTO pela de EMISSAO dentro de `contasPagas` passava 1090/0 verde, sem nenhum teste
+         acusar (achado do revisor confere-no-disco, 22/09). Os fixtures de `casos37` nao bastam aqui
+         porque os casos 'pago' deles nao gravam `dataPagamento` (cai no fallback = mesma data da
+         emissao, entao nao discrimina); por isso um fixture proprio, com `dataPagamento` explicito e
+         diferente de `data`. */
+      const casosCx37 = [
+        ['vencida sem marcar (a pagar)', { data: '2026-09-10', status: 'apagar' }],
+        ['futura sem marcar (a pagar)', { data: '2026-11-10', status: 'apagar' }],
+        ['paga, pagamento != emissao', { data: '2026-08-05', dataPagamento: '2026-09-15', status: 'pago' }],
+        ['paga sem dataPagamento gravada (cai na emissao)', { data: '2026-09-12', status: 'pago' }],
+      ];
+      const ruinsCx37 = [];
+      casosCx37.forEach(([rotC, campos]) => {
+        setg('movs', []);
+        const mv = Object.assign({ id: 'mx', tipo: 'DESPESA', valor: 70, natureza: 'ordinaria', cat: 'Luz', conta: 'X' }, campos);
+        M().push(mv);
+        const esp = A('caixaDaDespesa')(mv);
+        const linha = (A('contasPagas')() || []).find(x => x.m === mv);
+        if (!!esp !== !!linha) { ruinsCx37.push(['presenca', rotC, !!esp, !!linha]); return; }
+        if (esp) {
+          const dataReal = A('isoLocal')(linha.venc);
+          if (dataReal !== esp.data) ruinsCx37.push(['data', rotC, esp.data, dataReal]);
+          if (r34(linha.valor) !== r34(esp.valor)) ruinsCx37.push(['valor', rotC, esp.valor, linha.valor]);
+        }
+      });
+      t('37e: (6) `contasPagas` bate com `caixaDaDespesa` em presenca, data e valor nos ' + casosCx37.length + ' casos — inclusive quando dataPagamento diverge da emissao; se contasPagas voltar a datar pela emissao, aqui denuncia mesmo com a contagem de texto calada',
+        ruinsCx37.length === 0, S34(ruinsCx37.slice(0, 6)) + ' | divergencias: ' + ruinsCx37.length);
     } finally { Object.keys(R37).forEach(n => { try { setg(n, R37[n]); } catch (e) { /* build sem a var */ } }); }
   });
 
