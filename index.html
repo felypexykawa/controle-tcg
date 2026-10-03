@@ -711,6 +711,10 @@ function verMov(id){const t=movs.find(x=>x.id===id);if(!t){toast('Lançamento n�
   navHist.push(snap());if(navHist.length>40)navHist.shift();
   tela='consultar';consMenu=false;consF=t.tipo==='VENDA'?'VENDA':'COMPRA';
   consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';consGrupoFech={};
+  /* [03/10/2026] "abrir ESTE item na lista" só funciona na visão detalhada: na visão "por nota" (a padrão das abas Compras e Vendas) a linha do item não
+     existe na tela e o toque caía numa lista de cartões sem nada aberto — beco sem saída (tocar num pedaço do Lote, "ver item" de uma venda). Só o
+     chamador do Diagnóstico sabia disso e forçava `consVer='itens'` por conta própria; agora a regra mora na função, como já mora em `irDetalhe`. */
+  consVer='itens';
   emprestaPeriodo('');expandId=id;editId=null;render();
   setTimeout(()=>{const el=document.getElementById('mv-'+id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);}
 function vinculoInfoVenda(m){const alvo=movs.find(x=>x.id===m.origemId);
@@ -3594,8 +3598,15 @@ function separarParaColecao(id){
   const qtdRaw=Math.round(+qtdStr);
   if(!qtdRaw||qtdRaw<1){alert('Quantidade inválida.');return;}
   const qtd=Math.min(qtdRaw,dispQ);
-  const peca=baixarLote(id,qtd,'Coleção',{origemPedido:true});
+  const peca=aplicaSeparacaoColecao(id,qtd);
   if(!peca){alert('Não consegui separar essa quantidade.');return;}
+  save();diarioReg('separou pedido a caminho p/ coleção',rotDe(peca));toast('Separado pra coleção ✓ — já sai da expectativa de estoque disponível');render();
+}
+/* O EFEITO de separar parte (ou tudo) de um pedido a caminho pra coleção, escrito UMA vez (03/10/2026): `separarParaColecao` (uma peça, com a
+   quantidade que ele digita) e `separarNotaParaColecao` (a nota inteira, quantidade cheia) chamam esta função. */
+function aplicaSeparacaoColecao(id,qtd){
+  const peca=baixarLote(id,qtd,'Coleção',{origemPedido:true});
+  if(!peca)return null;
   /* [CORRIGIDO 2026-09-15, rodada de revisão — G3] baixarLote() infere destIni pelo sitDe
      ANTERIOR do lote (aqui, 'Pedido'), então sozinho ele gravaria destIni='Em estoque' --
      errado: esta peça nunca foi estoque de revenda de verdade, foi de pedido direto pra
@@ -3603,7 +3614,7 @@ function separarParaColecao(id){
      dia saísse da coleção (venda/troca), inflaria a curva de estoque com um fantasma
      (mesma classe do bug já corrigido uma vez em serieEstoque(), agora nascendo aqui). */
   peca.destIni='Coleção';
-  save();diarioReg('separou pedido a caminho p/ coleção',rotDe(peca));toast('Separado pra coleção ✓ — já sai da expectativa de estoque disponível');render();
+  return peca;
 }
 /* Agrupa cada pedido a caminho pela RAIZ do lote (`raizDe`, já existente): uma linha pra parte
    ainda sem comprador (se sobrar), uma por peça já vendida a alguém específico (aguardando
@@ -3684,15 +3695,42 @@ function abrirNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.len
   const tot=todos.reduce((s,x)=>s+(+x.valor||0),0);const nP=+h.nParc||0;
   const prodT=itens.reduce((s,x)=>s+(+x.valorProduto||0),0),freteT=itens.reduce((s,x)=>s+(+x.freteRateio||0),0),taxaT=itens.reduce((s,x)=>s+(+x.taxaRateio||0),0);
   const rotFT=(fr,tx)=>tx>0?`frete ${fmt(fr)} + taxa ${fmt(tx)}`:(fr>0?`frete/taxa ${fmt(fr)}`:'');
+  /* SITUAÇÃO E BOTÕES DE CADA ITEM (Felype 03/10/2026): esta tela não dizia a situação de nenhum item e só oferecia ✂ — quem recebia a caixa tinha de sair
+     daqui e procurar item por item na lista detalhada (a compra avulsa tem "✓ chegou" e "⭐ coleção" à mão; a nota não tinha). Cada botão chama a MESMA
+     função que a lista detalhada e o Fluxo de estoque já usam — nenhuma regra nova; `pedidosAgrupados` decide o que ainda "aguarda chegada". */
+  const EMOP={'Em estoque':'📦','Vendido':'💰','Coleção':'⭐','Pedido':'🚚','Aberto':'🔓','Trocado':'🔄'};
+  const ROTSIT={'Pedido':'a caminho','Em estoque':'em estoque','Coleção':'coleção','Vendido':'vendido','Aberto':'aberto','Trocado':'trocado'};
+  const aguardaChegar=new Set();pedidosAgrupados().forEach(g=>{g.pecas.forEach(p=>aguardaChegar.add(p.peca.id));g.colecao.forEach(x=>aguardaChegar.add(x.id));});
+  /* o que ainda não chegou: o que está 'Pedido' (inclusive PEDAÇO da nota — nasce de "desvincular" uma pré-venda de item a caminho e da pré-venda em boosters) ou aguarda a confirmação
+     própria. A faixa "a caminho" e os botões da nota inteira contam `pedidosDaNota`, que inclui esses pedaços: a lista TEM de mostrar todos os que a faixa conta. */
+  const pendente=m=>sitDe(m)==='Pedido'||aguardaChegar.has(m.id);
+  const volta=`abrirNota('${nid}')`;
+  const bt=(cor,rot,js,tt)=>`<button class="x" style="color:var(--${cor})"${tt?` title="${tt}"`:''} onclick="event.stopPropagation();${js}">${rot}</button>`;
+  /* "☰ mais ações" abre a linha do item na lista detalhada, onde estão TODAS as ações da compra avulsa (abrir a caixa, vincular a uma venda já lançada…):
+     nenhuma ação da compra avulsa fica fora de alcance de um item da nota */
+  /* `verMov` e não `irDetalhe` (revisor 03/10, achado grave): a nota abre de várias telas (Contas, Extrato, Diagnóstico, "ver nota" dentro de uma venda) e a lista pode estar numa aba ou
+     filtro que NÃO mostra este item. `irDetalhe` só troca a visão e funciona só de dentro da própria Consultar; `verMov` vai pra Consultar, na aba certa, sem filtro e sem período. */
+  const maisAcoes=id=>bt('mut','☰ mais ações',`verMov('${id}')`,'abrir a caixa, vincular a uma venda já lançada e as demais ações desta compra');
+  const botoesSit=m=>{const s=sitDe(m),id=m.id;
+    if(s==='Pedido')return bt('amber','⭐ p/ coleção',`separarParaColecao('${id}');${volta}`,'separar parte pra coleção antes de chegar')+bt('green','✓ chegou',`chegouPedido('${id}');${volta}`)+maisAcoes(id);
+    if(aguardaChegar.has(id))return bt('green','✓ chegou',`chegouPeca('${id}');${volta}`)+(s==='Coleção'?maisAcoes(id):'');
+    if(s==='Em estoque')return bt('green','💰 vender',`fecharModal();venderDe('${id}')`)+bt('amber','⭐ coleção',`fecharModal();guardarDe('${id}')`)+maisAcoes(id);
+    if(s==='Coleção')return bt('green','💰 vender',`fecharModal();venderDe('${id}')`)+maisAcoes(id);
+    return '';};
+  const chipSit=m=>{const s=sitDe(m);return `<span class="tag ${s==='Vendido'?'v':s==='Coleção'?'k':'c'}">${EMOP[s]||''} ${ROTSIT[s]||s.toLowerCase()}${aguardaChegar.has(m.id)?' · aguardando chegada':''}</span>`;};
+  const acoesSit=m=>`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">${chipSit(m)}${botoesSit(m)}</div>`;
+  const aCam=pedidosDaNota(nid);
+  const topoCam=aCam.length?`<div class="ctx" style="margin-bottom:6px">🚚 <b>${resumoDaNota(aCam)}</b> ainda a caminho. Chegou tudo junto? Um toque só — ou use os botões de cada item se chegou em partes.</div><div class="row2" style="margin-bottom:10px"><button class="btn" onclick="chegouNota('${nid}')">✓ tudo chegou</button><button class="btn g" style="color:var(--amber)" onclick="separarNotaParaColecao('${nid}')">⭐ tudo p/ coleção</button></div>`:'';
   const lin=itens.map(m=>{const vp=+m.valorProduto||0,fr=+m.freteRateio||0,tx=+m.taxaRateio||0,vAtual=+m.valor||0;
     const ft=rotFT(fr,tx);
     const raiz=vp>0?`produto ${fmt(vp)}${ft?' + '+ft:''} = <b>${fmt(vp+fr+tx)}</b>`:`${(+m.qtd||1)}× ${fmt(vAtual/(+m.qtd||1))}`;
     const mudou=vp>0&&Math.abs(vp+fr+tx-vAtual)>0.02?`<br><span style="color:var(--amber)">hoje neste lançamento: ${fmt(vAtual)} — parte já saiu do lote (ver 🧩 no item)</span>`:'';
-    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();abrir('${m.id}')"><div><b>${m.cat||'item'}</b>${m.colecao?' · '+m.colecao:''}${m.codigo?' <span style="color:var(--mut);font-size:10px">#'+m.codigo+'</span>':''}<div class="meta">${(+m.qtd||1)} un · ${raiz}${mudou}</div></div><div style="display:flex;gap:10px;align-items:center;flex:none"><b>${fmt(vAtual)}</b><button class="x" title="tirar da nota" onclick="event.stopPropagation();separarDaNota('${m.id}');fecharModal()">✂</button></div></div>`;}).join('');
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();abrir('${m.id}')"><div style="flex:1;min-width:0"><b>${m.cat||'item'}</b>${m.colecao?' · '+m.colecao:''}${m.codigo?' <span style="color:var(--mut);font-size:10px">#'+m.codigo+'</span>':''}<div class="meta">${(+m.qtd||1)} un · ${raiz}${mudou}</div>${acoesSit(m)}</div><div style="display:flex;gap:10px;align-items:center;flex:none"><b>${fmt(vAtual)}</b><button class="x" title="tirar da nota" onclick="event.stopPropagation();separarDaNota('${m.id}');fecharModal()">✂</button></div></div>`;}).join('');
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:85vh;overflow:auto">
     <div class="sec" style="margin-top:0">🧾 Nota${h.notaNum?' '+h.notaNum:''} — original</div>
     <div class="ctx">Emitida em <b>${dBR(new Date(h.data+'T00:00:00'))}</b> · ${h.contraparte||'—'} · custou <b>${fmt(tot)}</b>${prodT>0?` <span style="color:var(--mut)">(produto ${fmt(prodT)}${rotFT(freteT,taxaT)?' + '+rotFT(freteT,taxaT):''})</span>`:''}${nP>1?` · paga em <b>${nP}×</b> de <b>${fmt(tot/nP)}</b> (1ª em ${dBR(new Date((h.venc1||h.data)+'T00:00:00'))})`:' · à vista'} — confira com a nota do fornecedor: produto e frete/taxa separados são a prova real.</div>
     <button class="btn g" style="margin-bottom:8px" onclick="editarNota('${nid}')">✏️ editar a nota — quantidades, valores, frete e taxa</button>
+    ${topoCam}
     ${lin}
     ${/* Felype 2026-08-12: quando a nota nao tem NENHUM produto visivel (todos viraram pedaco de
           saida), a frase "toque num produto" mandava tocar em coisa que nao existe na tela — ele
@@ -3700,9 +3738,12 @@ function abrirNota(nid){const todos=movs.filter(m=>m.notaId===nid);if(!todos.len
           R$739,50. Agora os proprios pedacos viram linhas clicaveis que levam ao lote. */
       !pedacos.length?'':(itens.length?
       `<div class="meta" style="padding:4px 12px">🧩 +${pedacos.length} pedaço(s) de saída (venda/abertura/troca) contando no total — toque num produto e use "ver o lote completo" pra rastrear.</div>`
+      /* pedaço que ainda NÃO chegou (separado pra coleção antes de chegar, ou vendido antes de chegar) aparece aqui com o "✓ chegou" dele — sem isto
+         só dava pra confirmar a chegada dele no Fluxo de estoque, longe da nota */
+      +pedacos.filter(pendente).map(pz=>`<div class="item" style="align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();verLote('${pz.id}')"><div style="flex:1;min-width:0"><b>${EMOP[sitDe(pz)]||''} ${(+pz.qtd||1)} un · ${pz.cat||'item'}</b>${pz.colecao?' · '+pz.colecao:''}${acoesSit(pz)}</div><b>${fmt(+pz.valor||0)}</b></div>`).join('')
       :`<div class="meta" style="padding:4px 12px">🧩 Nenhum produto desta nota está inteiro hoje — os ${pedacos.length} pedaço(s) abaixo saíram por venda, abertura ou troca e são o que forma o total. Toque pra rastrear:</div>`
-       +pedacos.map(pz=>{const s=sitDe(pz);const EMOP={'Em estoque':'📦','Vendido':'💰','Coleção':'⭐','Pedido':'🚚','Aberto':'🔓','Trocado':'🔄'};
-         return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();verLote('${pz.id}')"><div><b>${EMOP[s]||''} ${(+pz.qtd||1)} un · ${pz.cat||'item'}</b>${pz.colecao?`<div class="meta">${pz.colecao} · ${s.toLowerCase()}</div>`:`<div class="meta">${s.toLowerCase()}</div>`}</div><div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+pz.valor||0)}<div class="meta" style="color:var(--blue)">ver o lote →</div></div></div>`;}).join(''))}
+       +pedacos.map(pz=>{const s=sitDe(pz);
+         return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="fecharModal();verLote('${pz.id}')"><div style="flex:1;min-width:0"><b>${EMOP[s]||''} ${(+pz.qtd||1)} un · ${pz.cat||'item'}</b>${pz.colecao?`<div class="meta">${pz.colecao} · ${s.toLowerCase()}</div>`:`<div class="meta">${s.toLowerCase()}</div>`}${pendente(pz)?acoesSit(pz):''}</div><div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+pz.valor||0)}<div class="meta" style="color:var(--blue)">ver o lote →</div></div></div>`;}).join(''))}
     <div style="display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:8px;padding-top:8px;font-weight:700"><span>Total (${itens.length} ${itens.length===1?'produto':'produtos'})</span><span>${fmt(tot)}</span></div>
     <div class="ctx" style="margin-top:8px">Entrou junto mas era separado? Toque num produto pra editar, use "✂ tirar da nota" na Consultar (um a um) ou desfaça a nota inteira:</div>
     <button class="btn g" style="margin-top:8px;color:var(--purple)" onclick="abrirFotosGrupo('${nid}','📷 Fotos da nota (comprovante)','abrirNota(&quot;${nid}&quot;)')">📷 fotos da nota (comprovante)</button><!-- alvo-alterado: intencional (fechar as fotos reabre a nota) -->
@@ -5589,13 +5630,30 @@ function mudarSit(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')r
   if(px==='Em estoque'&&sitDe(m)==='Pedido'&&!m.dataChegada)m.dataChegada=hojeISO(); /* [CORRIGIDO — M-2] "hoje" só é correto vindo de Pedido, nunca de Coleção */
   if(px==='Em estoque')delete m.origemPedido;
   m.situacao=px;m.destino=px==='Coleção'?'Coleção':'Vender';save();toast('Agora: '+px);render();}
-function chegouPedido(id){const m=movs.find(x=>x.id===id);if(!m)return;
-  if(!confirm('Confirmar que o pedido chegou? Ele entra no estoque disponível hoje.'))return;
-  m.situacao='Em estoque';m.destino='Vender';m.dataChegada=hojeISO();
+/* O EFEITO de "chegou" numa peça a caminho, escrito UMA vez (03/10/2026): `chegouPedido` (uma peça) e `chegouNota` (a nota inteira) chamam esta
+   função — antes a regra morava só dentro de `chegouPedido`, e a tela da Nota (que não tinha botão nenhum) só podia copiá-la. */
+function aplicaChegada(m){m.situacao='Em estoque';m.destino='Vender';m.dataChegada=hojeISO();
   delete m.origemPedido; /* [CORRIGIDO 2026-09-15, 4ª rodada — M-1] uma peça 'Pedido' pode ter origemPedido
     de sobra (editou pra Coleção via o formulário, depois editou de volta pra Pedido) — sem isto, o
-    fantasma sobrevive a esta confirmação e ainda reaparece no próximo fracionamento */
+    fantasma sobrevive a esta confirmação e ainda reaparece no próximo fracionamento */}
+function chegouPedido(id){const m=movs.find(x=>x.id===id);if(!m)return;
+  if(!confirm('Confirmar que o pedido chegou? Ele entra no estoque disponível hoje.'))return;
+  aplicaChegada(m);
   save();diarioReg('marcou pedido chegado',rotDe(m));toast('Chegou — está no estoque ✓');render();}
+/* A NOTA INTEIRA (Felype 03/10/2026: "dei entrada numa nota com vários itens... agora não tenho a opção de tirar do a caminho e colocar em
+   estoque ou coleção"): a compra avulsa tinha "✓ chegou" e "⭐ coleção" e a tela da nota não tinha nenhum dos dois. Só mexe no que ainda está
+   'Pedido' (a caminho) — peça já separada pra coleção ou já vendida antes de chegar tem a confirmação própria (`chegouPeca`) e não é tocada. */
+function pedidosDaNota(nid){return movs.filter(m=>m.tipo==='COMPRA'&&m.notaId===nid&&sitDe(m)==='Pedido');}
+function nItens(n){return n+(n===1?' item':' itens');}
+function resumoDaNota(its){const q=its.reduce((s,x)=>s+(+x.qtd||1),0),v=its.reduce((s,x)=>s+(+x.valor||0),0);return nItens(its.length)+', '+q+' un · '+fmt(v);}
+function chegouNota(nid){const its=pedidosDaNota(nid);if(!its.length){toast('Nenhum item desta nota está a caminho');return;}
+  if(!confirm('Confirmar que chegou?\n\n'+resumoDaNota(its)+' desta nota '+(its.length===1?'está':'estão')+' a caminho — todos entram no estoque disponível hoje.\n\nSe só parte chegou, cancele e use "✓ chegou" no item que chegou. Peças já separadas pra coleção ou vendidas antes de chegar não mudam: têm a própria confirmação.'))return;
+  its.forEach(aplicaChegada);
+  save();diarioReg('marcou nota chegada',(its[0].notaNum?'nota '+its[0].notaNum+' — ':'')+nItens(its.length));toast('Nota chegou — '+nItens(its.length)+' no estoque ✓');fecharModal();abrirNota(nid);render();}
+function separarNotaParaColecao(nid){const its=pedidosDaNota(nid);if(!its.length){toast('Nenhum item desta nota está a caminho');return;}
+  if(!confirm('Mandar pra COLEÇÃO tudo que está a caminho desta nota?\n\n'+resumoDaNota(its)+' ficam separados pra coleção: não serão vendidos e saem do estoque disponível. Continuam "aguardando chegada" até você confirmar a chegada de cada um.\n\nSe só parte vai pra coleção, cancele e use "⭐ p/ coleção" no item.'))return;
+  its.forEach(m=>aplicaSeparacaoColecao(m.id,+m.qtd||1));
+  save();diarioReg('separou nota a caminho p/ coleção',(its[0].notaNum?'nota '+its[0].notaNum+' — ':'')+nItens(its.length));toast('Nota separada pra coleção — '+nItens(its.length)+' ✓');fecharModal();abrirNota(nid);render();}
 let _abrirId=null,abertoItens=[],_abQtdA='',_abUnA='un',abItemSit='vender';
 function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;_abrirId=id;abertoItens=[];_abQtdA='';_abUnA='un';abItemSit=sitDe(m)==='Coleção'?'colecao':'vender';renderAbrir();}
 function togAbItemSit(v){abItemSit=v;document.querySelectorAll('#abitog .o').forEach(o=>o.classList.toggle('on',o.dataset.v===v));}
@@ -6310,11 +6368,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='24/09 14h01';
+const BUILD_TAG='03/10 03h59';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1790269311966;
+const BUILD_TS=1791010797127;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

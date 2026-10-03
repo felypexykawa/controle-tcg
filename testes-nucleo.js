@@ -6162,6 +6162,218 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         hRes.slice(Math.max(0, hRes.indexOf('físico hoje') - 60), hRes.indexOf('físico hoje') + 520));
     } finally { Object.keys(R37f).forEach(n => { try { setg(n, R37f[n]); } catch (e) { /* build sem a var */ } }); }
   });
+
+  /* ===== 38. NOTA: SITUACAO DOS ITENS E CHEGADA PELA NOTA INTEIRA (03/10/2026) =====
+     Felype: "dei entrada de uma nota com varios itens como a caminho... agora nao tenho a opcao de tirar do a caminho e colocar em estoque ou
+     colecao". A compra avulsa tinha "chegou" e "colecao" a mao (lista detalhada, Fluxo de estoque); a tela da nota nao dizia a situacao de nenhum
+     item e so oferecia a tesoura. Aqui o gesto e provado pelo caminho do usuario (o HTML que a tela devolve e a funcao que o botao chama) e a
+     PARIDADE e fixada: toda acao que a lista detalhada oferece a uma compra avulsa fica ao alcance de um item da nota. */
+  console.log('');
+  console.log('=== 38. nota: situacao dos itens, chegou / colecao pela nota inteira, paridade nota x avulso ===');
+  const FUNCS38 = ['aplicaChegada', 'pedidosDaNota', 'resumoDaNota', 'nItens', 'chegouNota', 'separarNotaParaColecao', 'aplicaSeparacaoColecao', 'chegouPedido',
+    'chegouPeca', 'separarParaColecao', 'pedidosAgrupados', 'abrirNota', 'irDetalhe', 'vConsultar', 'motor', 'baixarLote', 'sitDe'];
+  const faltam38 = FUNCS38.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('38a: [pre-requisito] o app carregado tem as ' + FUNCS38.length + ' funcoes desta secao', faltam38.length === 0, 'FALTAM no app: ' + faltam38.join(', '));
+  const bloco38 = (rot, corpo) => faltam38.length ? Promise.resolve() : bloco34(rot, corpo, '38');
+  const capturas38 = () => {
+    const c = { toasts: [], diario: [], alertas: [], confirms: [], perguntas: [], confirmar: true, resposta: '1' };
+    setg('toast', m => { c.toasts.push(String(m)); });
+    setg('diarioReg', a => { c.diario.push(String(a)); });
+    ctx.alert = m => { c.alertas.push(String(m)); };
+    ctx.confirm = m => { c.confirms.push(String(m)); return c.confirmar; };
+    ctx.prompt = (q, d) => { c.perguntas.push([String(q), d]); return c.resposta; };
+    return c;
+  };
+  const nota38 = (nid, itens) => itens.forEach(([idc, x]) => M().push(compra34(idc, Object.assign({ notaId: nid, notaNum: 'NF-' + nid, pgTipo: 'À vista', nParc: 0, venc1: '', data: '2026-09-30', conta: 'X' }, x))));
+  const f38 = idc => M().find(m => m.id === idc);
+  const sit38 = idc => A('sitDe')(f38(idc));
+  /* o trecho de UMA linha: da marca ate o proximo item OU o rodape de acoes da pagina (sem o rodape, o ultimo item da lista arrastava "Imprimir" e "Planilha") */
+  const trecho38 = (h, marca) => { const i = h.indexOf(marca); if (i < 0) return ''; const cand = ['class="item"', 'class="acoes"'].map(k => h.indexOf(k, i + 1)).filter(p => p > i); return h.slice(i, cand.length ? Math.min(...cand) : i + 3000); };
+  const telaCons38 = (ver, expand) => { setg('tela', 'consultar'); setg('consMenu', false); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('consJogo', 'todos');
+    setg('consCol', ''); setg('consPess', ''); setg('consConta', ''); setg('consCat', ''); setg('expandId', expand || null); setg('consF', 'COMPRA'); setg('consVer', ver); setg('consQ', ''); return A('vConsultar')(); };
+  /* os nomes das funcoes chamadas nos onclick de um pedaco de HTML (menos o ruido de navegacao) */
+  const RUIDO38 = new Set(['stopPropagation', 'fecharModal', 'toggleExp', 'abrirFotos', 'togSel', 'abrir', 'abrirNota', 'separarDaNota', 'verFicha', 'verLote', 'render']);
+  const cliques38 = frag => { const r = new Set(); const reA = /onclick="([^"]*)"/g; let a; while ((a = reA.exec(frag))) { const reF = /([A-Za-z_][A-Za-z0-9_]*)\(/g; let b; while ((b = reF.exec(a[1]))) if (!RUIDO38.has(b[1])) r.add(b[1]); } return r; };
+
+  /* ---- 38b: o que a tela da nota mostra — situacao de cada item, botao certo pra cada situacao, e os botoes da nota inteira so quando ha o que chegar ---- */
+  await bloco38('b', () => {
+    congela(2026, 10, 3, 10, 0);
+    nota38('N38', [['a1', { cat: 'Booster Box', qtd: 2, valor: 200, situacao: 'Pedido' }], ['a2', { cat: 'ETB', valor: 100, situacao: 'Em estoque' }],
+      ['a3', { cat: 'Blister', valor: 50, situacao: 'Coleção', destino: 'Coleção' }], ['a4', { cat: 'Quad', valor: 40, situacao: 'Vendido', dataChegada: '2026-09-30' }]]);
+    nota38('N39', [['z1', { cat: 'ETB', valor: 10, situacao: 'Em estoque' }]]);
+    capturas38();
+    const h = modal36(() => A('abrirNota')('N38')), L = idc => trecho38(h, "abrir('" + idc + "')");
+    t('38b: a nota com item a caminho oferece os dois botoes da NOTA INTEIRA e diz quanto esta a caminho (so o item a1: 1 item, 2 un)',
+      h.indexOf("chegouNota('N38')") > 0 && h.indexOf("separarNotaParaColecao('N38')") > 0 && /1 item, 2 un/.test(h) && !/itens, 2 un/.test(h), S34([h.indexOf("chegouNota('N38')"), /1 item, 2 un/.test(h)]));
+    t('38b: item A CAMINHO: diz "a caminho" e oferece "chegou", "p/ colecao" e "mais acoes" — e nao oferece vender',
+      /a caminho/.test(L('a1')) && L('a1').indexOf("chegouPedido('a1')") > 0 && L('a1').indexOf("separarParaColecao('a1')") > 0 && L('a1').indexOf("verMov('a1')") > 0 && L('a1').indexOf("venderDe('a1')") < 0, L('a1').slice(0, 900));
+    t('38b: item EM ESTOQUE: diz "em estoque" e oferece vender, colecao e mais acoes — e nao oferece "chegou"',
+      /em estoque/.test(L('a2')) && L('a2').indexOf("venderDe('a2')") > 0 && L('a2').indexOf("guardarDe('a2')") > 0 && L('a2').indexOf("verMov('a2')") > 0 && L('a2').indexOf("chegouPedido('a2')") < 0, L('a2').slice(0, 900));
+    t('38b: item JA NA COLECAO: oferece vender e mais acoes — e nao oferece guardar (ja esta la) nem "chegou"',
+      L('a3').indexOf("venderDe('a3')") > 0 && L('a3').indexOf("verMov('a3')") > 0 && L('a3').indexOf("guardarDe('a3')") < 0 && L('a3').indexOf("chegouPedido('a3')") < 0, L('a3').slice(0, 900));
+    t('38b: item VENDIDO (ja chegou): so diz "vendido" — nenhum botao de situacao',
+      /vendido/.test(L('a4')) && L('a4').indexOf("venderDe('a4')") < 0 && L('a4').indexOf("guardarDe('a4')") < 0 && L('a4').indexOf("chegouPedido('a4')") < 0 && L('a4').indexOf("verMov('a4')") < 0, L('a4').slice(0, 900));
+    const hz = modal36(() => A('abrirNota')('N39'));
+    t('38b: nota SEM nada a caminho nao mostra os botoes da nota inteira (nao inventa gesto que nao faz nada)', hz.indexOf('chegouNota(') < 0 && hz.indexOf('separarNotaParaColecao(') < 0, hz.slice(0, 400));
+  });
+
+  /* ---- 38c: "tudo chegou" — so o que esta a caminho, uma pergunta, nenhum numero de dinheiro mexe ---- */
+  await bloco38('c', () => {
+    congela(2026, 10, 3, 10, 0);
+    nota38('N38', [['b1', { cat: 'Booster Box', qtd: 2, valor: 200, situacao: 'Pedido', origemPedido: true }], ['b2', { cat: 'ETB', valor: 100, situacao: 'Pedido' }],
+      ['b3', { cat: 'Blister', valor: 50, situacao: 'Em estoque' }], ['b4', { cat: 'Quad', valor: 30, situacao: 'Coleção', destino: 'Coleção' }]]);
+    M().push(compra34('av1', { cat: 'ETB', valor: 70, situacao: 'Pedido', pgTipo: 'À vista', nParc: 0, venc1: '' }));            /* avulso a caminho: nao e da nota */
+    nota38('N40', [['o1', { cat: 'ETB', valor: 60, situacao: 'Pedido' }]]);                                                         /* OUTRA nota a caminho */
+    let c = capturas38(); const din0 = S34(dinheiro36()), m0 = A('motor')(), antes = JSON.stringify(M());
+    c.confirmar = false; A('chegouNota')('N38');
+    t('38c: cancelar o confirm nao muda nada, nao grava toast nem diario, e a pergunta diz 2 itens, 3 un e o valor (R$ 300)',
+      JSON.stringify(M()) === antes && c.toasts.length === 0 && c.diario.length === 0 && c.confirms.length === 1 && /2 itens, 3 un/.test(c.confirms[0]) && /300,00/.test(c.confirms[0]), S34(c.confirms));
+    c = capturas38(); c.confirmar = true; A('chegouNota')('N38');
+    t('38c: confirmar: os 2 itens a caminho viram Em estoque, destino Vender, dataChegada = hoje, e o origemPedido de sobra some',
+      ['b1', 'b2'].every(id => sit38(id) === 'Em estoque' && f38(id).destino === 'Vender' && f38(id).dataChegada === '2026-10-03' && !('origemPedido' in f38(id))), S34(['b1', 'b2'].map(f38)));
+    t('38c: o que NAO estava a caminho nao muda (estoque e colecao da mesma nota), nem a compra avulsa a caminho, nem a OUTRA nota a caminho',
+      sit38('b3') === 'Em estoque' && !f38('b3').dataChegada && sit38('b4') === 'Coleção' && !f38('b4').dataChegada && sit38('av1') === 'Pedido' && !f38('av1').dataChegada && sit38('o1') === 'Pedido' && !f38('o1').dataChegada,
+      S34(['b3', 'b4', 'av1', 'o1'].map(id => [id, sit38(id), f38(id).dataChegada])));
+    const m1 = A('motor')();
+    t('38c: valor e quantidade de cada item ficam; o dinheiro (saldos, a pagar, pagas, curva, projecao) nao muda 1 centavo; o estoque sobe exatamente os R$ 300 que sairam do "a caminho"',
+      f38('b1').valor === 200 && f38('b1').qtd === 2 && f38('b2').valor === 100 && S34(dinheiro36()) === din0 && r34(m1.estoque - m0.estoque) === 300 && r34(m0.pedido - m1.pedido) === 300,
+      S34([din0 === S34(dinheiro36()), m0.estoque, m1.estoque, m0.pedido, m1.pedido]));
+    t('38c: toast e diario dizem o que aconteceu (2 itens, com o numero da nota no diario)',
+      c.toasts.some(x => /Nota chegou — 2 itens/.test(x)) && c.diario.some(x => /nota chegada/.test(x)), S34([c.toasts, c.diario]));
+    const hDepois = modal36(() => A('abrirNota')('N38'));
+    t('38c: e a tela da nota, aberta depois, nao mostra mais o bloco "a caminho" (nada a caminho nela) e mostra os 4 itens com a situacao nova',
+      hDepois.indexOf('chegouNota(') < 0 && hDepois.indexOf("chegouPedido('b1')") < 0 && (hDepois.match(/em estoque/g) || []).length >= 3, hDepois.slice(0, 300));
+    c = capturas38(); A('chegouNota')('N38');
+    t('38c: de novo: nada a caminho — avisa, nao pergunta nada e nao muda nada', c.confirms.length === 0 && c.toasts.some(x => /Nenhum item/.test(x)) && c.diario.length === 0, S34([c.confirms, c.toasts]));
+    c = capturas38(); A('chegouNota')('nao-existe');
+    t('38c: nota que nao existe: avisa e nao quebra', c.confirms.length === 0 && c.toasts.some(x => /Nenhum item/.test(x)), S34(c.toasts));
+  });
+
+  /* ---- 38d: "tudo p/ colecao" — o MESMO efeito do botao por item (quantidade cheia): Colecao com origemPedido, ainda aguardando chegada ---- */
+  await bloco38('d', () => {
+    congela(2026, 10, 3, 10, 0);
+    nota38('N38', [['d1', { cat: 'Booster Box', qtd: 2, valor: 200, situacao: 'Pedido' }], ['d2', { cat: 'ETB', valor: 100, situacao: 'Pedido' }], ['d3', { cat: 'Blister', valor: 50, situacao: 'Em estoque' }]]);
+    let c = capturas38(); const din0 = S34(dinheiro36()), m0 = A('motor')(), n0 = M().length, antes = JSON.stringify(M());
+    c.confirmar = false; A('separarNotaParaColecao')('N38');
+    t('38d: cancelar o confirm nao muda nada e a pergunta diz que vao pra COLECAO (2 itens, 3 un)', JSON.stringify(M()) === antes && c.toasts.length === 0 && /COLEÇÃO/.test(c.confirms[0]) && /2 itens, 3 un/.test(c.confirms[0]), S34(c.confirms));
+    c = capturas38(); c.confirmar = true; A('separarNotaParaColecao')('N38');
+    t('38d: confirmar: os 2 itens viram Colecao (destino Colecao, destIni Colecao, origemPedido) SEM chegada — ainda aguardam, como o botao por item deixa',
+      ['d1', 'd2'].every(id => sit38(id) === 'Coleção' && f38(id).destino === 'Coleção' && f38(id).destIni === 'Coleção' && f38(id).origemPedido === true && !f38(id).dataChegada), S34(['d1', 'd2'].map(f38)));
+    t('38d: quantidade cheia: nenhum pedaco novo (a contagem de lancamentos nao muda), valores e quantidades ficam, e o item que ja estava em estoque nao e tocado',
+      M().length === n0 && f38('d1').qtd === 2 && f38('d1').valor === 200 && f38('d2').valor === 100 && sit38('d3') === 'Em estoque' && !f38('d3').origemPedido, S34([M().length, n0]));
+    const m1 = A('motor')(), ag = A('pedidosAgrupados')();
+    t('38d: saem do "a caminho" do motor (R$ 300) e aparecem na lista "separado pra colecao, aguardando chegada" do Fluxo de estoque; o dinheiro nao mexe',
+      r34(m0.pedido - m1.pedido) === 300 && ag.some(g => g.colecao.some(x => x.id === 'd1')) && ag.some(g => g.colecao.some(x => x.id === 'd2')) && !ag.some(g => g.remanescentes.some(x => x.id === 'd1')) && S34(dinheiro36()) === din0,
+      S34([m0.pedido, m1.pedido, ag.map(g => [g.colecao.length, g.remanescentes.length])]));
+    const h = modal36(() => A('abrirNota')('N38')), Ld = trecho38(h, "abrir('d1')");
+    t('38d: a tela da nota agora diz "aguardando chegada" nesses itens e oferece o "chegou" DELES (chegouPeca) — o gesto da peca separada continua o mesmo', /aguardando chegada/.test(Ld) && Ld.indexOf("chegouPeca('d1')") > 0, Ld.slice(0, 900));
+    c = capturas38(); A('chegouPeca')('d1');
+    t('38d: confirmar a chegada grava dataChegada, continua na Colecao e sai da lista de aguardando', sit38('d1') === 'Coleção' && f38('d1').dataChegada === '2026-10-03' && !A('pedidosAgrupados')().some(g => g.colecao.some(x => x.id === 'd1')), S34(f38('d1')));
+  });
+
+  /* ---- 38e: pedaco separado antes de chegar — fica visivel na nota com o "chegou" dele, e "tudo chegou" nao o atropela ---- */
+  await bloco38('e', () => {
+    congela(2026, 10, 3, 10, 0);
+    nota38('N38', [['e1', { cat: 'Booster Box', qtd: 3, valor: 300, situacao: 'Pedido' }]]);
+    let c = capturas38(); c.resposta = '1'; A('separarParaColecao')('e1');
+    const pz = M().find(m => m.loteOrigem === 'e1');
+    t('38e: separar 1 de 3 pela tela da nota cria o pedaco COM a nota, em Colecao, origemPedido, e o resto (2 un, R$ 200) segue a caminho',
+      !!pz && pz.notaId === 'N38' && sit38(pz.id) === 'Coleção' && pz.origemPedido === true && pz.qtd === 1 && pz.valor === 100 && sit38('e1') === 'Pedido' && f38('e1').qtd === 2 && f38('e1').valor === 200, S34(M()));
+    const h = modal36(() => A('abrirNota')('N38'));
+    t('38e: a nota lista o pedaco aguardando chegada, com o "chegou" DELE — e o resto a caminho tem o seu', !!pz && h.indexOf("chegouPeca('" + pz.id + "')") > 0 && h.indexOf("chegouPedido('e1')") > 0 && /aguardando chegada/.test(h), h.slice(0, 200));
+    c = capturas38(); c.confirmar = true; A('chegouNota')('N38');
+    t('38e: "tudo chegou" traz so o que estava a caminho (o resto de 2 un); o pedaco da colecao segue aguardando — tem a confirmacao propria',
+      sit38('e1') === 'Em estoque' && f38('e1').dataChegada === '2026-10-03' && sit38(pz.id) === 'Coleção' && !f38(pz.id).dataChegada && f38(pz.id).origemPedido === true, S34([f38('e1'), f38(pz.id)]));
+    t('38e: o total da nota nao muda (conservacao: 200 + 100 = 300)', r34(M().filter(m => m.notaId === 'N38').reduce((s, x) => s + x.valor, 0)) === 300, S34(M().map(m => m.valor)));
+  });
+
+  /* ---- 38f: PARIDADE nota x avulso — toda acao da lista detalhada ao alcance de um item da nota, a partir de QUALQUER tela de onde a nota abre ----
+     [revisor 03/10, grave] a 1a versao deste teste conferia so o NOME da funcao no onclick, e a linha da lista era montada por um ajudante que ja zerava aba, filtro e periodo: o teste
+     passava com o botao quebrado a partir de venda, contas, filtro de jogo e periodo. Agora o toque e EXECUTADO (o onclick do botao, no contexto da pagina) a partir de cada tela de origem
+     e o que se confere e a linha `mv-<id>` no HTML que a lista devolve DEPOIS dele, sem nenhum ajudante arrumando o contexto. */
+  await bloco38('f', () => {
+    const RUIDO_F = new Set(['abrirNota', 'separarDaNota']);                              /* acoes que SO existem pra quem esta numa nota */
+    const decod = h => h.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    const toca = (frag, rotulo) => { const m = frag.match(new RegExp('<button[^>]*onclick="([^"]*)"[^>]*>' + rotulo + '</button>')); if (!m) return false; ctx.event = { stopPropagation() {} }; vm.runInContext(decod(m[1]), ctx); return true; };
+    const CONTEXTOS = [
+      ['a lista de Compras sem filtro (controle)', () => { setg('tela', 'consultar'); setg('consF', 'COMPRA'); }],
+      ['de dentro de uma VENDA ("ver nota" na aba Vendas)', () => { setg('tela', 'consultar'); setg('consF', 'VENDA'); }],
+      ['com filtro de JOGO que nao e o do item', () => { setg('tela', 'consultar'); setg('consF', 'COMPRA'); setg('consJogo', 'One Piece'); }],
+      ['com PERIODO que nao cobre a data da compra', () => { setg('tela', 'consultar'); setg('consF', 'COMPRA'); setg('perSel', 'custom'); setg('perDe', '2026-10-01'); setg('perAte', '2026-10-03'); }],
+      ['da tela de Contas', () => { setg('tela', 'contas'); setg('consF', 'COMPRA'); }],
+    ];
+    const stOrig = ctx.setTimeout; ctx.setTimeout = () => 0;
+    try {
+      [['Pedido', 'Pedido'], ['Em estoque', 'Em estoque'], ['Coleção', 'Coleção']].forEach(([rot, s]) => {
+        reset(); congela(2026, 10, 3, 10, 0); capturas38();
+        M().push(compra34('av', { cat: 'ETB', valor: 100, situacao: s, destino: s === 'Coleção' ? 'Coleção' : 'Vender', pgTipo: 'À vista', nParc: 0, venc1: '' }));
+        nota38('NP', [['it', { cat: 'ETB', valor: 100, situacao: s, destino: s === 'Coleção' ? 'Coleção' : 'Vender', data: '2026-09-30' }]]);
+        const doAvulso = cliques38(trecho38(telaCons38('itens', 'av'), 'id="mv-av"'));                               /* o que a lista detalhada oferece ao avulso */
+        const naNota = cliques38(trecho38(modal36(() => A('abrirNota')('NP')), "abrir('it')"));                       /* o que a linha do item da nota oferece direto */
+        const diretos = { 'Pedido': ['chegouPedido', 'separarParaColecao'], 'Em estoque': ['venderDe', 'guardarDe'], 'Coleção': ['venderDe'] }[s];
+        t('38f: [' + rot + '] os gestos mais usados ja estao DIRETO na linha do item da nota (' + diretos.join(', ') + ') e ha o botao "mais acoes"', diretos.every(x => naNota.has(x)) && naNota.has('verMov'), S34([...naNota]));
+        CONTEXTOS.forEach(([rotC, prepara]) => {
+          setg('consJogo', ''); setg('perDe', ''); setg('perAte', ''); setg('perSel', 'tudo'); setg('consQ', ''); setg('expandId', null); setg('consVer', 'notas');
+          prepara();
+          const modal = modal36(() => A('abrirNota')('NP'));
+          const tocou = toca(trecho38(modal, "abrir('it')"), '☰ mais ações');
+          const h = A('vConsultar')();                                                                          /* a lista, COMO O APP A DESENHA depois do toque — nenhum ajudante arruma o contexto */
+          const viaPonte = cliques38(trecho38(h, 'id="mv-it"'));
+          const falta = [...doAvulso].filter(x => !RUIDO_F.has(x) && !viaPonte.has(x));
+          t('38f: [' + rot + '] "mais acoes" ' + rotC + ': a lista abre na tela certa e a linha do item EXISTE, aberta, com TODA acao que a lista detalhada oferece a uma compra avulsa (' + [...doAvulso].join(', ') + ')',
+            tocou && g('tela') === 'consultar' && h.indexOf('id="mv-it"') > 0 && doAvulso.size > 0 && falta.length === 0,
+            S34([tocou, g('tela'), g('consF'), h.indexOf('id="mv-it"'), 'faltam: ' + falta.join(',')]));
+        });
+      });
+    } finally { ctx.setTimeout = stOrig; setg('consJogo', ''); setg('perDe', ''); setg('perAte', ''); setg('perSel', 'tudo'); }
+  });
+
+  /* ---- 38g: "abrir ESTE item na lista" (verMov) tem de cair numa linha que EXISTE — achado ao procurar mais erros do tipo da nota (03/10/2026) ----
+     Na visao "por nota" (a padrao das abas Compras e Vendas) a linha do item nao existe na tela: tocar num pedaco do Lote, ou em "ver item" de uma venda,
+     marcava o item mas deixava a lista de cartoes sem nada aberto. So o chamador do Diagnostico forcava a visao detalhada. */
+  await bloco38('g', () => {
+    congela(2026, 10, 3, 10, 0); capturas38();
+    M().push(compra34('lt', { cat: 'Booster Box', qtd: 2, valor: 200, situacao: 'Pedido', pgTipo: 'À vista', nParc: 0, venc1: '', valorOrig: 300 }));
+    M().push(compra34('lt1', { cat: 'Booster Box', qtd: 1, valor: 100, situacao: 'Vendido', pgTipo: 'À vista', nParc: 0, venc1: '', loteOrigem: 'lt' }));
+    nota38('NG', [['ng1', { cat: 'ETB', valor: 50, situacao: 'Pedido' }], ['ng2', { cat: 'ETB', valor: 60, situacao: 'Pedido' }]]);
+    ['v1', 'v2'].forEach((idv, i) => M().push({ id: idv, tipo: 'VENDA', data: '2026-10-01', valor: 80 + i, vendaId: 'VG', contraparte: 'Cli', qtd: 1, cat: 'ETB', canal: 'Pix', semOrigem: 'historico' }));
+    const stOrig = ctx.setTimeout, fmOrig = g('fecharModal');
+    ctx.setTimeout = () => 0; setg('fecharModal', () => {});
+    try {
+      [['item de um LOTE (o toque num pedaco da tela do Lote)', 'lt', 'COMPRA'], ['item de uma NOTA', 'ng1', 'COMPRA'], ['item de uma VENDA de varios itens ("ver item" / toque na venda)', 'v1', 'VENDA']].forEach(([rot, idm, aba]) => {
+        setg('consVer', 'notas'); setg('expandId', null);
+        A('verMov')(idm);
+        const h = A('vConsultar')();
+        t('38g: verMov num ' + rot + ' com a lista em "por nota": troca pra visao detalhada, abre a aba certa e a linha do item EXISTE na tela, aberta',
+          g('consVer') === 'itens' && g('consF') === aba && g('expandId') === idm && h.indexOf('id="mv-' + idm + '"') > 0, S34([g('consVer'), g('consF'), g('expandId'), h.indexOf('id="mv-' + idm + '"')]));
+      });
+    } finally { ctx.setTimeout = stOrig; setg('fecharModal', fmOrig); }
+  });
+
+  /* ---- 38h: TODO item que a faixa "a caminho" e os botoes da nota inteira contam aparece na lista da nota com o "chegou" dele (revisor 03/10, medio) ----
+     `pedidosDaNota` inclui PEDACOS (nascem de "desvincular" uma pre-venda de item a caminho e da pre-venda em boosters) e a lista so mostrava pedaco que aguarda confirmacao propria: o
+     pedaco 'Pedido' entrava na conta e no botao "tudo chegou" mas ficava invisivel — e a propria pergunta mandava "use chegou no item que chegou", impossivel pra ele. */
+  await bloco38('h', () => {
+    congela(2026, 10, 3, 10, 0); capturas38();
+    const confere = (rot, nid) => { const cont = A('pedidosDaNota')(nid), h = modal36(() => A('abrirNota')(nid));
+      const faltam = cont.filter(x => h.indexOf("chegouPedido('" + x.id + "')") < 0).map(x => x.id);
+      t('38h: ' + rot + ': todo item que a faixa "a caminho" conta (' + cont.map(x => x.id).join(', ') + ') aparece na lista da nota com o "chegou" dele', cont.length > 0 && faltam.length === 0, 'faltam: ' + faltam.join(',') + ' | ' + h.slice(0, 120));
+      return h; };
+    /* a) pedaco 'Pedido' ao lado do original (o que "desvincular" uma pre-venda deixa) */
+    nota38('NH1', [['h1', { cat: 'Booster Box', qtd: 2, valor: 200, situacao: 'Pedido' }]]);
+    M().push(compra34('h1p', { cat: 'Booster Box', qtd: 1, valor: 100, situacao: 'Pedido', loteOrigem: 'h1', notaId: 'NH1', notaNum: 'NF-NH1', pgTipo: 'À vista', nParc: 0, venc1: '', conta: 'X' }));
+    confere('nota com original + pedaco a caminho', 'NH1');
+    /* b) nota SO de pedacos (o original esta fora da nota) */
+    M().push(compra34('ho', { cat: 'Booster Box', qtd: 2, valor: 0, situacao: 'Aberto', pgTipo: 'À vista', nParc: 0, venc1: '' }));
+    ['p1', 'p2'].forEach((idp, i) => M().push(compra34(idp, { cat: 'Booster', qtd: 1, valor: 10, situacao: i ? 'Pedido' : 'Coleção', origemPedido: i ? undefined : true, loteOrigem: 'ho', notaId: 'NH2', notaNum: 'NF-NH2', destino: i ? 'Vender' : 'Coleção', pgTipo: 'À vista', nParc: 0, venc1: '' })));
+    const h2 = confere('nota so de pedacos', 'NH2');
+    t('38h: nota so de pedacos: o pedaco a caminho mostra a situacao ("a caminho") e o separado pra colecao ainda aguardando mostra o "chegou" dele — antes ficavam sem chip e sem botao',
+      /a caminho/.test(h2) && h2.indexOf("chegouPeca('p1')") > 0, h2.slice(0, 300));
+    /* c) "tudo chegou" faz o que a lista mostra */
+    const c = capturas38(); c.confirmar = true; A('chegouNota')('NH1');
+    t('38h: "tudo chegou" traz o original (2 un) E o pedaco (1 un) — e a pergunta que o app fez dizia "2 itens, 3 un", exatamente o que a lista mostrava',
+      A('sitDe')(f38('h1')) === 'Em estoque' && A('sitDe')(f38('h1p')) === 'Em estoque' && /2 itens, 3 un/.test(c.confirms[0]), S34([c.confirms, f38('h1').situacao, f38('h1p').situacao]));
+  });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
      A regra do dinheiro e escrita aqui DE NOVO, em cima da DESCRICAO das compras (valor, plano, marcas, conta) e sem chamar nenhuma tela do app:
