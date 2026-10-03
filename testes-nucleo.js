@@ -6374,6 +6374,135 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('38h: "tudo chegou" traz o original (2 un) E o pedaco (1 un) — e a pergunta que o app fez dizia "2 itens, 3 un", exatamente o que a lista mostrava',
       A('sitDe')(f38('h1')) === 'Em estoque' && A('sitDe')(f38('h1p')) === 'Em estoque' && /2 itens, 3 un/.test(c.confirms[0]), S34([c.confirms, f38('h1').situacao, f38('h1p').situacao]));
   });
+
+  /* ===== 40. DATAS PELO DIA LOCAL (03/10/2026) =====
+     `toISOString()` e UTC. `hojeISO()` ja era local, mas 6 leituras de "agora" / de meia-noite local ainda passavam por UTC: os botoes "30 dias" e "90 dias" e o periodo inicial
+     erravam um dia entre 21h e 23h59 no Brasil (e o Felype trabalha de noite); a chave da semana, a proxima data de despesa fixa e o fim da semana so acertavam por sorte do fuso. */
+  console.log('');
+  console.log('=== 40. datas pelo dia local (fuso trocado dentro do teste) ===');
+  await bloco34('a', () => {
+    const tz0 = process.env.TZ;
+    try {
+      process.env.TZ = 'America/Sao_Paulo';
+      congela(2026, 10, 3, 22, 30);                                            /* 22h30 em Brasilia: em UTC ja e 04/10 */
+      A('setPer')('d30'); const d30 = g('perDe'); A('setPer')('d90'); const d90 = g('perDe'); A('setPer')('ano'); const ano = g('perDe');
+      t('40a: as 22h30 de 03/10 em Brasilia, "30 dias" comeca em 03/09 e "90 dias" em 05/07 (antes UTC: 04/09 e 06/07, um dia depois — o lancamento de 30 dias atras sumia da tela a noite)',
+        d30 === '2026-09-03' && d90 === '2026-07-05' && ano === '2026-01-01', S34([d30, d90, ano]));
+      descongela();
+      process.env.TZ = 'Asia/Tokyo';
+      const px = A('proxData')('2026-10-01', 'mensal', 0, 0), px1 = A('proxData')('2026-10-01', 'semanal', 0, 2);
+      const pr = A('perRange')('2026-10-05', 'semana'), cp = A('chavePer')('2026-10-07', 'semana');
+      t('40a: em Toquio (adiante do UTC) a proxima data de despesa fixa, o fim da semana e a chave da semana seguem o dia LOCAL (antes caiam um dia antes: 30/09, 10/10 e 04/10)',
+        px === '2026-10-01' && px1 === '2026-10-15' && pr[0] === '2026-10-05' && pr[1] === '2026-10-11' && cp === '2026-10-05', S34([px, px1, pr, cp]));
+    } finally { process.env.TZ = tz0; descongela(); setg('perDe', ''); setg('perAte', ''); setg('perSel', 'tudo'); }
+    t('40a: nenhuma leitura de data do app passa por toISOString().slice(0,10) (o dia certo mora em isoLocal)', !/toISOString\(\)\.slice\(0,\s*10\)/.test(src), (src.match(/.{0,60}toISOString\(\)\.slice\(0,\s*10\).{0,20}/) || [''])[0]);
+  });
+
+  /* ===== 41. TEXTO LIVRE SEM "<" NEM ">" (03/10/2026) =====
+     Achado do revisor de 22/09 (nome de colecao cru no innerHTML) e medicao de hoje: 49 pontos so nos campos mais obvios (obs, fornecedor, categoria...) montam texto digitado direto no
+     HTML, nenhum com escape, e cada funcao tem o seu `esc` local so pra aspas de onclick. Em vez de remendar 49 templates, a cura na raiz: o texto livre nunca GUARDA "<" nem ">"
+     (vira ‹ ›) — na digitacao, na gravacao (save, saveL, gravaTudoLocal) e no boot. Mais as aspas no atributo `value` do campo de codigo, que cortava o texto na edicao. */
+  console.log('');
+  console.log('=== 41. texto livre sem < e >: na digitacao e na gravacao ===');
+  const FUNCS41 = ['limpaTxt', 'limpaProfundo', 'limpaEstado', 'limpaCampoAoDigitar', 'save', 'saveL', 'gravaTudoLocal', 'vConsultar', 'vLancar', 'grupoDe'];
+  const faltam41 = FUNCS41.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('41a: [pre-requisito] o app carregado tem as ' + FUNCS41.length + ' funcoes desta secao', faltam41.length === 0, 'FALTAM no app: ' + faltam41.join(', '));
+  const bloco41 = (rot, corpo) => faltam41.length ? Promise.resolve() : bloco34(rot, corpo, '41');
+  const guardado41 = () => ctx.localStorage.getItem(g('MK')) || '';
+
+  await bloco41('b', () => {
+    const L = A('limpaTxt');
+    t('41b: limpaTxt troca "<" e ">" por ‹ › (e so isso), deixa o resto do texto, e e idempotente',
+      L('a<b>c') === 'a‹b›c' && L('Loja <3 & cia') === 'Loja ‹3 & cia' && L('sem nada') === 'sem nada' && L(L('x<y>')) === 'x‹y›', S34([L('a<b>c'), L('Loja <3 & cia')]));
+    t('41b: o que nao e texto passa intacto (numero, nulo, indefinido, objeto)', L(5) === 5 && L(null) === null && L(undefined) === undefined && L(true) === true, S34([L(5), L(null)]));
+    const x = { colsG: { 'Poké<mon': { 'A<b>': '2<026' } }, arr: ['x<y', 3, null, { k: 'v>' }], n: 5, ok: 'limpo' }, ref = x;
+    const r = A('limpaProfundo')(x);
+    t('41b: limpaProfundo limpa NO LUGAR (mesma referencia), valores E chaves, em qualquer fundura — e nao mexe em numero, nulo nem texto limpo',
+      r === ref && x.colsG['Poké‹mon']['A‹b›'] === '2‹026' && !('Poké<mon' in x.colsG) && x.arr[0] === 'x‹y' && x.arr[1] === 3 && x.arr[2] === null && x.arr[3].k === 'v›' && x.n === 5 && x.ok === 'limpo', S34(x));
+  });
+
+  await bloco41('c', () => {
+    const orig = { pess: g('pess'), colsJ: g('colsJ'), colsG: g('colsG'), excluidos: g('excluidos'), cats: g('cats') };
+    try {
+      capturas38();
+      M().push(compra34('q1', { cat: 'ETB', colecao: '151<b>', codigo: '12<3', contraparte: 'Loja <3 & cia', obs: '<img src=x onerror=alert(1)>', pgTipo: 'À vista', nParc: 0, venc1: '' }));
+      A('save')();
+      const q = M().find(m => m.id === 'q1');
+      t('41c: save() limpa os textos livres do lancamento (observacao, fornecedor, colecao, codigo) — e o que foi PARA O ARMAZENAMENTO tambem, sem nenhum "<" ou ">"',
+        q.obs === '‹img src=x onerror=alert(1)›' && q.contraparte === 'Loja ‹3 & cia' && q.colecao === '151‹b›' && q.codigo === '12‹3' && !/[<>]/.test(guardado41()), S34(q) + ' | guardado com < ou >: ' + /[<>]/.test(guardado41()));
+      setg('pess', ['Forn <x>']); setg('cats', ['Cat<1>']); setg('colsJ', { 'Pokémon': ['C<d>'], 'Jogo<z>': ['Y'] }); setg('colsG', { 'Pokémon': { 'C<d>': '2<026' } });
+      setg('excluidos', { 'pess:Forn <x>': 1700000000000 });
+      A('saveL')();
+      t('41c: saveL() limpa as listas de nome e as colecoes por jogo — o nome da colecao sai IGUAL como valor de colsJ e como CHAVE de colsG (o grupo/ano continua achando a colecao)',
+        g('pess')[0] === 'Forn ‹x›' && g('cats')[0] === 'Cat‹1›' && g('colsJ')['Pokémon'][0] === 'C‹d›' && 'Jogo‹z›' in g('colsJ') && A('grupoDe')('Pokémon', 'C‹d›') === '2‹026', S34([g('pess'), g('colsJ'), g('colsG')]));
+      t('41c: o dicionario de exclusoes NAO e tocado (as chaves dele sao ids/nomes que o outro aparelho tambem carimbou)', 'pess:Forn <x>' in g('excluidos'), S34(g('excluidos')));
+      /* o que chega fundido de um aparelho com a versao antiga tambem sai limpo */
+      setg('movs', [compra34('q2', { obs: 'veio <i>de fora</i>', pgTipo: 'À vista', nParc: 0, venc1: '' })]);
+      A('gravaTudoLocal')();
+      t('41c: gravaTudoLocal() (as duas portas da fusao com a nuvem) limpa o que veio do outro aparelho, na memoria e no armazenamento',
+        M()[0].obs === 'veio ‹i›de fora‹/i›' && !/[<>]/.test(guardado41()), S34([M()[0].obs, /[<>]/.test(guardado41())]));
+    } finally { Object.keys(orig).forEach(n => setg(n, orig[n])); }
+  });
+
+  await bloco41('d', () => {
+    const ev = (tag, type, value, sel) => { const alvo = { tagName: tag, type, value, selectionStart: sel, _sel: null, setSelectionRange(p, q) { this._sel = [p, q]; } }; return { target: alvo }; };
+    const LC = A('limpaCampoAoDigitar');
+    const e1 = ev('INPUT', 'text', 'a<b>c', 3); LC(e1);
+    t('41d: digitando/colando num campo de texto: o "<" e o ">" saem na hora e o cursor fica onde estava', e1.target.value === 'a‹b›c' && S34(e1.target._sel) === '[3,3]', S34([e1.target.value, e1.target._sel]));
+    const e2 = ev('TEXTAREA', undefined, 'x<y', 1); LC(e2); const e3 = ev('INPUT', 'search', 'q>', 2); LC(e3); const e4 = ev('INPUT', '', 'z<', 1); LC(e4);
+    t('41d: textarea, busca e campo sem tipo tambem', e2.target.value === 'x‹y' && e3.target.value === 'q›' && e4.target.value === 'z‹', S34([e2.target.value, e3.target.value, e4.target.value]));
+    const e5 = ev('INPUT', 'number', '5<', 1); LC(e5); const e6 = ev('INPUT', 'date', '2026-10-03', 1); LC(e6); LC({ target: {} }); LC({}); LC(null);
+    t('41d: campo numerico e de data nao sao tocados, e evento sem alvo nao quebra', e5.target.value === '5<' && e6.target.value === '2026-10-03', S34([e5.target.value, e6.target.value]));
+    t('41d: a limpeza esta LIGADA no documento, em fase de captura (um listener que ninguem registrou limpava so no teste)', /document\.addEventListener\('input',\s*limpaCampoAoDigitar,\s*true\)/.test(src), (src.match(/.{0,40}limpaCampoAoDigitar.{0,40}/g) || []).join(' | '));
+  });
+
+  await bloco41('e', () => {
+    congela(2026, 10, 3, 10, 0); capturas38();
+    M().push(compra34('r1', { cat: 'ETB', colecao: '151', obs: '<img src=x onerror=alert(1)>', pgTipo: 'À vista', nParc: 0, venc1: '' }));
+    const h0 = telaCons38('itens', null);                                                  /* ANTES de gravar: o texto cru chega ao HTML (a exposicao que a medicao achou) */
+    A('save')();
+    const h1 = telaCons38('itens', null);
+    t('41e: sem a limpeza a tag digitada chega CRUA ao HTML da Consulta (prova de que o teste enxerga o defeito)', h0.indexOf('<img src=x onerror') >= 0, h0.slice(Math.max(0, h0.indexOf('onerror') - 30), h0.indexOf('onerror') + 40));
+    t('41e: depois de gravar, a Consulta mostra o texto limpo e nenhuma tag injetada', h1.indexOf('<img src=x') < 0 && h1.indexOf('‹img src=x onerror=alert(1)›') >= 0, h1.slice(Math.max(0, h1.indexOf('img src=x') - 30), h1.indexOf('img src=x') + 60));
+  });
+
+  await bloco41('f', () => {
+    congela(2026, 10, 3, 10, 0); capturas38();
+    M().push(compra34('cq', { cat: 'Single/Carta', codigo: 'A"B', pgTipo: 'À vista', nParc: 0, venc1: '' }));
+    M().push({ id: 'vq', tipo: 'VENDA', data: '2026-10-01', valor: 50, cat: 'Single/Carta', codigo: 'C"D', contraparte: 'Cli', qtd: 1, canal: 'Pix', semOrigem: 'historico' });
+    setg('tipoSel', 'COMPRA'); setg('editId', 'cq'); setg('compraModo', 'item'); const hc = A('vLancar')();
+    setg('tipoSel', 'VENDA'); setg('editId', 'vq'); setg('vendaModo', 'item'); const hv = A('vLancar')();
+    t('41f: editar uma COMPRA com aspas no codigo: o atributo value sai escapado (value="A&quot;B") e nao cortado em value="A" — antes o campo mostrava "A" e salvar de novo gravava so isso',
+      hc.indexOf('value="A&quot;B"') > 0 && hc.indexOf('value="A"B"') < 0, hc.slice(hc.indexOf('id="f_cod"'), hc.indexOf('id="f_cod"') + 120));
+    t('41f: o mesmo na VENDA avulsa (o segundo campo de codigo do arquivo)', hv.indexOf('value="C&quot;D"') > 0 && hv.indexOf('value="C"D"') < 0, hv.slice(hv.indexOf('id="f_cod"'), hv.indexOf('id="f_cod"') + 120));
+  });
+
+  await bloco41('g', () => {
+    const orig = { cats: g('cats'), pess: g('pess'), colsJ: g('colsJ') };
+    try {
+      capturas38();
+      setg('cats', ['Cat<1>', 'Cat‹1›', 'Outra']); setg('pess', ['Forn <x>', 'Forn ‹x›', 'Forn ‹x›']); setg('colsJ', { 'Pokémon': ['C<d>', 'C‹d›', 'Beta'], 'Yu-Gi-Oh': ['Z'] });
+      A('saveL')();
+      t('41g: duas grafias que viram a MESMA depois da limpeza ("Cat<1>" e "Cat‹1›") nao ficam duplicadas — nas listas de nome e nas colecoes por jogo, no lugar e mantendo a ordem',
+        S34(g('cats')) === S34(['Cat‹1›', 'Outra']) && S34(g('pess')) === S34(['Forn ‹x›']) && S34(g('colsJ')['Pokémon']) === S34(['C‹d›', 'Beta']) && S34(g('colsJ')['Yu-Gi-Oh']) === S34(['Z']), S34([g('cats'), g('pess'), g('colsJ')]));
+      setg('cats', Object.defineProperty(['a'], '0', { get() { throw new Error('boom'); }, enumerable: true }));
+      let lancou = false; try { A('limpaEstado')(); } catch (e) { lancou = true; }
+      t('41g: limpaEstado NUNCA lanca (roda no comeco de save/saveL, o funil que tambem manda pra nuvem): estrutura quebrada nao trava o salvamento', !lancou, 'lancou: ' + lancou);
+    } finally { Object.keys(orig).forEach(n => setg(n, orig[n])); }
+  });
+
+  /* ---- 41h: a chave do tumulo por jogo (sessao da sincronizacao, secao 39) e CANONICA: calculada sobre o nome JA limpo ---- */
+  await bloco41('h', () => {
+    const K = A('chaveColJ'), N = A('nomeSeguro');
+    t('41h: a chave do tumulo por jogo e CANONICA: "A<b" e "A‹b" (o nome antes e depois da limpeza de texto) dao a MESMA chave — quem limpou primeiro nao importa, o tumulo e a marca de presenca nao ficam orfaos',
+      K('Pokémon', 'A<b') === K('Pokémon', 'A‹b') && K('Pok<mon', 'x') === K('Pok‹mon', 'x') && K('Pokémon', 'A>b') === K('Pokémon', 'A›b'), S34([K('Pokémon', 'A<b'), K('Pokémon', 'A‹b')]));
+    t('41h: o formato combinado nao mudou para nome sem "<" nem ">" (a secao 39 fixa o formato; aqui o controle de que a limpeza nao mexe no que ja era limpo)',
+      K('Pokémon', 'Mega Gard/Lucario') === 'colj:Pok%C3%A9mon:Mega%20Gard%2FLucario', K('Pokémon', 'Mega Gard/Lucario'));
+    let lancou = false, r;
+    try { r = [N('a<b' + String.fromCharCode(55357)), N(String.fromCharCode(56832) + '>'), N(null), N(undefined), N(5)]; } catch (e) { lancou = true; }
+    t('41h: com "<" e ">" misturados a texto malformado (metade de emoji solta), nulo, indefinido e numero, a chave NUNCA lanca (ela roda DENTRO da fusao: um throw travaria o salvamento dos dois aparelhos)',
+      !lancou && !!r && r.every(x => typeof x === 'string'), 'lancou: ' + lancou + ' | ' + S34(r));
+  });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
      A regra do dinheiro e escrita aqui DE NOVO, em cima da DESCRICAO das compras (valor, plano, marcas, conta) e sem chamar nenhuma tela do app:
@@ -6702,7 +6831,512 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     }
   } finally { ctx.confirm = R15.confirm; ctx.document.getElementById = R15.geb; setg('render', R15.render); setg('toast', R15.toast); setg('diarioReg', R15.diarioReg); setg('contasBanc', R15.contas); }
   t('35: I15 — em ' + casos15 + ' compras divididas em pedacos vendidos (' + comRepasse15 + ' apagando so o que nao vendeu, o que reparte o pagamento entre as compras que sobram), apagar pedaco nunca muda o total PAGO da compra (a soma das marcas), ao centavo', ruins15.length === 0, S35(ruins15.slice(0, 3)) + ' | ruins: ' + ruins15.length);
-}).catch(e=>{fail++;console.log('  FALHOU  secao 35 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
+}).catch(e=>{fail++;console.log('  FALHOU  secao 35 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
+  /* ===== 39. COLEÇÃO EXCLUÍDA (VAZIA) NÃO RESSUSCITA PELA FUSÃO ENTRE APARELHOS — TÚMULO POR JOGO (03/10/2026) =====
+     Achado do revisor confere-no-disco (22/09): `excluirCol` gravava o túmulo só com o NOME ('cols:'+nome) e mergeColsJ/mergeColsG uniam as
+     listas por jogo (colsJ = coleções de cada jogo; colsG = grupo/ano de cada uma) sem olhar túmulo nenhum: o aparelho velho, que ainda
+     tinha a coleção, a devolvia pra nuvem e ela voltava no outro. O caso aqui é dirigido pelo caminho real: DOIS aparelhos (o app inteiro
+     carregado duas vezes, com disco e tela próprios) ligados à MESMA nuvem de mentira, o gesto de excluir pela função que o botão chama e
+     a fusão pelas duas portas que fundem (salvarNuvem e aplicarNuvem). Controle negativo: a coleção de MESMO NOME em outro jogo não pode
+     ser tocada. Os cenários de comportamento NÃO usam os nomes novos do conserto — assim ficam vermelhos no código antigo pela razão certa;
+     o formato da chave é escrito aqui de propósito (`chave`), porque o teste não pode ler o contrato do código que ele vigia. */
+  console.log('');
+  console.log('=== 39. coleção excluída (vazia) não ressuscita pela fusão entre aparelhos — túmulo POR JOGO ===');
+  const J = 'Pokémon', J2 = 'Yu-Gi-Oh';
+  const clona = o => JSON.parse(JSON.stringify(o));
+  const tem = (L, x) => Array.isArray(L) && L.includes(x);
+  const chave = (j, c) => 'colj:' + encodeURIComponent(j) + ':' + encodeURIComponent(c);
+  const temFn = n => { try { return typeof A(n) === 'function'; } catch (e) { return false; } };
+  /* a nuvem: UM documento, copiado na ida e na volta como o Firestore faz (nenhuma referência compartilhada entre os aparelhos) */
+  const NUV = { doc: null };
+  const db39 = {
+    collection() { return { doc() { return {}; } }; },
+    runTransaction(fn) {
+      const tx = { get() { return Promise.resolve({ exists: !!NUV.doc, data: () => clona(NUV.doc) }); },
+                   set(ref, p) { NUV.doc = clona(p); } };
+      return fn(tx);
+    }
+  };
+  /* um aparelho: o app inteiro carregado de novo, com disco próprio e tela de mentira própria, ligado à nuvem de cima */
+  function aparelho(rotulo, disco, compartilhado) {
+    /* `disco`: reabrir um aparelho que já existia (o disco dele é o que ficou); `compartilhado`: DUAS ABAS do mesmo navegador usam o MESMO disco (o objeto, não uma cópia) */
+    const st = compartilhado ? disco : Object.assign({ tcg_seed_v1: '1' }, disco || {});
+    const c2 = Object.assign({}, ctx);
+    c2.localStorage = { getItem: k => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: k => { delete st[k]; }, clear() { for (const k in st) delete st[k]; } };
+    c2.document = Object.assign({}, ctx.document, { getElementById: () => elStub() });
+    c2.window = c2; c2.globalThis = c2; c2.self = c2;
+    c2.alert = () => {}; c2.confirm = () => true; c2.prompt = (q, d) => d;
+    vm.createContext(c2);
+    vm.runInContext(src, c2, { filename: 'aparelho39-' + rotulo + '.js' });
+    const ap = {
+      rotulo, ctx: c2, st,
+      g: n => vm.runInContext(n, c2),
+      set: (n, v) => { c2.__tmp = v; vm.runInContext(n + ' = __tmp;', c2); },
+      chama: (f, ...args) => { c2.__args = args; return vm.runInContext(f + '(...__args)', c2); },
+    };
+    ['render', 'toast', 'diarioReg', 'retomarMovesPendentes', 'go', 'fecharModal', 'abrirCols', 'atualizarColSel'].forEach(f => { try { ap.set(f, () => {}); } catch (e) {} });
+    /* o gesto roda com a nuvem desligada: assim o salvamento automático do saveL (modo nuvem) não corre no meio — quem sobe é `sobe`, de propósito */
+    ap.gesto = (f, ...args) => { ap.set('_syncReady', false); try { return ap.chama(f, ...args); } finally { ap.set('_syncReady', true); } };
+    /* 3 ms de respiro ANTES de salvar: o carimbo do documento (_upd) é Date.now(), e dois salvamentos de aparelhos diferentes no MESMO milissegundo
+       ficam com o mesmo carimbo — o segundo aparelho acharia que ninguém salvou no meio e não fundiria. Na vida real são dois humanos; aqui é tudo
+       em microssegundos, e sem o respiro o cenário "A recria depois de B ter fundido" falhava em ~1 de 3 rodadas (rastro de 03/10, rodadas 1, 2 e 6). */
+    ap.sobe = async () => { await new Promise(r => setTimeout(r, 3)); ap.chama('marcaPendNuvem'); ap.chama('salvarNuvem'); await tick(); await tick(); };
+    /* o que chega pelo onSnapshot: a nuvem de agora (ou um documento fabricado) entrando pela porta de aplicarNuvem */
+    ap.recebe = doc => { c2.__snap = doc ? clona(doc) : clona(NUV.doc); vm.runInContext('aplicarNuvem(__snap)', c2); };
+    ap.carrega = e => {
+      ['movs', 'jogos', 'cats', 'cols', 'colsJ', 'colsG', 'pess', 'pgs', 'despCats', 'cadastros', 'contasBanc', 'codigosResolvidos', 'excluidos'].forEach(k => ap.set(k, clona(e[k])));
+      ap.set('_baseH', {}); ap.set('_pendSeq', 0); ap.set('_pendOk', 0); delete st['tcg_pend_nuvem'];
+      ap.set('_db', db39); ap.set('_syncReady', true); ap.set('_restaurando', false); ap.set('tela', 'painel'); ap.set('editId', null);
+    };
+    return ap;
+  }
+  const movNovo = (id, extra) => Object.assign({ id, tipo: 'COMPRA', data: '2026-10-02', jogo: J, cat: 'ETB', colecao: 'Ninja', qtd: 1, valor: 50, situacao: 'Em estoque', destino: 'Vender', pgTipo: 'À vista', taxa: 0, contraparte: 'Loja X' }, extra || {});
+  const estadoBase = () => ({
+    movs: [Object.assign(movNovo('m1'), { data: '2026-09-01', valor: 100 })],
+    jogos: [J, J2], cats: ['ETB'], cols: ['Ninja', 'VAZIA', '151'],
+    colsJ: { [J]: ['Ninja', 'VAZIA', '151'], [J2]: ['151'] },
+    colsG: { [J]: { VAZIA: '2026', '151': '2023' }, [J2]: { '151': '2024' } },
+    pess: ['Loja X'], pgs: ['Pix'], despCats: [], cadastros: [], contasBanc: [], codigosResolvidos: {}, excluidos: {} });
+  const docRemoto = extra => Object.assign({ movs: [], jogos: [J, J2], cats: [], cols: [], colsJ: {}, colsG: {}, pess: [], pgs: [], despCats: [], cadastros: [], contasBanc: [], codigosResolvidos: {}, excluidos: {} }, extra || {});
+  /* a nuvem já tem o estado base (carimbo 100) e os dois aparelhos o têm; B vai ficar velho depois que A salvar */
+  function cenario(e0) {
+    const e = e0 || estadoBase();
+    NUV.doc = Object.assign(clona(e), { _upd: 100 });
+    const apA = aparelho('A'), apB = aparelho('B');
+    [apA, apB].forEach(x => { x.carrega(e); x.set('_ultimoUpdAplicado', 100); });
+    return { apA, apB };
+  }
+  const forma = o => JSON.stringify(o).slice(0, 260);
+
+  /* --- 39a-d: o caso concreto do achado — A exclui a coleção vazia, B (velho, ainda com ela) salva --- */
+  {
+    const { apA, apB } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    const exA = apA.g('excluidos');
+    t('39a: excluir a coleção grava o túmulo POR JOGO — e o antigo, que aparelho ainda não atualizado espera', +exA[chave(J, 'VAZIA')] > 0 && +exA['cols:VAZIA'] > 0, forma(exA));
+    t('39a: ...e ela saiu das listas deste aparelho: a coleção em colsJ e o grupo/ano dela em colsG', !tem(apA.g('colsJ')[J], 'VAZIA') && !('VAZIA' in apA.g('colsG')[J]), forma([apA.g('colsJ'), apA.g('colsG')]));
+    await apA.sobe();
+    t('39b: o que A subiu pra nuvem não tem a coleção (nem o grupo/ano dela) e leva o túmulo junto', !tem(NUV.doc.colsJ[J], 'VAZIA') && !('VAZIA' in NUV.doc.colsG[J]) && +NUV.doc.excluidos[chave(J, 'VAZIA')] > 0, forma([NUV.doc.colsJ, NUV.doc.colsG, NUV.doc.excluidos]));
+    /* B ficou pra trás: ainda tem a coleção, cria uma NOVA com grupo/ano e lança uma compra — o que um aparelho velho faz na vida real */
+    apB.g('movs').push(movNovo('m2'));
+    apB.g('colsJ')[J].push('NOVA'); apB.g('colsG')[J].NOVA = '2027';
+    await apB.sobe();
+    t('39c (O BUG): depois da fusão do aparelho VELHO a nuvem NÃO trouxe a coleção excluída de volta (nem o grupo/ano dela)', !tem(NUV.doc.colsJ[J], 'VAZIA') && !('VAZIA' in NUV.doc.colsG[J]), forma([NUV.doc.colsJ, NUV.doc.colsG]));
+    t('39c: ...o aparelho velho também a perdeu (a cópia dele foi refundida com o túmulo)', !tem(apB.g('colsJ')[J], 'VAZIA') && !('VAZIA' in apB.g('colsG')[J]), forma([apB.g('colsJ'), apB.g('colsG')]));
+    t('39c: ...e a fusão não comeu nada legítimo: Ninja, 151 e a coleção NOVA (com o grupo/ano de cada uma) seguem na nuvem e no aparelho velho',
+      ['Ninja', '151', 'NOVA'].every(c => tem(NUV.doc.colsJ[J], c) && tem(apB.g('colsJ')[J], c)) && NUV.doc.colsG[J]['151'] === '2023' && NUV.doc.colsG[J].NOVA === '2027' && tem(NUV.doc.colsJ[J2], '151') && NUV.doc.colsG[J2]['151'] === '2024',
+      forma([NUV.doc.colsJ, NUV.doc.colsG]));
+    t('39c: ...e o lançamento do aparelho velho entrou junto', NUV.doc.movs.some(m => m.id === 'm2') && NUV.doc.movs.some(m => m.id === 'm1'), forma(NUV.doc.movs.map(m => m.id)));
+    apA.recebe();
+    t('39d: A recebe o que B subiu e continua sem a coleção excluída (e com a NOVA)', !tem(apA.g('colsJ')[J], 'VAZIA') && !('VAZIA' in apA.g('colsG')[J]) && tem(apA.g('colsJ')[J], 'NOVA'), forma([apA.g('colsJ'), apA.g('colsG')]));
+  }
+
+  /* --- 39e: CONTROLE NEGATIVO — a coleção de mesmo nome em OUTRO jogo não pode ser tocada --- */
+  {
+    const { apA, apB } = cenario();
+    apA.gesto('excluirCol', J2, '151');
+    await apA.sobe();
+    apB.g('movs').push(movNovo('m2'));
+    await apB.sobe();
+    t('39e (controle negativo): excluir "151" no Yu-Gi-Oh NÃO leva o "151" do Pokémon — ele segue em colsJ, com o grupo/ano, na nuvem e no aparelho velho',
+      tem(NUV.doc.colsJ[J], '151') && NUV.doc.colsG[J]['151'] === '2023' && tem(apB.g('colsJ')[J], '151') && apB.g('colsG')[J]['151'] === '2023', forma([NUV.doc.colsJ, NUV.doc.colsG]));
+    t('39e: ...e no Yu-Gi-Oh a exclusão pegou (a coleção e o grupo/ano dela)', !tem(NUV.doc.colsJ[J2], '151') && !('151' in (NUV.doc.colsG[J2] || {})) && !tem(apB.g('colsJ')[J2], '151'), forma([NUV.doc.colsJ, NUV.doc.colsG]));
+  }
+
+  /* --- 39f: a PORTA PRINCIPAL do aplicarNuvem (sem pendência) troca colsJ/colsG pelo snapshot: o túmulo DESTE aparelho manda --- */
+  {
+    const { apA } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    await apA.sobe();
+    /* um aparelho que ainda não atualizou grava colsJ/colsG sem olhar túmulo: o documento dele traz a coleção de volta (e o túmulo, que ele só repassa) */
+    const doVelho = clona(NUV.doc); doVelho._upd = 555;
+    doVelho.colsJ[J].push('VAZIA'); doVelho.colsG[J].VAZIA = '2026';
+    apA.recebe(doVelho);
+    t('39f (PORTA PRINCIPAL): o snapshot de um aparelho que não filtra não traz de volta a coleção que ESTE aparelho excluiu', !tem(apA.g('colsJ')[J], 'VAZIA') && !('VAZIA' in apA.g('colsG')[J]), forma([apA.g('colsJ'), apA.g('colsG')]));
+    t('39f: ...e o resto do snapshot entrou normalmente (Ninja e 151 seguem, com o grupo/ano)', tem(apA.g('colsJ')[J], 'Ninja') && tem(apA.g('colsJ')[J], '151') && apA.g('colsG')[J]['151'] === '2023', forma(apA.g('colsJ')));
+  }
+
+  /* --- 39g: a PORTA DA PENDÊNCIA (lançou sem sinal, o snapshot chega e o aparelho FUNDE; o remoto vence o empate) --- */
+  {
+    const { apA, apB } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    await apA.sobe();
+    apB.set('_syncReady', false);   /* sem sinal: o lançamento fica só aqui, pendente */
+    apB.g('movs').push(movNovo('m3'));
+    apB.chama('marcaPendNuvem');
+    apB.recebe();
+    t('39g (porta da PENDÊNCIA): o aparelho que lançou sem sinal e ainda tinha a coleção não a devolve ao fundir com o snapshot — e o lançamento dele fica',
+      !tem(apB.g('colsJ')[J], 'VAZIA') && !('VAZIA' in apB.g('colsG')[J]) && apB.g('movs').some(m => m.id === 'm3'), forma([apB.g('colsJ'), apB.g('colsG')]));
+    t('39g: ...e a fusão não comeu o que é legítimo: Ninja e 151 (com o grupo/ano) seguem, nos dois jogos', tem(apB.g('colsJ')[J], 'Ninja') && tem(apB.g('colsJ')[J], '151') && apB.g('colsG')[J]['151'] === '2023' && tem(apB.g('colsJ')[J2], '151') && apB.g('colsG')[J2]['151'] === '2024', forma([apB.g('colsJ'), apB.g('colsG')]));
+  }
+
+  /* --- 39h e 39i: uso vence túmulo; e o túmulo ANTIGO (só o nome) não filtra as listas por jogo --- */
+  {
+    const { apA } = cenario();
+    apA.set('excluidos', { [chave(J, 'Ninja')]: Date.now(), [chave(J, 'VAZIA')]: Date.now() });
+    let lanca = null, f = null;
+    try { f = apA.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: ['Ninja', 'VAZIA'] }, colsG: { [J]: { Ninja: '2025', VAZIA: '2026' } } })); } catch (e) { lanca = e; }
+    t('39h: coleção que um lançamento USA nunca é filtrada, mesmo com túmulo (só se exclui coleção vazia — uso vence túmulo)', lanca === null && tem(f.colsJ[J], 'Ninja') && f.colsG[J].Ninja === '2025', String(lanca) + ' ' + forma(f));
+    t('39h: ...e a vazia com túmulo segue filtrada (controle: o filtro não ficou frouxo)', lanca === null && !tem(f.colsJ[J], 'VAZIA') && !('VAZIA' in f.colsG[J]), forma(f));
+    t('39h: ...e o uso REAVIVOU a coleção usada: marca de presença (negativa) no mapa fundido, que viaja — enquanto a vazia segue com o túmulo positivo', lanca === null && +f.excluidos[chave(J, 'Ninja')] < 0 && +f.excluidos[chave(J, 'VAZIA')] > 0, forma(f.excluidos));
+    let lanca2 = null; try { apA.chama('fundirComRemoto', { movs: [] }); } catch (e) { lanca2 = e; }
+    t('39h: documento remoto de aparelho antigo, sem colsJ/colsG nenhum, funde sem quebrar', lanca2 === null, String(lanca2));
+  }
+  {
+    const { apA } = cenario();
+    apA.set('excluidos', { 'cols:VAZIA': Date.now() });   /* o túmulo ANTIGO, o único que existia até hoje: tem o nome e não tem o jogo */
+    const f = apA.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: ['Ninja', 'VAZIA'], [J2]: ['VAZIA'] }, colsG: { [J]: { VAZIA: '2026' }, [J2]: { VAZIA: '2024' } }, cols: ['VAZIA'] }));
+    t('39i: o túmulo ANTIGO (só o nome) não filtra as listas por jogo — o nome sozinho mataria a coleção de mesmo nome de OUTRO jogo', tem(f.colsJ[J], 'VAZIA') && tem(f.colsJ[J2], 'VAZIA') && f.colsG[J].VAZIA === '2026' && f.colsG[J2].VAZIA === '2024', forma([f.colsJ, f.colsG]));
+    t('39i: ...e a lista global de nomes segue filtrada por ele, como sempre foi (compatibilidade)', !tem(f.cols, 'VAZIA'), forma(f.cols));
+  }
+
+  /* --- 39j: recriar a coleção excluída — pelas TRÊS portas que criam coleção — desfaz o túmulo, que senão a mataria na fusão seguinte --- */
+  const portas39 = [
+    ['addColModal (Organizar coleções → adicionar)', ap => { ap.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = 'VAZIA'; return e; }; ap.gesto('addColModal', J); }],
+    ['novo() (➕ adicionar novo… no formulário)', ap => { ap.ctx.prompt = () => 'VAZIA'; ap.ctx.document.getElementById = id => { const e = elStub(); if (id === 'f_jogo') e.value = J; return e; };
+      const el = { value: '__add__', insertBefore() {}, querySelector() { return null; } }; ap.gesto('novo', el, 'col'); }],
+    ['renomearCol (outra coleção renomeada para esse nome)', ap => { ap.ctx.prompt = () => 'VAZIA'; ap.gesto('renomearCol', J, 'OUTRA'); }],
+  ];
+  for (const [nome, recria] of portas39) {
+    for (const viu of [false, true]) {
+      const { apA, apB } = cenario();
+      apA.g('colsJ')[J].push('OUTRA');   /* só a porta de renomear usa */
+      apA.gesto('excluirCol', J, 'VAZIA');
+      await apA.sobe();
+      if (viu) { apB.g('movs').push(movNovo('m2')); await apB.sobe(); }   /* B já viu o túmulo positivo antes da recriação */
+      recria(apA);
+      t('39j: recriar "VAZIA" por ' + nome + ' — o túmulo (o por jogo E o antigo) vira marca negativa (restaurado), que viaja', +apA.g('excluidos')[chave(J, 'VAZIA')] < 0 && +apA.g('excluidos')['cols:VAZIA'] < 0 && tem(apA.g('colsJ')[J], 'VAZIA'), forma(apA.g('excluidos')));
+      await apA.sobe();
+      apB.g('movs').push(movNovo('m3'));
+      await apB.sobe();
+      t('39j: ...e a coleção recriada sobrevive à fusão com o aparelho velho (' + (viu ? 'que tinha visto a exclusão' : 'que nunca viu a exclusão') + '), na nuvem e nele',
+        tem(NUV.doc.colsJ[J], 'VAZIA') && tem(apB.g('colsJ')[J], 'VAZIA'), forma([NUV.doc.colsJ, apB.g('colsJ')]));
+    }
+  }
+
+  /* --- 39k: restaurar um ponto traz a coleção de volta (e é POR ISSO que restaurar precisa desfazer o túmulo) --- */
+  {
+    const ponto = () => ({ movs: clona(estadoBase().movs), jogos: [J, J2], cats: ['ETB'], cols: ['Ninja', 'VAZIA', '151'], colsJ: { [J]: ['Ninja', 'VAZIA', '151'], [J2]: ['151'] },
+      colsG: { [J]: { VAZIA: '2026', '151': '2023' }, [J2]: { '151': '2024' } }, pess: [], pgs: [], despCats: [], cadastros: [], contasBanc: [], codigosResolvidos: {} });
+    const a1 = cenario().apA;
+    a1.gesto('excluirCol', J, 'VAZIA');
+    const o = ponto();
+    a1.chama('esqueceExclusaoDe', o);   /* o que restaurarPontoNuvem faz ANTES de aplicar: o ponto é uma decisão de trazer de volta */
+    a1.recebe(o);
+    t('39k: o ponto restaurado traz de volta a coleção excluída e o grupo/ano dela — o restaurar desfez o túmulo por jogo', tem(a1.g('colsJ')[J], 'VAZIA') && a1.g('colsG')[J].VAZIA === '2026' && +a1.g('excluidos')[chave(J, 'VAZIA')] < 0, forma([a1.g('colsJ'), a1.g('excluidos')]));
+    const a2 = cenario().apA;
+    a2.gesto('excluirCol', J, 'VAZIA');
+    a2.recebe(ponto());   /* o MESMO ponto, sem desfazer o túmulo: o túmulo deste aparelho manda — é o que prova que o passo de cima é necessário */
+    t('39k (controle): sem desfazer o túmulo, o mesmo ponto NÃO traz a coleção — o túmulo deste aparelho manda', !tem(a2.g('colsJ')[J], 'VAZIA'), forma(a2.g('colsJ')));
+  }
+
+  /* --- 39l: importar um backup que traz a coleção excluída é um "quero isto de volta" — ela fica, e sobrevive à próxima fusão --- */
+  {
+    const { apA } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    let inp = null;
+    apA.ctx.document.createElement = () => { inp = elStub(); inp.click = () => {}; return inp; };
+    apA.ctx.FileReader = function () { const o = {}; o.readAsText = f => { o.result = f.txt; o.onload(); }; return o; };
+    apA.chama('importarBackup');
+    const arq = { v: 2, movs: clona(estadoBase().movs), jogos: [J, J2], cats: ['ETB'], cols: ['Ninja', 'VAZIA'], colsJ: { [J]: ['Ninja', 'VAZIA'] }, colsG: { [J]: { VAZIA: '2026' } }, pess: [], pgs: [], despCats: [] };
+    inp.files = [{ txt: JSON.stringify(arq) }];
+    apA.set('_syncReady', false); inp.onchange(); apA.set('_syncReady', true);
+    t('39l: importar o backup traz a coleção de volta (colsJ e grupo/ano) e desfaz o túmulo dela', tem(apA.g('colsJ')[J], 'VAZIA') && apA.g('colsG')[J].VAZIA === '2026' && +apA.g('excluidos')[chave(J, 'VAZIA')] < 0, forma([apA.g('colsJ'), apA.g('excluidos')]));
+    const f = apA.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: ['VAZIA'] } }));
+    t('39l: ...e ela sobrevive à próxima fusão (o túmulo foi desfeito, não só ignorado uma vez)', tem(f.colsJ[J], 'VAZIA'), forma(f.colsJ));
+  }
+
+  /* --- 39n: "apaguei o ÚLTIMO lançamento e depois a coleção que ficou vazia" — o aparelho velho ainda tem o lançamento apagado, e ele NÃO pode manter a coleção
+         viva (a conta de "em uso" sai dos lançamentos JÁ fundidos, depois dos túmulos, e não da lista crua do aparelho velho) --- */
+  {
+    const e = estadoBase();
+    e.movs.push(Object.assign(movNovo('m9'), { colecao: 'SO9' }));   /* 'SO9' tem exatamente 1 lançamento */
+    e.colsJ[J].push('SO9'); e.cols.push('SO9');
+    NUV.doc = Object.assign(clona(e), { _upd: 100 });
+    const apA = aparelho('A'), apB = aparelho('B');
+    [apA, apB].forEach(x => { x.carrega(e); x.set('_ultimoUpdAplicado', 100); });
+    apA.set('lixeiraGuarda', () => {});   /* a lixeira grava em IndexedDB/Firestore; não é o que se prova aqui */
+    apA.gesto('execExcl', 'm9', 'so');
+    const apagouLanc = !apA.g('movs').some(m => m.id === 'm9') && +apA.g('excluidos').m9 > 0;
+    apA.gesto('excluirCol', J, 'SO9');
+    t('39n: (cenário) A apagou o lançamento e depois a coleção que ficou vazia — pelos gestos reais', apagouLanc && !tem(apA.g('colsJ')[J], 'SO9') && +apA.g('excluidos')[chave(J, 'SO9')] > 0, forma([apA.g('colsJ'), apA.g('excluidos')]));
+    await apA.sobe();
+    apB.g('movs').push(movNovo('m10'));   /* o aparelho velho ainda tem m9 (que A apagou) e a coleção SO9 */
+    await apB.sobe();
+    t('39n: depois da fusão do aparelho velho, nem o lançamento apagado nem a coleção que ficou vazia voltam (a coleção não conta como "em uso" por um lançamento já apagado)',
+      !NUV.doc.movs.some(m => m.id === 'm9') && !tem(NUV.doc.colsJ[J], 'SO9') && !tem(apB.g('colsJ')[J], 'SO9'), forma([NUV.doc.movs.map(m => m.id), NUV.doc.colsJ]));
+    /* a PORTA PRINCIPAL também: um snapshot de aparelho que não filtra traz de volta o lançamento apagado E a coleção; o lançamento apagado não conta como uso */
+    const doVelho = clona(NUV.doc); doVelho._upd = 777;
+    doVelho.movs.push(movNovo('m9', { colecao: 'SO9' })); doVelho.colsJ[J].push('SO9');
+    apA.recebe(doVelho);
+    t('39n: ...e pela PORTA PRINCIPAL também — o snapshot que traz de volta o lançamento apagado e a coleção não reaviva a coleção (lançamento apagado não conta como uso)',
+      !apA.g('movs').some(m => m.id === 'm9') && !tem(apA.g('colsJ')[J], 'SO9'), forma([apA.g('movs').map(m => m.id), apA.g('colsJ')]));
+  }
+
+  /* --- 39o: "uso vence túmulo" na PORTA PRINCIPAL — um lançamento DENTRO da coleção que este aparelho excluiu a mantém (senão o lançamento fica com coleção
+         fora da lista, e o seletor de edição não a marca: salvar a edição zera o campo) --- */
+  {
+    const { apA, apB } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    await apA.sobe();
+    apB.g('movs').push(movNovo('m7', { colecao: 'VAZIA' }));   /* o aparelho velho lança numa coleção que A acabou de excluir */
+    await apB.sobe();
+    apA.recebe();
+    const opts = apA.chama('selColOpts', J, 'VAZIA');
+    t('39o (uso vence túmulo, fluxo real entre aparelhos atualizados): A recebe a nuvem com um lançamento DENTRO da coleção que excluiu — a coleção fica na lista, o seletor de edição do lançamento a marca, e o uso gravou a marca de presença (reavivou)',
+      apA.g('movs').some(m => m.id === 'm7' && m.colecao === 'VAZIA') && tem(apA.g('colsJ')[J], 'VAZIA') && /selected>VAZIA/.test(opts) && +NUV.doc.excluidos[chave(J, 'VAZIA')] < 0, forma([apA.g('colsJ'), opts.slice(0, 160), NUV.doc.excluidos]));
+  }
+  {
+    /* e o snapshot de um aparelho ANTIGO, que não grava a marca de presença: a regra "uso vence túmulo" da porta principal tem de segurar sozinha */
+    const { apA } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    await apA.sobe();
+    const doAntigo = clona(NUV.doc); doAntigo._upd = 555;
+    doAntigo.colsJ[J].push('VAZIA'); doAntigo.colsG[J].VAZIA = '2026'; doAntigo.movs.push(movNovo('m7', { colecao: 'VAZIA' }));
+    apA.recebe(doAntigo);
+    const opts = apA.chama('selColOpts', J, 'VAZIA');
+    t('39o (PORTA PRINCIPAL, snapshot de aparelho antigo sem a marca): o lançamento DENTRO da coleção excluída a mantém na lista, com o grupo/ano, o seletor de edição a marca, e o uso gravou a marca de presença (reavivou) neste aparelho',
+      apA.g('movs').some(m => m.id === 'm7') && tem(apA.g('colsJ')[J], 'VAZIA') && apA.g('colsG')[J].VAZIA === '2026' && /selected>VAZIA/.test(opts) && +apA.g('excluidos')[chave(J, 'VAZIA')] < 0, forma([apA.g('colsJ'), opts.slice(0, 160), apA.g('excluidos')]));
+  }
+
+  /* --- 39p e 39q: "em uso" é por (jogo, coleção), e lançamento antigo sem o campo jogo vale Pokémon --- */
+  {
+    const e = estadoBase();
+    e.movs.push(movNovo('m5', { colecao: '151' }));   /* o "151" do POKÉMON tem lançamento; o do Yu-Gi-Oh está vazio */
+    const { apA, apB } = cenario(e);
+    apA.gesto('excluirCol', J2, '151');
+    await apA.sobe();
+    apB.g('movs').push(movNovo('m6'));
+    await apB.sobe();
+    t('39p: "em uso" é por (jogo, coleção) — o lançamento do "151" do Pokémon NÃO segura o "151" vazio do Yu-Gi-Oh: a exclusão do Yu-Gi-Oh vale na nuvem e no aparelho velho, e o do Pokémon fica',
+      !tem(NUV.doc.colsJ[J2], '151') && !tem(apB.g('colsJ')[J2], '151') && tem(NUV.doc.colsJ[J], '151'), forma([NUV.doc.colsJ]));
+  }
+  {
+    const e = estadoBase();
+    const antigo = movNovo('m4', { colecao: 'LEG' }); delete antigo.jogo;   /* lançamento de antes de existir o campo jogo */
+    e.movs.push(antigo); e.colsJ[J].push('LEG');
+    const { apA } = cenario(e);
+    apA.set('excluidos', { [chave(J, 'LEG')]: Date.now() });
+    const f = apA.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: ['LEG'] } }));
+    t('39q: lançamento antigo SEM o campo jogo conta como Pokémon — a coleção dele não é filtrada, mesmo com túmulo', tem(f.colsJ[J], 'LEG'), forma(f.colsJ));
+  }
+  {
+    /* nome que veio como NÚMERO (backup editado à mão, planilha): o lançamento diz "151" (texto), a lista tem 151 (número) — é a mesma coleção */
+    const e = estadoBase();
+    e.movs.push(movNovo('m5', { colecao: '151' }));
+    e.colsJ[J] = e.colsJ[J].filter(c => c !== '151');   /* a lista local NÃO tem o "151" em texto: o número que vem do outro lado é o único a acionar a regra */
+    const { apA } = cenario(e);
+    apA.set('excluidos', { [chave(J, '151')]: Date.now() });
+    const f = apA.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: [151] } }));
+    t('39q: o nome que veio como número e o texto do lançamento são a mesma coleção — ela conta como em uso e não é filtrada', f.colsJ[J].some(c => c === 151), forma(f.colsJ));
+  }
+
+  /* --- 39r: criar é um EVENTO — a coleção que B cria DEPOIS de A a ter excluído (B ainda não tinha visto o túmulo) sobrevive --- */
+  {
+    const { apA, apB } = cenario();
+    apA.set('_syncReady', false);   /* A sem sinal: cria e exclui "TESTE" só no aparelho dele */
+    apA.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = 'TESTE'; return e; };
+    apA.chama('addColModal', J);
+    apA.chama('excluirCol', J, 'TESTE');
+    apA.chama('marcaPendNuvem');
+    await new Promise(r => setTimeout(r, 5));
+    apB.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = 'TESTE'; if (id === 'novaColG') e.value = '2031'; return e; };
+    apB.gesto('addColModal', J);   /* B cria o SEU "TESTE", depois, sem nunca ter visto o túmulo de A */
+    t('39r: criar grava a marca de PRESENÇA mesmo sem túmulo conhecido neste aparelho (negativa, viaja)', +apB.g('excluidos')[chave(J, 'TESTE')] < 0, forma(apB.g('excluidos')));
+    await apB.sobe();
+    apA.set('_syncReady', true);
+    await new Promise(r => setTimeout(r, 3));   /* o recebe() abaixo dispara um salvamento (porta da pendência): outro milissegundo, senão o carimbo _upd pode coincidir com o de B */
+    apA.recebe();   /* A volta a ter sinal: o snapshot chega, A tem pendência — funde */
+    await tick(); await tick();
+    apB.recebe();
+    t('39r: a coleção que B criou DEPOIS da exclusão feita por A sobrevive — na nuvem, em A e em B, com o grupo/ano', tem(NUV.doc.colsJ[J], 'TESTE') && tem(apA.g('colsJ')[J], 'TESTE') && tem(apB.g('colsJ')[J], 'TESTE') && NUV.doc.colsG[J].TESTE === '2031', forma([NUV.doc.colsJ, NUV.doc.colsG]));
+  }
+
+  /* --- 39s: restaurar um ponto na nuvem PELO GESTO REAL (o que importa é a ORDEM: esquecer o túmulo e SÓ DEPOIS aplicar) --- */
+  {
+    const e = estadoBase();
+    e.movs.push(movNovo('m9', { colecao: 'Ninja' }));
+    const ponto = clona(e); delete ponto.excluidos;   /* o ponto guarda os dados, não os túmulos */
+    const { apA } = cenario(e);
+    apA.set('lixeiraGuarda', () => {});
+    apA.gesto('execExcl', 'm9', 'so');       /* depois do ponto, A apagou o lançamento m9... */
+    apA.gesto('excluirCol', J, 'VAZIA');     /* ...e a coleção VAZIA */
+    const antes = [tem(apA.g('colsJ')[J], 'VAZIA'), apA.g('movs').some(m => m.id === 'm9')];
+    apA.set('salvarPontoNuvem', () => Promise.resolve({ ok: true }));
+    apA.set('pontosNuvemRef', () => ({ doc: () => ({ get: () => Promise.resolve({ exists: true, data: () => ({ dados: JSON.stringify(ponto) }) }) }) }));
+    apA.chama('restaurarPontoNuvem', 123);
+    for (let i = 0; i < 6; i++) await tick();
+    t('39s: restaurar um ponto na nuvem (o GESTO real, não os passos à mão) traz de volta a coleção excluída, o grupo/ano dela e o lançamento apagado depois do ponto',
+      !antes[0] && !antes[1] && tem(apA.g('colsJ')[J], 'VAZIA') && apA.g('colsG')[J].VAZIA === '2026' && apA.g('movs').some(m => m.id === 'm9'), forma([antes, apA.g('colsJ'), apA.g('excluidos')]));
+  }
+
+  /* --- 39t: importar um backup que traz um lançamento apagado — ele volta E FICA (antes voltava e sumia na primeira fusão) --- */
+  {
+    const e = estadoBase();
+    e.movs.push(movNovo('m9'));
+    const { apA, apB } = cenario(e);
+    apA.set('lixeiraGuarda', () => {});
+    apA.gesto('execExcl', 'm9', 'so');
+    await apA.sobe();
+    let inp = null;
+    apA.ctx.document.createElement = () => { inp = elStub(); inp.click = () => {}; return inp; };
+    apA.ctx.FileReader = function () { const o = {}; o.readAsText = f => { o.result = f.txt; o.onload(); }; return o; };
+    apA.chama('importarBackup');
+    const arq = Object.assign({ v: 2 }, clona(e)); delete arq.excluidos;
+    inp.files = [{ txt: JSON.stringify(arq) }];
+    apA.set('_syncReady', false); inp.onchange(); apA.set('_syncReady', true);
+    const logo = apA.g('movs').some(m => m.id === 'm9');
+    await apA.sobe();
+    apB.recebe();
+    const bVe = apB.g('movs').some(m => m.id === 'm9');
+    apB.g('movs').push(movNovo('m8')); await apB.sobe();
+    apA.g('movs').push(movNovo('m10')); await apA.sobe();
+    t('39t: importar um backup que traz um lançamento APAGADO traz de volta e ele FICA — logo depois, em B depois de receber, e em A e na nuvem depois das fusões seguintes',
+      logo && bVe && apA.g('movs').some(m => m.id === 'm9') && NUV.doc.movs.some(m => m.id === 'm9') && !(+apA.g('excluidos').m9 > 0), forma([logo, bVe, apA.g('excluidos').m9]));
+  }
+
+  /* --- 39u: "uso vence túmulo" é um EVENTO. O aparelho velho lançou na coleção ANTES de a exclusão chegar (ela fica, enquanto tem lançamento); semanas depois o
+         lançamento sai — apagado OU movido para outra coleção — e a coleção (com o grupo/ano) não pode sumir sozinha dos dois aparelhos, sem aviso --- */
+  for (const como of ['apagado', 'movido']) {
+    const { apA, apB } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    await apA.sobe();
+    apB.g('movs').push(movNovo('mx', { colecao: 'VAZIA' }));
+    await apB.sobe();
+    apA.recebe();
+    const vivaComUso = tem(apA.g('colsJ')[J], 'VAZIA') && tem(NUV.doc.colsJ[J], 'VAZIA');
+    if (como === 'apagado') { apB.set('lixeiraGuarda', () => {}); apB.gesto('execExcl', 'mx', 'so'); }
+    else { apB.g('movs').find(m => m.id === 'mx').colecao = 'Ninja'; apB.chama('marcaPendNuvem'); }
+    await apB.sobe();
+    apA.recebe();
+    apA.g('movs').push(movNovo('my'));
+    await apA.sobe();
+    apB.recebe();
+    t('39u: coleção reaproveitada DEPOIS da exclusão segue existindo, com o grupo/ano, quando o lançamento dela sai (' + como + ') — em A, em B e na nuvem',
+      vivaComUso && tem(apA.g('colsJ')[J], 'VAZIA') && tem(apB.g('colsJ')[J], 'VAZIA') && tem(NUV.doc.colsJ[J], 'VAZIA') && apB.g('colsG')[J].VAZIA === '2026',
+      forma([vivaComUso, apA.g('colsJ')[J], apB.g('colsJ')[J], apB.g('colsG')[J]]));
+  }
+
+  /* --- 39v: a marca de presença é DURÁVEL (vai para o disco) e é mais NOVA que qualquer túmulo que o aparelho conheça, mesmo de relógio adiantado --- */
+  {
+    const { apA } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    apA.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = 'VAZIA'; return e; };
+    apA.gesto('addColModal', J);   /* recria, sem sinal */
+    const reaberto = aparelho('R', apA.st);   /* o mesmo aparelho, fechado e reaberto: o que vale é o disco dele */
+    t('39v: a marca de presença foi gravada no DISCO — criar sem sinal, fechar e reabrir o app não perde a marca', +reaberto.g('excluidos')[chave(J, 'VAZIA')] < 0, forma(reaberto.g('excluidos')));
+  }
+  {
+    const { apA } = cenario();
+    const futuro = Date.now() + 3600000;   /* túmulo carimbado por um aparelho com o relógio ADIANTADO em 1 hora */
+    apA.set('excluidos', { [chave(J, 'VAZIA')]: futuro, 'cols:VAZIA': futuro });
+    apA.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = 'VAZIA'; return e; };
+    apA.gesto('addColModal', J);
+    t('39v: a marca de presença é MAIS NOVA que o túmulo mais recente que o aparelho conhece, mesmo o de um relógio adiantado (carimbo monotônico, não Date.now cru)', -apA.g('excluidos')[chave(J, 'VAZIA')] > futuro, forma(apA.g('excluidos')));
+  }
+
+  /* --- 39w: RENOMEAR é a mesma classe — o nome antigo sai por TÚMULO e não por ausência: o aparelho que reconecta não o devolve vazio, com o grupo/ano duplicado --- */
+  {
+    const { apA, apB } = cenario();
+    apA.ctx.prompt = () => 'VAZIA 2';
+    apA.gesto('renomearCol', J, 'VAZIA');
+    await apA.sobe();
+    apB.set('_syncReady', false); apB.g('movs').push(movNovo('m2')); apB.chama('marcaPendNuvem');   /* B, sem sinal, lança algo */
+    apB.set('_syncReady', true);
+    await new Promise(r => setTimeout(r, 3));
+    apB.recebe();   /* reconecta: o snapshot de A chega e B funde (e sobe) */
+    await tick(); await tick(); await tick();
+    await new Promise(r => setTimeout(r, 3));
+    apA.recebe();
+    t('39w: renomear "VAZIA" para "VAZIA 2" e o outro aparelho reconectar com pendência: o nome antigo NÃO volta (nem o grupo/ano duplicado) — em A, em B e na nuvem',
+      [apA, apB].every(ap => !tem(ap.g('colsJ')[J], 'VAZIA') && tem(ap.g('colsJ')[J], 'VAZIA 2') && !('VAZIA' in ap.g('colsG')[J])) && !tem(NUV.doc.colsJ[J], 'VAZIA') && tem(NUV.doc.colsJ[J], 'VAZIA 2'),
+      forma([apA.g('colsJ')[J], apB.g('colsJ')[J], NUV.doc.colsJ[J], apB.g('colsG')[J]]));
+  }
+  {
+    const { apA, apB } = cenario();
+    apA.ctx.prompt = () => 'VAZIA 2'; apA.gesto('renomearCol', J, 'VAZIA'); await apA.sobe();
+    apA.ctx.prompt = () => 'VAZIA'; apA.gesto('renomearCol', J, 'VAZIA 2'); await apA.sobe();   /* e de volta */
+    apB.g('movs').push(movNovo('m2')); await apB.sobe();
+    t('39w: renomear e depois renomear DE VOLTA — o nome original sobrevive à fusão do aparelho velho (a marca de presença da volta vence o túmulo da ida), e o intermediário não fica',
+      tem(NUV.doc.colsJ[J], 'VAZIA') && !tem(NUV.doc.colsJ[J], 'VAZIA 2') && tem(apB.g('colsJ')[J], 'VAZIA') && !tem(apB.g('colsJ')[J], 'VAZIA 2'), forma([NUV.doc.colsJ[J], apB.g('colsJ')[J]]));
+  }
+
+  /* --- 39x: a porta principal grava as listas por jogo NO DISCO depois de filtrar (senão o disco guardava a coleção excluída, e um boot sem sinal fundia esse disco velho de volta) --- */
+  {
+    const { apA } = cenario();
+    apA.gesto('excluirCol', J, 'VAZIA');
+    await apA.sobe();
+    apA.st.tcg_colsj = JSON.stringify(estadoBase().colsJ); apA.st.tcg_colsg = JSON.stringify(estadoBase().colsG);   /* o disco ficou velho: quem só recebe e lança nunca regravou as listas */
+    const doVelho = clona(NUV.doc); doVelho._upd = 888; doVelho.colsJ[J].push('VAZIA'); doVelho.colsG[J].VAZIA = '2026';
+    apA.recebe(doVelho);
+    const dj = JSON.parse(apA.st.tcg_colsj || 'null'), dg = JSON.parse(apA.st.tcg_colsg || 'null');
+    t('39x: depois da porta principal filtrar, as listas por jogo vão para o DISCO sem a coleção excluída (a memória e o disco não divergem)', !!dj && !!dg && !tem(dj[J], 'VAZIA') && !('VAZIA' in dg[J]), forma([dj, dg]));
+  }
+
+  /* --- 39y: EMPATE de carimbo. Um aparelho de relógio adiantado deixou uma marca: é o maior carimbo que os DOIS conhecem. Na mesma janela, sem se verem, A exclui a
+         coleção e B a recria — os dois carimbam max+1, com sinais OPOSTOS. A fusão só trocava com |carimbo| estritamente maior: cada aparelho ficava com o seu sinal
+         para sempre, e a coleção entrava e saía da nuvem a cada salvamento. O desempate é fixo e igual em todos: o positivo vence --- */
+  {
+    const k = 'k-empate';
+    t('39y: mergeExcl desempata empate de |carimbo| com sinais opostos do mesmo jeito nos dois sentidos — o positivo vence', A('mergeExcl')({ [k]: 5 }, { [k]: -5 })[k] === 5 && A('mergeExcl')({ [k]: -5 }, { [k]: 5 })[k] === 5 && A('mergeExcl')({ [k]: -7 }, { [k]: 5 })[k] === -7, forma([A('mergeExcl')({ [k]: 5 }, { [k]: -5 }), A('mergeExcl')({ [k]: -5 }, { [k]: 5 })]));
+    const { apA, apB } = cenario();
+    const M = Date.now() + 120000;   /* o maior carimbo conhecido está 2 min à frente do relógio dos dois */
+    [apA, apB].forEach(x => x.set('excluidos', { 'marca-do-relogio-adiantado': M }));
+    apA.gesto('excluirCol', J, 'VAZIA');
+    /* A grava DOIS túmulos em seguida (o antigo M+1, o por jogo M+2): para B empatar com o por jogo, B primeiro cria outra coleção (consome o M+1) e só então recria a "VAZIA" (M+2) */
+    const criaEmB = (nome, grupo) => { apB.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = nome; if (id === 'novaColG') e.value = grupo; return e; }; apB.gesto('addColModal', J); };
+    criaEmB('Q', '');
+    criaEmB('VAZIA', '2030');   /* B recria "VAZIA" com grupo/ano, sem ter visto a exclusão de A */
+    const kc = chave(J, 'VAZIA'), va = apA.g('excluidos')[kc], vb = apB.g('excluidos')[kc];
+    t('39y: (cenário) os dois aparelhos carimbam o MESMO valor absoluto com sinais opostos (o empate de verdade)', Math.abs(va) === Math.abs(vb) && va > 0 && vb < 0, forma([va, vb]));
+    await apA.sobe(); await apB.sobe(); await new Promise(r => setTimeout(r, 3)); apA.recebe(); apB.recebe();
+    for (let r = 0; r < 4; r++) { const x = r % 2 ? apB : apA; x.g('movs').push(movNovo('r' + r)); await x.sobe(); await new Promise(r2 => setTimeout(r2, 3)); apA.recebe(); apB.recebe(); }
+    t('39y: depois de 4 rodadas quietas os dois aparelhos e a nuvem têm a MESMA marca para a coleção (convergem) e a coleção está igual nos três', apA.g('excluidos')[kc] === apB.g('excluidos')[kc] && apA.g('excluidos')[kc] === NUV.doc.excluidos[kc] && tem(NUV.doc.colsJ[J], 'VAZIA') === tem(apA.g('colsJ')[J], 'VAZIA') && tem(apA.g('colsJ')[J], 'VAZIA') === tem(apB.g('colsJ')[J], 'VAZIA'), forma([apA.g('excluidos')[kc], apB.g('excluidos')[kc], NUV.doc.excluidos[kc], NUV.doc.colsJ[J]]));
+  }
+
+  /* --- 39z: DUAS ABAS no mesmo navegador dividem o disco. A aba 1 cria uma coleção sem sinal e fecha; a aba 2, que ficou aberta e velha, recebe um snapshot pela porta
+         principal. Ela não pode regravar no disco as listas SEM a coleção que a outra criou e ainda não confirmou (a marca de pendência fica no disco) --- */
+  {
+    const { apA } = cenario();                       /* aba 1 */
+    const aba2 = aparelho('aba2', apA.st, true);     /* aba 2: mesmo disco, aberta antes da criação */
+    aba2.carrega(estadoBase()); aba2.set('_ultimoUpdAplicado', 100);
+    apA.set('_syncReady', false);
+    apA.ctx.document.getElementById = id => { const e = elStub(); if (id === 'novaCol') e.value = 'Z'; if (id === 'novaColG') e.value = '2031'; return e; };
+    apA.chama('addColModal', J);                     /* cria Z (e grava as listas no disco) */
+    apA.chama('marcaPendNuvem');
+    const doNuvem = clona(NUV.doc); doNuvem._upd = 999;   /* um snapshot da nuvem, que não tem Z */
+    aba2.recebe(doNuvem);
+    const dj = JSON.parse(apA.st.tcg_colsj || 'null'), dg = JSON.parse(apA.st.tcg_colsg || 'null');
+    t('39z: a aba velha, ao receber pela porta principal, NÃO apaga do disco a coleção que a outra aba criou sem sinal e ainda não confirmou (nem o grupo/ano dela)', !!dj && !!dg && tem(dj[J], 'Z') && dg[J].Z === '2031', forma([dj, dg]));
+  }
+
+  /* --- 39m: o contrato da chave e a robustez dos filtros (nomes novos: aqui o pré-requisito é declarado, não pressuposto) --- */
+  {
+    const fn39 = ['nomeSeguro', 'chaveColJ', 'colsEmUso', 'colExcluida', 'filtraColsJ', 'filtraColsG', 'carimboPresente', 'reavivaveis', 'aplicaTumuloCols', 'marcaPresente', 'desmarcaCol'];
+    const faltam39 = fn39.filter(n => !temFn(n));
+    t('39m: [pré-requisito] o app carregado tem as ' + fn39.length + ' funções desta seção', faltam39.length === 0, 'FALTAM no app: ' + faltam39.join(', '));
+    if (!faltam39.length) {
+      const K = A('chaveColJ');
+      t('39m: a chave do túmulo por jogo tem o formato combinado — jogo e coleção codificados, nenhuma barra ("Mega Gard/Lucario" é nome real)', K('Pokémon', 'Mega Gard/Lucario') === 'colj:Pok%C3%A9mon:Mega%20Gard%2FLucario' && !K('a/b', 'c/d').includes('/'), K('Pokémon', 'Mega Gard/Lucario'));
+      t('39m: jogo e coleção não se confundem (jogo "A:B" + coleção "C" ≠ jogo "A" + coleção "B:C"), nem com o túmulo antigo, que é o nome puro', K('A:B', 'C') !== K('A', 'B:C') && !K('Pokémon', 'X').startsWith('cols:'));
+      let lanca = null;
+      try { A('filtraColsJ')(null); A('filtraColsJ')(undefined); A('filtraColsJ')({ [J]: 'x' }); A('filtraColsG')(null); A('filtraColsG')({ [J]: 'x' }); A('filtraColsG')({ [J]: null }); } catch (e) { lanca = e; }
+      t('39m: os filtros aguentam dado malformado (nulo, jogo sem lista) sem lançar — e uma lista de jogo malformada passa como veio, não vira lista vazia', lanca === null && A('filtraColsJ')({ [J]: 'x' })[J] === 'x', String(lanca));
+      /* o Firestore recusa nome de campo acima de 1.500 bytes; japonês codificado ocupa 9 bytes por caractere — a chave não pode travar o salvamento */
+      const jp = 'あ'.repeat(170), jp2 = 'あ'.repeat(169) + 'い';
+      t('39m: nome MUITO longo não estoura o teto de 1.500 bytes do Firestore — a chave tem teto, é a mesma a cada cálculo e continua distinguindo nomes diferentes; nome curto fica como estava', K('Pokémon', jp).length < 500 && K('Pokémon', jp) === K('Pokémon', jp) && K('Pokémon', jp) !== K('Pokémon', jp2) && K('Pokémon', 'Mega Gard/Lucario') === 'colj:Pok%C3%A9mon:Mega%20Gard%2FLucario', String(K('Pokémon', jp).length));
+      /* encodeURIComponent lança URIError com metade de emoji solta; a chave é calculada DENTRO da fusão, então um nome assim travaria o salvamento na nuvem */
+      const solta = 'X' + String.fromCharCode(0xD800);
+      let lanca2 = null, k1 = null, k2 = null;
+      try { k1 = K('Pokémon', solta); k2 = K('Pokémon', solta); } catch (e) { lanca2 = e; }
+      t('39m: a chave aguenta nome malformado (metade de emoji solta) sem lançar, é a mesma a cada cálculo e não se confunde com "X?"', lanca2 === null && k1 === k2 && k1 !== K('Pokémon', 'X?') && K('Pokémon', 'Cartas 😀') === 'colj:Pok%C3%A9mon:Cartas%20%F0%9F%98%80', String(lanca2) + ' ' + k1);
+      const { apA: apM } = cenario();
+      let lanca3 = null, f3 = null;
+      try { f3 = apM.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: ['Ninja', solta] }, colsG: { [J]: { [solta]: '2020' } } })); } catch (e) { lanca3 = e; }
+      t('39m: nome de coleção malformado não derruba a fusão — a coleção segue na lista, com o grupo/ano', lanca3 === null && f3.colsJ[J].some(c => c === solta) && f3.colsG[J][solta] === '2020', String(lanca3));
+    }
+  }
+}).catch(e=>{fail++;console.log('  FALHOU  secao 39 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');
   console.log('  ' + ok + ' passaram, ' + fail + ' falharam');
   process.exit(fail ? 1 : 0);

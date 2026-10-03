@@ -449,7 +449,7 @@ checks={
  'infinito do teclado (emoji) normalizado pro da Liga em todo caminho de codigo':'function normCod' in chk and 'function codLimpo(cod){cod=normCod(cod);' in chk,
  'busca de preco casa os DOIS formatos de infinito (arquivo real tem emoji E matematico)':'function idxLigaNorm' in chk and 'ix[normCod(cod)]||ix[codLimpo(cod)]' in chk,
  'painel nao acusa nada enquanto os precos nao carregaram (evita alarme de 100%)':'const temPrecos=!!(_precosLiga&&_precosLiga.cartas)' in chk and 'if(!temPrecos)return null;' in chk,
- 'memoria local cheia NUNCA impede de salvar na nuvem (era a causa da exclusao que voltava)':'function gravaLocal' in chk and 'const save=()=>{gravaLocal(MK' in chk and 'localStorage.setItem(MK,JSON.stringify(movs))' not in chk,
+ 'memoria local cheia NUNCA impede de salvar na nuvem (era a causa da exclusao que voltava)':'function gravaLocal' in chk and 'const save=()=>{limpaEstado();gravaLocal(MK' in chk and 'localStorage.setItem(MK,JSON.stringify(movs))' not in chk,
  'copias de seguranca locais enxutas (8 sem miniatura, era 20 com) - o que enchia a memoria':'if(b.length>8)b=b.slice(-8)' in chk and 'delete c.fotoThumb' in chk,
  'dados chegando SEMPRE liberam o menu - erro no processamento nao deixa tela morta':'function telaFalhaApp' in chk and 'tropeçou' in chk and "catch(e){falha='ao aplicar seus dados: '" in chk,
  'login aprovado tira a tela de login na hora (nao espera o banco) - o laco nascia aqui':'function telaCarregando' in chk and 'limpouRedirect();_telaLoginNoAr=false;telaCarregando();' in chk,

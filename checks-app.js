@@ -761,7 +761,9 @@ const CAPACIDADES = [
     /* [F0, revisao 23/08] restaurarPontoNuvem passou a limpar a pendencia de nuvem antes de aplicar
        o ponto (limpaPendNuvem/pendNuvem) — sem elas aqui a funcao recortada explode e a
        capacidade se recusa a passar (foi o que barrou o build em 23/08 00h40). */
-    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido', 'limpaPendNuvem', 'pendNuvem', 'publicaBase'],
+    /* [03/10] esqueceExclusaoDe passou a desfazer o tumulo das colecoes POR JOGO (chaveColJ, que usa nomeSeguro): sem as duas aqui, um ponto que carrega colsJ
+       (todo ponto real carrega) fazia a capacidade se recusar a passar — e o ponto de mentira abaixo agora carrega colsJ para exercitar esse ramo de verdade. */
+    recorta: ['pontosNuvemRef', 'pontosNuvemLista', 'salvarPontoNuvem', 'restaurarPontoNuvem', 'pontoNuvemDiario', 'esqueceExclusaoDe', 'desmarcaExcluido', 'chaveColJ', 'nomeSeguro', 'limpaTxt', 'limpaPendNuvem', 'pendNuvem', 'publicaBase'],
     atributos: [[/\bsalvarPontoNuvem\s*\(/g, 2, 'o botao "salvar ponto na nuvem" e a rotina diaria']],
     contexto: () => {
       const gravados = []; const store = {}; const avisos = []; const excluidos = {};   /* vai no objeto devolvido abaixo */
@@ -772,7 +774,7 @@ const CAPACIDADES = [
       const doc = id => ({
         set: p => { if (recusar) return { then: () => ({ catch: f => jah(f(new Error('permissao'))) }) }; gravados.push({ id, p }); return jah(); },
         delete: () => { apagados.push(id); return jah(); },
-        get: () => jah({ exists: true, data: () => ({ dados: JSON.stringify({ movs: [{ id: 'do-ponto' }] }) }) })
+        get: () => jah({ exists: true, data: () => ({ dados: JSON.stringify({ movs: [{ id: 'do-ponto' }], colsJ: { 'Pokémon': ['Coleção do ponto'] } }) }) })
       });
       const col = { doc, orderBy: () => col, limit: () => col,
         get: () => jah({ forEach: f => existentes.forEach(id => f({ id, data: () => ({}) })) }) };

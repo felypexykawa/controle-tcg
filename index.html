@@ -209,6 +209,29 @@ let jogos=get('tcg_jogos',['Pokémon','Yu-Gi-Oh','One Piece']);
 let despCats=get('tcg_despcats',['Luz','Aluguel','Advogado','Internet','Sleeves','Toploader','Sacolas','Fita','Caixas']);
 let cadastros=get('tcg_cadastros',[]);const salvarCad=()=>gravaLocal('tcg_cadastros',JSON.stringify(cadastros));
 let contasBanc=get('tcg_contasb',[]);const salvarCB=()=>gravaLocal('tcg_contasb',JSON.stringify(contasBanc));
+/* [03/10/2026] TEXTO LIVRE (observação, fornecedor/cliente, coleção, categoria, código, conta, jogo...) nunca guarda "<" nem ">". O HTML do app monta nome e observação direto
+   no template (49 pontos medidos só nos campos mais óbvios, nenhum com escape — cada função tem o seu `esc` local, só pra aspas de onclick) e um "<b" digitado, colado ou lido por
+   OCR quebrava ou injetava a linha. Trocar na DIGITAÇÃO e na GRAVAÇÃO cura todos os pontos de uma vez, sem mexer em 49 templates: só o símbolo muda (‹ ›). */
+function limpaTxt(s){return(typeof s==='string'&&(s.indexOf('<')>=0||s.indexOf('>')>=0))?s.replace(/</g,'‹').replace(/>/g,'›'):s;}
+/* limpa no LUGAR (mesma referência) os textos de um valor aninhado; chaves de objeto também (o nome da coleção é valor em `colsJ` e CHAVE em `colsG` — têm de sair iguais) */
+function limpaProfundo(x){
+  if(Array.isArray(x)){for(let i=0;i<x.length;i++){const v=x[i];if(typeof v==='string')x[i]=limpaTxt(v);else if(v&&typeof v==='object')limpaProfundo(v);}}
+  else if(x&&typeof x==='object'){for(const k of Object.keys(x)){const v=x[k],nk=limpaTxt(k);
+    if(nk!==k){delete x[k];x[nk]=v;}
+    if(typeof v==='string')x[nk]=limpaTxt(v);else if(v&&typeof v==='object')limpaProfundo(v);}}
+  return x;}
+/* tudo que o dono digita e fica guardado: lançamentos, listas de nome, coleções por jogo, contas e cadastros. NÃO entram `excluidos` (as chaves são ids/nomes que outro aparelho
+   também carimbou) nem `codigosResolvidos`. */
+/* duas grafias que viram a mesma depois da limpeza ("A<b" e "A‹b") não ficam duplicadas nas listas de nome — tira a repetida, no lugar, mantendo a ordem */
+function dedupeNomes(L){if(!Array.isArray(L))return;const vis=new Set();let w=0;for(let i=0;i<L.length;i++){const v=L[i];if(typeof v==='string'){if(vis.has(v))continue;vis.add(v);}L[w++]=v;}L.length=w;}
+/* NUNCA lança: roda no começo de `save`/`saveL`, o funil que também manda o lançamento pra nuvem — um erro aqui travaria o salvamento dos dois aparelhos */
+function limpaEstado(){try{[movs,cats,cols,pess,pgs,jogos,despCats,colsJ,colsG,contasBanc,cadastros].forEach(x=>{if(x&&typeof x==='object')limpaProfundo(x);});
+  [cats,cols,pess,pgs,jogos,despCats].forEach(dedupeNomes);if(colsJ&&typeof colsJ==='object')Object.keys(colsJ).forEach(j=>dedupeNomes(colsJ[j]));}catch(e){}}
+/* a mesma limpeza no campo, enquanto se digita/cola: o dono não vê o "<" voltar trocado só depois de salvar, e os rascunhos (itens da nota, da abertura, da venda) saem limpos */
+function limpaCampoAoDigitar(e){const t=e&&e.target;if(!t||!t.tagName)return;
+  if((t.tagName==='INPUT'&&/^(text|search|)$/.test(t.type||''))||t.tagName==='TEXTAREA'){const v=t.value;
+    if(typeof v==='string'&&(v.indexOf('<')>=0||v.indexOf('>')>=0)){const p=t.selectionStart;t.value=limpaTxt(v);try{t.setSelectionRange(p,p);}catch(_){}}}}
+document.addEventListener('input',limpaCampoAoDigitar,true);
 /* código ambíguo (2+ cartas na Liga p/ o mesmo código) resolvido 1x — vale pra TODOS os
    itens com esse código, atuais e futuros (a rotina de coleta lê isto pra navegar direto,
    sem passar pela página "Busca:" de novo). Chave = código LIMPO (codLimpo). */
@@ -243,6 +266,8 @@ function esqueceExclusaoDe(o){if(!o)return;
   (Array.isArray(o.pgs)?o.pgs:[]).forEach(n=>{if(n)ids.push('pgs:'+n);});
   (Array.isArray(o.jogos)?o.jogos:[]).forEach(n=>{if(n)ids.push('jogos:'+n);});
   (Array.isArray(o.cols)?o.cols:[]).forEach(n=>{if(n)ids.push('cols:'+n);});
+  /* [cura 03/10] o ponto (ou o arquivo importado) traz de volta também as coleções POR JOGO: desmarca o túmulo de cada (jogo, coleção) que ele carrega */
+  if(o.colsJ&&typeof o.colsJ==='object')Object.keys(o.colsJ).forEach(j=>{(Array.isArray(o.colsJ[j])?o.colsJ[j]:[]).forEach(n=>{if(n)ids.push(chaveColJ(j,n));});});
   /* [fotos D1] restaurar traz os grupos de volta: desmarca os túmulos de nota/venda/troca dos lançamentos que voltam */
   (Array.isArray(o.movs)?o.movs:[]).forEach(m=>{if(!m)return;if(m.notaId)ids.push('nota:'+m.notaId);if(m.vendaId)ids.push('venda:'+m.vendaId);if(m.trocaId)ids.push('troca:'+m.trocaId);});
   desmarcaExcluido(ids);}
@@ -267,6 +292,52 @@ function podaExcluidos(){
       if(dono&&!_fotosPurga.includes(dono)){_fotosPurga.push(dono);mudou=true;}}
     delete excluidos[k];}});
   if(mudou)gravaFotosPurga();}
+/* [cura 03/10/2026 — coleção excluída ressuscitava na fusão entre aparelhos; achado do revisor em 22/09] O túmulo antigo ('cols:'+nome) não
+   diz de que JOGO a coleção saiu, e as listas por jogo — colsJ (coleções de cada jogo) e colsG (grupo/ano de cada uma) — eram unidas sem
+   olhar túmulo nenhum: o aparelho que ainda tinha a coleção a devolvia pra nuvem e ela voltava no outro. O túmulo novo é POR JOGO:
+   'colj:'+jogo+':'+coleção, com os dois nomes codificados (sem "/", que quebraria o id de documento da fila de limpeza das fotos —
+   "Mega Gard/Lucario" é nome real —, e sem ":" sobrando, que misturaria jogo com coleção). Vale só pra aquele (jogo, coleção): excluir
+   "151" no Yu-Gi-Oh não toca no "151" do Pokémon.
+   O túmulo antigo continua sendo gravado junto (aparelho que ainda não atualizou e a lista global `cols` seguem como estavam), mas NÃO filtra
+   colsJ/colsG: ele só tem o nome, e o nome sozinho mataria a coleção de mesmo nome de OUTRO jogo. Limite declarado: exclusão gravada só com
+   a chave antiga (feita antes desta versão, ou por aparelho que ainda não atualizou) segue sem proteção nas listas por jogo.
+   Coleção que algum lançamento usa NUNCA é filtrada: só se exclui coleção vazia, então uso vence túmulo — o filtro jamais pode esconder uma coleção com
+   lançamento dentro. E o uso vira EVENTO: `reavivaveis` troca o túmulo de uma coleção em uso (`colsEmUso`) por marca de presença ANTES de filtrar, senão a
+   coleção sumiria sozinha no dia em que o último lançamento saísse. Escrever a marca de presença é feito por `carimboPresente`/`marcaPresente`. */
+/* encodeURIComponent LANÇA com texto malformado (metade de emoji solta no nome) — e esta chave é calculada DENTRO da fusão: um nome estranho
+   travaria o salvamento na nuvem dos dois aparelhos. Por isso a codificação é total: no erro, só a metade solta vira U+FFFD (emoji válido fica).
+   E o Firestore recusa nome de campo com mais de 1.500 bytes: japonês codificado vira 9 bytes por caractere, então um nome muito longo passaria do teto e
+   TRAVARIA todo salvamento enquanto a marca existisse. Acima de 200 caracteres codificados a parte vira os 160 primeiros + "~" + um hash do nome inteiro. */
+function nomeSeguro(s){s=limpaTxt(String(s));let e;
+  try{e=encodeURIComponent(s);}catch(x){const R=String.fromCharCode(65533);
+    e=encodeURIComponent(Array.from(s).map(ch=>{const k=ch.codePointAt(0);return (k>=55296&&k<=57343)?R:ch;}).join(''));}
+  if(e.length<=200)return e;let h=5381;for(let i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return e.slice(0,160)+'~'+h.toString(36);}
+function chaveColJ(j,c){return 'colj:'+nomeSeguro(j)+':'+nomeSeguro(c);}
+function colsEmUso(lista){const s=new Set();(lista||[]).forEach(m=>{if(m&&m.colecao)s.add(JSON.stringify([String(m.jogo||'Pokémon'),String(m.colecao)]));});return s;}
+function colExcluida(j,c){return estaExcluido(chaveColJ(j,c));}
+function filtraColsJ(o){if(!o||typeof o!=='object')return o;const out={};
+  Object.keys(o).forEach(j=>{out[j]=Array.isArray(o[j])?o[j].filter(c=>!colExcluida(j,c)):o[j];});return out;}
+function filtraColsG(o){if(!o||typeof o!=='object')return o;const out={};
+  Object.keys(o).forEach(j=>{const d=o[j];if(!d||typeof d!=='object'){out[j]=d;return;}
+    const n={};Object.keys(d).forEach(c=>{if(!colExcluida(j,c))n[c]=d[c];});out[j]=n;});return out;}
+/* carimbo de PRESENÇA: marca negativa (restaurado) com |carimbo| maior que tudo o que o mapa já conhece (monotônico, como agoraExcl). `mapa` é o dicionário de
+   exclusões — o global, ou o fundido que a fusão ainda não assumiu (por isso esta função não grava em disco). */
+function carimboPresente(mapa,ids){let m=0;for(const k in mapa){const a=Math.abs(+mapa[k]||0);if(a>m)m=a;}const t=Math.max(Date.now(),m+1);ids.flat().forEach(id=>{if(id)mapa[id]=-t;});}
+/* criar uma coleção (ou renomear PARA um nome): criar é um EVENTO com hora, e grava a marca de presença SEMPRE — mesmo sem túmulo conhecido neste aparelho.
+   Só desmarcar o que já existe deixava a criação feita por quem ainda não tinha visto a exclusão perder para um túmulo MAIS ANTIGO que chega na fusão (o último
+   a mexer tem de ganhar, e criar é mexer). A marca negativa viaja e vence o positivo de |carimbo| menor (mergeExcl). */
+function marcaPresente(...ids){carimboPresente(excluidos,ids);gravaLocal('tcg_excluidos',JSON.stringify(excluidos));}
+function desmarcaCol(j,c){desmarcaExcluido('cols:'+c);marcaPresente(chaveColJ(j,c));}
+/* "uso vence túmulo" tem de virar EVENTO: coleção que um lançamento usa e que ainda tem túmulo positivo foi REAVIVADA por esse uso. Sem gravar a marca de presença,
+   ela só existia enquanto o lançamento existisse — no dia em que ele saísse (apagado ou movido) o túmulo antigo voltava a valer e a coleção e o grupo/ano sumiam
+   dos dois aparelhos, sem aviso. */
+function reavivaveis(mapa,colsJ,uso){const L=[];if(!mapa||!colsJ||typeof colsJ!=='object'||!uso)return L;
+  Object.keys(colsJ).forEach(j=>{(Array.isArray(colsJ[j])?colsJ[j]:[]).forEach(c=>{if(+mapa[chaveColJ(j,c)]>0&&uso.has(JSON.stringify([String(j),String(c)])))L.push(chaveColJ(j,c));});});return L;}
+/* a fusão devolve o resultado cru; aqui o túmulo POR JOGO vale antes de a coleção voltar ao payload. Usa os lançamentos JÁ fundidos (R.movs, depois dos túmulos):
+   lançamento apagado que o aparelho velho ainda tem não pode manter viva a coleção que ficou vazia depois dele. A marca de reavivar vai em R.excluidos (o mapa
+   fundido), nunca no global: quem chama só assume os túmulos fundidos no sucesso do commit. */
+function aplicaTumuloCols(R){const uso=colsEmUso(R.movs);const rev=reavivaveis(R.excluidos,R.colsJ,uso);if(rev.length)carimboPresente(R.excluidos,rev);
+  R.colsJ=filtraColsJ(R.colsJ);R.colsG=filtraColsG(R.colsG);return R;}
 /* varredura de fundo: poucas por vez; leitura falhada deixa pra próxima; com nuvem ligada e sem login, espera */
 function processarPurgaFotos(){if(!_fotosPurga.length)return;if(USAR_NUVEM&&!_db)return;
   _fotosPurga.slice(0,3).forEach(dono=>{
@@ -394,7 +465,7 @@ function restauraRascunho(){idbOpen(db=>{if(!db){_rascPronto=true;return;}try{co
   rq.onerror=()=>{_rascPronto=true;};}catch(e){_rascPronto=true;}});}
 setTimeout(()=>{try{restauraRascunho();}catch(e){_rascPronto=true;}},800);   /* restaura cedo, antes de o dono chegar ao Lançar */
 function estaExcluido(id){return !!(id&&+excluidos[id]>0);}   /* positivo = excluído; negativo = restaurado (marca viaja) */
-let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return d.toISOString().slice(0,10);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
+let tela='simular',tipoSel='COMPRA',editId=null,perDe=(function(){const d=new Date();d.setDate(d.getDate()-30);return isoLocal(d);})(),perAte='',perSel='d30',consF='tudo',consQ='',consJogo='todos',pgTipo='À vista',canal='Pix',despNat='ordinaria',despStat='pago',despFixa=false,despFreq='mensal',expandId=null,cadTip='cliente',consMenu=false;
 let simMat='%',simRev='%',simMatModo='margem',navHist=[],notaItens=[],compraModo='item',notaHead={frete:0,taxa:0,cp:'',conta:'',sit:'Em estoque',data:'',num:'',pg:'À vista',nParc:3,venc1:'',obs:''};
 let vendaItens=[],vendaModo='item',vendaHead={cp:'',canal:'Pix',taxa:15,recDias:28,conta:'',data:''},relGran='mes',vendaDe='estoque';
 let relSer={din_in:true,din_out:true,est_in:false,est_out:false,col_in:false,col_out:false},relJogo='',relCol='',relPess='',relCat='',relExtrato=false;
@@ -1523,6 +1594,7 @@ function togTodosCt(){if(Object.keys(ctExp).length)ctExp={};else _ctKeys.forEach
 let vendaUn='un',consUn='un',trocaUn='un';
 let trocaDei=[],trocaRecebi=[],trocaDin=0,deiModo='estoque';
 const CATB={'ETB':9,'Booster Box':36,'Box da Coleção':10,'Mini BB':6,'Quad':4,'Triple':3,'Sleeved':1,'Blister':1,'Case':0,'Single/Carta':0,'Outro':0};
+limpaEstado();   /* dado guardado antes desta regra (ou vindo de fora) sai limpo ANTES de as listas derivarem dos lancamentos */
 movs.forEach(m=>{if(m.cat&&!cats.includes(m.cat))cats.push(m.cat);if(m.colecao&&!cols.includes(m.colecao))cols.push(m.colecao);if(m.contraparte&&!pess.includes(m.contraparte))pess.push(m.contraparte);});
 if(!colsJ){colsJ={};jogos.forEach(j=>colsJ[j]=[]);movs.forEach(m=>{const j=m.jogo||'Pokémon';if(!colsJ[j])colsJ[j]=[];if(m.colecao&&!colsJ[j].includes(m.colecao))colsJ[j].push(m.colecao);});if(!colsJ['Pokémon'])colsJ['Pokémon']=[];cols.forEach(c=>{if(!colsJ['Pokémon'].includes(c))colsJ['Pokémon'].push(c);});salvarColsJ();}
 const fmt=n=>'R$ '+(Math.round(n*100)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1562,8 +1634,8 @@ function gravaLocal(chave,valor){
     /* [re-checagem 23/08, n1] sem rede a nuvem NÃO tem o lançamento — a mensagem não pode prometer isso */
     try{toast('⚠ A memória deste aparelho encheu e não consegui guardar a cópia local. Se você estiver SEM internet, o lançamento pode se perder — reconecte antes de fechar o app.');}catch(_){}}
   return false;}
-const save=()=>{gravaLocal(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}};
-const saveL=()=>{gravaLocal('tcg_cats',JSON.stringify(cats));gravaLocal('tcg_cols',JSON.stringify(cols));gravaLocal('tcg_pess',JSON.stringify(pess));gravaLocal('tcg_pgs',JSON.stringify(pgs));gravaLocal('tcg_jogos',JSON.stringify(jogos));gravaLocal('tcg_despcats',JSON.stringify(despCats));gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));gravaLocal('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}};
+const save=()=>{limpaEstado();gravaLocal(MK,JSON.stringify(movs));backup();_provaCache=null;if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}};
+const saveL=()=>{limpaEstado();gravaLocal('tcg_cats',JSON.stringify(cats));gravaLocal('tcg_cols',JSON.stringify(cols));gravaLocal('tcg_pess',JSON.stringify(pess));gravaLocal('tcg_pgs',JSON.stringify(pgs));gravaLocal('tcg_jogos',JSON.stringify(jogos));gravaLocal('tcg_despcats',JSON.stringify(despCats));gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));gravaLocal('tcg_contasb',JSON.stringify(contasBanc));if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}};
 function toast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),1600);}
 const sitDe=m=>m.situacao||(m.destino==='Coleção'?'Coleção':'Em estoque');
 /* id único: base36 do relógio + 5 chars aleatórios — dois aparelhos lançando no mesmo milissegundo não colidem */
@@ -1921,7 +1993,7 @@ function candidatosMoverFoto(movId,tudo){const m=movs.find(x=>x.id===movId);cons
     if(g){movs.filter(x=>x.id!==m.id&&x[g[0]+'Id']===g[1]).forEach(x=>add(x.id,'🧩 mesma '+g[0]+': '+rotMoverFoto(x)));
       add(g[1],'📎 comprovante da '+g[2]);}}
   else{movs.filter(x=>x.notaId===movId||x.vendaId===movId||x.trocaId===movId).forEach(x=>add(x.id,'↘ item deste grupo: '+rotMoverFoto(x)));}
-  const lim=tudo?'':new Date(Date.now()-90*864e5).toISOString().slice(0,10);   /* tudo = "incluir antigos" (revisão F3, M4) */
+  const lim=tudo?'':isoLocal(new Date(Date.now()-90*864e5));   /* tudo = "incluir antigos" (revisão F3, M4) */
   movs.filter(x=>(x.tipo==='COMPRA'||x.tipo==='VENDA')&&(x.data||'')>=lim).sort((a,b)=>(b.data||'').localeCompare(a.data||'')).forEach(x=>add(x.id,rotMoverFoto(x)));
   return out;}
 function abrirMoverFoto(fid,movId,tudo){const f=_fotosCache.find(x=>x.id===fid);const v=document.getElementById('fotoview');if(!f||!v)return;
@@ -2390,14 +2462,14 @@ function filtrosRelCard(){
    ficava falsa (le-como-felype r7, 3) */
 function emprestaPeriodo(motivo,aba){if(!_perEmprestado)_perEmprestado={perDe,perAte,perSel,motivo:motivo||'',aba:aba||''};perDe='';perAte='';perSel='tudo';}
 function devolvePeriodo(){if(!_perEmprestado)return;perDe=_perEmprestado.perDe;perAte=_perEmprestado.perAte;perSel=_perEmprestado.perSel;_perEmprestado=null;}
-function setPer(k){_perEmprestado=null;perSel=k;const h=new Date(),iso=x=>x.toISOString().slice(0,10);
+function setPer(k){_perEmprestado=null;perSel=k;const h=new Date(),iso=isoLocal;
   if(k==='d30'){const a=new Date(h);a.setDate(a.getDate()-30);perDe=iso(a);perAte='';}
   else if(k==='d90'){const a=new Date(h);a.setDate(a.getDate()-90);perDe=iso(a);perAte='';}
   else if(k==='ano'){perDe=h.getFullYear()+'-01-01';perAte='';}
   else{perDe='';perAte='';}render();}
 function perRange(k,g){if(g==='ano')return[k+'-01-01',k+'-12-31'];
   if(g==='mes'){const p=k.split('-'),last=new Date(+p[0],+p[1],0).getDate();return[k+'-01',k+'-'+String(last).padStart(2,'0')];}
-  if(g==='semana'){const d=new Date(k+'T00:00:00'),e=new Date(d);e.setDate(d.getDate()+6);return[k,e.toISOString().slice(0,10)];}
+  if(g==='semana'){const d=new Date(k+'T00:00:00'),e=new Date(d);e.setDate(d.getDate()+6);return[k,isoLocal(e)];}
   return[k,k];}
 function irPer(k,f){const r=perRange(k,relGran);navHist.push(snap());if(navHist.length>40)navHist.shift();_perEmprestado=null;perDe=r[0];perAte=r[1];perSel='custom';consF=f||'tudo';consMenu=false;consQ='';expandId=null;tela='consultar';editId=null;render();}
 const PERS=[['d30','30 dias'],['d90','90 dias'],['ano','Este ano'],['tudo','Tudo']];
@@ -2565,7 +2637,7 @@ function selColOpts(jogo,val){const lista=colsDe(jogo);const semG=[],porG={};
   const op=c=>`<option ${c===val?'selected':''}>${c}</option>`;
   return `<option value="">— selecionar —</option>`+gks.map(g=>`<optgroup label="📁 ${g}">${porG[g].map(op).join('')}</optgroup>`).join('')+semG.map(op).join('')+`<option value="__add__">➕ adicionar novo…</option>`;}
 function novo(el,tipo){if(el.value!=='__add__'){bcalc();vcalc();return;}const n=(prompt('Adicionar novo:')||'').trim();
-  if(n){if(tipo==='col'){const j=document.getElementById('f_jogo')?.value||document.getElementById('n_jogo')?.value||document.getElementById('r_jogo')?.value||document.getElementById('v_jogo')?.value||'Pokémon';if(!colsJ[j])colsJ[j]=[];if(!colsJ[j].includes(n))colsJ[j].push(n);if(!cols.includes(n))cols.push(n);saveL();}else{const L=tipo==='cat'?cats:tipo==='pg'?pgs:tipo==='jogo'?jogos:tipo==='despcat'?despCats:pess;if(!L.includes(n)){L.push(n);saveL();}}const opt=document.createElement('option');opt.text=n;opt.value=n;el.insertBefore(opt,el.querySelector('option[value="__add__"]'));el.value=n;if(tipo==='cat')bdef();}else el.value='';}
+  if(n){if(tipo==='col'){const j=document.getElementById('f_jogo')?.value||document.getElementById('n_jogo')?.value||document.getElementById('r_jogo')?.value||document.getElementById('v_jogo')?.value||'Pokémon';if(!colsJ[j])colsJ[j]=[];if(!colsJ[j].includes(n))colsJ[j].push(n);if(!cols.includes(n))cols.push(n);desmarcaCol(j,n);saveL();}else{const L=tipo==='cat'?cats:tipo==='pg'?pgs:tipo==='jogo'?jogos:tipo==='despcat'?despCats:pess;if(!L.includes(n)){L.push(n);saveL();}}const opt=document.createElement('option');opt.text=n;opt.value=n;el.insertBefore(opt,el.querySelector('option[value="__add__"]'));el.value=n;if(tipo==='cat')bdef();}else el.value='';}
 function selJogo(el){if(el.value==='__add__'){novo(el,'jogo');}reCol(el.value);}
 function reCol(jogo){const sel=document.getElementById('f_col');if(!sel)return;const atual=sel.value;sel.innerHTML=selColOpts(jogo,colsDe(jogo).includes(atual)?atual:'');}
 /* Atualiza SÓ o select de coleção presente na tela (f_col/n_col/r_col) — nunca um
@@ -2581,7 +2653,7 @@ function togNat(t){despNat=t;document.querySelectorAll('#nattog .o').forEach(o=>
 function togStat(t){despStat=t;document.querySelectorAll('#stattog .o').forEach(o=>o.classList.toggle('on',o.dataset.v===t));}
 function togFixa(v){despFixa=!!v;document.querySelectorAll('#fixtog .o').forEach(o=>o.classList.toggle('on',+o.dataset.v===v));const b=document.getElementById('freqbox');if(b)b.style.display=v?'block':'none';}
 function freqChg(v){despFreq=v;const ib=document.getElementById('intbox');if(ib)ib.style.display=v==='dias'?'block':'none';}
-function proxData(iso,freq,intD,i){const d=new Date(iso+'T00:00:00');if(freq==='mensal')d.setMonth(d.getMonth()+i);else if(freq==='semanal')d.setDate(d.getDate()+7*i);else if(freq==='anual')d.setFullYear(d.getFullYear()+i);else d.setDate(d.getDate()+(intD||30)*i);return d.toISOString().slice(0,10);}
+function proxData(iso,freq,intD,i){const d=new Date(iso+'T00:00:00');if(freq==='mensal')d.setMonth(d.getMonth()+i);else if(freq==='semanal')d.setDate(d.getDate()+7*i);else if(freq==='anual')d.setFullYear(d.getFullYear()+i);else d.setDate(d.getDate()+(intD||30)*i);return isoLocal(d);}
 
 function vLancar(){
   const t=tipoSel,hoje=hojeISO(),e=editId?movs.find(m=>m.id===editId):null;
@@ -2593,7 +2665,7 @@ function vLancar(){
     if(compraModo==='nota'&&!editId){campos+=notaForm();}
     else{campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo selecionado)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod','f_jogo')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: 245/198 · JP/C: ver ❔" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="escanearCod('f_cod','f_idi','f_obs','','ligaHintCod')">📷 escanear</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod','f_jogo')">🔎 ver na Liga</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="colarLinkLiga('f_cod','f_obs','ligaHintCod')">🔗 colar link</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block;color:var(--mut)" onclick="abrirPadroesCod()">❔ padrões</span></label><input id="f_cod" value="${(e?.codigo||'').replace(/"/g,'&quot;')}" placeholder="ex: 245/198 · JP/C: ver ❔" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <div class="row2"><div><label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${e?.idioma===x?'selected':''}>${x}</option>`).join('')}</select></div>
         <div><label>Quantidade</label><input id="f_qtd" type="number" inputmode="numeric" value="${e?.qtd??1}" oninput="bcalc()"></div></div>
       <label>Condição <span style="color:var(--mut);font-size:10px">(afeta o preço na Liga — opcional)</span></label><select id="f_cond">${CONDS.map(([v,l])=>`<option value="${v}" ${(e?.condicao||'—')===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -2614,7 +2686,7 @@ function vLancar(){
       campos+= !editId?`<label style="margin-top:0">De onde sai a carta?</label><div class="toggle" id="vdetog"><div class="o ${vendaDe==='estoque'?'on':''}" onclick="setVendaDe('estoque')">📦 Estoque</div><div class="o ${vendaDe==='colecao'?'on':''}" onclick="setVendaDe('colecao')">⭐ Coleção</div><div class="o ${vendaDe==='avulsa'?'on':''}" onclick="setVendaDe('avulsa')">✍ Avulsa</div></div>`:'';
       if(avulso){campos+=`<div class="row2"><div><label style="margin-top:0">Jogo <span onclick="abrirJogos()" style="color:var(--blue);cursor:pointer;font-size:10px">✎ editar</span></label><select id="f_jogo" onchange="selJogo(this)">${jogos.map(x=>`<option ${(e?.jogo||'Pokémon')===x?'selected':''}>${x}</option>`).join('')}<option value="__add__">➕ novo…</option></select></div><div><label style="margin-top:0">Tipo de produto</label><select id="f_cat" onchange="novo(this,'cat')">${selOpts(cats,e?.cat)}</select></div></div>
       <label>Coleção / set <span style="color:var(--mut);font-size:10px">(do jogo)</span> <span onclick="abrirCols(document.getElementById('f_jogo')?.value||'Pokémon')" style="color:var(--blue);cursor:pointer;font-size:10px">✎ organizar</span></label><select id="f_col" onchange="novo(this,'col')">${selColOpts(e?.jogo||'Pokémon',e?.colecao)}</select>
-      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod','f_jogo')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span></label><input id="f_cod" value="${e?.codigo||''}" placeholder="ex: SV3-125" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
+      <label>Código <span style="color:var(--mut);font-size:10px">(opcional)</span> <span class="lnk" style="font-size:12.5px;padding:3px 4px;display:inline-block" onclick="buscarLigaCampo('f_cod','f_jogo')">🔎 ver na Liga</span> <span class="lnk" style="font-size:16px;font-weight:800;border:1.5px solid var(--blue);border-radius:8px;padding:1px 12px;display:inline-block;line-height:1.45" title="inserir o símbolo do infinito (promo, ex. 032/∞)" onclick="insSimbolo('f_cod','∞')">∞</span></label><input id="f_cod" value="${(e?.codigo||'').replace(/"/g,'&quot;')}" placeholder="ex: SV3-125" onchange="this.value=fixaParenteses(this.value);ligaHint(this.value,'ligaHintCod')" oninput="ligaHint(this.value,'ligaHintCod')"><div class="meta" id="ligaHintCod"></div>
       <label>Idioma</label><select id="f_idi">${['Inglês','Português','Japonês','Coreano','Chinês','—'].map(x=>`<option ${(e?.idioma||'Inglês')===x?'selected':''}>${x}</option>`).join('')}</select>`;}
       else{let itens=vendaDe==='estoque'?movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Pedido')):movs.filter(m=>m.tipo==='COMPRA'&&sitDe(m)==='Coleção');
         const jgsIt=[...new Set(itens.map(d=>d.jogo||'Pokémon'))].sort();
@@ -2722,7 +2794,7 @@ function addItemNota(){const g=id=>document.getElementById(id);const cat=g('n_ca
   if(val<=0&&unit>0)val=Math.round(unit*qtd*100)/100;
   if(unit<=0&&val>0)unit=Math.round((val/qtd)*100)/100;
   if(val<=0){alert('Informe o valor de cada item (ou o total).');return;}
-  const col=g('n_col')?.value,cod=(g('n_cod')?.value||'').trim(),cond=g('n_cond')?.value;notaItens.push({jogo:g('n_jogo').value,cat,colecao:(col&&col!=='__add__')?col:'',idioma:g('n_idi').value,qtd,valor:val,vUnit:unit,codigo:cod,boosters:+g('n_boo')?.value||0,condicao:(cond&&cond!=='—')?cond:'',fotos:_fotosItem.slice()});_fotosItem=[];render();}
+  const col=g('n_col')?.value,cod=limpaTxt((g('n_cod')?.value||'').trim()),cond=g('n_cond')?.value;notaItens.push({jogo:g('n_jogo').value,cat,colecao:(col&&col!=='__add__')?col:'',idioma:g('n_idi').value,qtd,valor:val,vUnit:unit,codigo:cod,boosters:+g('n_boo')?.value||0,condicao:(cond&&cond!=='—')?cond:'',fotos:_fotosItem.slice()});_fotosItem=[];render();}
 /* [revisão F2, menor 7] remover item que já tem foto da carta: avisar antes — a foto vai junto */
 function removeItemNota(i){const it=notaItens[i];if(it&&it.fotos&&it.fotos.length&&!confirm('Este item tem '+it.fotos.length+' foto'+(it.fotos.length>1?'s':'')+' da carta. Remover o item da nota apaga a foto também. Remover?'))return;notaItens.splice(i,1);render();}
 function editItemNota(i){if(!baldeItemLivre())return;const it=notaItens.splice(i,1)[0];
@@ -3892,7 +3964,7 @@ function simPasso(){const e=document.getElementById('simpasso');if(!e)return;con
   if(simMatModo==='real')l1=`Você passou ${fmt(faceMat)} de material que te custou ${fmt(custoMat)} (informado direto).`;
   else{const marg=+document.getElementById('s_marg')?.value||0;l1=`Você deu ${fmt(faceMat)} de material — mas ele te daria ${marg}% se vendido, então custou ${fmt(faceMat)} ÷ ${(1+marg/100).toFixed(2).replace('.',',')} = ${fmt(custoMat)}.`;}
   e.innerHTML=`<b>Por que o custo real é esse:</b><br>1) ${l1}<br>${din>0?'2) + '+fmt(din)+' em dinheiro.<br>':''}3) Custo real = <b>${fmt(custoMat+din)}</b>. O ganho real compara a revenda com isso, não com o valor de face.`;}
-function chavePer(data,g){const d=new Date(data+'T00:00:00');if(g==='ano')return ''+d.getFullYear();if(g==='mes')return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(g==='semana'){const x=new Date(d);x.setDate(d.getDate()-((d.getDay()+6)%7));return x.toISOString().slice(0,10);}return data;}
+function chavePer(data,g){const d=new Date(data+'T00:00:00');if(g==='ano')return ''+d.getFullYear();if(g==='mes')return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(g==='semana'){const x=new Date(d);x.setDate(d.getDate()-((d.getDay()+6)%7));return isoLocal(x);}return data;}
 function rotuloPer(k,g){if(g==='ano')return k;const p=k.split('-');if(g==='mes')return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+p[1]-1]+'/'+p[0].slice(2);if(g==='semana')return 'sem de '+p[2]+'/'+p[1];return p[2]+'/'+p[1];}
 /* NOTA (2026-09-15): esta função e `serieEstoque()` (tela Fluxo de estoque) respondem perguntas
    DIFERENTES sobre o mesmo dado — de propósito, não é bug. Esta soma por EMISSÃO (`m.data` da
@@ -4536,7 +4608,7 @@ function abrirCols(jogo){jogo=(jogo&&jogo!=='__add__')?jogo:'Pokémon';const L=c
   document.body.insertAdjacentHTML('beforeend',h);}
 function setGrupoCol(j,c,g){g=(g||'').trim();if(!colsG[j])colsG[j]={};if(g)colsG[j][c]=g;else delete colsG[j][c];salvarColsG();if(USAR_NUVEM){marcaPendNuvem();if(_syncReady)salvarNuvem();}toast(g?('📁 '+c+' → '+g):'grupo removido');}
 function renomearCol(j,c){const nv=(prompt('Renomear coleção:',c)||'').trim();if(!nv||nv===c)return;if(colsDe(j).includes(nv)){alert('Já existe uma coleção com esse nome.');return;}
-  colsJ[j]=colsJ[j].map(x=>x===c?nv:x);const g=grupoDe(j,c);if(g){if(!colsG[j])colsG[j]={};colsG[j][nv]=g;delete colsG[j][c];}
+  colsJ[j]=colsJ[j].map(x=>x===c?nv:x);desmarcaCol(j,nv);/* [cura 03/10] o nome ANTIGO sai por túmulo, não por ausência: sem ele o aparelho velho devolvia o nome antigo, vazio e com o grupo/ano duplicado */marcaExcluido(chaveColJ(j,c));const g=grupoDe(j,c);if(g){if(!colsG[j])colsG[j]={};colsG[j][nv]=g;delete colsG[j][c];}
   movs.forEach(m=>{if((m.jogo||'Pokémon')===j&&m.colecao===c)m.colecao=nv;});
   const ci=cols.indexOf(c);if(ci>=0)cols[ci]=nv;
   salvarColsG();saveL();save();abrirCols(j);}
@@ -4544,10 +4616,10 @@ function excluirCol(j,c){const n=movs.filter(m=>(m.jogo||'Pokémon')===j&&m.cole
   if(n>0){alert('Essa coleção tem '+n+' lançamento(s). Renomeie ou mova os lançamentos antes de excluir.');return;}
   const g=grupoDe(j,c);
   if(!confirm('Excluir a coleção "'+c+'"?\n\nEla está vazia (0 lançamentos) — nenhuma carta, lançamento ou foto é apagado.'+(g?' A marcação de grupo/ano "'+g+'" desta coleção some junto.':'')))return;
-  marcaExcluido('cols:'+c);colsJ[j]=colsJ[j].filter(x=>x!==c);if(colsG[j])delete colsG[j][c];cols=cols.filter(x=>x!==c);salvarColsG();saveL();abrirCols(j);}
+  marcaExcluido('cols:'+c);/* [cura 03/10] + o túmulo POR JOGO (o antigo fica como estava: aparelho que não atualizou e a lista global esperam por ele) — ver chaveColJ */marcaExcluido(chaveColJ(j,c));colsJ[j]=colsJ[j].filter(x=>x!==c);if(colsG[j])delete colsG[j][c];cols=cols.filter(x=>x!==c);salvarColsG();saveL();abrirCols(j);}
 function addColModal(j){const n=(document.getElementById('novaCol')?.value||'').trim(),g=(document.getElementById('novaColG')?.value||'').trim();if(!n)return;
   if(!colsJ[j])colsJ[j]=[];if(!colsJ[j].includes(n))colsJ[j].push(n);if(!cols.includes(n))cols.push(n);
-  if(g){if(!colsG[j])colsG[j]={};colsG[j][n]=g;}salvarColsG();saveL();abrirCols(j);}
+  if(g){if(!colsG[j])colsG[j]={};colsG[j][n]=g;}desmarcaCol(j,n);salvarColsG();saveL();abrirCols(j);}
 function renomearJogo(i){const antigo=jogos[i],nv=(prompt('Renomear jogo:',antigo)||'').trim();if(!nv||nv===antigo)return;if(jogos.includes(nv)){alert('Já existe um jogo com esse nome.');return;}jogos[i]=nv;movs.forEach(m=>{if((m.jogo||'Pokémon')===antigo)m.jogo=nv;});saveL();save();fecharModal();abrirJogos();}
 function excluirJogo(i){if(jogos.length<=1){alert('Precisa ter ao menos 1 jogo.');return;}const j=jogos[i],n=movs.filter(m=>(m.jogo||'Pokémon')===j).length,destino=jogos.find((x,k)=>k!==i);if(n>0){if(!confirm(`${n} lançamento(s) usam "${j}". Excluir e mover esses pra "${destino}"?`))return;}else if(!confirm(`Excluir o jogo "${j}"?`))return;movs.forEach(m=>{if((m.jogo||'Pokémon')===j)m.jogo=destino;});marcaExcluido('jogos:'+j);jogos.splice(i,1);saveL();save();fecharModal();abrirJogos();}
 function vCadastros(){
@@ -5020,7 +5092,7 @@ function importarBackup(){const inp=document.createElement('input');inp.type='fi
       if(!confirm('Importar '+arr.length+' lançamentos? Isso SUBSTITUI o que está no app agora.'))return;
       movs=arr.map(m=>({...m}));
       arr.forEach(m=>{const j=m.jogo||'Pokémon';if(!jogos.includes(j))jogos.push(j);if(!colsJ[j])colsJ[j]=[];if(m.colecao){if(!colsJ[j].includes(m.colecao))colsJ[j].push(m.colecao);if(!cols.includes(m.colecao))cols.push(m.colecao);}if(m.cat&&!cats.includes(m.cat))cats.push(m.cat);if(m.contraparte&&!pess.includes(m.contraparte))pess.push(m.contraparte);if(m.conta&&!pgs.includes(m.conta))pgs.push(m.conta);});
-      if(d&&!Array.isArray(d)){if(Array.isArray(d.jogos))jogos=[...new Set([...jogos,...d.jogos])];if(Array.isArray(d.cats))cats=[...new Set([...cats,...d.cats])];if(Array.isArray(d.cols))cols=[...new Set([...cols,...d.cols])];if(d.colsJ&&typeof d.colsJ==='object')Object.keys(d.colsJ).forEach(j=>{colsJ[j]=[...new Set([...(colsJ[j]||[]),...(d.colsJ[j]||[])])];});if(d.colsG&&typeof d.colsG==='object')Object.keys(d.colsG).forEach(j=>{colsG[j]=Object.assign(colsG[j]||{},d.colsG[j]);});if(Array.isArray(d.pess))pess=[...new Set([...pess,...d.pess])];if(Array.isArray(d.pgs))pgs=[...new Set([...pgs,...d.pgs])];if(Array.isArray(d.despCats))despCats=[...new Set([...despCats,...d.despCats])];if(Array.isArray(d.cadastros)&&d.cadastros.length)cadastros=d.cadastros;if(Array.isArray(d.contasBanc)&&d.contasBanc.length)contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object'&&Object.keys(d.codigosResolvidos).length)codigosResolvidos=d.codigosResolvidos;salvarCad();salvarCB();salvarColsG();salvarCodRes();}
+      /* [cura 03/10] importar é um "quero isto de volta": desfaz o túmulo de TUDO que o arquivo traz (lançamentos, cadastros, contas, nomes e as coleções por jogo) — como restaurarBackup, lixeiraRestaura e o ponto na nuvem já faziam; sem isso a coleção ficava e o lançamento voltava e sumia na fusão seguinte */esqueceExclusaoDe(Object.assign({},(d&&!Array.isArray(d))?d:{},{movs:arr}));if(d&&!Array.isArray(d)){if(Array.isArray(d.jogos))jogos=[...new Set([...jogos,...d.jogos])];if(Array.isArray(d.cats))cats=[...new Set([...cats,...d.cats])];if(Array.isArray(d.cols))cols=[...new Set([...cols,...d.cols])];if(d.colsJ&&typeof d.colsJ==='object')Object.keys(d.colsJ).forEach(j=>{colsJ[j]=[...new Set([...(colsJ[j]||[]),...(d.colsJ[j]||[])])];});if(d.colsG&&typeof d.colsG==='object')Object.keys(d.colsG).forEach(j=>{colsG[j]=Object.assign(colsG[j]||{},d.colsG[j]);});if(Array.isArray(d.pess))pess=[...new Set([...pess,...d.pess])];if(Array.isArray(d.pgs))pgs=[...new Set([...pgs,...d.pgs])];if(Array.isArray(d.despCats))despCats=[...new Set([...despCats,...d.despCats])];if(Array.isArray(d.cadastros)&&d.cadastros.length)cadastros=d.cadastros;if(Array.isArray(d.contasBanc)&&d.contasBanc.length)contasBanc=d.contasBanc;if(d.codigosResolvidos&&typeof d.codigosResolvidos==='object'&&Object.keys(d.codigosResolvidos).length)codigosResolvidos=d.codigosResolvidos;salvarCad();salvarCB();salvarColsG();salvarCodRes();}
       const fts=(d&&!Array.isArray(d)&&Array.isArray(d.fotos))?d.fotos:null;
       save();saveL();fecharModal();
       if(fts&&fts.length){toast('restaurando '+fts.length+' foto(s)…');restaurarFotos(fts,okN=>{go('painel');toast('Backup importado ✓ — '+arr.length+' lançamentos + '+okN+' foto'+(okN===1?'':'s'));});}
@@ -6056,7 +6128,8 @@ function mergeDictRaso(local,remoto){return {...(remoto||{}),...(local||{})};}
 /* [cura de classe 25/08 — revisor-lixeira G1] o dicionário de exclusão funde por EVENTO MAIS RECENTE (|ts| maior),
    não por união: exclusão = ts positivo, restauração = ts negativo. União devorava o restaurado. */
 function mergeExcl(a,b){const out={...(a||{})};Object.keys(b||{}).forEach(k=>{const va=out[k],vb=b[k];
-  if(va===undefined||Math.abs(+vb||0)>Math.abs(+va||0))out[k]=vb;});return out;}
+  /* [03/10] empate de |carimbo| com sinais opostos (dois aparelhos carimbam igual quando conhecem o mesmo máximo, à frente do relógio): o POSITIVO vence, nos dois sentidos — sem desempate fixo cada aparelho ficava com o seu sinal pra sempre e a coleção entrava e saía da nuvem a cada fusão */
+  if(va===undefined||Math.abs(+vb||0)>Math.abs(+va||0)||(Math.abs(+vb||0)===Math.abs(+va||0)&&+vb>+va))out[k]=vb;});return out;}
 /* colsJ = {jogo:[colecao,...]} — merge por jogo, e dentro de cada jogo une o array de coleções. */
 function mergeColsJ(local,remoto){
   const out={};
@@ -6074,6 +6147,7 @@ function mergeColsG(local,remoto){
    fundido ficava só na memória até o próximo marcaExcluido). Agora uma função, usada pelas duas
    portas que fundem (salvarNuvem e aplicarNuvem). */
 function gravaTudoLocal(){
+  limpaEstado();   /* o que veio do outro aparelho (versao antiga) tambem sai limpo */
   gravaLocal(MK,JSON.stringify(movs));
   gravaLocal('tcg_cats',JSON.stringify(cats));
   gravaLocal('tcg_cols',JSON.stringify(cols));
@@ -6110,7 +6184,7 @@ function fundirComRemoto(r,remotoVence){r=r||{};
     const M=(a,b)=>remotoVence?mergePorIdBase(a,b):mergePorId(a,b);  /* a=local, b=remoto; remotoVence = por registro, pela base confirmada */
     const D=(a,b)=>remotoVence?mergeDictRaso(b,a):mergeDictRaso(a,b);
     const G=(a,b)=>remotoVence?mergeColsG(b,a):mergeColsG(a,b);
-    return {
+    return aplicaTumuloCols({   /* [cura 03/10] túmulo POR JOGO: a coleção excluída não volta pelo aparelho que ainda a tinha */
       movs:reidrataThumbs(movs,M(movs,r.movs)),   /* [1MB fase 1] snapshot vem sem thumb; a local não morre no merge */
       jogos:mergeArrUniao(jogos,r.jogos,'jogos:'),
       cats:mergeArrUniao(cats,r.cats),
@@ -6124,7 +6198,7 @@ function fundirComRemoto(r,remotoVence){r=r||{};
       excluidos:exc,
       colsJ:mergeColsJ(colsJ,r.colsJ),
       colsG:G(colsG,r.colsG),
-    };}
+    });}
   finally{excluidos=excAntes;}}
 function salvarNuvem(){if(!_db||!_syncReady)return;
   setSync('saving');
@@ -6240,6 +6314,8 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
   reidrataThumbs(_movsAntesTh,movs);   /* [1MB fase 1] a PORTA PRINCIPAL troca movs inteiro pelo snapshot (enxuto); a miniatura local volta aqui */
   if(Array.isArray(cadastros))cadastros=cadastros.filter(c=>!estaExcluido(c&&c.id));
   if(Array.isArray(contasBanc))contasBanc=contasBanc.filter(c=>!estaExcluido(c&&c.id));gravaLocal(MK,JSON.stringify(movs));
+  /* [cura 03/10] mesma regra dos filtros de cima, agora nas coleções por jogo: aparelho que ainda não atualizou grava colsJ/colsG sem olhar túmulo, e o snapshot dele não pode trazer de volta o que este aparelho excluiu. Coleção em uso com túmulo é REAVIVADA (marca de presença). E grava colsJ/colsG no disco: sem isso o disco ficava com a coleção excluída, e um boot sem sinal fundia esse disco velho de volta depois dos 120 dias — mas SÓ quando nenhuma aba deste aparelho tem alteração ainda não confirmada (a marca de pendência fica no disco): duas abas dividem o disco, e a que ficou aberta apagaria dele a coleção que a outra criou sem sinal e fechou */
+  {const uso=colsEmUso(movs);const rev=reavivaveis(excluidos,colsJ,uso);if(rev.length)marcaPresente(rev);colsJ=filtraColsJ(colsJ);colsG=filtraColsG(colsG);let pd=false;try{pd=localStorage.getItem('tcg_pend_nuvem')==='1';}catch(e){}if(!pd){gravaLocal('tcg_colsj',JSON.stringify(colsJ));gravaLocal('tcg_colsg',JSON.stringify(colsG));}}
   if(!fundiuPend)gravaBaseConfirmada(d);   /* snapshot aplicado sem pendência = a nuvem confirmou este estado (base do N1) */
   if(lancarTemRascunho()){if(!window._avisoRascunhoAt||Date.now()-window._avisoRascunhoAt>15000){window._avisoRascunhoAt=Date.now();toast('☁️ outro aparelho salvou — termina seu lançamento que a tela atualiza sozinha');}return;}
   render();}
@@ -6368,11 +6444,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='03/10 03h59';
+const BUILD_TAG='03/10 05h24';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791010797127;
+const BUILD_TS=1791015875548;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
