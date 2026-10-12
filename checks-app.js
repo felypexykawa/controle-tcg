@@ -551,6 +551,8 @@ const CAPACIDADES = [
         sitDe: m => (m && m._vendida ? 'Vendido' : (m && m._sit) || 'Em estoque'),
         precoLigaDe: c => FICHAS[('' + c).trim()] || null,
         provaReal: () => ({ A: [], n: { vermelho: 0, amarelo: 0 } }),
+        /* [12/10/2026] a lista de pendencias passou a escrever custo e data de cada carta (fmt e dBR): dubles simples, o que se prova aqui e o agrupamento, nao a formatacao */
+        fmt: n => 'R$ ' + (Math.round(n * 100) / 100), dBR: d => d.toLocaleDateString('pt-BR'),
         /* as 3 severidades entram na fixture: com so uma, podar o mapa SEV mandava as outras
            duas pro grupo "outros" — a soma continuava fechando e a vacina passava verde
            enquanto 2 grupos inteiros sumiam da tela do dono (furo M6 do 4o reataque) */

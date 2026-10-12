@@ -6503,6 +6503,200 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('41h: com "<" e ">" misturados a texto malformado (metade de emoji solta), nulo, indefinido e numero, a chave NUNCA lanca (ela roda DENTRO da fusao: um throw travaria o salvamento dos dois aparelhos)',
       !lancou && !!r && r.every(x => typeof x === 'string'), 'lancou: ' + lancou + ' | ' + S34(r));
   });
+
+  /* ===== 42. VINCULO MANUAL SO COM OS PROVAVEIS · CARTA AVULSA NAO ABRE · CARTA SEM PRECO NA LIGA COM CAMINHO (12/10/2026) =====
+     Felype, ao tentar vincular na mao: "no texto eu nao consigo identificar a colecao... ele me joga para uma lista imensa, sem nenhum tipo de filtro. Fica bem improvavel eu fazer qualquer
+     correcao". E, numa carta sem preco na Liga: "nao achei a opcao de preco na liga... achei o botao de abrir, o que a gente ja tinha tratado que single card nao tem como abrir". */
+  console.log('');
+  console.log('=== 42. vinculo manual so com os provaveis · carta avulsa nao abre · carta sem preco na Liga mostra o caminho ===');
+  const FUNCS42 = ['ehAbrivel', 'abrivelDisp', 'abrirTransf', 'vinculoPontua', 'vinculoCandidatos', 'abrirVinculo', 'renderVinculo', 'pendGrupos', 'abrirLigaDoItem', 'vConsultar', 'provaReal'];
+  const faltam42 = FUNCS42.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('42a: [pre-requisito] o app carregado tem as ' + FUNCS42.length + ' funcoes desta secao', faltam42.length === 0, 'FALTAM no app: ' + faltam42.join(', '));
+  const bloco42 = (rot, corpo) => faltam42.length ? Promise.resolve() : bloco34(rot, corpo, '42');
+  const venda42 = (idv, extra) => Object.assign({ id: idv, tipo: 'VENDA', data: '2026-06-04', jogo: 'Pokémon', cat: 'ETB', colecao: '(diversos)', qtd: 1, valor: 500, contraparte: 'jumble', obs: '' }, extra || {});
+  const ids42 = L => L.map(x => x.c.id);
+  const fixVinc42 = () => {
+    M().push(compra34('b1', { cat: 'ETB', colecao: 'Caos ascendente', idioma: 'Português', data: '2026-05-20', qtd: 2, valor: 532 }));
+    M().push(venda42('v1', { colecao: '(diversos)', data: '2026-06-04', obs: 'etbs /quad' }),
+      venda42('v2', { colecao: 'Caos ascendente', data: '2026-06-10' }),
+      venda42('v3', { colecao: 'Mega Gard/Lucario', data: '2026-04-14' }),
+      venda42('v4', { cat: 'Booster Box', colecao: '(diversos)', data: '2026-06-06', obs: 'box' }),
+      venda42('v5', { colecao: 'Caos ascendente', data: '2026-05-01' }),
+      venda42('v6', { jogo: 'Magic', colecao: 'Caos ascendente' }),
+      venda42('v7', { colecao: 'Caos ascendente', origemId: 'b1' }),
+      venda42('v8', { colecao: 'Caos ascendente', data: '2026-05-25' }));
+  };
+
+  await bloco42('b', () => {
+    const E = A('ehAbrivel');
+    t('42b: ehAbrivel — carta avulsa NAO abre; ETB, Booster Box, Triple e item sem categoria abrem; nulo nao quebra',
+      !E(compra34('s1', { cat: 'Single/Carta' })) && E(compra34('e1', { cat: 'ETB' })) && E(compra34('b1', { cat: 'Booster Box' })) && E(compra34('t1', { cat: 'Triple' })) && E({ id: 'x' }) && !E(null) && !E(undefined), '');
+    M().push(compra34('c1', { cat: 'Single/Carta', codigo: 'Pikachu (173/165)' }), compra34('c2', { cat: 'ETB' }), compra34('c3', { cat: 'Single/Carta', situacao: 'Coleção' }),
+      compra34('c4', { cat: 'Booster Box', situacao: 'Coleção' }), compra34('c5', { cat: 'Triple', situacao: 'Vendido' }));
+    const lista = A('abrivelDisp')().map(m => m.id).sort();
+    t('42b: a lista da tela Abrir traz so o que abre — estoque e coleção que não é carta avulsa (c2, c4); carta avulsa (c1, c3) e o que já saiu (c5) ficam de fora', S34(lista) === '["c2","c4"]', S34(lista));
+    const msgs = [], origAb = g('_abrirId');
+    try {
+      setg('toast', m => { msgs.push(m); });
+      setg('_abrirId', null); A('abrirTransf')('c1');
+      t('42b: abrirTransf recusa carta avulsa — o formulário não abre (_abrirId continua vazio) e o app diz por quê', g('_abrirId') === null && msgs.length === 1 && /não se abre/.test(msgs[0]), S34([g('_abrirId'), msgs]));
+      A('abrirTransf')('c2');
+      t('42b: abrirTransf continua abrindo o que abre (ETB)', g('_abrirId') === 'c2', S34(g('_abrirId')));
+    } finally { setg('_abrirId', origAb); }
+    /* a tela Abrir de verdade: o seletor "O que voce vai abrir?" nasce de abrivelDisp() — o teste da funcao sozinha nao pegaria a tela voltar ao filtro antigo */
+    reset(); M().push(compra34('t1', { cat: 'ETB', obs: 'ABRIVEL-ETB-X' }), compra34('t2', { cat: 'Single/Carta', obs: 'AVULSA-PIKACHU-X', codigo: 'Pikachu (173/165)' }));
+    const tipo0 = g('tipoSel'), edit0 = g('editId');
+    try {
+      setg('tipoSel', 'ABRIR'); setg('editId', null);
+      const hA = A('vLancar')(), itensA = ((g('_sbDados') || {}).ab_pick || { itens: [] }).itens.map(x => x.id).sort();
+      t('42b: a tela Abrir oferece o ETB (t1) e NAO oferece a carta avulsa (t2) no seletor "O que você vai abrir?"', /ab_pick/.test(hA) && S34(itensA) === '["t1"]', S34(itensA));
+    } finally { setg('tipoSel', tipo0); setg('editId', edit0); }
+  });
+
+  await bloco42('c', () => {
+    fixVinc42();
+    const C = A('vinculoCandidatos'), base = M().find(m => m.id === 'b1');
+    const R = C(base, 'deCompra', '', false);
+    t('42c: a lista de vendas abre só nos PROVÁVEIS (mesmo tipo e coleção compatível; "(diversos)" serve de curinga), do mais ao menos provável: v8 e v2 (mesma coleção; v8 empata em pontos mas está a 5 dias da compra e v2 a 21: a mais PERTO vem antes), v1 (coleção mista), v5 (mesma coleção, mas ANTES da compra: vai pro fim)',
+      S34(ids42(R.lista)) === '["v8","v2","v1","v5"]' && R.filtrado === true && R.nProvaveis === 4 && R.nTotal === 6, S34([ids42(R.lista), R.filtrado, R.nProvaveis, R.nTotal]));
+    t('42c: venda de OUTRO jogo (v6) e venda que já tem vínculo (v7) nunca aparecem, nem em "ver todos"', !ids42(C(base, 'deCompra', '', true).lista).some(i => i === 'v6' || i === 'v7'), S34(ids42(C(base, 'deCompra', '', true).lista)));
+    const T = C(base, 'deCompra', '', true);
+    t('42c: "ver todos" traz as 6, com os prováveis na frente: v8, v2, v1, v4 (outro tipo, curinga), v5 (antes da compra), v3 (outra coleção e antes da compra)',
+      S34(ids42(T.lista)) === '["v8","v2","v1","v4","v5","v3"]' && T.filtrado === false, S34([ids42(T.lista), T.filtrado]));
+    const Q = C(base, 'deCompra', 'booster', false);
+    t('42c: digitar na busca procura em TODOS, não só nos prováveis: "booster" acha v4 mesmo sendo de outro tipo', S34(ids42(Q.lista)) === '["v4"]' && Q.filtrado === false, S34([ids42(Q.lista), Q.filtrado]));
+    const Q2 = C(base, 'deCompra', 'etb', false);
+    t('42c: ... e quando a busca acha prováveis E não prováveis, traz os dois (a busca "etb" acha v3, de outra coleção, junto dos prováveis)', S34(ids42(Q2.lista)) === '["v8","v2","v1","v5","v3"]' && Q2.filtrado === false, S34([ids42(Q2.lista), Q2.filtrado]));
+    const P = A('vinculoPontua');
+    const p1 = P(base, M().find(m => m.id === 'v2'), 'deCompra'), p2 = P(base, M().find(m => m.id === 'v5'), 'deCompra'), p3 = P(base, M().find(m => m.id === 'v4'), 'deCompra');
+    const Pn = A('vinculoPontua');
+    t('42c: "Caos Ascendente " (maiúscula, espaço na ponta) e "Caos ascendente" são a MESMA coleção; "Heróis Excelsos" e "Herois excelsos" também (sem acento)',
+      Pn({ cat: 'ETB', colecao: 'Caos Ascendente ' }, { cat: 'ETB', colecao: 'Caos ascendente' }, 'deVenda').mesmaCol === true && Pn({ cat: 'ETB', colecao: 'Heróis Excelsos' }, { cat: 'ETB', colecao: 'Herois excelsos' }, 'deVenda').mesmaCol === true && Pn({ cat: 'ETB', colecao: 'A' }, { cat: 'ETB', colecao: 'B' }, 'deVenda').mesmaCol === false, '');
+    const caixa = { cat: 'Booster Box', colecao: 'X', boosters: 36, data: '2026-05-01' }, caixa1 = { cat: 'Booster Box', colecao: 'X', boosters: 1, data: '2026-05-01' };
+    t('42c: venda de Booster ou Sleeved solto sai de uma caixa com vários boosters dentro (compatível); caixa de 1 booster não vale pra Sleeved; ETB nunca sai de caixa',
+      Pn(caixa, { cat: 'Booster', colecao: 'X', data: '2026-06-01' }, 'deCompra').mesmoTipo === true && Pn(caixa, { cat: 'Sleeved', colecao: 'X', data: '2026-06-01' }, 'deCompra').mesmoTipo === true && Pn(caixa1, { cat: 'Sleeved', colecao: 'X', data: '2026-06-01' }, 'deCompra').mesmoTipo === false && Pn(caixa, { cat: 'ETB', colecao: 'X', data: '2026-06-01' }, 'deCompra').mesmoTipo === false, '');
+    t('42c: vinculoPontua — mesma coleção e depois da compra = melhor; venda anterior à compra é marcada (antes) e cai; outro tipo não é provável',
+      p1.mesmaCol && !p1.antes && p1.provavel && p2.antes && p2.provavel && p1.pts > p2.pts && !p3.mesmoTipo && p3.mista && !p3.provavel, S34([p1, p2, p3]));
+  });
+
+  await bloco42('d', () => {
+    M().push(venda42('sv', { cat: 'ETB', colecao: '(diversos)', data: '2026-06-04', obs: 'etbs /quad', valor: 1044 }),
+      compra34('p1', { cat: 'ETB', colecao: 'Caos ascendente', data: '2026-05-20' }),
+      compra34('p2', { cat: 'Booster Box', colecao: 'Caos ascendente', data: '2026-05-20' }),
+      compra34('p3', { cat: 'ETB', colecao: 'Mega Gard/Lucario', situacao: 'Coleção', data: '2026-01-10' }),
+      compra34('p4', { cat: 'ETB', colecao: 'Caos ascendente', situacao: 'Vendido', dataVenda: '2026-06-04' }),
+      compra34('p5', { cat: 'Single/Carta', colecao: 'Caos ascendente' }),
+      compra34('p6', { cat: 'ETB', colecao: '151', data: '2026-07-01' }),
+      compra34('p7', { cat: 'ETB', colecao: 'Caos ascendente', situacao: 'Vendido' }), venda42('sv7', { cat: 'ETB', origemId: 'p7' }));
+    const C = A('vinculoCandidatos'), base = M().find(m => m.id === 'sv');
+    const R = C(base, 'deVenda', '', false);
+    t('42d: "de onde saiu" a venda: itens EM ESTOQUE/COLEÇÃO do mesmo tipo (venda sem coleção serve a qualquer uma) e a peça que JÁ SAIU sem venda apontando (p4, a origem de verdade de uma venda lançada solta); a peça que saiu no MESMO DIA da venda (p4) vem na frente, e o que chegou DEPOIS da venda por último (p6). A peça vendida que já tem venda ligada (p7) nunca entra',
+      S34(ids42(R.lista)) === '["p4","p1","p3","p6"]' && R.nProvaveis === 4 && R.nTotal === 6 && R.lista.filter(x => x.orfa).length === 1 && R.lista[0].orfa === true, S34([ids42(R.lista), R.nProvaveis, R.nTotal, R.lista.map(x => !!x.orfa)]));
+    M().push(compra34('cs', { cat: 'Single/Carta', colecao: 'Herois Excelsos' }));
+    const S1 = C(M().find(m => m.id === 'cs'), 'deCompra', '', false);
+    t('42d: sem nenhum provável, mostra todos e avisa (semProvaveis) — a tela nunca fica vazia por causa do filtro', S1.semProvaveis === true && S1.filtrado === false && S1.lista.length === 1, S34([S1.semProvaveis, S1.filtrado, ids42(S1.lista)]));
+  });
+
+  await bloco42('e', () => {
+    fixVinc42();
+    const orig = { id: g('_vincId'), modo: g('_vincModo'), q: g('_vincQ'), todos: g('_vincTodos') };
+    let html = '';
+    try {
+      ctx.document.body.insertAdjacentHTML = (p, h) => { html = h; };
+      A('abrirVinculo')('b1', 'deCompra');
+      t('42e: a tela mostra o item que está sendo ligado (coleção, tipo, idioma, quantidade, custo) — antes só dizia "Item" e o custo',
+        /Caos ascendente · ETB/.test(html) && /Português/.test(html) && /2 un/.test(html) && html.includes(fmt34(532)), html.slice(0, 600));
+      t('42e: abre só nos prováveis: v2 e v1 estão na tela, v4 (outro tipo) e v3 (outra coleção) não; a linha diz "4 mais prováveis" e oferece "ver todos (6)"',
+        html.includes("confirmVinculo('v2')") && html.includes("confirmVinculo('v1')") && !html.includes("confirmVinculo('v4')") && !html.includes("confirmVinculo('v3')") && /4 mais prováveis/.test(html) && /ver todos \(6\)/.test(html), '');
+      const linha = id => { const i = html.indexOf("confirmVinculo('" + id + "')"); return i < 0 ? '' : html.slice(i, html.indexOf('vincular</span>', i)); };
+      t('42e: cada candidato diz por que está na lista — "mesma coleção" (v2), "coleção não identificada" (v1), "venda antes da compra" (v5)',
+        /mesma coleção/.test(linha('v2')) && /coleção não identificada/.test(linha('v1')) && /venda antes da compra/.test(linha('v5')), S34([linha('v2').slice(0, 200), linha('v1').slice(0, 200)]));
+      setg('_vincTodos', true); A('renderVinculo')();
+      t('42e: "ver todos" põe v4 e v3 na tela, marca v4 como "outro tipo" e oferece voltar a "só os prováveis (4)"',
+        html.includes("confirmVinculo('v4')") && html.includes("confirmVinculo('v3')") && /outro tipo/.test(linha('v4')) && /só os prováveis \(4\)/.test(html), '');
+      setg('_vincTodos', false); setg('_vincQ', 'booster'); A('renderVinculo')();
+      t('42e: com texto na busca a tela diz "Buscando em todos" e acha v4', /Buscando em todos: 1 resultado/.test(html) && html.includes("confirmVinculo('v4')"), '');
+      /* a busca refaz a tela: o foco e o cursor voltam pro campo (senao o teclado do celular fecha a cada letra) */
+      const foco = { focused: 0, pos: null, focus() { this.focused++; }, setSelectionRange(a) { this.pos = a; }, remove() {} }, geb0 = ctx.document.getElementById, st0 = ctx.setTimeout;
+      try {
+        ctx.document.getElementById = idn => idn === 'vinc_q' ? foco : geb0(idn); ctx.setTimeout = f => { f(); return 1; };
+        setg('_vincQ', ''); A('abrirVinculo')('b1', 'deCompra');
+        A('vincBusca')({ value: 'booster', selectionStart: 3 });
+        t('42e: digitar na busca refaz a lista E devolve o foco ao campo no mesmo ponto do cursor', g('_vincQ') === 'booster' && /Buscando em todos: 1 resultado/.test(html) && foco.focused === 1 && foco.pos === 3, S34([g('_vincQ'), foco.focused, foco.pos]));
+        t('42e: o campo de busca tem o id que o foco procura (vinc_q) e chama vincBusca', /id="vinc_q"/.test(html) && /oninput="vincBusca\(this\)"/.test(html), '');
+      } finally { ctx.document.getElementById = geb0; ctx.setTimeout = st0; }
+      reset(); M().push(compra34('cs', { cat: 'Single/Carta', colecao: 'Herois Excelsos' }), venda42('v1', { cat: 'ETB' }));
+      setg('_vincQ', ''); A('abrirVinculo')('cs', 'deCompra');
+      t('42e: sem nenhum provável a tela avisa e mostra todos (não fica vazia)', /Nenhum candidato do mesmo tipo/.test(html) && html.includes("confirmVinculo('v1')"), html.slice(0, 400));
+      /* ---- "de onde saiu": a peca que ja saiu so se RECONECTA (aplicarOrigem), a de estoque vincula (confirmVinculo) ---- */
+      reset(); M().push(venda42('sv', { cat: 'ETB', colecao: '(diversos)', data: '2026-06-04' }), compra34('e1', { cat: 'ETB', colecao: 'Caos', data: '2026-05-20' }), compra34('o1', { cat: 'ETB', colecao: 'Caos', situacao: 'Vendido', dataVenda: '2026-06-04' }));
+      setg('_vincQ', ''); A('abrirVinculo')('sv', 'deVenda');
+      t('42e: a peça que já saiu do estoque aparece como "reconectar" e chama aplicarOrigem (nenhuma baixa nova); a de estoque continua "vincular" e chama confirmVinculo',
+        html.includes("aplicarOrigem('sv','o1')") && !html.includes("confirmVinculo('o1')") && html.includes("confirmVinculo('e1')") && !html.includes("aplicarOrigem('sv','e1')") && /já saiu do estoque — só reconecta/.test(html) && /reconectar<\/span>/.test(html), html.slice(0, 500));
+      reset(); M().push(compra34('nada', { cat: 'ETB' })); setg('_vincQ', ''); A('abrirVinculo')('nada', 'deCompra');
+      t('42e: sem nenhum candidato a tela diz só "Nenhum candidato encontrado." (não "mostrando todos (0)")', /Nenhum candidato encontrado\./.test(html) && !/mostrando todos/.test(html), html.slice(0, 400));
+      /* ---- linha longa de observacao nao empurra a tela; gemeo compara o custo POR UNIDADE ---- */
+      reset(); const longa = 'ajuste de estoque 11/10/2026: ' + 'texto muito comprido '.repeat(12) + 'FIM-DA-OBS';
+      M().push(venda42('sv', { cat: 'ETB', colecao: '(diversos)' }), compra34('g1', { cat: 'ETB', colecao: 'Caos', qtd: 2, valor: 545.98, obs: longa }), compra34('g2', { cat: 'ETB', colecao: 'Caos', qtd: 1, valor: 272.99 }));
+      setg('_vincQ', ''); A('abrirVinculo')('sv', 'deVenda');
+      t('42e: a observação comprida aparece cortada com "…" (a ponta "FIM-DA-OBS" não chega à tela)', /texto muito comprido/.test(html) && !/FIM-DA-OBS/.test(html) && /…/.test(html), html.slice(0, 300));
+      t('42e: 2 un a R$ 545,98 e 1 un a R$ 272,99 são o MESMO custo por unidade: o aviso de "gêmeo com custo diferente" não aparece', !/gêmeo com custo diferente/.test(html), '');
+      M().push(compra34('g3', { cat: 'ETB', colecao: 'Caos', qtd: 1, valor: 300 })); A('renderVinculo')();
+      t('42e: com um terceiro a R$ 300 por unidade (custo por unidade diferente de verdade) o aviso de gêmeo aparece', /gêmeo com custo diferente/.test(html), '');
+    } finally { setg('_vincId', orig.id); setg('_vincModo', orig.modo); setg('_vincQ', orig.q); setg('_vincTodos', orig.todos); }
+  });
+
+  await bloco42('f', () => {
+    const orig = { liga: g('_precosLiga'), tent: g('_precosTentado'), consF: g('consF'), consVer: g('consVer'), exp: g('expandId'), abre: ctx.open };
+    try {
+      setg('_precosLiga', { cartas: {
+        '032/∞': { codigo: '032/♾️', status: 'NAO_COLETAVEL', titulo: '032/∞ — total do código é ∞', versoes: [] },
+        'Pikachu (173/165)': { status: 'OK', titulo: 'Pikachu (173/165)', versoes: [{ v: '', mn: 10, md: 12, mx: 15 }] } }, atualizadoEm: '2026-10-09T00:00:00Z' });
+      setg('_precosTentado', true);
+      M().push(compra34('g1', { cat: 'Single/Carta', colecao: 'Herois Excelsos', idioma: 'Português', qtd: 1, valor: 20, situacao: 'Coleção', codigo: 'Mega gardevoir ex (032/∞)' }),
+        compra34('g2', { cat: 'Single/Carta', colecao: 'Base', situacao: 'Coleção', codigo: 'Pikachu (173/165)' }),
+        compra34('g3', { cat: 'Single/Carta', colecao: '', situacao: 'Coleção', codigo: 'Bulk', qtd: 15, valor: 323.26, obs: 'Bulk (🔓 de Sleeved)' }));
+      const gp = A('pendGrupos')().find(x => x.id === 'sem_preco');
+      const it = gp && gp.itens.find(x => /gardevoir/i.test(x.t));
+      t('42f: a pendência "sem preço" lista a carta com coleção e custo e o MOTIVO em português claro (∞ = carta promocional; só o link direto resolve) — e a que tem preço (g2) não entra',
+        !!it && /Herois Excelsos/.test(it.d) && /carta promocional/.test(it.d) && /link direto/.test(it.d) && gp.itens.length === 2 && !gp.itens.some(x => /Pikachu/.test(x.t)), S34(gp));
+      const itB = gp.itens.find(x => /Bulk/.test(x.t));
+      t('42f: o "Bulk" (15 cartas soltas) pode ser marcado ali mesmo como lote de cartas avulsas — a carta única (g1) não ganha esse botão',
+        !!itB && itB.a.some(a => /é lote de cartas avulsas/.test(a[0])) && !it.a.some(a => /é lote de cartas avulsas/.test(a[0])), S34([itB && itB.a.map(a => a[0]), it.a.map(a => a[0])]));
+      const rots = it ? it.a.map(a => a[0]) : [];
+      t('42f: ... e oferece ali mesmo "colar o link da Liga" e "procurar na Liga" (antes só havia "abrir o lançamento")', rots[0] === '🔗 colar o link da Liga' && rots.includes('🔎 procurar na Liga') && rots.includes('abrir o lançamento'), S34(rots));
+      t('42f: colar o link chama setCodigoUrl no item certo e reabre a lista; procurar leva o jogo e o código entre aspas',
+        !!it && /setCodigoUrl\('g1'\)/.test(it.a[0][1]) && /abrirPendencias\('sem_preco'\)/.test(it.a[0][1]) && /abrirLigaDoItem\('Pokémon','Mega gardevoir ex \(032\/∞\)'\)/.test(it.a[1][1]), S34(it && it.a));
+      setg('tela', 'consultar'); setg('consMenu', false); setg('consQ', ''); setg('consJogo', 'todos'); setg('consCol', ''); setg('consPess', ''); setg('consConta', ''); setg('consCat', '');
+      setg('consF', 'COMPRA'); setg('consVer', 'itens'); setg('expandId', 'g1');
+      const h = A('vConsultar')();
+      t('42f: no item aberto, a carta sem preço na Liga ganha "usar link direto" (antes o botão sumia) e o texto explica o ∞ — e NÃO oferece 🔓 abrir',
+        /onclick="setCodigoUrl\('g1'\)"/.test(h) && /carta promocional/.test(h) && !/abrirTransf\('g1'\)/.test(h), h.slice(h.indexOf('mv-g1'), h.indexOf('mv-g1') + 300));
+      setg('expandId', 'g2');
+      const h2 = A('vConsultar')();
+      t('42f: carta com preço na Liga não ganha o aviso de "sem preço" nem o botão de link direto, e também não abre', !/carta promocional/.test(h2) && !/onclick="setCodigoUrl\('g2'\)"/.test(h2) && !/abrirTransf\('g2'\)/.test(h2), '');
+      const urls = []; ctx.open = u => { urls.push(String(u)); return null; };
+      const L = A('abrirLigaDoItem');
+      L('Pokémon', 'Mega gardevoir ex (032/∞)'); L('Pokémon', 'Morpeko da marine 206/∞'); L('Pokémon', 'Pikachu (173/165)'); L('Pokémon', '056/∞');
+      L('Pokémon', 'Mega gardevoir ex(032/∞)'); L('Pokémon', 'Nome (032 / ♾️)'); L('Pokémon', '(SVP 032/∞)');
+      const q = u => decodeURIComponent((u.match(/card=([^&]*)/) || [])[1] || '');
+      t('42f: procurar na Liga um código com ∞ busca só pelo NOME ("Mega gardevoir ex", "Morpeko da marine"); código normal vai inteiro; código que é só número com ∞ vai como está',
+        q(urls[0]) === 'Mega gardevoir ex' && q(urls[1]) === 'Morpeko da marine' && q(urls[2]) === 'Pikachu (173/165)' && q(urls[3]) === '056/∞', S34(urls.map(q)));
+      t('42f: ... e sem espaço antes do parêntese ("ex(032/∞)" não perde o "ex"), com ♾️ e espaços na barra ("Nome (032 / ♾️)" vira "Nome") e sem nome nenhum ("(SVP 032/∞)" não manda busca vazia)',
+        q(urls[4]) === 'Mega gardevoir ex' && q(urls[5]) === 'Nome' && q(urls[6]) === '(SVP 032/∞)', S34(urls.map(q)));
+    } finally { setg('_precosLiga', orig.liga); setg('_precosTentado', orig.tent); setg('consF', orig.consF); setg('consVer', orig.consVer); setg('expandId', orig.exp); ctx.open = orig.abre; }
+  });
+
+  await bloco42('g', () => {
+    M().push(compra34('o1', { cat: 'Sleeved', colecao: 'Caos ascendente', idioma: 'Português', qtd: 136, valor: 1027.43, situacao: 'Vendido', data: '2026-05-21', dataSaida: '2026-10-11' }),
+      compra34('o2', { cat: 'ETB', colecao: 'Chaos rising', idioma: 'Inglês', qtd: 1, valor: 272.99, situacao: 'Vendido', data: '2026-05-20' }));
+    const tit = A('provaReal')().A.filter(a => /Material vendido sem venda apontando/.test(a.titulo)).map(a => a.titulo);
+    t('42g: o aviso amarelo "vendido sem venda" diz coleção, tipo, data, IDIOMA e QUANTIDADE (Caos ascendente PT e Chaos rising EN pareciam iguais na tela)',
+      tit.some(x => /Caos ascendente · Sleeved \(21\/05\/2026\) · Português · 136 un/.test(x)) && tit.some(x => /Chaos rising · ETB \(20\/05\/2026\) · Inglês$/.test(x)), S34(tit));
+    const al = A('provaReal')().A.find(a => /Material vendido sem venda apontando/.test(a.titulo));
+    t('42g: o aviso não promete "dali dá pra vincular" (o item vendido não tem botão de vínculo): diz onde ligar — na venda, com "de onde saiu?" ou "procurar origem sozinho"',
+      !!al && !/dali dá pra vincular/.test(al.acaoRot + al.detalhe) && /abra a venda correspondente/.test(al.detalhe) && al.acaoRot === 'ver o item', S34(al));
+  });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
      A regra do dinheiro e escrita aqui DE NOVO, em cima da DESCRICAO das compras (valor, plano, marcas, conta) e sem chamar nenhuma tela do app:

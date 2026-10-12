@@ -710,43 +710,82 @@ function guardarDe(id){_preSel=id;tipoSel='CONSUMO';editId=null;go('lancar');}
    migração da planilha, etc.) e o item continua "fantasma" no estoque/coleção. Não cria
    lançamento novo: só liga os dois que já existem e move o item pra Vendido. */
 let _vincId=null,_vincModo=null,_vincQ='';
-function abrirVinculo(id,modo){const m=movs.find(x=>x.id===id);if(!m)return;_vincId=id;_vincModo=modo;_vincQ='';renderVinculo();}
+let _vincTodos=false,_vincT=null;
+function abrirVinculo(id,modo){const m=movs.find(x=>x.id===id);if(!m)return;_vincId=id;_vincModo=modo;_vincQ='';_vincTodos=false;renderVinculo();}
+/* [12/10/2026] Felype: "ele me joga para uma lista imensa, sem nenhum tipo de filtro... fica bem improvável eu fazer qualquer correção". A lista abre só nos PROVÁVEIS (mesmo tipo e
+   coleção compatível — "(diversos)"/sem coleção serve de curinga), do mais próximo ao mais distante; "ver todos" traz o resto; digitar na busca procura em todos. */
+function vinculoNorm(s){return String(s||'').normalize('NFD').replace(/[^ -~]/g,'').toLowerCase().trim();}   /* sem acento, sem maiúscula, sem espaço nas pontas: "Caos Ascendente" = "Caos ascendente" */
+function vinculoMista(x){const k=vinculoNorm(x&&x.colecao);return !k||k==='(diversos)';}
+function vinculoPontua(base,c,modo){
+  const compra=modo==='deCompra'?base:c,venda=modo==='deCompra'?c:base;
+  /* venda de booster/sleeved solto sai de uma caixa com vários boosters dentro (o app grava essa venda como 'Booster' com origem na caixa) */
+  const mesmoTipo=!!compra.cat&&!!venda.cat&&(compra.cat===venda.cat||((+compra.boosters||1)>1&&(venda.cat==='Booster'||venda.cat==='Sleeved')));
+  const cb=vinculoNorm(base.colecao),cc=vinculoNorm(c.colecao);
+  const mesmaCol=!!cb&&cb===cc,mista=vinculoMista(base)||vinculoMista(c);
+  const antes=!!(compra.data&&venda.data&&venda.data<compra.data);
+  const dias=(compra.data&&venda.data)?Math.abs(Math.round((new Date(venda.data+'T00:00:00')-new Date(compra.data+'T00:00:00'))/864e5)):99999;
+  const mesmaSaida=modo==='deVenda'&&!!c.dataVenda&&c.dataVenda===base.data;   /* peça que já saiu do estoque no mesmo dia da venda */
+  return {mesmoTipo,mesmaCol,mista,antes,dias,mesmaSaida,provavel:mesmoTipo&&(mesmaCol||mista),pts:(antes?0:10)+(mesmoTipo?4:0)+(mesmaCol?3:(mista?1:0))+(mesmaSaida?5:0)};}
+function vinculoCandidatos(m,modo,q,todos){
+  q=(q||'').toLowerCase();
+  const mesmoJogo=x=>(x.jogo||'Pokémon')===(m.jogo||'Pokémon');
+  const txt=c=>((c.colecao||'')+' '+(c.cat||'')+' '+(c.contraparte||'')+' '+(c.obs||'')).toLowerCase();
+  /* "de onde saiu?": além do que está em estoque/coleção/pedido, entram as peças que JÁ SAÍRAM do estoque sem venda apontando (órfãs): é onde mora a origem de uma venda
+     lançada solta — essas só se RECONECTAM (aplicarOrigem), não baixam nada de novo */
+  const base=modo==='deCompra'
+    ?movs.filter(v=>v.tipo==='VENDA'&&!v.origemId&&mesmoJogo(v))
+    :movs.filter(c=>c.tipo==='COMPRA'&&mesmoJogo(c)&&(sitDe(c)==='Em estoque'||sitDe(c)==='Coleção'||sitDe(c)==='Pedido'||fragOrfao(c)));
+  const todosC=base.map(c=>Object.assign({c,orfa:modo==='deVenda'&&sitDe(c)==='Vendido'},vinculoPontua(m,c,modo)));
+  const buscados=q?todosC.filter(x=>txt(x.c).includes(q)):todosC;
+  const provaveis=buscados.filter(x=>x.provavel);
+  const filtrado=!(q||todos||!provaveis.length);
+  const lista=(filtrado?provaveis:buscados).slice();
+  lista.sort((a,b)=>b.pts-a.pts||a.dias-b.dias||((b.c.data||'')<(a.c.data||'')?-1:1));
+  return {lista,nProvaveis:provaveis.length,nTotal:buscados.length,filtrado,semProvaveis:!provaveis.length};}
+/* a busca refaz a tela inteira: sem devolver o foco e o cursor o teclado fecharia a cada letra (mesmo cuidado da busca da Consulta) */
+function vincBusca(el){const v=el.value,pos=el.selectionStart;_vincQ=v;clearTimeout(_vincT);
+  _vincT=setTimeout(()=>{renderVinculo();const n=document.getElementById('vinc_q');if(n){n.focus();try{n.setSelectionRange(pos,pos);}catch(e){}}},200);}
 function renderVinculo(){const m=movs.find(x=>x.id===_vincId);if(!m)return;
   const old=document.getElementById('modal');if(old)old.remove();
-  const q=_vincQ.toLowerCase();
-  let cands,titulo,ctx;
+  let titulo,ctx;
+  const det=x=>[(x.colecao||'sem coleção')+' · '+(x.cat||'item'),(x.idioma&&x.idioma!=='—')?x.idioma:'',(+x.qtd||1)+' un',x.data?dBR(new Date(x.data+'T00:00:00')):'',x.contraparte||''].filter(Boolean).join(' · ');
   if(_vincModo==='deCompra'){
-    cands=movs.filter(v=>v.tipo==='VENDA'&&!v.origemId&&(v.jogo||'Pokémon')===(m.jogo||'Pokémon')&&(!q||((v.colecao||'')+' '+(v.cat||'')+' '+(v.contraparte||'')+' '+(v.obs||'')).toLowerCase().includes(q)));
     titulo='🔗 Vincular a uma venda já lançada';
-    ctx=`Escolha a venda que corresponde a <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'item')}</b> (custo ${fmt(+m.valor||0)}). O item sai ${sitDe(m)==='Coleção'?'da coleção':sitDe(m)==='Pedido'?'do pedido (a caminho)':'do estoque'} — a compra continua registrada.`;
+    ctx=`Escolha a venda que corresponde ao item abaixo (custo ${fmt(+m.valor||0)}). O item sai ${sitDe(m)==='Coleção'?'da coleção':sitDe(m)==='Pedido'?'do pedido (a caminho)':'do estoque'} — a compra continua registrada.`;
   }else{
-    cands=movs.filter(c=>c.tipo==='COMPRA'&&(sitDe(c)==='Em estoque'||sitDe(c)==='Coleção'||sitDe(c)==='Pedido')&&(c.jogo||'Pokémon')===(m.jogo||'Pokémon')&&(!q||((c.colecao||'')+' '+(c.cat||'')+' '+(c.contraparte||'')+' '+(c.obs||'')).toLowerCase().includes(q)));
     titulo='🔗 De onde saiu? (estoque · coleção · pedido)';
-    ctx=`Escolha de onde saiu <b>${(m.colecao?m.colecao+' · ':'')+(m.cat||'item')}</b> (vendida por ${fmt(+m.valor||0)}). O item escolhido some do estoque/coleção — nada é apagado. Itens 🚚 (pedido a caminho) também aparecem: vender antes de chegar é normal — vinculando, ele sai do pedido como vendido.`;
+    ctx=`Escolha de onde saiu a venda abaixo (vendida por ${fmt(+m.valor||0)}). O item escolhido some do estoque/coleção — nada é apagado. Itens 🚚 (pedido a caminho) também aparecem: vender antes de chegar é normal — vinculando, ele sai do pedido como vendido. Peças marcadas "já saiu do estoque" só são reconectadas à venda (nenhuma baixa nova).`;
   }
-  cands.sort((a,b)=>(b.data||'')<(a.data||'')?-1:1);
+  const R=vinculoCandidatos(m,_vincModo,_vincQ,_vincTodos);
   /* PENDÊNCIA 7 (2026-08-13): quando 2+ candidatos são o MESMO produto (coleção/cat/código/
      idioma/condição iguais) mas têm CUSTO diferente, a escolha errada muda o lucro registrado
-     em silêncio. O custo por linha já existia (fmt(+c.valor)); isto só adiciona idioma/condição
-     (que faltavam aqui, mas já existem no seletor de venda nova) e um aviso visual SÓ quando a
-     ambiguidade é real (mesmo produto, custo diverge) — nunca dispara em duplicatas genuínas de
-     mesmo custo, onde a ordem de fato não importa. */
+     em silêncio. Aviso visual SÓ quando a ambiguidade é real (mesmo produto, custo diverge). */
   const chaveDup=c=>[c.colecao||'',c.cat||'',c.codigo||'',c.idioma||'',c.condicao||''].join('|');
   const gruposDup={};
-  cands.forEach(c=>{const k=chaveDup(c);(gruposDup[k]=gruposDup[k]||[]).push(Math.round((+c.valor||0)*100));});
-  const lin=cands.length?cands.slice(0,60).map(c=>{const rot=_vincModo==='deCompra'?'vendida por':'custou';
-    const badgePed=(_vincModo!=='deCompra'&&sitDe(c)==='Pedido')?' <span class="tag c">🚚 a caminho</span>':'';
+  R.lista.forEach(x=>{const c=x.c,k=chaveDup(c);(gruposDup[k]=gruposDup[k]||[]).push(Math.round((+c.valor||0)/Math.max(+c.qtd||1,1)*100));});   /* custo POR UNIDADE: 2 un a 545,98 e 1 un a 272,99 são o mesmo custo (antes o aviso de gêmeo comparava o total e disparava à toa) */
+  const tag=(t,cor)=>` <span class="tag ${cor||'c'}" style="font-size:9px">${t}</span>`;
+  const lin=R.lista.length?R.lista.slice(0,60).map(x=>{const c=x.c,rot=_vincModo==='deCompra'?'vendida por':'custou';
+    const badgePed=(_vincModo!=='deCompra'&&sitDe(c)==='Pedido')?tag('🚚 a caminho'):'';
     const valoresGrupo=gruposDup[chaveDup(c)]||[];
     const custoDivergente=_vincModo!=='deCompra'&&valoresGrupo.length>1&&new Set(valoresGrupo).size>1;
     const avisoGemeos=custoDivergente?' <span class="tag c" style="font-size:9px" title="Mesma coleção/tipo/código/idioma/condição que outro candidato desta lista, mas custo diferente — confira qual é a peça física antes de vincular">⚠ gêmeo com custo diferente</span>':'';
+    const marcas=(x.orfa?tag('já saiu do estoque — só reconecta','v'):'')+(x.mesmaCol?tag('mesma coleção','v'):(x.mista?tag('coleção não identificada'):''))+(x.mesmoTipo?'':tag('outro tipo'))+(x.antes?tag('⚠ venda antes da compra'):'');
     const infoExtra=_vincModo!=='deCompra'?`${c.idioma&&c.idioma!=='—'?' · '+c.idioma:''}${c.condicao&&c.condicao!=='—'?' · '+c.condicao:''}`:'';
-    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="confirmVinculo('${c.id}')"><div><b>${(c.colecao?c.colecao+' · ':'')+(c.cat||'item')}</b>${c.codigo?' <span style="color:var(--mut);font-size:10px">#'+c.codigo+'</span>':''}${badgePed}${avisoGemeos}<div class="meta">${c.data?dBR(new Date(c.data+'T00:00:00')):'—'} · ${c.contraparte||'—'} · ${(+c.qtd||1)} un${infoExtra} · ${rot} <b>${fmt(+c.valor||0)}</b></div></div><span class="lnk">vincular</span></div>`;}).join('')
+    const alvo=x.orfa?`aplicarOrigem('${m.id}','${c.id}')`:`confirmVinculo('${c.id}')`;
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:9px 12px;cursor:pointer" onclick="${alvo}"><div><b>${(c.colecao?c.colecao+' · ':'')+(c.cat||'item')}</b>${c.codigo?' <span style="color:var(--mut);font-size:10px">#'+c.codigo+'</span>':''}${badgePed}${marcas}${avisoGemeos}<div class="meta">${c.data?dBR(new Date(c.data+'T00:00:00')):'—'} · ${c.contraparte||'—'} · ${(+c.qtd||1)} un${infoExtra} · ${rot} <b>${fmt(+c.valor||0)}</b>${c.obs?' · '+(String(c.obs).length>70?String(c.obs).slice(0,70)+'…':c.obs):''}</div></div><span class="lnk">${x.orfa?'reconectar':'vincular'}</span></div>`;}).join('')
     :'<div class="empty">Nenhum candidato com esse filtro (mesmo jogo).</div>';
+  const nota=R.nTotal===0?'Nenhum candidato encontrado.'
+    :((R.semProvaveis&&!_vincQ)
+      ?`Nenhum candidato do mesmo tipo (<b>${m.cat||'item'}</b>) com coleção compatível — mostrando todos (${R.nTotal}).`
+      :(R.filtrado
+        ?`Mostrando só os <b>${R.lista.length} mais prováveis</b>: mesmo tipo (<b>${m.cat||'item'}</b>) e coleção compatível, do mais próximo ao mais distante. <span class="lnk" onclick="_vincTodos=true;renderVinculo()">ver todos (${R.nTotal})</span>`
+        :(_vincQ?`Buscando em todos: ${R.lista.length} resultado(s).`:`Mostrando todos (${R.nTotal}). <span class="lnk" onclick="_vincTodos=false;renderVinculo()">só os prováveis (${R.nProvaveis})</span>`)));
   const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModalVinculo()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="sec" style="margin-top:0">${titulo}</div>
     <div class="ctx">${ctx}</div>
-    <input value="${_vincQ.replace(/"/g,'&quot;')}" oninput="_vincQ=this.value;renderVinculo()" placeholder="buscar por coleção, cliente/fornecedor..." style="margin-bottom:6px">
-    <div class="meta" style="margin-bottom:6px">${cands.length} candidato(s) — mesmo jogo (${m.jogo||'Pokémon'})${cands.length>60?', mostrando 60':''}</div>
+    <div class="item" style="display:block;padding:8px 12px;margin-bottom:6px"><b>${_vincModo==='deCompra'?'Item do estoque/coleção':'Venda'}</b><div class="meta">${det(m)} · ${_vincModo==='deCompra'?'custo':'vendida por'} <b>${fmt(+m.valor||0)}</b>${m.obs?' · '+m.obs:''}</div></div>
+    <input id="vinc_q" value="${_vincQ.replace(/"/g,'&quot;')}" oninput="vincBusca(this)" placeholder="buscar por coleção, cliente/fornecedor, texto da observação..." style="margin-bottom:6px">
+    <div class="meta" style="margin-bottom:6px">${nota}${R.lista.length>60?' (mostrando 60)':''}</div>
     ${lin}
     <button class="btn g" style="margin-top:12px" onclick="fecharModalVinculo()">cancelar</button></div></div>`;
   document.body.insertAdjacentHTML('beforeend',hh);}
@@ -1433,7 +1472,7 @@ function provaReal(){
     if((v.custoOrigem==null||+v.custoOrigem===0)&&(+alvo.valor||0)>0.02&&!alvoTemFilhos)add('amarelo','Venda vinculada sem custo registrado: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O vínculo existe mas o custo está vazio — o lucro aparece maior do que é. (Brinde de custo zero de verdade não gera este aviso.)','abrir a venda',`verMov('${v.id}')`);});
   /* 5. Material vendido órfão (saiu do estoque, nenhuma venda aponta) */
   movs.filter(x=>fragOrfao(x)).forEach(f=>{
-    add('amarelo','Material vendido sem venda apontando: '+rotDe(f),'Saiu como vendido ('+fmt(+f.valor||0)+(f.dataVenda?' em '+String(f.dataVenda).split('-').reverse().join('/'):', sem data de saída')+') mas nenhuma venda está ligada a ele — ou a venda correspondente está sem vínculo, ou foi excluída.','ver o item (dali dá pra vincular)',`verMov('${f.id}')`);});
+    add('amarelo','Material vendido sem venda apontando: '+rotDe(f)+((f.idioma&&f.idioma!=='—')?' · '+f.idioma:'')+((+f.qtd||1)>1?' · '+(+f.qtd)+' un':''),'Saiu como vendido ('+fmt(+f.valor||0)+(f.dataVenda?' em '+String(f.dataVenda).split('-').reverse().join('/'):', sem data de saída')+') mas nenhuma venda está ligada a ele — ou a venda correspondente está sem vínculo, ou foi excluída. Para ligar: abra a venda correspondente e toque em 🔗 de onde saiu? (ou 🔍 procurar origem sozinho).','ver o item',`verMov('${f.id}')`);});
   /* 6. Referência de venda quebrada */
   movs.filter(x=>x.vendaRef&&!movs.some(v=>v.id===x.vendaRef)).forEach(f=>{
     add('amarelo','Referência de venda quebrada em '+rotDe(f),'O pedaço aponta pra uma venda que não existe mais (excluída).','ver o item',`verMov('${f.id}')`);});
@@ -2729,7 +2768,7 @@ function vLancar(){
       <div class="toggle" id="fixtog"><div class="o ${!despFixa?'on':''}" data-v="0" onclick="togFixa(0)">Avulsa · uma vez</div><div class="o ${despFixa?'on':''}" data-v="1" onclick="togFixa(1)">Fixa · repete</div></div>
       <div id="freqbox" style="display:${despFixa?'block':'none'}"><div class="row2"><div><label>Frequência</label><select id="f_freq" onchange="freqChg(this.value)">${[['mensal','todo mês'],['semanal','toda semana'],['anual','todo ano'],['dias','a cada X dias']].map(([v,l])=>`<option value="${v}" ${despFreq===v?'selected':''}>${l}</option>`).join('')}</select></div><div id="intbox" style="display:${despFreq==='dias'?'block':'none'}"><label>A cada quantos dias</label><input id="f_int" type="number" value="30"></div></div><div class="ctx">Gero as próximas <b>12 previsões</b> como "a pagar" — você confirma cada pagamento, nada vira pago sozinho.</div></div>`:(e&&e.serieId?`<div class="ctx" style="background:var(--infobg);color:var(--blue)">✎ Despesa fixa: o que mudar aqui vale <b>desta data pra frente</b>; as já pagas não mudam.</div>`:'')}`;
   } else if(t==='ABRIR'){
-    const dispA=movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção'));
+    const dispA=abrivelDisp();
     if(!dispA.length)campos=`<div class="soon">Nada em estoque ou na coleção pra abrir. Lance uma compra primeiro.</div>`;
     else campos=`<div class="ctx" style="margin-bottom:8px">Transforma um lote (caixa, ETB, booster) nas cartas que saíram de dentro — o custo é dividido entre elas. Mesmo gesto do "🔓 abrir" no item expandido da Consultar.</div>
       <label>O que você vai abrir? <span style="color:var(--mut);font-size:10px">(digite pra filtrar)</span></label>${selBusca('ab_pick',dispA.map(d=>({id:d.id,rot:`${d.jogo&&d.jogo!=='Pokémon'?'['+d.jogo+'] ':''}${(d.obs||((d.colecao?d.colecao+' · ':'')+(d.cat||'item'))).slice(0,40)}${(+d.qtd||1)>1?' · '+(+d.qtd||1)+' un':''} — ${fmt(+d.valor||0)}${sitDe(d)==='Coleção'?' · ⭐ coleção':' · 📦 estoque'}`})),null,'digite pra filtrar…',null)}
@@ -3138,7 +3177,7 @@ function vConsultar(){
           <div style="font-size:11px;font-weight:600;color:${venda?'var(--green)':'var(--red)'}">${pg}</div></div>
       </div>
       ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
-        ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button><button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deCompra')">🔗 vincular a uma venda já lançada</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deCompra')">🔗 vincular a uma venda já lançada</button>`:''}${venda&&!m.origemId&&m.semOrigem!=='historico'?`<button class="x" style="color:var(--blue)" onclick="procurarOrigem('${m.id}')">🔍 procurar origem sozinho</button><button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deVenda')">🔗 de onde saiu? (estoque · coleção · pedido)</button><button class="x" style="color:var(--mut)" onclick="marcarHistorica('${m.id}')">📜 marcar como histórica</button>`:''}${venda&&m.semOrigem==='historico'?`<button class="x" style="color:var(--mut)" onclick="desmarcarHistorica('${m.id}')">↩ desfazer "histórica"</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
+        ${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--green)" onclick="chegouPedido('${m.id}')">✓ chegou — entrar no estoque</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Em estoque'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender</button><button class="x" style="color:var(--amber)" onclick="guardarDe('${m.id}')">⭐ coleção</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Coleção'?`<button class="x" style="color:var(--green)" onclick="venderDe('${m.id}')">💰 vender da coleção</button>`:''}${m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')?`${ehAbrivel(m)?`<button class="x" style="color:var(--purple)" onclick="abrirTransf('${m.id}')">🔓 abrir</button>`:''}<button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deCompra')">🔗 vincular a uma venda já lançada</button>`:''}${m.tipo==='COMPRA'&&sitDe(m)==='Pedido'?`<button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deCompra')">🔗 vincular a uma venda já lançada</button>`:''}${venda&&!m.origemId&&m.semOrigem!=='historico'?`<button class="x" style="color:var(--blue)" onclick="procurarOrigem('${m.id}')">🔍 procurar origem sozinho</button><button class="x" style="color:var(--blue)" onclick="abrirVinculo('${m.id}','deVenda')">🔗 de onde saiu? (estoque · coleção · pedido)</button><button class="x" style="color:var(--mut)" onclick="marcarHistorica('${m.id}')">📜 marcar como histórica</button>`:''}${venda&&m.semOrigem==='historico'?`<button class="x" style="color:var(--mut)" onclick="desmarcarHistorica('${m.id}')">↩ desfazer "histórica"</button>`:''}${m.notaId?`<button class="x" style="color:var(--blue)" onclick="abrirNota('${m.notaId}')">🧾 ver nota</button><button class="x" onclick="separarDaNota('${m.id}')">✂ tirar da nota</button>`:''}
         ${venda&&m.origemId&&m.custoOrigem!=null?(function(){const custo=+m.custoOrigem||0,receb=Math.round(total*(1-(+m.taxa||0)/100)*100)/100,lucro=Math.round((receb-custo)*100)/100,pct=custo>0?Math.round(lucro/custo*1000)/10:null,pctTxt=pct!=null?' ('+(pct>=0?'+':'')+pct+'%)':'';
           return `<span class="meta" style="flex-basis:100%">💰 comprei por <b>${fmt(custo)}</b> · vendi líquido por <b>${fmt(receb)}</b> · lucro <b style="color:${lucro>=0?'var(--green)':'var(--red)'}">${fmt(lucro)}${pctTxt}</b></span>`;})():''}
         ${venda&&m.origemId?vinculoInfoVenda(m)+`<button class="x" onclick="desvincular('${m.id}')">✂ desvincular</button>`:''}
@@ -3165,12 +3204,14 @@ function vConsultar(){
         ${m.codigo&&ligaHistDe(m.codigo)?`<button class="x" style="color:var(--blue)" onclick="graficoLiga('${(m.codigo||'').replace(/'/g,"\\'")}')">📈 evolução</button>`:''}
         ${(function(){const pl=m.codigo?precoLigaDe(m.codigo):null;const codC=m.codigo?codLimpo(m.codigo):'';
           const ambig=pl&&pl.status==='AMBIGUO';const resolvGlobal=ambig&&codigosResolvidos[codC];
-          if(!(m.codigoUrl||!m.codigo||!pl||ambig))return '';
+          const semPrecoLiga=!!pl&&!ambig&&!ligaVersoes(pl).length;   /* [12/10/2026] carta com preço vazio na Liga (código com ∞ etc.) também precisa do link direto: antes o botão sumia justo onde era a única saída */
+          if(!(m.codigoUrl||!m.codigo||!pl||ambig||semPrecoLiga))return '';
           if(ambig&&!m.codigoUrl)return `<button class="x" style="color:${resolvGlobal?'var(--green)':'var(--blue)'}" onclick="abrirEscolhaAmbigua('${codC.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">🔗 ${resolvGlobal?'código resolvido ✓':'escolher carta'}</button>`;
           return `<button class="x" style="color:${m.codigoUrl?'var(--green)':'var(--blue)'}" onclick="setCodigoUrl('${m.id}')">🔗 ${m.codigoUrl?'link direto (este item) ✓':'usar link direto'}</button>`;})()}
         ${(function(){if(!m.codigo)return '';const pl=precoLigaDe(m.codigo);const codC=codLimpo(m.codigo);
           if(!pl)return `<span class="meta" style="flex-basis:100%">🔍 Liga: <b>#${codC}</b> ainda não coletada${m.codigoUrl?' — 🔗 link direto definido, a próxima coleta traz o valor':' — a coleta traz o valor na próxima rodada (ou cole o 🔗 link direto pra garantir a carta certa)'}</span>`;
           const vs=ligaVersoes(pl);
+          if(!vs.length&&pl.status!=='AMBIGUO'){const inf=/[∞♾]/.test(m.codigo||'');return `<span class="meta" style="flex-basis:100%;color:var(--amber)">🔍 Liga: sem preço para esta carta — ${inf?'o código tem ∞ no total (carta promocional) e a busca da Liga não a acha por ele':'a Liga não devolveu preço para este código'}. ${m.codigoUrl?'🔗 Link direto definido: a próxima coleta busca nessa página.':'Toque em <b>🔎 preço Liga</b>, ache a carta pelo nome, copie o endereço dela e cole em <b>🔗 usar link direto</b>.'}</span>`;}
           if(pl.status==='AMBIGUO'){const globR=codigosResolvidos[codC],resolv=globR||m.codigoUrl;
             const diverge=globR&&m.codigoUrl&&globR!==m.codigoUrl;
             if(diverge)return `<span class="meta" style="flex-basis:100%;color:var(--red)">🔍 Liga: ⚠ este item tem um link PRÓPRIO diferente do link resolvido pro código ${codC} — confira qual carta é a certa (toque em 🔗 pra ver/trocar a deste item).</span>`;
@@ -5727,7 +5768,10 @@ function separarNotaParaColecao(nid){const its=pedidosDaNota(nid);if(!its.length
   its.forEach(m=>aplicaSeparacaoColecao(m.id,+m.qtd||1));
   save();diarioReg('separou nota a caminho p/ coleção',(its[0].notaNum?'nota '+its[0].notaNum+' — ':'')+nItens(its.length));toast('Nota separada pra coleção — '+nItens(its.length)+' ✓');fecharModal();abrirNota(nid);render();}
 let _abrirId=null,abertoItens=[],_abQtdA='',_abUnA='un',abItemSit='vender';
-function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;_abrirId=id;abertoItens=[];_abQtdA='';_abUnA='un';abItemSit=sitDe(m)==='Coleção'?'colecao':'vender';renderAbrir();}
+/* [12/10/2026] carta avulsa não se abre (não tem nada dentro). Felype: "single card não tem como abrir... já devia ter resolvido" — o botão 🔓 aparecia em toda compra em estoque/coleção, inclusive Single/Carta, e a lista da tela Abrir também. */
+function ehAbrivel(m){return !!m&&m.cat!=='Single/Carta';}
+function abrivelDisp(){return movs.filter(m=>m.tipo==='COMPRA'&&(sitDe(m)==='Em estoque'||sitDe(m)==='Coleção')&&ehAbrivel(m));}
+function abrirTransf(id){const m=movs.find(x=>x.id===id);if(!m)return;if(!ehAbrivel(m)){toast('Carta avulsa não se abre — não tem nada dentro.');return;}_abrirId=id;abertoItens=[];_abQtdA='';_abUnA='un';abItemSit=sitDe(m)==='Coleção'?'colecao':'vender';renderAbrir();}
 function togAbItemSit(v){abItemSit=v;document.querySelectorAll('#abitog .o').forEach(o=>o.classList.toggle('on',o.dataset.v===v));}
 function renderAbrir(){const m=movs.find(x=>x.id===_abrirId);if(!m)return;const old=document.getElementById('modal');if(old)old.remove();
   const sit=sitDe(m);const tot=+m.valor||0;
@@ -5802,7 +5846,10 @@ function ligaJogoAtual(jogoSelId){
 /* o card ja sabe de que jogo ele e — nao depende de seletor nenhum na tela */
 function abrirLigaDoItem(jogo,cod){const site=ligaDoJogo(jogo);
   if(!site){alert('Ainda não sei o endereço da Liga de "'+jogo+'".\n\nTenho: '+nomeDasLigas()+'.');return;}
-  window.open('https://'+site+'/?view=cards/search&card='+encodeURIComponent(cod),'_blank');}
+  /* [12/10/2026] código com ∞ no total (promocional) a Liga não acha pelo código: a busca vai só pelo nome */
+  const n0=String(normCod(cod)),semInf=n0.replace(/\s*\([^()]*∞[^()]*\)\s*$/,'').replace(/\s+\S*∞\S*\s*$/,'').trim();
+  const busca=/∞/.test(n0)?(semInf||n0):cod;
+  window.open('https://'+site+'/?view=cards/search&card='+encodeURIComponent(busca),'_blank');}
 /* usada onde a tela NAO tem seletor de jogo (abrir caixa): o jogo vem do proprio lote. */
 function abrirLigaDoCampo(jogo,inputId){const v=(document.getElementById(inputId)?.value||'').trim();
   if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
@@ -6444,11 +6491,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='03/10 05h24';
+const BUILD_TAG='12/10 10h39';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791015875548;
+const BUILD_TS=1791812385087;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -6646,8 +6693,13 @@ function pendGrupos(){
      uma severidade nova, ela cai no grupo "outros" do fim — nunca some da conta. Sem essa
      rede, o total do topo voltaria a nao fechar com a soma dos grupos, que foi exatamente o
      defeito corrigido nesta mesma entrega (dizia 79, enumerava 60). */
-  const cadItem=x=>({t:(x.m.obs||((x.m.colecao?x.m.colecao+' · ':'')+(x.m.cat||'carta')))+(x.cod?' · #'+x.cod:''),
-    d:'',a:[['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${x.m.id}')`]].concat(x.motivo==='sem_codigo'?[['📚 é lote de cartas avulsas',`fecharModal();marcarLoteSemCodigo('${x.m.id}',true)`]]:[])});
+  const cadItem=x=>{const m=x.m,inf=!!x.cod&&/[∞♾]/.test(x.cod),js=v=>String(v||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    /* [12/10/2026] a linha não dizia a coleção, o idioma nem a quantidade, e a única ação era "abrir o lançamento": o Felype não achava onde resolver o preço da Liga */
+    const det=[m.colecao,(m.idioma&&m.idioma!=='—')?m.idioma:'',(+m.qtd||1)>1?(+m.qtd)+' un':'',fmt(+m.valor||0),m.data?dBR(new Date(m.data+'T00:00:00')):''].filter(Boolean).join(' · ');
+    const por=x.motivo==='sem_preco'?(inf?'O código tem ∞ no total (carta promocional): a Liga não a acha por ele. O caminho é o link direto.':'A Liga não devolveu preço para este código. Procure a carta pelo nome e cole o link dela.'):'';
+    const acoes=x.motivo==='sem_preco'?[['🔗 colar o link da Liga',`fecharModal();setCodigoUrl('${m.id}');abrirPendencias('sem_preco')`],['🔎 procurar na Liga',`abrirLigaDoItem('${js(m.jogo||'Pokémon')}','${js(x.cod)}')`]]:[];
+    return {t:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'carta')))+(x.cod?' · #'+x.cod:''),d:det+(por?'<br>'+por:''),
+      a:acoes.concat([['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${m.id}')`]]).concat((x.motivo==='sem_codigo'||(x.motivo==='sem_preco'&&(+m.qtd||1)>1))?[['📚 é lote de cartas avulsas',`fecharModal();marcarLoteSemCodigo('${m.id}',true)`]]:[])};};
   const provaItem=x=>({t:x.titulo,d:x.detalhe,
     a:[...(x.acaoJs?[[x.acaoRot,`fecharModal();${x.acaoJs}`]]:[]),...(x.acao2Js?[[x.acao2Rot,`fecharModal();${x.acao2Js}`]]:[])]});
   const MOT={sem_preco:['🏷️','tem código, mas a Liga não devolveu preço'],sem_codigo:['ℹ️','sem código e sem link — não há por onde buscar']};
