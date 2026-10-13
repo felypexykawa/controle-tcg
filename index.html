@@ -205,6 +205,14 @@ function mergePorIdBase(local,remoto){const byId={};(remoto||[]).forEach(m=>{if(
     if(b!==undefined){if(hashReg(m)!==b)byId[m.id]=m;}
     else if(refLocal.has(m.id)||(m.trocaId&&trocasLocais.has(m.trocaId)))byId[m.id]=m;});
   return Object.values(byId).filter(m=>!estaExcluido(m&&m.id));}
+/* [13/10, 'local vence'] como mergePorIdBase, mas registro SEM base confirmada continua local-vence (o comportamento de sempre da porta do salvarNuvem): so o registro que este aparelho NAO mexeu desde a
+   ultima confirmacao da nuvem aceita a versao do outro aparelho — a cópia velha (aba parada, app em segundo plano) nao reverte a edicao dele. */
+function mergePorIdBaseOuLocal(local,remoto){const byId={};(remoto||[]).forEach(m=>{if(m&&m.id)byId[m.id]=m;});
+  (local||[]).forEach(m=>{if(!m||!m.id)return;const rem=byId[m.id];
+    if(!rem){byId[m.id]=m;return;}
+    const b=_baseH[m.id];
+    if(b===undefined||hashReg(m)!==b)byId[m.id]=m;});
+  return Object.values(byId).filter(m=>!estaExcluido(m&&m.id));}
 const MK='tcg_movs_v2';
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
 const SEED=[];
@@ -6286,9 +6294,9 @@ function fundirComRemoto(r,remotoVence){r=r||{};
      A porta do salvarNuvem (base fresca, janela de uma ida-e-volta) mantém "local vence". */
   const exc=mergeExcl(excluidos,r.excluidos);const excAntes=excluidos;excluidos=exc;   /* [G1-classe] evento mais recente vence, união devorava restaurado */
   try{podaExcluidos();
-    const M=(a,b)=>remotoVence?mergePorIdBase(a,b):mergePorId(a,b);  /* a=local, b=remoto; remotoVence = por registro, pela base confirmada */
-    const D=(a,b)=>remotoVence?mergeDictRaso(b,a):mergeDictRaso(a,b);
-    const G=(a,b)=>remotoVence?mergeColsG(b,a):mergeColsG(a,b);
+    const M=(a,b)=>remotoVence==='base'?mergePorIdBaseOuLocal(a,b):remotoVence?mergePorIdBase(a,b):mergePorId(a,b);  /* a=local, b=remoto; remotoVence=true: por registro, pela base confirmada · 'base': so onde ha base (salvarNuvem) */
+    const D=(a,b)=>remotoVence===true?mergeDictRaso(b,a):mergeDictRaso(a,b);
+    const G=(a,b)=>remotoVence===true?mergeColsG(b,a):mergeColsG(a,b);
     return aplicaTumuloCols({   /* [cura 03/10] túmulo POR JOGO: a coleção excluída não volta pelo aparelho que ainda a tinha */
       movs:reidrataThumbs(movs,M(movs,r.movs)),   /* [1MB fase 1] snapshot vem sem thumb; a local não morre no merge */
       jogos:mergeArrUniao(jogos,r.jogos,'jogos:'),
@@ -6325,7 +6333,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
          e com os túmulos do outro lado aplicados ANTES da união: aqui a ordem antiga unia os
          movs primeiro e só depois fundia `excluidos`, então o item que o outro aparelho tinha
          apagado (ausente lá, presente aqui) ressuscitava no payload. */
-      final=fundirComRemoto(remoto);
+      final=fundirComRemoto(remoto,'base');
     }
     const payload={...final,movs:semThumbs(final.movs),_upd:Date.now(),_wid:novoWid(),_by:_userEmail,_v:(typeof BUILD_TS!=='undefined'?BUILD_TS:0)};   /* _v: a aba velha descobre que existe app mais novo (revisor G1-classe, G-3) · movs sobem SEM miniatura (1MB fase 1) */
     /* [re-checagem 2, N2] a base é calculada AQUI, no mesmo instante síncrono em que o payload vai
@@ -6351,7 +6359,8 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
          DURANTE a ida-e-volta do commit (memória E disco), e a marca de pendência ficava apontando
          para um dado que não existia mais. Refunde com o estado de agora: local vence (o que entrou
          no meio fica) e o que o commit trouxe do outro aparelho entra. */
-      const g=fundirComRemoto(final);
+      /* [13/10, revisor do mundo real G1] 'base' so se a ULTIMA versao que este aparelho conhece ainda e a que ele acabou de gravar; se um documento mais novo de outro aparelho entrou na janela (aplicarNuvem trocou o par carimbo/id e a base), a refusao volta ao local-vence de sempre — senao a copia velha (final) vencia e desfazia o snapshot novo */
+      const g=fundirComRemoto(final,(_ultimoWid===payload._wid)?'base':undefined);
       movs=g.movs;jogos=g.jogos;cats=g.cats;cols=g.cols;pess=g.pess;pgs=g.pgs;despCats=g.despCats;cadastros=g.cadastros;contasBanc=g.contasBanc;codigosResolvidos=g.codigosResolvidos;excluidos=g.excluidos;colsJ=g.colsJ;colsG=g.colsG;
       gravaTudoLocal();
       if(!lancarTemRascunho())render();
@@ -6550,11 +6559,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/10 15h02';
+const BUILD_TAG='13/10 16h06';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791914551607;
+const BUILD_TS=1791918371035;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

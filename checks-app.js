@@ -352,7 +352,7 @@ const CAPACIDADES = [
            restauracao = negativo). Aceita a forma antiga (historico) e a nova; exigir SO a antiga barraria a cura. */
         ['o registro se funde quando os dois aparelhos gravam juntos',
           ctx._fonte.indexOf('excluidos:mergeDictRaso(excluidos,remoto.excluidos)') >= 0
-          || (/final=fundirComRemoto\(remoto\)/.test(ctx._fonte) && /merge(DictRaso|Excl)\(excluidos,r\.excluidos\)/.test(ctx._fonte)), true],
+          || (/final=fundirComRemoto\(remoto(,[^)]*)?\)/.test(ctx._fonte) && /merge(DictRaso|Excl)\(excluidos,r\.excluidos\)/.test(ctx._fonte)), true],
         ['o registro VOLTA da nuvem e poda o que ja foi apagado', /if\(d\.excluidos&&typeof d\.excluidos===.object.\)/.test(ctx._fonte), true],
         /* o filtro TEM de rodar fora do if: aparelho que ainda nao recarregou grava snapshot
            sem o campo, e ai o filtro nunca rodava e tudo ressuscitava (revisao adversarial 21/08) */

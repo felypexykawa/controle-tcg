@@ -995,6 +995,17 @@ nucleo('upd39b-outro-aparelho-vira-proprio', 'fundiu=true;fundiuDeOutro=!_widsPr
 nucleo('iso43c-snap-sem-item', 'consCat,consGrupoFech:Object.assign({},consGrupoFech),soId:consSoId,scrollY:sy,', 'consCat,consGrupoFech:Object.assign({},consGrupoFech),scrollY:sy,', '43d')
 nucleo('iso43c-voltar-nao-restaura', "consSoId=(s.soId&&movs.some(x=>x.id===s.soId))?s.soId:'';", "consSoId='';", '43d')
 nucleo('iso43c-voltar-sem-guarda-do-item-apagado', "consSoId=(s.soId&&movs.some(x=>x.id===s.soId))?s.soId:'';", "consSoId=s.soId||'';", '43d')
+# 13/10/2026 — 'local vence' na porta do salvarNuvem: base confirmada por registro QUANDO existe, local vence quando nao existe
+nucleo('lv39-sem-base-remoto-vence', 'if(b===undefined||hashReg(m)!==b)byId[m.id]=m;});', 'if(b!==undefined&&hashReg(m)!==b)byId[m.id]=m;});', '39upd2')
+nucleo('lv39-sempre-local', 'if(b===undefined||hashReg(m)!==b)byId[m.id]=m;});', 'byId[m.id]=m;});', '39upd2')
+nucleo('lv39-base-ignora-edicao-local', 'if(b===undefined||hashReg(m)!==b)byId[m.id]=m;});', 'if(b===undefined)byId[m.id]=m;});', '39upd2')
+nucleo('lv39-salvar-sem-base', "final=fundirComRemoto(remoto,'base');", 'final=fundirComRemoto(remoto);', '39upd2')
+nucleo('lv39-refusao-sem-base', "const g=fundirComRemoto(final,(_ultimoWid===payload._wid)?'base':undefined);", 'const g=fundirComRemoto(final);', '39upd2')
+nucleo('lv39b-refusao-sempre-base', "const g=fundirComRemoto(final,(_ultimoWid===payload._wid)?'base':undefined);", "const g=fundirComRemoto(final,'base');", '39upd2')
+nucleo('lv39b-refusao-modo-base-pura', "const g=fundirComRemoto(final,(_ultimoWid===payload._wid)?'base':undefined);", 'const g=fundirComRemoto(final,true);', '39upd2')
+nucleo('lv39b-colsg-remoto-vence-no-modo-base', 'const G=(a,b)=>remotoVence===true?mergeColsG(b,a):mergeColsG(a,b);', 'const G=(a,b)=>remotoVence?mergeColsG(b,a):mergeColsG(a,b);', '39upd2')
+nucleo('lv39-dicionario-remoto-vence', 'const D=(a,b)=>remotoVence===true?mergeDictRaso(b,a):mergeDictRaso(a,b);', 'const D=(a,b)=>remotoVence?mergeDictRaso(b,a):mergeDictRaso(a,b);', '39upd2')
+nucleo('lv39-modo-base-vira-base-pura', "remotoVence==='base'?mergePorIdBaseOuLocal(a,b):remotoVence?mergePorIdBase(a,b):mergePorId(a,b)", 'remotoVence?mergePorIdBase(a,b):mergePorId(a,b)', '39upd2')
 
 def roda_nucleo(n):
     r = subprocess.run(['node', os.path.join(REPO, 'testes-nucleo.js'), os.path.join(SP, n + '.html')], capture_output=True, cwd=SP)

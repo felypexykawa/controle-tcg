@@ -7905,6 +7905,84 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     apM.g('movs').push(movNovo('m9')); await apM.sobe();
     apL.g('movs').push(movNovo('l1')); await apL.sobe();
     t('39upd2 (controle negativo): quando OUTRO aparelho salvou no meio, o aviso de fusão continua saindo e os dois lançamentos ficam (avisos: ' + JSON.stringify(avisosL) + ')', avisosL.some(m => /outro aparelho/.test(m)) && ['m1', 'm9', 'l1'].every(id => NUV.doc.movs.some(m => m.id === id)), forma([avisosL, NUV.doc.movs.map(m => m.id)]));
+    /* "LOCAL VENCE" (limites G1/G2/G4 do revisor de 11/08): o aparelho N tem uma cópia VELHA do m1 (a que a nuvem confirmou antes) e salva outra coisa; entretanto o aparelho O editou o m1 e já gravou.
+       Quem não mexeu no m1 desde a última confirmação não pode devolver a cópia velha por cima da edição do outro. */
+    const { apA: apN, apB: apO } = cenario(); NUV.ver = 0; [apN, apO].forEach(x => x.set('_db', dbOt2));
+    const baseE = apN.chama('calcBase', { movs: estadoBase().movs });
+    [apN, apO].forEach(x => x.set('_baseH', clona(baseE)));
+    apO.g('movs').find(m => m.id === 'm1').valor = 250; await apO.sobe();     /* O edita o m1 (100 -> 250) e grava */
+    apN.g('movs').push(movNovo('n1')); await apN.sobe();                         /* N, com o m1 velho, salva um lançamento que não tem nada a ver */
+    const m1Nuv = NUV.doc.movs.find(m => m.id === 'm1');
+    t('39upd2 (local vence): o aparelho que NÃO mexeu no m1 não devolve a cópia velha — a edição do outro aparelho (R$ 250) continua na nuvem, e o lançamento novo entrou', !!m1Nuv && +m1Nuv.valor === 250 && NUV.doc.movs.some(m => m.id === 'n1'), forma([m1Nuv && m1Nuv.valor, NUV.doc.movs.map(m => m.id)]));
+    t('39upd2 (local vence): ...e o aparelho que salvou também ficou com a edição (250), sem a cópia velha', +apN.g('movs').find(m => m.id === 'm1').valor === 250, String(apN.g('movs').find(m => m.id === 'm1').valor));
+    apO.recebe();
+    t('39upd2 (local vence): ...e o aparelho que editou NÃO perdeu a própria edição ao receber o documento de volta', +apO.g('movs').find(m => m.id === 'm1').valor === 250, String(apO.g('movs').find(m => m.id === 'm1').valor));
+    /* CONTROLES NEGATIVOS do "local vence": (1) quem MEXEU no m1 continua vencendo o empate; (2) sem base confirmada para o registro o comportamento de sempre (local vence) não muda — a edição feita sem internet / na 1ª sessão depois da atualização não pode se perder; (3) os dicionários seguem local-vence */
+    {
+      const { apA: apP, apB: apQ } = cenario(); NUV.ver = 0; [apP, apQ].forEach(x => x.set('_db', dbOt2));
+      [apP, apQ].forEach(x => x.set('_baseH', clona(baseE)));
+      apQ.g('movs').find(m => m.id === 'm1').valor = 250; await apQ.sobe();
+      apP.g('movs').find(m => m.id === 'm1').valor = 300; await apP.sobe();
+      t('39upd2 (local vence, controle 1): o aparelho que TAMBÉM editou o m1 continua vencendo o empate (R$ 300) — só quem não mexeu aceita a versão do outro', +NUV.doc.movs.find(m => m.id === 'm1').valor === 300, String(NUV.doc.movs.find(m => m.id === 'm1').valor));
+      const { apA: apR, apB: apS } = cenario(); NUV.ver = 0; [apR, apS].forEach(x => { x.set('_db', dbOt2); x.set('_baseH', {}); });
+      apS.g('movs').find(m => m.id === 'm1').valor = 250; await apS.sobe();
+      apR.g('movs').find(m => m.id === 'm1').valor = 300; await apR.sobe();
+      t('39upd2 (local vence, controle 2): SEM base confirmada para o registro, o local segue vencendo (a edição feita sem internet não se perde: R$ 300)', +NUV.doc.movs.find(m => m.id === 'm1').valor === 300, String(NUV.doc.movs.find(m => m.id === 'm1').valor));
+      const { apA: apT, apB: apU } = cenario(); NUV.ver = 0; [apT, apU].forEach(x => { x.set('_db', dbOt2); x.set('_baseH', clona(baseE)); });
+      apU.set('codigosResolvidos', { K: 'do-outro' }); await apU.sobe();
+      apT.set('codigosResolvidos', { K: 'daqui' }); apT.g('movs').push(movNovo('t1')); await apT.sobe();
+      t('39upd2 (local vence, controle 3): os dicionários (códigos resolvidos) seguem "local vence" na porta do salvarNuvem', NUV.doc.codigosResolvidos && NUV.doc.codigosResolvidos.K === 'daqui', forma(NUV.doc.codigosResolvidos));
+    }
+    /* ACHADOS DO REVISOR DO MUNDO REAL sobre a cura do "local vence" (13/10): a REFUSÃO depois do commit */
+    {
+      /* nuvem em que o commit grava na hora mas a RESPOSTA fica segura até alguém liberar (o 4G que atrasa a resposta; os timers de 3 s do restaurar) */
+      const dbPortao = port => ({
+        collection() { return { doc() { return {}; } }; },
+        runTransaction(fn) {
+          const tenta = () => {
+            const lido = NUV.ver || 0; let escrita = null;
+            const tx = { get() { return Promise.resolve({ exists: !!NUV.doc, data: () => clona(NUV.doc) }); }, set(r, p) { escrita = clona(p); } };
+            return Promise.resolve(fn(tx)).then(res => { if ((NUV.ver || 0) !== lido) return tenta(); if (escrita) { NUV.doc = escrita; NUV.ver = lido + 1; } return res; });
+          };
+          const feito = tenta();
+          return new Promise(r => { port.libera = () => feito.then(r); });
+        }
+      });
+      const doOutro = (extra, upd, wid) => { const d = Object.assign(clona(NUV.doc), extra || {}, { _upd: upd, _wid: wid }); return d; };
+      /* G1 (regressão da cura, achada pelo revisor): um documento MAIS NOVO de outro aparelho entra na janela entre o commit e a resposta; a refusão em modo "base" tratava o local (já igual à base nova) como "não mexi" e devolvia o valor VELHO */
+      {
+        const { apA: apV } = cenario(); NUV.ver = 0; apV.set('_baseH', clona(baseE));
+        NUV.doc = doOutro({ movs: [...NUV.doc.movs, movNovo('z9')] }, 150, 'wid-W-1');          /* o outro aparelho gravou o z9; V ainda não recebeu: a transação de V vai fundir */
+        const port = {}; apV.set('_db', dbPortao(port));
+        apV.g('movs').find(m => m.id === 'm1').valor = 250;
+        apV.chama('salvarNuvem');                                                                 /* SEM marca de pendência (como os timers do restaurar) */
+        for (let i = 0; i < 8; i++) await tick();
+        NUV.doc = doOutro({}, 999, 'wid-W-2'); NUV.doc.movs.find(m => m.id === 'm1').valor = 300;   /* o outro aparelho grava m1 = 300 por cima e o documento chega a V ANTES da resposta */
+        apV.recebe();
+        port.libera();
+        for (let i = 0; i < 8; i++) await tick();
+        t('39upd2 (G1 do revisor): documento MAIS NOVO de outro aparelho que entra na janela do commit NÃO é desfeito pela refusão — o m1 fica em R$ 300, não volta para 250', +apV.g('movs').find(m => m.id === 'm1').valor === 300, String(apV.g('movs').find(m => m.id === 'm1').valor));
+      }
+      /* a edição feita DURANTE a ida-e-volta, em registro SEM base confirmada, não pode ser perdida na refusão (o modo "base" não pode virar "base pura") */
+      {
+        const { apA: apX } = cenario(); NUV.ver = 0; apX.set('_baseH', {});
+        NUV.doc = doOutro({ movs: [...NUV.doc.movs, movNovo('z9')] }, 150, 'wid-W-1');
+        const port = {}; apX.set('_db', dbPortao(port));
+        apX.g('movs').find(m => m.id === 'm1').valor = 250; apX.chama('marcaPendNuvem'); apX.chama('salvarNuvem');
+        for (let i = 0; i < 8; i++) await tick();
+        apX.g('movs').find(m => m.id === 'm1').valor = 80;                                        /* edição no meio da ida-e-volta, depois do payload */
+        port.libera();
+        for (let i = 0; i < 8; i++) await tick();
+        t('39upd2 (refusão): a edição feita DURANTE a ida-e-volta, num registro sem base confirmada, fica (R$ 80) — a refusão não vira "remoto vence"', +apX.g('movs').find(m => m.id === 'm1').valor === 80, String(apX.g('movs').find(m => m.id === 'm1').valor));
+      }
+      /* grupo/ano (colsG) segue "local vence" na porta do salvarNuvem — o modo "base" é só dos registros (movs/cadastros/contas) */
+      {
+        const { apA: apY, apB: apZ } = cenario(); NUV.ver = 0; [apY, apZ].forEach(x => { x.set('_db', dbOt2); x.set('_baseH', clona(baseE)); });
+        apZ.g('colsG')[J]['151'] = '2024'; await apZ.sobe();
+        apY.g('colsG')[J]['151'] = '2025'; apY.g('movs').push(movNovo('y1')); await apY.sobe();
+        t('39upd2 (colsG): o grupo/ano alterado por este aparelho continua vencendo o empate na porta do salvarNuvem (2025, não 2024)', NUV.doc.colsG[J]['151'] === '2025', String(NUV.doc.colsG[J]['151']));
+      }
+    }
   }
 }).catch(e=>{fail++;console.log('  FALHOU  secao 39 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');
