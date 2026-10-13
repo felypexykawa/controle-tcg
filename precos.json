@@ -322,13 +322,9 @@
    }
   },
   "032/♾️": {
-   "codigo": "032/♾️",
-   "status": "NAO_COLETAVEL",
-   "titulo": "032/∞ — total do código é ∞ (placeholder do cadastro), mesma família dos demais ∞; sem o total real a busca não identifica a carta",
-   "versoes": [],
-   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=Mega%20gardevoir%20ex%20%28032%2F%E2%99%BE%EF%B8%8F%29",
-   "verificadoEm": "2026-08-20",
-   "motivo": "032/∞ — total do código é ∞ (placeholder do cadastro), mesma família dos demais ∞; sem o total real a busca não identifica a carta"
+   "codigo": "032/∞",
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=032/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "109/094": {
    "codigo": "109/094",
@@ -1725,91 +1721,58 @@
   },
   "159/∞": {
    "codigo": "159/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (placeholder do cadastro) — busca por 055/∞ devolveu zero; padrão confirmado numa carta da família",
-   "titulo": "159/∞ — total do código é ∞ (placeholder do cadastro) — busca por 055/∞ devolveu zero; padrão confirmado numa carta da família",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=159/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "055/∞": {
    "codigo": "055/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ — busca testada nesta rodada, zero resultado",
-   "titulo": "055/∞ — total do código é ∞ — busca testada nesta rodada, zero resultado",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=055/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "056/∞": {
    "codigo": "056/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "056/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=056/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "057/∞": {
    "codigo": "057/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "057/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=057/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "060/∞": {
    "codigo": "060/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "060/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=060/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "059/∞": {
    "codigo": "059/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "059/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=059/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "058/∞": {
    "codigo": "058/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "058/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=058/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "063/∞": {
    "codigo": "063/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "063/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=063/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "062/∞": {
    "codigo": "062/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "062/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=062/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "061/∞": {
    "codigo": "061/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "061/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=061/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "195/∞": {
    "codigo": "195/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "195/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=195/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "0106-07/196": {
    "codigo": "0106-07/196",
@@ -2245,11 +2208,8 @@
   },
   "206/∞": {
    "codigo": "206/∞",
-   "status": "NAO_COLETAVEL",
-   "motivo": "total do código é ∞ (mesma família do 055/∞ testado)",
-   "titulo": "Morpeko da marine 206/∞ — total do código é ∞ (mesma família do 055/∞ testado)",
-   "versoes": [],
-   "verificadoEm": "2026-08-20"
+   "url": "https://www.ligapokemon.com.br/?view=cards/search&card=206/%E2%88%9E",
+   "reaberto": "2026-10-13: teste ao vivo na Liga abriu a carta direto buscando \"Nome (NUM/∞)\" com o infinito matematico; o rotulo NAO_COLETAVEL de 20/08 vinha de testar so o codigo sem nome"
   },
   "tg02/tg30": {
    "codigo": "tg02/tg30",
