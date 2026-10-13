@@ -7513,7 +7513,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     const { apA } = cenario();
     apA.gesto('excluirCol', J, 'VAZIA');
     await apA.sobe();
-    const doAntigo = clona(NUV.doc); doAntigo._upd = 555;
+    const doAntigo = clona(NUV.doc); doAntigo._upd = 555; delete doAntigo._wid;   /* aparelho antigo não grava _wid */
     doAntigo.colsJ[J].push('VAZIA'); doAntigo.colsG[J].VAZIA = '2026'; doAntigo.movs.push(movNovo('m7', { colecao: 'VAZIA' }));
     apA.recebe(doAntigo);
     const opts = apA.chama('selColOpts', J, 'VAZIA');
@@ -7689,7 +7689,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     apA.gesto('excluirCol', J, 'VAZIA');
     await apA.sobe();
     apA.st.tcg_colsj = JSON.stringify(estadoBase().colsJ); apA.st.tcg_colsg = JSON.stringify(estadoBase().colsG);   /* o disco ficou velho: quem só recebe e lança nunca regravou as listas */
-    const doVelho = clona(NUV.doc); doVelho._upd = 888; doVelho.colsJ[J].push('VAZIA'); doVelho.colsG[J].VAZIA = '2026';
+    const doVelho = clona(NUV.doc); doVelho._upd = 888; delete doVelho._wid;   /* aparelho antigo não grava _wid */ doVelho.colsJ[J].push('VAZIA'); doVelho.colsG[J].VAZIA = '2026';
     apA.recebe(doVelho);
     const dj = JSON.parse(apA.st.tcg_colsj || 'null'), dg = JSON.parse(apA.st.tcg_colsg || 'null');
     t('39x: depois da porta principal filtrar, as listas por jogo vão para o DISCO sem a coleção excluída (a memória e o disco não divergem)', !!dj && !!dg && !tem(dj[J], 'VAZIA') && !('VAZIA' in dg[J]), forma([dj, dg]));
@@ -7757,6 +7757,143 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       try { f3 = apM.chama('fundirComRemoto', docRemoto({ colsJ: { [J]: ['Ninja', solta] }, colsG: { [J]: { [solta]: '2020' } } })); } catch (e) { lanca3 = e; }
       t('39m: nome de coleção malformado não derruba a fusão — a coleção segue na lista, com o grupo/ano', lanca3 === null && f3.colsJ[J].some(c => c === solta) && f3.colsG[J][solta] === '2020', String(lanca3));
     }
+  }
+
+  /* --- 39upd: DOIS APARELHOS GRAVANDO NO MESMO MILISSEGUNDO (13/10/2026; limite r1 #3 do revisor do mundo real, "a perda mais séria") ---
+     A nuvem aqui tem concorrência de verdade, como o Firestore: a transação lê, escreve e, se o documento mudou desde a leitura, REFAZ a função. O carimbo
+     do documento é Date.now(); com os dois relógios no mesmo milissegundo (congelados aqui) o segundo aparelho lia o documento do primeiro com o carimbo
+     igual ao que ele próprio tinha acabado de carimbar na tentativa recusada, concluía que ninguém salvou no meio, não fundia e sobrescrevia. */
+  {
+    const dbOt = {
+      collection() { return { doc() { return {}; } }; },
+      runTransaction(fn) {
+        const tenta = () => {
+          const lido = NUV.ver || 0; let escrita = null;
+          const tx = { get() { return Promise.resolve({ exists: !!NUV.doc, data: () => clona(NUV.doc) }); }, set(r, p) { escrita = clona(p); } };
+          return Promise.resolve(fn(tx)).then(res => { if ((NUV.ver || 0) !== lido) return tenta(); if (escrita) { NUV.doc = escrita; NUV.ver = lido + 1; } return res; });
+        };
+        return tenta();
+      }
+    };
+    const congela = (...aps) => { const o = aps.map(x => vm.runInContext('Date.now', x.ctx)); aps.forEach(x => { x.ctx.__T = 1760000000000; vm.runInContext('Date.now = function(){return __T}', x.ctx); }); return () => aps.forEach((x, i) => { x.ctx.__o = o[i]; vm.runInContext('Date.now = __o', x.ctx); }); };
+    const { apA, apB } = cenario(); NUV.ver = 0;
+    const solta = congela(apA, apB);
+    try {
+      [apA, apB].forEach(x => x.set('_db', dbOt));
+      apA.g('movs').push(movNovo('a1')); apB.g('movs').push(movNovo('b1'));
+      apA.chama('marcaPendNuvem'); apB.chama('marcaPendNuvem');
+      apA.chama('salvarNuvem'); apB.chama('salvarNuvem');   /* as duas transações abertas no mesmo tick, com o mesmo milissegundo */
+      for (let i = 0; i < 16; i++) await tick();
+    } finally { solta(); }
+    const idsNuv = NUV.doc.movs.map(m => m.id).sort();
+    t('39upd (O BUG): dois aparelhos gravando no MESMO milissegundo — o lançamento dos DOIS está na nuvem (antes o do primeiro sumia)', idsNuv.join() === 'a1,b1,m1', forma(idsNuv));
+    apA.recebe(); apB.recebe();
+    t('39upd: ...e cada aparelho recebe o do outro (o carimbo igual não faz o aparelho tomar o documento do OUTRO por eco do próprio)', ['a1', 'b1', 'm1'].every(id => apA.g('movs').some(m => m.id === id) && apB.g('movs').some(m => m.id === id)), forma([apA.g('movs').map(m => m.id), apB.g('movs').map(m => m.id)]));
+    t('39upd: cada gravação leva um id próprio (_wid) não vazio, e o documento guarda um só', typeof NUV.doc._wid === 'string' && NUV.doc._wid.length >= 8, String(NUV.doc._wid));
+    /* o id muda a CADA gravação, mesmo com o relógio parado */
+    const { apA: apC } = cenario(); NUV.ver = 0; apC.set('_db', dbOt);
+    const solta2 = congela(apC);
+    let w1, w2;
+    try { await apC.sobe(); w1 = NUV.doc._wid; apC.g('movs').push(movNovo('c1')); await apC.sobe(); w2 = NUV.doc._wid; } finally { solta2(); }
+    t('39upd: duas gravações seguidas do mesmo aparelho, no mesmo milissegundo, têm ids diferentes', !!w1 && !!w2 && w1 !== w2, String([w1, w2]));
+    /* CONTROLE NEGATIVO: o eco da própria gravação continua ignorado — não reaplica por cima do que o aparelho tem agora */
+    apC.g('movs').push(movNovo('x9'));          /* mudança local que ainda não subiu */
+    apC.recebe();                                 /* o eco da gravação dele mesmo */
+    t('39upd (controle negativo): o ECO da própria gravação segue ignorado (a mudança local ainda não gravada não some)', apC.g('movs').some(m => m.id === 'x9'), forma(apC.g('movs').map(m => m.id)));
+    /* aparelho ANTIGO: o documento dele não tem _wid; um carimbo diferente continua sendo aplicado */
+    apC.recebe(docRemoto({ movs: [movNovo('o1')], _upd: 1760000000999 }));
+    t('39upd: documento de aparelho antigo (sem _wid) com carimbo novo continua entrando pela porta principal', apC.g('movs').some(m => m.id === 'o1'), forma(apC.g('movs').map(m => m.id)));
+    /* CONTROLE NEGATIVO 2: quando NINGUÉM salvou no meio, a gravação segue sem fundir (o id não pode virar fusão a toda hora): nem depois da própria gravação, nem depois de receber o documento de outro aparelho */
+    const contaFusao = ap => { const orig = ap.g('fundirComRemoto'); const c = { n: 0 }; ap.set('fundirComRemoto', (...a) => { c.n++; return orig(...a); }); return c; };
+    const { apA: apD } = cenario(); NUV.ver = 0; apD.set('_db', dbOt);
+    const cD = contaFusao(apD);
+    await apD.sobe(); apD.g('movs').push(movNovo('d1')); await apD.sobe();
+    t('39upd (controle negativo): duas gravações seguidas do mesmo aparelho, sem ninguém no meio, NÃO fundem (' + cD.n + ' fusões)', cD.n === 0 && NUV.doc.movs.some(m => m.id === 'd1'), forma([cD.n, NUV.doc.movs.map(m => m.id)]));
+    const { apA: apE } = cenario(); NUV.ver = 0; apE.set('_db', dbOt);
+    NUV.doc = Object.assign(clona(NUV.doc), { movs: [...NUV.doc.movs, movNovo('z1')], _upd: 5000, _wid: 'wid-de-outro-aparelho' });
+    apE.recebe();
+    const cE = contaFusao(apE);
+    apE.g('movs').push(movNovo('e1')); await apE.sobe();
+    t('39upd (controle negativo): depois de receber o documento de OUTRO aparelho, a próxima gravação NÃO funde de novo (já está em dia) e leva os dois lançamentos (' + cE.n + ' fusões)', cE.n === 0 && ['m1', 'z1', 'e1'].every(id => NUV.doc.movs.some(m => m.id === id)), forma([cE.n, NUV.doc.movs.map(m => m.id)]));
+    /* aparelho ANTIGO (ainda não recarregou) grava SEM _wid, só com carimbo novo: o aparelho novo, que nunca gravou (id vazio), tem de continuar enxergando isso como "mudou" */
+    const { apA: apF } = cenario(); NUV.ver = 0; apF.set('_db', dbOt);
+    const docAntigo = Object.assign(clona(NUV.doc), { movs: [...NUV.doc.movs, movNovo('z2')], _upd: 200 });
+    NUV.doc = clona(docAntigo);
+    const cF = contaFusao(apF);
+    apF.g('movs').push(movNovo('f1')); await apF.sobe();     /* salva sem ter recebido o que o aparelho antigo gravou no meio */
+    t('39upd: o aparelho ANTIGO (sem _wid) salvou no meio com carimbo novo → o aparelho novo funde e os lançamentos dos dois ficam (' + cF.n + ' fusões: a da transação e a de depois do commit)', cF.n >= 1 && ['m1', 'z2', 'f1'].every(id => NUV.doc.movs.some(m => m.id === id)), forma([cF.n, NUV.doc.movs.map(m => m.id)]));
+    const { apA: apG } = cenario(); apG.recebe(clona(docAntigo));
+    t('39upd: ...e o mesmo documento do aparelho antigo entra pela porta principal num aparelho que nunca gravou (o id vazio não é eco)', apG.g('movs').some(m => m.id === 'z2'), forma(apG.g('movs').map(m => m.id)));
+    /* regra "documento sem _wid conta como vazio" (achado L1 do revisor): receber o documento de um aparelho antigo e salvar em seguida NÃO funde; receber o MESMO documento de novo é eco */
+    const { apA: apH } = cenario(); NUV.ver = 0; apH.set('_db', dbOt);
+    const docAnt2 = Object.assign(clona(NUV.doc), { movs: [...NUV.doc.movs, movNovo('z3')], _upd: 300 }); NUV.doc = clona(docAnt2);
+    apH.recebe(clona(docAnt2));
+    const cH = contaFusao(apH);
+    apH.g('movs').push(movNovo('h1')); await apH.sobe();
+    t('39upd: depois de receber o documento de um aparelho antigo (sem _wid), a próxima gravação NÃO funde (' + cH.n + ' fusões) e leva os dois lançamentos', cH.n === 0 && ['m1', 'z3', 'h1'].every(id => NUV.doc.movs.some(m => m.id === id)), forma([cH.n, NUV.doc.movs.map(m => m.id)]));
+    const { apA: apI } = cenario(); NUV.ver = 0; apI.recebe(clona(docAnt2)); apI.g('movs').push(movNovo('i1')); apI.recebe(clona(docAnt2));
+    t('39upd: o MESMO documento de aparelho antigo recebido duas vezes é eco na segunda (a mudança local ainda não gravada não some)', apI.g('movs').some(m => m.id === 'i1'), forma(apI.g('movs').map(m => m.id)));
+  }
+
+  /* --- 39upd2: os dois achados do revisor do mundo real (13/10) --- */
+  {
+    const dbOt2 = {
+      collection() { return { doc() { return {}; } }; },
+      runTransaction(fn) {
+        const tenta = () => {
+          const lido = NUV.ver || 0; let escrita = null;
+          const tx = { get() { return Promise.resolve({ exists: !!NUV.doc, data: () => clona(NUV.doc) }); }, set(r, p) { escrita = clona(p); } };
+          return Promise.resolve(fn(tx)).then(res => { if ((NUV.ver || 0) !== lido) return tenta(); if (escrita) { NUV.doc = escrita; NUV.ver = lido + 1; } return res; });
+        };
+        return tenta();
+      }
+    };
+    /* G1 — COMMIT AMBÍGUO: o servidor grava, a resposta se perde (4G ruim) e o SDK refaz a função; a retentativa lê a PRÓPRIA gravação. Ela tem de fundir, senão sobe o estado local (sem o que a 1ª tentativa
+       acabara de fundir do outro aparelho) por cima e apaga o lançamento dele. */
+    const dbAmbiguo = {
+      collection() { return { doc() { return {}; } }; },
+      runTransaction(fn) {
+        let perdeu = false;
+        const tenta = () => {
+          const lido = NUV.ver || 0; let escrita = null;
+          const tx = { get() { return Promise.resolve({ exists: !!NUV.doc, data: () => clona(NUV.doc) }); }, set(r, p) { escrita = clona(p); } };
+          return Promise.resolve(fn(tx)).then(res => {
+            if ((NUV.ver || 0) !== lido) return tenta();
+            if (escrita) { NUV.doc = escrita; NUV.ver = lido + 1; }
+            if (!perdeu) { perdeu = true; return tenta(); }    /* a resposta do 1º commit se perdeu: o SDK refaz a função */
+            return res;
+          });
+        };
+        return tenta();
+      }
+    };
+    const { apA, apB } = cenario(); NUV.ver = 0;
+    apB.set('_db', dbOt2); apB.g('movs').push(movNovo('b1')); await apB.sobe();       /* B grava b1; A ainda não recebeu */
+    apA.set('_db', dbAmbiguo); apA.g('movs').push(movNovo('a1')); await apA.sobe();
+    const idsAmb = NUV.doc.movs.map(m => m.id).sort();
+    t('39upd2 (G1, commit ambíguo): a retentativa que lê a PRÓPRIA gravação funde — o lançamento do outro aparelho (b1) NÃO some da nuvem', idsAmb.join() === 'a1,b1,m1', forma(idsAmb));
+    t('39upd2 (G1): ...e ficou no aparelho que gravou', ['a1', 'b1', 'm1'].every(id => apA.g('movs').some(m => m.id === id)), forma(apA.g('movs').map(m => m.id)));
+    /* M1 — DUAS GRAVAÇÕES DO MESMO APARELHO NO MESMO INSTANTE (excluirPess, renomearJogo, importarBackup... chamam save() e saveL() em seguida): nenhum aviso falso de "outro aparelho" */
+    const { apA: apJ } = cenario(); NUV.ver = 0; apJ.set('_db', dbOt2);
+    const avisos = []; apJ.set('toast', m => { avisos.push(String(m)); });
+    apJ.g('movs').push(movNovo('j1')); apJ.chama('marcaPendNuvem'); apJ.chama('salvarNuvem');
+    apJ.g('movs').push(movNovo('j2')); apJ.chama('marcaPendNuvem'); apJ.chama('salvarNuvem');
+    for (let i = 0; i < 16; i++) await tick();
+    t('39upd2 (M1): duas gravações do MESMO aparelho abertas juntas não mostram o aviso falso de "outro aparelho" (avisos: ' + JSON.stringify(avisos) + ')', !avisos.some(m => /outro aparelho/.test(m)) && ['j1', 'j2', 'm1'].every(id => NUV.doc.movs.some(m => m.id === id)), forma([avisos, NUV.doc.movs.map(m => m.id)]));
+    /* o eco MAIS ANTIGO da própria gravação (chega depois que o aparelho já gravou de novo, com mudança ainda por confirmar) é ignorado: não reaplica nem avisa */
+    const { apA: apK } = cenario(); NUV.ver = 0; apK.set('_db', dbOt2);
+    const avisosK = []; apK.set('toast', m => { avisosK.push(String(m)); });
+    await apK.sobe(); const docUm = clona(NUV.doc);
+    apK.g('movs').push(movNovo('k1')); await apK.sobe();
+    apK.g('movs').push(movNovo('k9')); apK.chama('marcaPendNuvem');        /* mudança local ainda não confirmada */
+    apK.recebe(docUm);                                                      /* o eco da 1ª gravação chega atrasado */
+    t('39upd2 (M1): o eco MAIS ANTIGO da própria gravação é ignorado — a mudança local pendente não some e nenhum aviso sai (avisos: ' + JSON.stringify(avisosK) + ')', apK.g('movs').some(m => m.id === 'k9') && !avisosK.some(m => /outro aparelho|mesclado/.test(m)), forma([avisosK, apK.g('movs').map(m => m.id)]));
+    /* CONTROLE NEGATIVO: documento de OUTRO aparelho (id que esta aba nunca gravou) continua gerando o aviso e entrando */
+    const { apA: apL, apB: apM } = cenario(); NUV.ver = 0; apL.set('_db', dbOt2); apM.set('_db', dbOt2);
+    const avisosL = []; apL.set('toast', m => { avisosL.push(String(m)); });
+    apM.g('movs').push(movNovo('m9')); await apM.sobe();
+    apL.g('movs').push(movNovo('l1')); await apL.sobe();
+    t('39upd2 (controle negativo): quando OUTRO aparelho salvou no meio, o aviso de fusão continua saindo e os dois lançamentos ficam (avisos: ' + JSON.stringify(avisosL) + ')', avisosL.some(m => /outro aparelho/.test(m)) && ['m1', 'm9', 'l1'].every(id => NUV.doc.movs.some(m => m.id === id)), forma([avisosL, NUV.doc.movs.map(m => m.id)]));
   }
 }).catch(e=>{fail++;console.log('  FALHOU  secao 39 explodiu -> '+((e&&e.stack)||e));}).then(()=>{
   console.log('\n----------------------------------------');

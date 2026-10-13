@@ -437,7 +437,7 @@ checks={
  'prova real: 5 checagens novas (tipo/condicao/conta excluida/vencimento/multi-item)':"TIPOS_OK=new Set(['COMPRA','VENDA','DESPESA','TRANSF'])" in chk and 'CONDS_OK=new Set' in chk and 'porVendaId' in chk and 'porTrocaId' in chk,
  'prova real: conta excluida so nos campos que usam contasBanc (nao no texto livre m.conta)':'if(contaSumiu(m.conta))' not in chk and 'contaSumiu(m.contaDe)' in chk,
  'aviso de versao nova honesto quando o cache do GitHub Pages nao passou ainda':'_veioDeAtualizar' in chk and 'O servidor ainda está servindo a versão antiga' in chk,
- 'R1: form nao zera - eco da propria escrita nao repinta + flag de rascunho por interacao':'if(d._upd&&d._upd===_ultimoUpdAplicado)return;' in chk and '_lancarDirty' in chk and "v.addEventListener('input',marca)" in chk,
+ 'R1: form nao zera - eco da propria escrita nao repinta + flag de rascunho por interacao':"if(d._upd&&d._upd===_ultimoUpdAplicado&&(d._wid||'')===_ultimoWid)return;" in chk and '_lancarDirty' in chk and "v.addEventListener('input',marca)" in chk,
  'R1: voltar() saindo do lancar limpa rascunho E fotos pendentes (bug pre-existente)':"if(tela==='lancar'&&s.tela!=='lancar'){_lancarDirty=false;_fotosPend=[];}" in chk,
  'diagnostico de lote com conta quebrada aponta o culpado (nao so "a soma difere")':'function diagLote' in chk and 'function soltarIntrusa' in chk and 'O que explica a diferença' in chk,
  'busca por digitacao na Consulta (debounce + preserva foco/cursor no celular)':'function buscaCons' in chk and 'consBusca' in chk and 'setSelectionRange' in chk,

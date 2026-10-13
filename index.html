@@ -124,6 +124,14 @@ let _avisoVersaoVelha=false;   /* aviso "recarregue" 1x quando um snapshot vier 
    pra saber se alguém salvou por cima entre a última leitura e agora (corrida de 2 saves,
    mapeado 2026-08-11: ver comentário completo em salvarNuvem). */
 let _ultimoUpdAplicado=0;
+/* [cura 13/10, limite r1 #3] o _upd e Date.now(): dois aparelhos gravando no MESMO milissegundo ficam com o mesmo carimbo, e o segundo achava que ninguem tinha salvo no meio e
+   sobrescrevia (o lancamento e o tumulo do primeiro sumiam da nuvem e do proprio aparelho). Cada gravacao carrega agora tambem um id aleatorio (_wid): so e 'a minha
+   versao' (eco, ou ninguem salvou) quando o _upd E o _wid batem. Documento de aparelho antigo nao tem _wid (conta como vazio) e segue so pelo _upd. */
+let _ultimoWid='';
+function novoWid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,6);}
+/* os ids que ESTA aba gravou (os 200 ultimos): documento com id meu nao e 'outro aparelho' (sem aviso falso) e, se for mais antigo que a minha gravacao de agora, e eco */
+const _widsProprios=new Set();
+function lembraWid(w){_widsProprios.add(w);if(_widsProprios.size>200)_widsProprios.delete(_widsProprios.values().next().value);}
 /* [F0 22/08 — lançamento feito SEM INTERNET não pode sumir quando a rede volta]
    Até aqui: sem rede, salvarNuvem falhava (a transação exige servidor) e o lançamento vivia só
    neste aparelho; se o OUTRO aparelho salvasse qualquer coisa antes do próximo save daqui, o
@@ -6298,10 +6306,10 @@ function fundirComRemoto(r,remotoVence){r=r||{};
 function salvarNuvem(){if(!_db||!_syncReady)return;
   setSync('saving');
   const ref=_db.collection('controle').doc('dados');
-  let final=null,fundiu=false,seqCap=0,baseCap=null;
+  let final=null,fundiu=false,fundiuDeOutro=false,seqCap=0,baseCap=null;const widsTx=new Set();   /* widsTx: os ids das tentativas DESTA transacao (a retentativa depois de um commit cuja resposta se perdeu le a propria gravacao: tem de fundir) */
   _db.runTransaction(tx=>tx.get(ref).then(snap=>{
     const remoto=snap.exists?snap.data():null;
-    fundiu=false;seqCap=_pendSeq;
+    fundiu=false;fundiuDeOutro=false;seqCap=_pendSeq;
     final={movs,jogos,cats,cols,colsJ,colsG,pess,pgs,despCats,cadastros,contasBanc,codigosResolvidos,excluidos};
     /* outro aparelho já salvou uma versão que este cliente ainda não tinha aplicado (_upd
        diferente do último que ele viu) — em vez de sobrescrever o documento inteiro (o bug:
@@ -6309,15 +6317,15 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
        payload com a estratégia certa pro seu formato (mapeado 2026-08-11, pedido do Felype:
        antes só movs tinha proteção — cadastro/conta/categoria criados quase juntos em 2
        aparelhos podiam se perder em silêncio do mesmo jeito que os lançamentos perdiam). */
-    if(remoto&&remoto._upd&&remoto._upd!==_ultimoUpdAplicado){
-      fundiu=true;
+    if(remoto&&remoto._upd&&(widsTx.has(remoto._wid)||remoto._upd!==_ultimoUpdAplicado||(remoto._wid||'')!==_ultimoWid)){
+      fundiu=true;fundiuDeOutro=!_widsProprios.has(remoto._wid);
       /* [F0 22/08] a fusão mora numa função só (fundirComRemoto), dividida com aplicarNuvem —
          e com os túmulos do outro lado aplicados ANTES da união: aqui a ordem antiga unia os
          movs primeiro e só depois fundia `excluidos`, então o item que o outro aparelho tinha
          apagado (ausente lá, presente aqui) ressuscitava no payload. */
       final=fundirComRemoto(remoto);
     }
-    const payload={...final,movs:semThumbs(final.movs),_upd:Date.now(),_by:_userEmail,_v:(typeof BUILD_TS!=='undefined'?BUILD_TS:0)};   /* _v: a aba velha descobre que existe app mais novo (revisor G1-classe, G-3) · movs sobem SEM miniatura (1MB fase 1) */
+    const payload={...final,movs:semThumbs(final.movs),_upd:Date.now(),_wid:novoWid(),_by:_userEmail,_v:(typeof BUILD_TS!=='undefined'?BUILD_TS:0)};   /* _v: a aba velha descobre que existe app mais novo (revisor G1-classe, G-3) · movs sobem SEM miniatura (1MB fase 1) */
     /* [re-checagem 2, N2] a base é calculada AQUI, no mesmo instante síncrono em que o payload vai
        pro tx.set — não no .then, que roda uma ida-e-volta depois e relia os objetos VIVOS (uma
        correção feita no meio do commit ficava "confirmada" e a fusão seguinte a apagava). Mesma
@@ -6331,7 +6339,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
        repintaria a tela em cima do formulário em digitação. Se a transação falhar depois
        desta linha, o valor "pendente" só força um merge extra no próximo save (direção
        segura: nunca perde dado, no pior caso funde de novo). */
-    _ultimoUpdAplicado=payload._upd;
+    _ultimoUpdAplicado=payload._upd;_ultimoWid=payload._wid;widsTx.add(payload._wid);lembraWid(payload._wid);
     tx.set(ref,payload);
     return payload;
   })).then(payload=>{
@@ -6345,7 +6353,7 @@ function salvarNuvem(){if(!_db||!_syncReady)return;
       movs=g.movs;jogos=g.jogos;cats=g.cats;cols=g.cols;pess=g.pess;pgs=g.pgs;despCats=g.despCats;cadastros=g.cadastros;contasBanc=g.contasBanc;codigosResolvidos=g.codigosResolvidos;excluidos=g.excluidos;colsJ=g.colsJ;colsG=g.colsG;
       gravaTudoLocal();
       if(!lancarTemRascunho())render();
-      toast('☁️ mesclado com o que o outro aparelho salvou ✓');
+      if(fundiuDeOutro)toast('☁️ mesclado com o que o outro aparelho salvou ✓');
     }
     /* [F0 22/08] commit confirmado: limpa a pendência ATÉ o seq capturado na montagem do
        payload — um save mais novo que entrou em voo continua pendente. */
@@ -6385,8 +6393,9 @@ function aplicarNuvem(d){if(!d||_restaurando)return;
      dentro da transação em salvarNuvem) — reprocessar e repintar era o que apagava o
      formulário em digitação. Snapshot de OUTRO aparelho tem _upd diferente e segue o
      fluxo normal abaixo. */
-  if(d._upd&&d._upd===_ultimoUpdAplicado)return;
-  if(d._upd)_ultimoUpdAplicado=d._upd;_provaCache=null;
+  if(d._upd&&d._upd===_ultimoUpdAplicado&&(d._wid||'')===_ultimoWid)return;
+  if(d._wid&&_widsProprios.has(d._wid))return;   /* eco de uma gravacao MINHA mais antiga (a de agora ja esta registrada): o estado local e mais novo que ela; reaplicar era o aviso falso de 'outro aparelho' */
+  if(d._upd){_ultimoUpdAplicado=d._upd;_ultimoWid=d._wid||'';}_provaCache=null;
   const fundiuPend=pendNuvem();
   if(fundiuPend){
     /* [F0 22/08] há mudança local que a nuvem ainda NÃO confirmou (sem rede na hora de salvar,
@@ -6539,11 +6548,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/10 11h54';
+const BUILD_TAG='13/10 13h07';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791903259699;
+const BUILD_TS=1791907665183;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
