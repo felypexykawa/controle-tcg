@@ -945,7 +945,7 @@ nucleo('ux43-massa-marca-todas', "const alvo=movs.filter(x=>fragOrfao(x)&&_svSel
 nucleo('ux43-massa-lista-tudo', 'function renderSemVendaMassa(){const pend=movs.filter(x=>fragOrfao(x));', "function renderSemVendaMassa(){const pend=movs.filter(x=>x.tipo==='COMPRA'&&sitDe(x)!=='Pedido');", '43f')
 nucleo('ux43-massa-link-sempre', "(g.id==='amarelo'&&movs.some(x=>fragOrfao(x))?", "(g.id==='amarelo'?", '43f')
 nucleo('ux43-massa-link-ausente', '(g.id===\'amarelo\'&&movs.some(x=>fragOrfao(x))?`<div class="ctx" style="margin:6px 0">', '(false?`<div class="ctx" style="margin:6px 0">', '43f')
-nucleo('ux43-voltar-nao-limpa', "function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;consSoId='';", 'function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;', '43d')
+# (13/10) 'ux43-voltar-nao-limpa' saiu: com o item isolado voltando junto no snapshot (limite c), voltar() reescreve consSoId logo abaixo, entao o 'consSoId=''' do topo ficou redundante e a sabotagem virou equivalente; a regra segue vigiada por iso43c-*
 nucleo('ux43-busca-nao-limpa', "consQ=v;consSoId='';expandId=null;", 'consQ=v;expandId=null;', '43d')
 nucleo('ux43-texto-infinito-errado', 'a Liga acha a carta pelo nome e código completos, e a rotina de preços passou a buscar assim — o preço pode chegar na próxima coleta', 'a busca da Liga não a acha por ele', '42f')
 nucleo('ux43-pedido-sem-valor-atual', "${(m.tipo==='COMPRA'&&['Em estoque','Coleção','Pedido'].includes(sitDe(m)))?(function(){const vm=valorMercadoDe([m]);", "${(m.tipo==='COMPRA'&&['Em estoque','Coleção'].includes(sitDe(m)))?(function(){const vm=valorMercadoDe([m]);", '43c')
@@ -991,6 +991,10 @@ nucleo('upd39b-aviso-nunca', "if(fundiuDeOutro)toast('☁️ mesclado com o que 
 nucleo('upd39b-proprios-nao-lembra', '_ultimoUpdAplicado=payload._upd;_ultimoWid=payload._wid;widsTx.add(payload._wid);lembraWid(payload._wid);', '_ultimoUpdAplicado=payload._upd;_ultimoWid=payload._wid;widsTx.add(payload._wid);', '39upd2')
 nucleo('upd39b-eco-antigo-reaplica', 'if(d._wid&&_widsProprios.has(d._wid))return;', 'if(false)return;', '39upd2')
 nucleo('upd39b-outro-aparelho-vira-proprio', 'fundiu=true;fundiuDeOutro=!_widsProprios.has(remoto._wid);', 'fundiu=true;fundiuDeOutro=false;', '39upd2')
+# 13/10/2026 — limite (c) do lote 3: o item isolado volta junto no voltar (editar a partir dele e salvar devolve ele isolado)
+nucleo('iso43c-snap-sem-item', 'consCat,consGrupoFech:Object.assign({},consGrupoFech),soId:consSoId,scrollY:sy,', 'consCat,consGrupoFech:Object.assign({},consGrupoFech),scrollY:sy,', '43d')
+nucleo('iso43c-voltar-nao-restaura', "consSoId=(s.soId&&movs.some(x=>x.id===s.soId))?s.soId:'';", "consSoId='';", '43d')
+nucleo('iso43c-voltar-sem-guarda-do-item-apagado', "consSoId=(s.soId&&movs.some(x=>x.id===s.soId))?s.soId:'';", "consSoId=s.soId||'';", '43d')
 
 def roda_nucleo(n):
     r = subprocess.run(['node', os.path.join(REPO, 'testes-nucleo.js'), os.path.join(SP, n + '.html')], capture_output=True, cwd=SP)

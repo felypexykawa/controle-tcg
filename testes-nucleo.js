@@ -6704,7 +6704,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
      "e aparecer o valor atual ali debaixo do preco da liga?"; e (pendente desde 12/10) o aviso "vendido sem venda" sem saida: botao "de proposito" e o Triple que o detector escondia. */
   console.log('');
   console.log('=== 43. custo na lista · valor atual no item · abrir das Pendencias isola o item · vendido sem venda de proposito ===');
-  const FUNCS43 = ['marcarSemVenda', 'desmarcarSemVenda', 'fragOrfao', 'verMov', 'abrirCorrigirCodigo', 'vConsultar', 'valorMercadoDe', 'provaReal', 'go', 'irConsultar', 'verFiltro'];
+  const FUNCS43 = ['marcarSemVenda', 'desmarcarSemVenda', 'fragOrfao', 'verMov', 'abrirCorrigirCodigo', 'vConsultar', 'valorMercadoDe', 'provaReal', 'go', 'irConsultar', 'verFiltro', 'abrir', 'voltarDaEdicao', 'voltar', 'snap'];
   const faltam43 = FUNCS43.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
   t('43a: [pre-requisito] o app carregado tem as ' + FUNCS43.length + ' funcoes desta secao', faltam43.length === 0, 'FALTAM no app: ' + faltam43.join(', '));
   const bloco43 = (rot, corpo) => faltam43.length ? Promise.resolve() : bloco34(rot, corpo, '43');
@@ -6788,6 +6788,17 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       t('43d: o botão voltar desfaz o isolamento', g('consSoId') === '', S34(g('consSoId')));
       setg('consSoId', 'a1'); A('buscaCons')({ value: 'x', selectionStart: 1 });
       t('43d: digitar na busca da Consulta desfaz o isolamento (quem busca quer a lista inteira) e guarda o texto buscado', g('consSoId') === '' && g('consQ') === 'x', S34([g('consSoId'), g('consQ')]));
+      /* limite (c) do lote 3 (13/10): editar/vender a partir do item isolado e salvar devolve o item ISOLADO (antes caía na lista cheia, com o item aberto no meio) */
+      setg('tela', 'consultar'); setg('consQ', ''); setg('consF', 'tudo'); setg('consVer', 'itens'); setg('consSoId', 'a1'); setg('expandId', 'a1'); A('abrir')('a1');
+      t('43d: abrir o formulário de edição pelo item isolado leva para o Lançar (cenário)', g('tela') === 'lancar' && g('editId') === 'a1', S34([g('tela'), g('editId')]));
+      A('voltarDaEdicao')();
+      t('43d (limite c): salvar a edição feita a partir do item ISOLADO devolve o item isolado — não a lista cheia', g('tela') === 'consultar' && g('consSoId') === 'a1', S34([g('tela'), g('consSoId')]));
+      const hv = A('vConsultar')();
+      t('43d (limite c): ...e a Consulta volta mostrando só ele, com o aviso de item isolado', /mv-a1/.test(hv) && !/mv-a2/.test(hv) && /mostrando só este item/.test(hv), hv.slice(0, 200));
+      setg('consSoId', ''); setg('expandId', null); A('abrir')('a2'); A('voltarDaEdicao')();
+      t('43d (controle negativo): editar a partir da lista cheia volta para a lista cheia (nada isolado)', g('tela') === 'consultar' && g('consSoId') === '', S34([g('tela'), g('consSoId')]));
+      setg('consSoId', 'a3'); A('abrir')('a3'); const iA3 = M().findIndex(m => m.id === 'a3'); M().splice(iA3, 1); A('voltarDaEdicao')();
+      t('43d (limite c): se o item isolado foi apagado na edição, a Consulta volta inteira — não fica vazia presa num isolamento de item que não existe', g('consSoId') === '', S34(g('consSoId')));
     } finally { setg('consF', o.consF); setg('consVer', o.consVer); setg('expandId', o.exp); setg('consSoId', o.soId); }
   });
 

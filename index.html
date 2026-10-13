@@ -2566,7 +2566,7 @@ function selPeriodo(){return `<div class="perbox"><div class="seg" style="margin
 /* [Felype 22/08 23h] "tem uma lista de 100 itens; como é que eu vou achar onde eu tava?" — o snapshot do
    voltar passa a guardar também o item aberto, a vista, a ordem, os filtros e a ROLAGEM. */
 function snap(){let sy=0;try{sy=window.scrollY||window.pageYOffset||0;}catch(e){}
-  return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel,expandId,consVer,consOrd,consJogo,consCol,consPess,consConta,consCat,consGrupoFech:Object.assign({},consGrupoFech),scrollY:sy,perEmp:_perEmprestado?Object.assign({},_perEmprestado):null};}
+  return {tela,consF,consQ,consMenu,perDe,perAte,perSel,editId,tipoSel,expandId,consVer,consOrd,consJogo,consCol,consPess,consConta,consCat,consGrupoFech:Object.assign({},consGrupoFech),soId:consSoId,scrollY:sy,perEmp:_perEmprestado?Object.assign({},_perEmprestado):null};}
 /* [21/08] NAO zere `_fotosItem` aqui. Ele saiu desta linha de proposito: enquanto estava,
    o balde chegava vazio no `guardaBaldeItem` e o aviso "N fotos descartadas" nao saia —
    justamente nas duas saidas mais usadas (tocar Consultar ou Painel). Remendo antigo
@@ -2617,6 +2617,8 @@ function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;consSoId=''
   if('expandId' in s)expandId=s.expandId;if(s.consVer)consVer=s.consVer;if(s.consOrd)consOrd=s.consOrd;
   if('consJogo' in s)consJogo=s.consJogo;if('consCol' in s)consCol=s.consCol;if('consPess' in s)consPess=s.consPess;if('consConta' in s)consConta=s.consConta;if('consCat' in s)consCat=s.consCat;
   if(s.consGrupoFech)consGrupoFech=Object.assign({},s.consGrupoFech);
+  /* [13/10] o item isolado ('mostrando so este item') volta junto — salvar uma edicao feita a partir dele devolve ele isolado, nao a lista cheia; item que sumiu nao deixa a tela vazia */
+  consSoId=(s.soId&&movs.some(x=>x.id===s.soId))?s.soId:'';
   render();
   /* [revisão C 23/08, N5/N6] rola DEPOIS do layout assentar (mesmo 60 ms do verMov) e devolve também a
      posição 0 — antes "scrollY=0" não rolava e a página ficava onde estava */
@@ -6548,11 +6550,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/10 13h07';
+const BUILD_TAG='13/10 15h02';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791907665183;
+const BUILD_TS=1791914551607;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
