@@ -6936,6 +6936,162 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       t('44c: o formulário REAL de edição da compra com coleção fora da lista traz a opção (o caminho do usuário, não só a função)', /Zeta ⚠ fora da lista/.test(h), '');
     } finally { setg('colsJ', o.colsJ); setg('colsG', o.colsG); setg('editId', o.editId); setg('tipoSel', o.tipoSel); }
   });
+
+  /* ===== 45. APARÊNCIA (13/10/2026) =====
+     Pedido do Felype: os temas por jogo (Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh!, visão geral) são o PADRÃO em qualquer aparelho; a pessoa desliga as imagens, ajusta a intensidade, troca a imagem de
+     cada jogo, escolhe a fonte e o tom do fundo; a escolha fica só no aparelho. Aqui: o padrão, as regras de cada controle, a persistência, o desenho da faixa/fundo/modal e o aplicar na tela. */
+  console.log('');
+  console.log('=== 45. aparência: tema padrão por jogo, liga/desliga, intensidade, fonte, tom ===');
+  const FUNCS45 = ['aparNorm', 'temaChave', 'jogoFoco', 'aparEscolha', 'aparenciaCSS', 'aplicaAparencia', 'temaTopoHTML', 'abrirAparencia', 'aparSet', 'aparLiga', 'aparNum', 'aparSel', 'aparEsc', 'aparReset', 'aparSalva'];
+  const faltam45 = FUNCS45.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('45a: [pré-requisito] o app carregado tem as ' + FUNCS45.length + ' funções desta seção', faltam45.length === 0, 'FALTAM no app: ' + faltam45.join(', '));
+  const bloco45 = (rot, corpo) => faltam45.length ? Promise.resolve() : bloco34(rot, corpo, '45');
+  const apar45 = () => { const o = g('APAR'); return { o, volta: () => setg('APAR', o) }; };
+
+  await bloco45('b', () => {
+    const N = A('aparNorm'), CSS = A('aparenciaCSS');
+    t('45b: sem nada guardado o padrão é o MESMO em qualquer aparelho — imagens ligadas (topo e fundo), topo 70, fundo 14, fonte do sistema, só valores e títulos, tom padrão',
+      S34(N(undefined)) === S34(N({})) && S34(N(null)) === S34(N({})) && N({}).imagens === true && N({}).topo === true && N({}).fundo === true && N({}).opTopo === 70 && N({}).opFundo === 14 && N({}).fonte === 'sistema' && N({}).fonteEm === 'valores' && N({}).tom === 'padrao', S34(N({})));
+    const ruim = N({ opTopo: 500, opFundo: -3, fonte: 'comic-sans', tom: 'verde', fonteEm: 'x', imagens: false, arte: { 'pokemon:topo': 'floresta-sol', 'xx:topo': 'a', 'pokemon:lateral': 'b', 'onepiece:fundo': 5 } });
+    t('45b: valores absurdos são corrigidos (intensidade do topo 500 vira 100, o fundo -3 vira 0, fonte/tom desconhecidos voltam ao padrão), "imagens: false" é respeitado e escolhas de jogo ou espaço que não existem são descartadas',
+      ruim.opTopo === 100 && ruim.opFundo === 0 && ruim.fonte === 'sistema' && ruim.tom === 'padrao' && ruim.fonteEm === 'valores' && ruim.imagens === false && S34(ruim.arte) === '{"pokemon:topo":"floresta-sol"}', S34(ruim));
+    t('45b: intensidade fora da faixa: topo mínimo 10, fundo máximo 40; texto numérico é aceito', N({ opTopo: 2 }).opTopo === 10 && N({ opFundo: 99 }).opFundo === 40 && N({ opTopo: '55' }).opTopo === 55, S34([N({ opTopo: 2 }).opTopo, N({ opFundo: 99 }).opFundo, N({ opTopo: '55' }).opTopo]));
+    const est = N({});
+    const pk = CSS(est, 'pokemon', false), op = CSS(est, 'onepiece', false), db = CSS(est, 'dragonball', false), yg = CSS(est, 'yugioh', false), ge = CSS(est, 'geral', false);
+    t('45b: Pokémon (padrão): topo = Mew arejado (máscara, temas/pokemon-mew-arejado.webp, 0,70) e fundo = floresta com sol (0,14)',
+      !!pk.topo && pk.topo.tipo === 'mascara' && pk.topo.url === 'temas/pokemon-mew-arejado.webp' && pk.topo.op === 0.7 && !!pk.fundo && pk.fundo.url === 'temas/pokemon-floresta-sol.webp' && pk.fundo.op === 0.14 && pk.ink === '#1D3470', S34([pk.topo, pk.fundo]));
+    t('45b: One Piece (padrão): topo = Going Merry e fundo = Nami de corpo inteiro',
+      !!op.topo && op.topo.url === 'temas/onepiece-going-merry.webp' && !!op.fundo && op.fundo.url === 'temas/onepiece-nami-corpo.webp' && op.ink === '#0F4452', S34([op.topo, op.fundo]));
+    t('45b: Dragon Ball (padrão): topo e fundo = Shenlong e Goku (a versão SEM as esferas, a que o Felype escolheu)',
+      !!db.topo && db.topo.tipo === 'mascara' && db.topo.url === 'temas/dragonball-shenlong.webp' && !!db.fundo && db.fundo.url === 'temas/dragonball-shenlong.webp' && db.ink === '#2A2F66', S34([db.topo, db.fundo]));
+    t('45b: Yu-Gi-Oh! e a visão geral ficam com o "meu desenho" (SVG) no topo e SEM fundo até chegarem as imagens',
+      yg.topo && yg.topo.tipo === 'svg' && yg.topo.url === 'temas/meu-yugioh.svg' && !yg.fundo && ge.topo && ge.topo.url === 'temas/meu-geral.svg' && !ge.fundo, S34([yg, ge]));
+    const off = N({ imagens: false }), semTopo = N({ topo: false }), semFundo = N({ fundo: false });
+    t('45b: "Mostrar imagens" desligado tira topo E fundo de TODOS os jogos', ['pokemon', 'onepiece', 'dragonball', 'yugioh', 'geral'].every(k => { const c = CSS(off, k, false); return !c.topo && !c.fundo; }), S34(CSS(off, 'pokemon', false)));
+    t('45b: desligar só o topo deixa o fundo, e desligar só o fundo deixa o topo', !CSS(semTopo, 'pokemon', false).topo && !!CSS(semTopo, 'pokemon', false).fundo && !!CSS(semFundo, 'pokemon', false).topo && !CSS(semFundo, 'pokemon', false).fundo, '');
+    const esc = CSS(est, 'pokemon', true);
+    t('45b: no modo escuro a tinta do tema clareia e as intensidades caem (topo 0,53 e fundo 0,08), sem tom de fundo', esc.ink === '#a9c0ee' && esc.topo.op === 0.53 && esc.fundo.op === 0.08, S34([esc.ink, esc.topo.op, esc.fundo.op]));
+    t('45b: o tom do fundo: "quente" e "frio" dão a cor fixa, "cor do jogo" usa a do tema, "padrão" e o modo escuro não mexem',
+      CSS(N({ tom: 'quente' }), 'pokemon', false).tomBg === '#F8F4EC' && CSS(N({ tom: 'frio' }), 'pokemon', false).tomBg === '#EEF3FA' && CSS(N({ tom: 'tema' }), 'onepiece', false).tomBg === '#FCF7EA' && CSS(N({ tom: 'padrao' }), 'pokemon', false).tomBg === '' && CSS(N({ tom: 'quente' }), 'pokemon', true).tomBg === '',
+      S34([CSS(N({ tom: 'quente' }), 'pokemon', false).tomBg, CSS(N({ tom: 'tema' }), 'onepiece', false).tomBg]));
+    t('45b: a fonte escolhida vem na resposta e jogo desconhecido cai na visão geral', CSS(N({ fonte: 'outfit' }), 'pokemon', false).fonte.id === 'outfit' && CSS(est, 'magic', false).chave === 'geral', S34(CSS(est, 'magic', false).chave));
+  });
+
+  await bloco45('c', () => {
+    const T = A('temaChave');
+    const casos = [['Pokémon', 'pokemon'], ['Pokemon TCG', 'pokemon'], ['One Piece', 'onepiece'], ['OnePiece', 'onepiece'], ['Dragon Ball Super', 'dragonball'], ['Yu-Gi-Oh', 'yugioh'], ['Yugioh!', 'yugioh'], ['Magic', 'geral'], ['', 'geral'], [null, 'geral']];
+    t('45c: o nome do jogo vira o tema certo (com ou sem acento/espaço) e o que não conhecemos cai na visão geral', casos.every(([n, k]) => T(n) === k), S34(casos.map(([n]) => T(n))));
+    setg('tela', 'consultar'); setg('consJogo', 'One Piece'); setg('relJogo', 'Pokémon');
+    t('45c: na Consulta o jogo em foco é o filtro da própria Consulta', A('jogoFoco')() === 'One Piece', A('jogoFoco')());
+    setg('consJogo', 'todos');
+    t('45c: Consulta sem filtro de jogo usa o do Painel', A('jogoFoco')() === 'Pokémon', A('jogoFoco')());
+    setg('tela', 'painel'); setg('consJogo', 'One Piece'); setg('relJogo', 'Yu-Gi-Oh');
+    t('45c: nas outras telas o jogo em foco é o filtro do Painel (o da Consulta não vaza)', A('jogoFoco')() === 'Yu-Gi-Oh', A('jogoFoco')());
+    setg('relJogo', '');
+    t('45c: sem nenhum filtro de jogo não há jogo em foco (visão geral)', A('jogoFoco')() === '' && T(A('jogoFoco')()) === 'geral', S34(A('jogoFoco')()));
+  });
+
+  await bloco45('d', () => {
+    const E = A('aparEscolha'), N = A('aparNorm');
+    t('45d: sem escolha guardada vale o padrão de cada jogo', E(N({}), 'pokemon', 'topo') === 'mew-arejado' && E(N({}), 'pokemon', 'fundo') === 'floresta-sol' && E(N({}), 'yugioh', 'fundo') === '' && E(N({}), 'dragonball', 'fundo') === 'shenlong', S34([E(N({}), 'pokemon', 'topo'), E(N({}), 'yugioh', 'fundo')]));
+    t('45d: a pessoa pode escolher "Nenhuma" (texto vazio) — e isso é diferente de não ter escolhido', E(N({ arte: { 'pokemon:fundo': '' } }), 'pokemon', 'fundo') === '' && E(N({}), 'pokemon', 'fundo') === 'floresta-sol', '');
+    t('45d: escolha de imagem que não existe mais no tema volta ao padrão em vez de quebrar a tela', E({ arte: { 'pokemon:topo': 'imagem-apagada' } }, 'pokemon', 'topo') === 'mew-arejado', E({ arte: { 'pokemon:topo': 'imagem-apagada' } }, 'pokemon', 'topo'));
+    t('45d: a escolha é POR JOGO e POR ESPAÇO (topo e fundo são independentes)', E(N({ arte: { 'pokemon:topo': 'mew-denso' } }), 'pokemon', 'topo') === 'mew-denso' && E(N({ arte: { 'pokemon:topo': 'mew-denso' } }), 'pokemon', 'fundo') === 'floresta-sol' && E(N({ arte: { 'pokemon:topo': 'mew-denso' } }), 'onepiece', 'topo') === 'going-merry', '');
+  });
+
+  await bloco45('e', () => {
+    const { volta } = apar45();
+    try {
+      setg('APAR', A('aparNorm')({}));
+      const lido = () => JSON.parse(ctx.localStorage.getItem('tcg_aparencia') || 'null');
+      A('aparSet')('opTopo', 150);
+      t('45e: mudar a intensidade acima do limite grava 100 (na memória e no aparelho)', g('APAR').opTopo === 100 && lido() && lido().opTopo === 100, S34([g('APAR').opTopo, lido()]));
+      A('aparLiga')('imagens');
+      t('45e: ligar/desligar "Mostrar imagens" inverte e grava', g('APAR').imagens === false && lido().imagens === false, S34(lido()));
+      A('aparLiga')('imagens'); A('aparLiga')('topo');
+      t('45e: desligar só o topo grava e deixa o resto', g('APAR').imagens === true && g('APAR').topo === false && g('APAR').fundo === true, S34(g('APAR')));
+      A('aparLiga')('topo');
+      A('aparSel')('fonte', 'manrope'); A('aparSel')('tom', 'quente'); A('aparSel')('fonteEm', 'app');
+      t('45e: fonte, "aplicar em" e tom do fundo gravam', g('APAR').fonte === 'manrope' && g('APAR').tom === 'quente' && g('APAR').fonteEm === 'app' && lido().fonte === 'manrope', S34(lido()));
+      A('aparSel')('fonte', 'comic-sans');
+      t('45e: fonte que não existe é recusada (volta ao sistema), não quebra a tela', g('APAR').fonte === 'sistema', g('APAR').fonte);
+      A('aparEsc')('pokemon', 'topo', 'mew-denso'); A('aparEsc')('pokemon', 'fundo', '');
+      const c = A('aparenciaCSS')(g('APAR'), 'pokemon', false);
+      t('45e: trocar a imagem de um jogo muda só aquele jogo e espaço (topo = Mew denso, fundo = nenhuma)', c.topo.url === 'temas/pokemon-mew-denso.webp' && !c.fundo && lido().arte['pokemon:topo'] === 'mew-denso' && lido().arte['pokemon:fundo'] === '', S34([c.topo, c.fundo, lido().arte]));
+      A('aparEsc')('xx', 'topo', 'a'); A('aparEsc')('pokemon', 'lateral', 'a');
+      t('45e: jogo ou espaço que não existe é ignorado (não suja o que está guardado)', !('xx:topo' in lido().arte) && !('pokemon:lateral' in lido().arte), S34(lido().arte));
+      A('aparNum')('opFundo', 33);
+      t('45e: arrastar o controle de intensidade grava o valor sem precisar redesenhar o app', g('APAR').opFundo === 33 && lido().opFundo === 33, S34(lido()));
+      A('aparNum')('fonte', 'x');
+      t('45e: o controle de intensidade só aceita as duas intensidades (não grava outro campo por engano)', g('APAR').fonte === 'sistema', g('APAR').fonte);
+      A('aparReset')();
+      t('45e: "Restaurar o padrão" volta TUDO ao padrão e grava', S34(g('APAR')) === S34(A('aparNorm')({})) && S34(lido()) === S34(A('aparNorm')({})), S34([g('APAR'), lido()]));
+    } finally { volta(); }
+  });
+
+  await bloco45('f', () => {
+    const { volta } = apar45(), ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      setg('APAR', A('aparNorm')({}));
+      A('abrirAparencia')();
+      const n = (re, s) => (s.match(re) || []).length;
+      t('45f: a tela de Aparência tem "Mostrar imagens", mais as opções de topo e de fundo (3 caixas de marcar)', /Mostrar imagens/.test(cap) && n(/type="checkbox"/g, cap) === 3, String(n(/type="checkbox"/g, cap)));
+      t('45f: tem os 2 controles de intensidade (topo e fundo), com a faixa certa', n(/type="range"/g, cap) === 2 && /id="apar_opTopo" type="range" min="10" max="100"/.test(cap) && /id="apar_opFundo" type="range" min="0" max="40"/.test(cap), '');
+      t('45f: tem 2 listas por jogo (topo e fundo) para os 5 jogos + fonte + "aplicar em" + tom = 13 listas', n(/<select /g, cap) === 13, String(n(/<select /g, cap)));
+      t('45f: a lista do topo do Pokémon traz Nenhuma, Mew (arejado), Floresta com sol, Mew (denso) e Meu desenho; a do FUNDO não traz "Meu desenho" (SVG não serve de fundo)',
+        /id="aparT_pokemon"[\s\S]*?<\/select>/.test(cap) && ['Nenhuma', 'Mew \\(arejado\\)', 'Floresta com sol', 'Mew \\(denso\\)', 'Meu desenho'].every(x => new RegExp(x).test(cap.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0])) && !/Meu desenho/.test(cap.match(/id="aparF_pokemon"[\s\S]*?<\/select>/)[0]), '');
+      t('45f: tem "Restaurar o padrão" e Fechar, e todo controle tem dica (title ou texto de apoio)', /Restaurar o padrão/.test(cap) && /Fechar/.test(cap) && n(/title="/g, cap) >= 18, String(n(/title="/g, cap)));
+      t('45f: com as imagens ligadas nada está desabilitado', !/disabled/.test(cap), '');
+      setg('APAR', A('aparNorm')({ imagens: false }));
+      A('abrirAparencia')();
+      t('45f: com "Mostrar imagens" desligado, topo/fundo e as duas intensidades ficam desabilitados (4 controles)', n(/disabled/g, cap) === 4, String(n(/disabled/g, cap)));
+    } finally { ctx.document.body.insertAdjacentHTML = ins; volta(); }
+  });
+
+  await bloco45('g', () => {
+    const { volta } = apar45();
+    try {
+      setg('APAR', A('aparNorm')({})); setg('tela', 'painel');
+      setg('relJogo', 'Pokémon'); const h = A('temaTopoHTML')();
+      t('45g: o Painel do Pokémon traz a faixa do tema com a arte padrão (máscara) e o nome do jogo', h.includes('class="temaTopo" data-tema="pokemon"') && h.includes('temas/pokemon-mew-arejado.webp') && h.includes('>Pokémon<') && h.includes('opacity:0.7'), h.slice(0, 300));
+      setg('relJogo', 'Yu-Gi-Oh'); const hd = A('temaTopoHTML')();
+      t('45g: o Painel do Yu-Gi-Oh! usa o "meu desenho" como imagem (SVG) com a opacidade escolhida', hd.includes('data-tema="yugioh"') && hd.includes('<img class="arte svg" src="temas/meu-yugioh.svg"') && hd.includes('opacity:0.7'), hd.slice(0, 300));
+      setg('relJogo', 'Dragon Ball'); const hdb = A('temaTopoHTML')();
+      t('45g: o Painel do Dragon Ball traz o Shenlong (máscara) e o nome do jogo', hdb.includes('data-tema="dragonball"') && hdb.includes('temas/dragonball-shenlong.webp') && hdb.includes('>Dragon Ball<'), hdb.slice(0, 200));
+      setg('relJogo', 'Magic'); t('45g: jogo sem tema próprio cai na visão geral', /data-tema="geral"/.test(A('temaTopoHTML')()), A('temaTopoHTML')().slice(0, 120));
+      setg('relJogo', ''); t('45g: sem filtro de jogo o Painel mostra a visão geral', /data-tema="geral"/.test(A('temaTopoHTML')()), '');
+      setg('relJogo', 'Pokémon'); setg('APAR', A('aparNorm')({ imagens: false }));
+      t('45g: com as imagens desligadas a faixa NÃO existe (o Painel volta ao visual simples, sem espaço sobrando)', A('temaTopoHTML')() === '', A('temaTopoHTML')());
+      setg('APAR', A('aparNorm')({ topo: false }));
+      t('45g: com só o topo desligado também não há faixa', A('temaTopoHTML')() === '', '');
+      setg('relJogo', '');
+    } finally { volta(); }
+  });
+
+  await bloco45('h', () => {
+    const { volta } = apar45(), d = ctx.document, orig = { de: d.documentElement, body: d.body, ce: d.createElement, geb: d.getElementById };
+    try {
+      const fake = { vars: {}, cls: {}, camada: null };
+      d.documentElement = { style: { setProperty: (k, v) => { fake.vars[k] = v; }, removeProperty: k => { delete fake.vars[k]; } } };
+      d.body = Object.assign({}, orig.body, { classList: { toggle: (c, on) => { fake.cls[c] = !!on; }, add: c => { fake.cls[c] = true; }, remove: c => { fake.cls[c] = false; } }, insertBefore: el => { fake.camada = el; }, firstChild: null });
+      d.createElement = () => ({ style: { cssText: '' }, remove() { fake.camada = null; } });
+      d.getElementById = id => (id === 'temaFundo' ? fake.camada : orig.geb(id));
+      setg('tela', 'painel'); setg('relJogo', 'Pokémon'); setg('APAR', A('aparNorm')({}));
+      A('aplicaAparencia')();
+      t('45h: aplicar o tema do Pokémon põe a cor do jogo na raiz da página', fake.vars['--tema-ink'] === '#1D3470' && fake.vars['--tema-ac'] === '#2B4EA2', S34(fake.vars));
+      t('45h: cria a camada de fundo com a imagem certa e a intensidade escolhida, e liga a marca de "fundo com tema" no corpo', !!fake.camada && fake.camada.style.cssText.includes('temas/pokemon-floresta-sol.webp') && fake.camada.style.cssText.includes('opacity:0.14') && fake.cls.comFundoTema === true, fake.camada && fake.camada.style.cssText.slice(0, 160));
+      t('45h: com a fonte do sistema nenhuma marca de fonte é ligada', fake.cls.fonteApp === false && fake.cls.fonteVal === false && fake.vars['--fonte'] && /apple-system/.test(fake.vars['--fonte']), S34([fake.cls, fake.vars['--fonte']]));
+      setg('APAR', A('aparNorm')({ fonte: 'outfit', fonteEm: 'valores', tom: 'frio' })); A('aplicaAparencia')();
+      t('45h: fonte nova em "só valores e títulos" liga fonteVal; o tom frio põe o fundo azulado', fake.cls.fonteVal === true && fake.cls.fonteApp === false && /Outfit/.test(fake.vars['--fonte']) && fake.vars['--bg'] === '#EEF3FA', S34([fake.cls, fake.vars]));
+      setg('APAR', A('aparNorm')({ fonte: 'outfit', fonteEm: 'app' })); A('aplicaAparencia')();
+      t('45h: "o app inteiro" liga fonteApp (e desliga fonteVal), e o tom padrão tira o fundo forçado', fake.cls.fonteApp === true && fake.cls.fonteVal === false && !('--bg' in fake.vars), S34([fake.cls, fake.vars]));
+      setg('relJogo', 'Yu-Gi-Oh'); setg('APAR', A('aparNorm')({})); A('aplicaAparencia')();
+      t('45h: jogo sem imagem de fundo (Yu-Gi-Oh!) remove a camada e a marca do corpo', fake.camada === null && fake.cls.comFundoTema === false, S34(fake.cls));
+      setg('relJogo', 'Pokémon'); setg('APAR', A('aparNorm')({ imagens: false })); A('aplicaAparencia')();
+      t('45h: "Mostrar imagens" desligado: nenhuma camada, nenhuma marca', fake.camada === null && fake.cls.comFundoTema === false, S34(fake.cls));
+    } finally { d.documentElement = orig.de; d.body = orig.body; d.createElement = orig.ce; d.getElementById = orig.geb; setg('relJogo', ''); volta(); }
+  });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
      A regra do dinheiro e escrita aqui DE NOVO, em cima da DESCRICAO das compras (valor, plano, marcas, conta) e sem chamar nenhuma tela do app:

@@ -27,6 +27,19 @@ header h1{font-size:16px;font-weight:600}header .sub{font-size:12px;opacity:.75;
 .sec{font-size:12px;color:var(--mut);font-weight:600;margin:14px 2px 8px;text-transform:uppercase;letter-spacing:.4px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .mini{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+/* APARENCIA (13/10): faixa do tema no Painel, fundo fraco atras das telas, fonte escolhida */
+.wrap{position:relative;z-index:1}
+.temaTopo{position:relative;height:170px;margin:0 0 10px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(160deg,var(--tema-bg1,#F7F7F9),var(--tema-bg2,#E9EBF1))}
+.temaTopo .arte{position:absolute;right:0;top:0;bottom:0;width:64%}
+.temaTopo img.arte{left:auto;width:auto;max-width:64%;object-fit:contain;object-position:right center}
+.temaTopo .tt{position:absolute;left:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:2px;color:var(--tema-ink,#2A2E48);max-width:40%}
+.temaTopo .tt b{font-size:19px;font-weight:700}.temaTopo .tt span{font-size:12px;opacity:.75}
+body.comFundoTema .card,body.comFundoTema .mini{background:color-mix(in srgb,var(--card) 90%,transparent)}
+.aparL{display:flex;align-items:center;gap:6px;cursor:pointer}
+body.fonteApp{font-family:var(--fonte)}
+body.fonteVal .v,body.fonteVal .head,body.fonteVal .sec,body.fonteVal header h1{font-family:var(--fonte)}
+@media(prefers-color-scheme:dark){.temaTopo{background:var(--card)}.temaTopo img.arte{filter:invert(1) hue-rotate(180deg)}}
+@media print{.temaTopo,#temaFundo{display:none!important}}
 .mini.click{cursor:pointer}.mini.click:active{background:var(--card2)}
 .mini .k{font-size:12px;color:var(--mut)}.mini .v{font-size:19px;font-weight:600;margin-top:3px}
 .mini .s{font-size:11px;color:var(--mut);margin-top:1px}
@@ -2642,7 +2655,131 @@ function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;consSoId=''
    do login resolver, não só o dos preços — por isso a trava mora aqui dentro, e não no
    fetch: enquanto a tela de login estiver no ar, render() não pinta por cima dela. */
 let _telaLoginNoAr=false;
-function render(){guardaBaldeItem();guardaBaldePend();if(_telaLoginNoAr)return;agendaRascunho();
+/* ===== APARÊNCIA (13/10/2026): temas por jogo (PADRÃO em qualquer aparelho), imagens liga/desliga, intensidade, fonte e tom do fundo =====
+   Pedido do Felype (13/10): os temas que montamos viram o padrão em qualquer aparelho (as imagens vão junto com o app, em temas/); a pessoa desativa ou escolhe outros. A escolha de cada
+   aparelho fica em localStorage (tcg_aparencia) e NÃO vai para a nuvem — o padrão é o mesmo em todos. As artes são WebP com alfa usados como máscara (mask-image) sobre a cor do tema; as
+   "meu desenho" são SVGs prontos. O tema segue o jogo em foco (filtro de jogo do Painel/Consultar); sem jogo = "Visão geral". */
+const APAR_KEY='tcg_aparencia';
+const APAR_PADRAO={imagens:true,topo:true,fundo:true,opTopo:70,opFundo:14,fonte:'sistema',fonteEm:'valores',tom:'padrao',arte:{}};
+const FONTES=[
+  {id:'sistema',rot:'Sistema (a de sempre)',css:'-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:''},
+  {id:'outfit',rot:'Outfit',css:'Outfit,-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Outfit:wght@400;600;700'},
+  {id:'manrope',rot:'Manrope',css:'Manrope,-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Manrope:wght@400;600;700'},
+  {id:'lexend',rot:'Lexend (leitura fácil)',css:'Lexend,-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Lexend:wght@400;600'},
+  {id:'dmsans',rot:'DM Sans',css:'"DM Sans",-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'DM+Sans:wght@400;600;700'},
+  {id:'figtree',rot:'Figtree',css:'Figtree,-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Figtree:wght@400;600;700'},
+  {id:'jakarta',rot:'Plus Jakarta Sans',css:'"Plus Jakarta Sans",-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Plus+Jakarta+Sans:wght@400;600;700'},
+  {id:'sora',rot:'Sora',css:'Sora,-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Sora:wght@400;600'},
+  {id:'urbanist',rot:'Urbanist',css:'Urbanist,-apple-system,Segoe UI,Roboto,Arial,sans-serif',gf:'Urbanist:wght@400;600;700'}
+];
+const TONS=[{id:'padrao',rot:'Padrão do app',bg:''},{id:'quente',rot:'Quente (creme)',bg:'#F8F4EC'},{id:'frio',rot:'Frio (azulado)',bg:'#EEF3FA'},{id:'tema',rot:'Cor do jogo em foco',bg:'tema'}];
+/* tam/pos = recorte da imagem DENTRO da caixa da arte (topo) ou do fundo da tela (fundo); arq = arquivo em temas/; svg = desenho pronto (sem recorte) */
+const TEMAS={
+  geral:{rot:'Visão geral',sub:'todos os jogos',ink:'#2A2E48',inkEsc:'#c9ccdf',ac:'#4A4E8A',bg1:'#F7F7F9',bg2:'#E9EBF1',
+    artes:{meu:{rot:'Meu desenho',svg:'meu-geral.svg'}},padrao:{topo:'meu',fundo:''}},
+  pokemon:{rot:'Pokémon',sub:'éter',ink:'#1D3470',inkEsc:'#a9c0ee',ac:'#2B4EA2',bg1:'#FBFCFF',bg2:'#D9E6F8',
+    artes:{
+      'mew-arejado':{rot:'Mew (arejado)',arq:'pokemon-mew-arejado.webp',topo:{tam:'auto 656px',pos:'right -75px top -128px'},fundo:{tam:'cover',pos:'center 30%'}},
+      'floresta-sol':{rot:'Floresta com sol',arq:'pokemon-floresta-sol.webp',topo:{tam:'auto 1018px',pos:'right -170px top -330px'},fundo:{tam:'cover',pos:'center 22%'}},
+      'mew-denso':{rot:'Mew (denso)',arq:'pokemon-mew-denso.webp',topo:{tam:'auto 656px',pos:'right -75px top -128px'},fundo:{tam:'cover',pos:'center 30%'}},
+      meu:{rot:'Meu desenho',svg:'meu-pokemon.svg'}},
+    padrao:{topo:'mew-arejado',fundo:'floresta-sol'}},
+  onepiece:{rot:'One Piece',sub:'cartografia',ink:'#0F4452',inkEsc:'#9cd3de',ac:'#17697A',bg1:'#FCF7EA',bg2:'#EADFC6',
+    artes:{
+      'going-merry':{rot:'Going Merry',arq:'onepiece-going-merry.webp',topo:{tam:'auto 300px',pos:'right 18px top -10px'},fundo:{tam:'cover',pos:'center'}},
+      'nami-corpo':{rot:'Nami (corpo inteiro)',arq:'onepiece-nami-corpo.webp',topo:{tam:'auto 536px',pos:'right -20px top -8px'},fundo:{tam:'cover',pos:'center 20%'}},
+      'nami-rosto':{rot:'Nami (rosto)',arq:'onepiece-nami-rosto.webp',topo:{tam:'auto 630px',pos:'right -70px top -60px'},fundo:{tam:'cover',pos:'center 25%'}},
+      meu:{rot:'Meu desenho',svg:'meu-onepiece.svg'}},
+    padrao:{topo:'going-merry',fundo:'nami-corpo'}},
+  dragonball:{rot:'Dragon Ball',sub:'aura',ink:'#2A2F66',inkEsc:'#b9bdf0',ac:'#D1791F',bg1:'#FFF9ED',bg2:'#F6DCB0',
+    artes:{
+      shenlong:{rot:'Shenlong e Goku',arq:'dragonball-shenlong.webp',topo:{tam:'auto 745px',pos:'right -65px top -95px'},fundo:{tam:'cover',pos:'center 20%'}},
+      'shenlong-esferas':{rot:'Shenlong e Goku (com as esferas)',arq:'dragonball-shenlong-esferas.webp',topo:{tam:'auto 745px',pos:'right -65px top -95px'},fundo:{tam:'cover',pos:'center 20%'}},
+      meu:{rot:'Meu desenho',svg:'meu-dragonball.svg'}},
+    padrao:{topo:'shenlong',fundo:'shenlong'}},
+  yugioh:{rot:'Yu-Gi-Oh!',sub:'relicário',ink:'#1C2B4A',inkEsc:'#b4c4e6',ac:'#23498A',bg1:'#FBF8EF',bg2:'#EBDDBA',
+    artes:{meu:{rot:'Meu desenho',svg:'meu-yugioh.svg'}},padrao:{topo:'meu',fundo:''}}
+};
+const TEMA_CHAVES=['pokemon','onepiece','dragonball','yugioh','geral'];
+function aparNorm(o){o=(o&&typeof o==='object')?o:{};const P=APAR_PADRAO,n=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d;};
+  const arte={};if(o.arte&&typeof o.arte==='object')Object.keys(o.arte).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k);if(m&&TEMAS[m[1]]&&typeof o.arte[k]==='string')arte[k]=o.arte[k];});
+  return {imagens:o.imagens!==false,topo:o.topo!==false,fundo:o.fundo!==false,opTopo:n(o.opTopo,10,100,P.opTopo),opFundo:n(o.opFundo,0,40,P.opFundo),
+    fonte:FONTES.some(f=>f.id===o.fonte)?o.fonte:P.fonte,fonteEm:o.fonteEm==='app'?'app':'valores',tom:TONS.some(t=>t.id===o.tom)?o.tom:P.tom,arte};}
+let APAR=aparNorm(get(APAR_KEY,{}));
+function aparSalva(){gravaLocal(APAR_KEY,JSON.stringify(APAR));}
+function temaChave(nome){const s=String(nome||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(s.indexOf('pokem')>=0)return 'pokemon';if(s.indexOf('one piece')>=0||s.indexOf('onepiece')>=0)return 'onepiece';if(s.indexOf('dragon')>=0)return 'dragonball';if(s.indexOf('yu')===0||s.indexOf('yugi')>=0)return 'yugioh';return 'geral';}
+/* o jogo em foco: o filtro de jogo da tela atual (Consultar tem o seu; as demais usam o do Painel/Relatórios). Sem filtro = visão geral */
+function jogoFoco(){if(tela==='consultar'&&consJogo&&consJogo!=='todos')return consJogo;return relJogo||'';}
+function aparEscolha(est,chave,slot){const k=chave+':'+slot;if(est.arte&&Object.prototype.hasOwnProperty.call(est.arte,k)){const v=est.arte[k];return (v===''||(TEMAS[chave]&&TEMAS[chave].artes[v]))?v:TEMAS[chave].padrao[slot];}return TEMAS[chave].padrao[slot];}
+/* PURA: tudo o que a tela precisa para desenhar o tema, sem tocar no DOM (testável) */
+function aparenciaCSS(est,chave,escuro){const T=TEMAS[chave]||TEMAS.geral;chave=TEMAS[chave]?chave:'geral';
+  const r={chave,rot:T.rot,sub:T.sub,ink:escuro?T.inkEsc:T.ink,ac:T.ac,bg1:T.bg1,bg2:T.bg2,fundo:null,topo:null,fonte:FONTES.find(f=>f.id===est.fonte)||FONTES[0],tomBg:''};
+  if(est.imagens){
+    if(est.fundo){const id=aparEscolha(est,chave,'fundo'),a=id&&T.artes[id];if(a&&a.arq)r.fundo={id,url:'temas/'+a.arq,tam:a.fundo.tam,pos:a.fundo.pos,op:Math.round(est.opFundo*(escuro?.6:1))/100};}
+    if(est.topo){const id=aparEscolha(est,chave,'topo'),a=id&&T.artes[id];
+      if(a)r.topo=a.arq?{id,tipo:'mascara',url:'temas/'+a.arq,tam:a.topo.tam,pos:a.topo.pos,op:Math.round(est.opTopo*(escuro?.75:1))/100}:{id,tipo:'svg',url:'temas/'+a.svg,op:Math.round(est.opTopo*(escuro?.85:1))/100};}}
+  const tom=TONS.find(t=>t.id===est.tom);if(!escuro&&tom&&tom.bg)r.tomBg=tom.bg==='tema'?T.bg1:tom.bg;
+  return r;}
+function aparEscuro(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);}catch(e){return false;}}
+const _aparFontesCarregadas={};
+function aparCarregaFonte(f){if(!f||!f.gf||_aparFontesCarregadas[f.id])return;_aparFontesCarregadas[f.id]=1;
+  try{const l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family='+f.gf+'&display=swap';document.head.appendChild(l);}catch(e){}}
+function aparMascaraCSS(m){return `background:var(--tema-ink);opacity:${m.op};-webkit-mask-image:url(${m.url}),linear-gradient(to right,transparent 0,#000 42%);mask-image:url(${m.url}),linear-gradient(to right,transparent 0,#000 42%);-webkit-mask-size:${m.tam},100% 100%;mask-size:${m.tam},100% 100%;-webkit-mask-position:${m.pos},0 0;mask-position:${m.pos},0 0;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-composite:source-in;mask-composite:intersect`;}
+/* DOM: variáveis na raiz, camada de fundo fraco e classes no body. Barato e idempotente — roda a cada render() */
+function aplicaAparencia(){try{
+  const c=aparenciaCSS(APAR,temaChave(jogoFoco()),aparEscuro());
+  const root=document.documentElement,b=document.body;if(!root||!root.style||!b)return c;
+  root.style.setProperty('--tema-ink',c.ink);root.style.setProperty('--tema-ac',c.ac);root.style.setProperty('--tema-bg1',c.bg1);root.style.setProperty('--tema-bg2',c.bg2);
+  root.style.setProperty('--fonte',c.fonte.css);if(c.tomBg)root.style.setProperty('--bg',c.tomBg);else root.style.removeProperty('--bg');
+  aparCarregaFonte(c.fonte);
+  b.classList.toggle('fonteApp',c.fonte.id!=='sistema'&&APAR.fonteEm==='app');b.classList.toggle('fonteVal',c.fonte.id!=='sistema'&&APAR.fonteEm!=='app');
+  let f=document.getElementById('temaFundo');
+  if(c.fundo){if(!f){f=document.createElement('div');f.id='temaFundo';b.insertBefore(f,b.firstChild);}
+    f.style.cssText=`position:fixed;inset:0;z-index:0;pointer-events:none;background:var(--tema-ink);opacity:${c.fundo.op};-webkit-mask-image:url(${c.fundo.url});mask-image:url(${c.fundo.url});-webkit-mask-size:${c.fundo.tam};mask-size:${c.fundo.tam};-webkit-mask-position:${c.fundo.pos};mask-position:${c.fundo.pos};-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat`;
+    b.classList.add('comFundoTema');}
+  else{if(f)f.remove();b.classList.remove('comFundoTema');}
+  return c;}catch(e){return null;}}
+/* a faixa do tema no topo do Painel (só quando há arte de topo ligada) */
+function temaTopoHTML(){const c=aparenciaCSS(APAR,temaChave(jogoFoco()),aparEscuro());if(!c.topo)return '';
+  const arte=c.topo.tipo==='mascara'?`<div class="arte" style="${aparMascaraCSS(c.topo)}"></div>`:`<img class="arte svg" src="${c.topo.url}" alt="" style="opacity:${c.topo.op}">`;
+  return `<div class="temaTopo" data-tema="${c.chave}">${arte}<div class="tt"><b>${c.rot}</b><span>${c.sub}</span></div></div>`;}
+function aparRedesenha(){let y=0;try{const n=document.querySelector('#modal > div');y=n?n.scrollTop:0;}catch(e){}fecharModal();abrirAparencia();try{const n=document.querySelector('#modal > div');if(n)n.scrollTop=y;}catch(e){}}
+function aparSet(campo,v){if(!(campo in APAR_PADRAO)||campo==='arte')return;APAR=aparNorm(Object.assign({},APAR,{[campo]:v}));aparSalva();aplicaAparencia();render();}
+function aparLiga(campo){aparSet(campo,!APAR[campo]);aparRedesenha();}
+/* arrastar o controle NAO redesenha o app inteiro: só reaplica o fundo e acerta a opacidade da faixa que já está na tela */
+function aparNum(campo,v){if(campo!=='opTopo'&&campo!=='opFundo')return;APAR=aparNorm(Object.assign({},APAR,{[campo]:v}));aparSalva();const c=aplicaAparencia();
+  try{document.querySelectorAll('.temaTopo .arte').forEach(e=>{e.style.opacity=(c&&c.topo)?c.topo.op:'';});}catch(e){}
+  const el=document.getElementById('aparv_'+campo);if(el)el.textContent=APAR[campo]+'%';}
+function aparSel(campo,v){aparSet(campo,v);aparRedesenha();}
+function aparEsc(chave,slot,v){if(!TEMAS[chave]||(slot!=='topo'&&slot!=='fundo'))return;const arte=Object.assign({},APAR.arte);arte[chave+':'+slot]=v;APAR=aparNorm(Object.assign({},APAR,{arte}));aparSalva();aplicaAparencia();render();aparRedesenha();}
+function aparReset(){APAR=aparNorm({});aparSalva();aplicaAparencia();render();aparRedesenha();toast('Aparência: voltou ao padrão ✓');}
+function abrirAparencia(){const A=APAR,esc=s=>String(s).replace(/"/g,'&quot;');
+  const chk=(campo,rot,dica,ind)=>`<label class="aparL" title="${esc(dica)}" style="${ind?'margin-left:22px;':''}"><input type="checkbox" style="width:auto;margin:0" ${A[campo]?'checked':''} ${campo!=='imagens'&&!A.imagens?'disabled':''} onchange="aparLiga('${campo}')"> <b>${rot}</b></label><div class="ctx" style="${ind?'margin-left:44px;':'margin-left:22px;'}margin-bottom:6px">${dica}</div>`;
+  const rng=(campo,rot,min,max,dica)=>`<div style="margin:8px 0 2px;display:flex;justify-content:space-between"><label for="apar_${campo}"><b>${rot}</b></label><span id="aparv_${campo}" style="color:var(--mut)">${A[campo]}%</span></div><input id="apar_${campo}" type="range" min="${min}" max="${max}" value="${A[campo]}" ${!A.imagens?'disabled':''} oninput="aparNum('${campo}',this.value)" style="width:100%" title="${esc(dica)}"><div class="ctx">${dica}</div>`;
+  const sel=(id,rot,opts,atual,fn,dica)=>`<div style="margin:10px 0 2px"><label for="${id}"><b>${rot}</b></label></div><select id="${id}" onchange="${fn}" title="${esc(dica)}" style="width:100%;padding:9px;border-radius:9px;border:1px solid var(--inpb);background:var(--inp);color:var(--txt)">${opts.map(o=>`<option value="${esc(o[0])}" ${String(o[0])===String(atual)?'selected':''}>${o[1]}</option>`).join('')}</select><div class="ctx">${dica}</div>`;
+  const porJogo=TEMA_CHAVES.map(ch=>{const T=TEMAS[ch],arts=Object.keys(T.artes);
+    const op=slot=>[['','Nenhuma']].concat(arts.filter(k=>slot==='topo'||T.artes[k].arq).map(k=>[k,T.artes[k].rot]));
+    return `<div class="item" style="display:block;padding:10px 12px"><b>${T.rot}</b>
+      ${sel('aparT_'+ch,'Topo do Painel',op('topo'),aparEscolha(A,ch,'topo'),`aparEsc('${ch}','topo',this.value)`,'A imagem da faixa no alto do Painel quando este jogo está em foco.')}
+      ${sel('aparF_'+ch,'Fundo das telas',op('fundo'),aparEscolha(A,ch,'fundo'),`aparEsc('${ch}','fundo',this.value)`,'A imagem fraquinha atrás das telas (só as de traço; "meu desenho" não serve de fundo).')}</div>`;}).join('');
+  const h=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
+    <div class="head">🎨 Aparência</div>
+    <div class="ctx">Os temas de cada jogo já vêm prontos em todos os aparelhos. Aqui você liga, desliga ou troca — a escolha vale só para este aparelho.</div>
+    ${chk('imagens','Mostrar imagens','Desligado, o app volta ao visual simples de antes (sem faixa, sem fundo).',false)}
+    ${chk('topo','no topo do Painel','A faixa com a arte do jogo em foco.',true)}
+    ${chk('fundo','no fundo das telas','A imagem fraca atrás de todas as telas.',true)}
+    ${rng('opTopo','Intensidade do topo',10,100,'Quanto a arte do topo aparece (100 = traço cheio).')}
+    ${rng('opFundo','Intensidade do fundo',0,40,'Quanto o fundo aparece (14 é o padrão; acima de 25 pode atrapalhar a leitura).')}
+    <div class="sec" style="margin-top:14px">Imagem de cada jogo</div>${porJogo}
+    <div class="sec" style="margin-top:14px">Letra e cor</div>
+    ${sel('aparFonte','Fonte',FONTES.map(f=>[f.id,f.rot]),A.fonte,"aparSel('fonte',this.value)",'As fontes novas carregam da internet; sem internet o app usa a de sempre.')}
+    ${sel('aparFonteEm','Aplicar a fonte em',[['valores','Só valores e títulos'],['app','O app inteiro']],A.fonteEm,"aparSel('fonteEm',this.value)",'Só valores e títulos mexe pouco no resto; o app inteiro troca todas as letras.')}
+    ${sel('aparTom','Tom do fundo',TONS.map(t=>[t.id,t.rot]),A.tom,"aparSel('tom',this.value)",'A cor de trás dos cartões (no modo escuro o app mantém o escuro).')}
+    <div class="acoes" style="margin-top:14px"><button class="btn g" onclick="aparReset()" title="Volta tudo ao padrão de fábrica deste aparelho">↺ Restaurar o padrão</button><button class="btn g" onclick="fecharModal()">Fechar</button></div>
+  </div></div>`;
+  document.body.insertAdjacentHTML('beforeend',h);}
+function render(){guardaBaldeItem();guardaBaldePend();if(_telaLoginNoAr)return;agendaRascunho();aplicaAparencia();
   if(papelAtual()==='lancamento'){if(tela!=='lancar')tela='lancar';if(navHist.length)navHist=[];}
   const V={painel:vPainel,lancar:vLancar,consultar:vConsultar,simular:vSimular,relatorios:vRelatorios,contas:vContas,estoque:vEstoque};document.getElementById('view').innerHTML=(V[tela]||vPainel)();document.querySelectorAll('nav button,.htop').forEach(b=>b.classList.toggle('on',b.dataset.t===tela));const bv=document.getElementById('btnVoltar');if(bv)bv.style.display=navHist.length?'block':'none';if(tela==='simular')simCalc();}
 
@@ -2699,7 +2836,7 @@ function vPainel(){
       ${lin('vendi (líquido)',r.vendasLiq,`consF='VENDA';go('consultar')`,'+')}
       </div>
     </div></div>`;})();
-  return `<div class="mini click" style="position:sticky;top:var(--hh,0px);z-index:4;margin-bottom:10px;padding:9px 12px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35);${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render();${relFOpen?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtro ${relFOpen?'▾':'▸'}</div><div class="s">${filtroResumoTxt()}</div></div>
+  return `${temaTopoHTML()}<div class="mini click" style="position:sticky;top:var(--hh,0px);z-index:4;margin-bottom:10px;padding:9px 12px;box-shadow:0 6px 8px -6px rgba(0,0,0,.35);${relFOpen?'outline:1.5px solid var(--blue)':''}" onclick="relFOpen=!relFOpen;render();${relFOpen?'':"window.scrollTo({top:0,behavior:'smooth'})"}"><div class="k">🔎 Filtro ${relFOpen?'▾':'▸'}</div><div class="s">${filtroResumoTxt()}</div></div>
     ${relFOpen?filtrosRelCard():''}
     <div class="sec">Onde está o dinheiro</div>
     <div class="grid2">
@@ -2717,6 +2854,7 @@ function vPainel(){
     <div class="lnk" onclick="abrirPendencias()">⚠️ pendências — o que precisa da sua mão${(function(){const R=pendenciasResumo();if(!R.pronto||!_precosTentado)return ' <span style="color:var(--mut)">· conferindo…</span>';if(!R.total)return ' <span style="color:var(--green)">· tudo certo ✓</span>';return ` <b style="color:${R.grave?'var(--red)':'var(--amber)'}">· ${R.total} achado${R.total>1?'s':''}</b>${R.n1toque?` <span style="color:var(--mut)">· ${R.n1toque} resolve em 1 toque</span>`:''}`;})()}</div>
     <div class="lnk" onclick="imprimir()">🖨 imprimir este resumo</div>
     <div class="lnk" onclick="abrirBackup()">💾 backup · restaurar · exportar</div>
+    <div class="lnk" onclick="abrirAparencia()" title="Imagens dos jogos, fonte e tom do fundo (vale só para este aparelho)">🎨 aparência · imagens · fonte</div>
     ${USAR_NUVEM&&_userEmail?`<div class="lnk" onclick="sairConta()">🚪 sair da conta (${_userEmail})</div>`:''}
     ${resultadoHTML}
     <div class="lnk" onclick="limparTudo()">limpar tudo</div>`;
@@ -6559,11 +6697,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/10 16h06';
+const BUILD_TAG='13/10 16h54';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791918371035;
+const BUILD_TS=1791921282407;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

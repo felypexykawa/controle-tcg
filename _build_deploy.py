@@ -97,7 +97,20 @@ chk=out
 # que e a unica sobre a qual esta checagem tem o que dizer.
 _litLiga=len(re.findall(r'''buscarLigaCampo\(\s*['"]''', chk))
 _chamLiga=re.findall(r'''buscarLigaCampo\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*\)''', chk)
+# [13/10, Aparencia] toda imagem/SVG citada nos temas tem de existir em temas/: arte citada e ausente = faixa/fundo quebrados no ar
+_artesTema=set(re.findall(r"arq:'([^']+)'",chk))|set(re.findall(r"svg:'([^']+)'",chk))
+_artesFalta=[f for f in sorted(_artesTema) if not os.path.exists(os.path.join(AQUI,'temas',f))]
+if _artesFalta: print('  arte de tema citada e AUSENTE em temas/:', ', '.join(_artesFalta))
+# SVG que nao e XML valido (atributo repetido, tag aberta) abre no navegador mas NAO carrega como <img>: a faixa ficava em branco (achado ao vivo em 13/10)
+import xml.etree.ElementTree as _ET
+_svgRuins=[]
+for _f in sorted(_artesTema):
+    if _f.endswith('.svg') and os.path.exists(os.path.join(AQUI,'temas',_f)):
+        try: _ET.parse(os.path.join(AQUI,'temas',_f))
+        except Exception: _svgRuins.append(_f)
+if _svgRuins: print('  SVG de tema que nao e XML valido (nao carrega como imagem):', ', '.join(_svgRuins))
 checks={
+ 'aparencia: toda arte citada nos temas existe em temas/ (nenhuma faltando no ar) e ha artes citadas, todas as SVG sao XML valido':bool(_artesTema) and not _artesFalta and not _svgRuins,
  'apiKey presente':'AIzaSy' in chk,
  'USAR_NUVEM auto-deriva':'const USAR_NUVEM = !!(firebaseConfig' in chk,
  'SEED vazio':'const SEED=[];' in chk,
