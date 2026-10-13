@@ -2695,6 +2695,7 @@ const TEMAS={
     artes:{
       shenlong:{rot:'Shenlong e Goku',arq:'dragonball-shenlong.webp',topo:{tam:'auto 745px',pos:'right -65px top -95px'},fundo:{tam:'cover',pos:'center 20%'}},
       'shenlong-esferas':{rot:'Shenlong e Goku (com as esferas)',arq:'dragonball-shenlong-esferas.webp',topo:{tam:'auto 745px',pos:'right -65px top -95px'},fundo:{tam:'cover',pos:'center 20%'}},
+      'shenlong-cartas':{rot:'Shenlong e Goku (esferas viram cartas e moedas)',arq:'dragonball-shenlong-cartas.webp',topo:{tam:'auto 745px',pos:'right -65px top -95px'},fundo:{tam:'cover',pos:'center 20%'}},
       meu:{rot:'Meu desenho',svg:'meu-dragonball.svg'}},
     padrao:{topo:'shenlong',fundo:'shenlong'}},
   yugioh:{rot:'Yu-Gi-Oh!',sub:'relicário',ink:'#1C2B4A',inkEsc:'#b4c4e6',ac:'#23498A',bg1:'#FBF8EF',bg2:'#EBDDBA',
@@ -6697,11 +6698,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='13/10 16h54';
+const BUILD_TAG='13/10 17h27';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791921282407;
+const BUILD_TS=1791923261932;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
