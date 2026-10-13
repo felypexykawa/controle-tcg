@@ -6504,6 +6504,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       !lancou && !!r && r.every(x => typeof x === 'string'), 'lancou: ' + lancou + ' | ' + S34(r));
   });
 
+
   /* ===== 42. VINCULO MANUAL SO COM OS PROVAVEIS · CARTA AVULSA NAO ABRE · CARTA SEM PRECO NA LIGA COM CAMINHO (12/10/2026) =====
      Felype, ao tentar vincular na mao: "no texto eu nao consigo identificar a colecao... ele me joga para uma lista imensa, sem nenhum tipo de filtro. Fica bem improvavel eu fazer qualquer
      correcao". E, numa carta sem preco na Liga: "nao achei a opcao de preco na liga... achei o botao de abrir, o que a gente ja tinha tratado que single card nao tem como abrir". */
@@ -6658,8 +6659,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
         compra34('g3', { cat: 'Single/Carta', colecao: '', situacao: 'Coleção', codigo: 'Bulk', qtd: 15, valor: 323.26, obs: 'Bulk (🔓 de Sleeved)' }));
       const gp = A('pendGrupos')().find(x => x.id === 'sem_preco');
       const it = gp && gp.itens.find(x => /gardevoir/i.test(x.t));
-      t('42f: a pendência "sem preço" lista a carta com coleção e custo e o MOTIVO em português claro (∞ = carta promocional; só o link direto resolve) — e a que tem preço (g2) não entra',
-        !!it && /Herois Excelsos/.test(it.d) && /carta promocional/.test(it.d) && /link direto/.test(it.d) && gp.itens.length === 2 && !gp.itens.some(x => /Pikachu/.test(x.t)), S34(gp));
+      t('42f: a pendência "sem preço" lista a carta com coleção e custo e o MOTIVO em português claro (∞ = carta promocional; o preço chega na próxima coleta) — e a que tem preço (g2) não entra',
+        !!it && /Herois Excelsos/.test(it.d) && /carta promocional/.test(it.d) && /próxima coleta/.test(it.d) && gp.itens.length === 2 && !gp.itens.some(x => /Pikachu/.test(x.t)), S34(gp));
       const itB = gp.itens.find(x => /Bulk/.test(x.t));
       t('42f: o "Bulk" (15 cartas soltas) pode ser marcado ali mesmo como lote de cartas avulsas — a carta única (g1) não ganha esse botão',
         !!itB && itB.a.some(a => /é lote de cartas avulsas/.test(a[0])) && !it.a.some(a => /é lote de cartas avulsas/.test(a[0])), S34([itB && itB.a.map(a => a[0]), it.a.map(a => a[0])]));
@@ -6671,7 +6672,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('consF', 'COMPRA'); setg('consVer', 'itens'); setg('expandId', 'g1');
       const h = A('vConsultar')();
       t('42f: no item aberto, a carta sem preço na Liga ganha "usar link direto" (antes o botão sumia) e o texto explica o ∞ — e NÃO oferece 🔓 abrir',
-        /onclick="setCodigoUrl\('g1'\)"/.test(h) && /carta promocional/.test(h) && !/abrirTransf\('g1'\)/.test(h), h.slice(h.indexOf('mv-g1'), h.indexOf('mv-g1') + 300));
+        /onclick="setCodigoUrl\('g1'\)"/.test(h) && /carta promocional/.test(h) && /pode chegar na próxima coleta/.test(h) && !/não a acha/.test(h) && !/abrirTransf\('g1'\)/.test(h), h.slice(h.indexOf('mv-g1'), h.indexOf('mv-g1') + 300));
       setg('expandId', 'g2');
       const h2 = A('vConsultar')();
       t('42f: carta com preço na Liga não ganha o aviso de "sem preço" nem o botão de link direto, e também não abre', !/carta promocional/.test(h2) && !/onclick="setCodigoUrl\('g2'\)"/.test(h2) && !/abrirTransf\('g2'\)/.test(h2), '');
@@ -6680,10 +6681,10 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       L('Pokémon', 'Mega gardevoir ex (032/∞)'); L('Pokémon', 'Morpeko da marine 206/∞'); L('Pokémon', 'Pikachu (173/165)'); L('Pokémon', '056/∞');
       L('Pokémon', 'Mega gardevoir ex(032/∞)'); L('Pokémon', 'Nome (032 / ♾️)'); L('Pokémon', '(SVP 032/∞)');
       const q = u => decodeURIComponent((u.match(/card=([^&]*)/) || [])[1] || '');
-      t('42f: procurar na Liga um código com ∞ busca só pelo NOME ("Mega gardevoir ex", "Morpeko da marine"); código normal vai inteiro; código que é só número com ∞ vai como está',
-        q(urls[0]) === 'Mega gardevoir ex' && q(urls[1]) === 'Morpeko da marine' && q(urls[2]) === 'Pikachu (173/165)' && q(urls[3]) === '056/∞', S34(urls.map(q)));
-      t('42f: ... e sem espaço antes do parêntese ("ex(032/∞)" não perde o "ex"), com ♾️ e espaços na barra ("Nome (032 / ♾️)" vira "Nome") e sem nome nenhum ("(SVP 032/∞)" não manda busca vazia)',
-        q(urls[4]) === 'Mega gardevoir ex' && q(urls[5]) === 'Nome' && q(urls[6]) === '(SVP 032/∞)', S34(urls.map(q)));
+      t('42f: procurar na Liga leva o TEXTO INTEIRO do cadastro, com o ∞ (a Liga abre a carta direto — o Felype testou e eu medi em 13 cartas); código normal vai inteiro também',
+        q(urls[0]) === 'Mega gardevoir ex (032/∞)' && q(urls[1]) === 'Morpeko da marine 206/∞' && q(urls[2]) === 'Pikachu (173/165)' && q(urls[3]) === '056/∞', S34(urls.map(q)));
+      t('42f: o emoji ♾️ do teclado do celular vira o ∞ matemático e as barras ficam coladas ("Nome (032 / ♾️)" -> "Nome (032/∞)"): com o emoji a Liga devolve "nenhum item"',
+        q(urls[4]) === 'Mega gardevoir ex(032/∞)' && q(urls[5]) === 'Nome (032/∞)' && q(urls[6]) === '(SVP 032/∞)' && !/%E2%99%BE/.test(urls[5]), S34(urls.map(q)) + ' | ' + urls[5]);
     } finally { setg('_precosLiga', orig.liga); setg('_precosTentado', orig.tent); setg('consF', orig.consF); setg('consVer', orig.consVer); setg('expandId', orig.exp); ctx.open = orig.abre; }
   });
 
@@ -6696,6 +6697,233 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     const al = A('provaReal')().A.find(a => /Material vendido sem venda apontando/.test(a.titulo));
     t('42g: o aviso não promete "dali dá pra vincular" (o item vendido não tem botão de vínculo): diz onde ligar — na venda, com "de onde saiu?" ou "procurar origem sozinho"',
       !!al && !/dali dá pra vincular/.test(al.acaoRot + al.detalhe) && /abra a venda correspondente/.test(al.detalhe) && al.acaoRot === 'ver o item', S34(al));
+  });
+
+  /* ===== 43. LISTA DIZ "CUSTO" · VALOR ATUAL NO ITEM · ABRIR DAS PENDENCIAS MOSTRA SO O ITEM · VENDIDO SEM VENDA DE PROPOSITO (13/10/2026) =====
+     Felype, depois de usar o lote de 12/10: "ela abre assim, tudo misturado com as outras"; "o que e esse valor na lateral direita? e nosso custo.. nao daria p escrever custo ali?";
+     "e aparecer o valor atual ali debaixo do preco da liga?"; e (pendente desde 12/10) o aviso "vendido sem venda" sem saida: botao "de proposito" e o Triple que o detector escondia. */
+  console.log('');
+  console.log('=== 43. custo na lista · valor atual no item · abrir das Pendencias isola o item · vendido sem venda de proposito ===');
+  const FUNCS43 = ['marcarSemVenda', 'desmarcarSemVenda', 'fragOrfao', 'verMov', 'abrirCorrigirCodigo', 'vConsultar', 'valorMercadoDe', 'provaReal', 'go', 'irConsultar', 'verFiltro'];
+  const faltam43 = FUNCS43.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('43a: [pre-requisito] o app carregado tem as ' + FUNCS43.length + ' funcoes desta secao', faltam43.length === 0, 'FALTAM no app: ' + faltam43.join(', '));
+  const bloco43 = (rot, corpo) => faltam43.length ? Promise.resolve() : bloco34(rot, corpo, '43');
+  const consulta43 = () => { setg('tela', 'consultar'); setg('consMenu', false); setg('consQ', ''); setg('consJogo', 'todos'); setg('consCol', ''); setg('consPess', ''); setg('consConta', ''); setg('consCat', ''); setg('consGrupoFech', {}); setg('perSel', 'tudo'); setg('perDe', ''); setg('perAte', ''); setg('selMode', false); };
+
+  await bloco43('b', () => {
+    const o = { consF: g('consF'), consVer: g('consVer'), exp: g('expandId'), soId: g('consSoId') };
+    try {
+      consulta43(); setg('consF', 'tudo'); setg('consVer', 'itens'); setg('expandId', null); setg('consSoId', '');
+      M().push(compra34('k1', { cat: 'ETB', valor: 300, data: '2026-08-01' }), venda42('kv1', { valor: 500, data: '2026-08-05' }), { id: 'kd1', tipo: 'DESPESA', data: '2026-08-06', valor: 37, status: 'pago', natureza: 'ordinaria', cat: 'Luz' });
+      const h = A('vConsultar')();
+      t('43b: a coluna da direita da lista diz "custo" na compra e "venda" na venda (antes só o número: o Felype não sabia o que era)',
+        /custo<\/div><div style="font-weight:700">/.test(h) && /venda<\/div><div style="font-weight:700">/.test(h), (h.match(/<div style="text-align:right;white-space:nowrap">[\s\S]{0,200}/g) || []).join(' || ').slice(0, 500));
+      t('43b: despesa não ganha rótulo (só compra e venda): "custo" aparece 1 vez e "venda" 1 vez na coluna', (h.match(/line-height:1\.1">custo</g) || []).length === 1 && (h.match(/line-height:1\.1">venda</g) || []).length === 1, S34([(h.match(/line-height:1\.1">custo</g) || []).length, (h.match(/line-height:1\.1">venda</g) || []).length]));
+    } finally { setg('consF', o.consF); setg('consVer', o.consVer); setg('expandId', o.exp); setg('consSoId', o.soId); }
+  });
+
+  /* errata do revisor (13/10): o rótulo só existia na lista detalhada; a visão que abre por padrão (por nota / por venda) mostrava o número solto */
+  await bloco43('b2', () => {
+    const o = { consF: g('consF'), consVer: g('consVer'), exp: g('expandId'), soId: g('consSoId') };
+    try {
+      consulta43(); setg('consF', 'COMPRA'); setg('consVer', 'notas'); setg('expandId', null); setg('consSoId', '');
+      M().push(compra34('n1', { cat: 'ETB', valor: 300, data: '2026-08-01', notaId: 'nx1', notaNum: '501' }), compra34('n2', { cat: 'Box', valor: 100, data: '2026-08-01', notaId: 'nx1', notaNum: '501' }),
+        compra34('lr1', { cat: 'Box', valor: 777, data: '2026-08-02', qtd: 1 }), compra34('lr2', { cat: 'Booster', valor: 0, data: '2026-08-02', qtd: 3, loteOrigem: 'lr1' }),
+        compra34('av1', { cat: 'ETB', valor: 55, data: '2026-08-03' }));
+      const hc = A('vConsultar')();
+      const rot = (h, pal, val) => new RegExp('line-height:1\\.1">' + pal + '</div><div style="font-weight:700">' + val.replace(/[.$]/g, '\\$&').replace(/ /g, '\\s')).test(h);
+      t('43b: na visão POR NOTA (a que abre por padrão na aba Compras) o cartão da nota diz "custo" em cima do valor (R$ 400,00 = 300 + 100)', rot(hc, 'custo', 'R$ 400,00'), (hc.match(/line-height:1\.1">[a-z]+<\/div>[\s\S]{0,80}/g) || []).join(' || ').slice(0, 400));
+      t('43b: o cartão do LOTE (compra fracionada) também diz "custo" (R$ 777,00)', rot(hc, 'custo', 'R$ 777,00'), (hc.match(/line-height:1\.1">[a-z]+<\/div>[\s\S]{0,80}/g) || []).join(' || ').slice(0, 400));
+      t('43b: o cartão da compra AVULSA (sem nota) também diz "custo" (R$ 55,00)', rot(hc, 'custo', 'R$ 55,00'), (hc.match(/line-height:1\.1">[a-z]+<\/div>[\s\S]{0,80}/g) || []).join(' || ').slice(0, 400));
+      t('43b: na aba Compras o rótulo "venda" NÃO aparece (3 "custo", 0 "venda")', (hc.match(/line-height:1\.1">custo</g) || []).length === 3 && !/line-height:1\.1">venda</.test(hc), S34([(hc.match(/line-height:1\.1">custo</g) || []).length, (hc.match(/line-height:1\.1">venda</g) || []).length]));
+      setg('consF', 'VENDA');
+      M().push(venda42('sv1', { valor: 120, data: '2026-08-05', vendaId: 'vdx', contraparte: 'Ana' }), venda42('sv2', { valor: 80, data: '2026-08-05', vendaId: 'vdx', contraparte: 'Ana' }), venda42('sv3', { valor: 66, data: '2026-08-06', contraparte: 'Beto' }));
+      const hv = A('vConsultar')();
+      t('43b: na visão POR VENDA o cartão da venda com vários itens diz "venda" (R$ 200,00 = 120 + 80)', rot(hv, 'venda', 'R$ 200,00'), (hv.match(/line-height:1\.1">[a-z]+<\/div>[\s\S]{0,80}/g) || []).join(' || ').slice(0, 400));
+      t('43b: o cartão da venda de item ÚNICO também diz "venda" (R$ 66,00) e a aba Vendas não mostra "custo" (2 "venda", 0 "custo")', rot(hv, 'venda', 'R$ 66,00') && (hv.match(/line-height:1\.1">venda</g) || []).length === 2 && !/line-height:1\.1">custo</.test(hv), S34([(hv.match(/line-height:1\.1">venda</g) || []).length, (hv.match(/line-height:1\.1">custo</g) || []).length]));
+    } finally { setg('consF', o.consF); setg('consVer', o.consVer); setg('expandId', o.exp); setg('consSoId', o.soId); }
+  });
+
+  await bloco43('c', () => {
+    const o = { liga: g('_precosLiga'), consF: g('consF'), consVer: g('consVer'), exp: g('expandId'), soId: g('consSoId') };
+    try {
+      setg('_precosLiga', { cartas: { 'Pikachu (173/165)': { status: 'OK', titulo: 'Pikachu', versoes: [{ v: '', mn: 10, md: 12, mx: 15 }] } }, historico: { 'Eevee (104/159)': { '': [{ d: '2026-09-01', mn: 5, md: 6 }] } }, atualizadoEm: '2026-10-09T00:00:00Z' });
+      consulta43(); setg('consF', 'COMPRA'); setg('consVer', 'itens'); setg('consSoId', '');
+      M().push(compra34('w1', { cat: 'Single/Carta', codigo: 'Pikachu (173/165)', qtd: 2, valor: 20, situacao: 'Coleção' }),
+        compra34('w2', { cat: 'Single/Carta', codigo: 'Eevee (104/159)', qtd: 3, valor: 9, situacao: 'Coleção' }),
+        compra34('w3', { cat: 'ETB', valor: 300, situacao: 'Em estoque' }),
+        compra34('w4', { cat: 'ETB', valor: 111, situacao: 'Vendido' }), compra34('w5', { cat: 'ETB', valor: 200, situacao: 'Pedido' }));
+      const vista = idm => { setg('expandId', idm); return A('vConsultar')(); };
+      const h1 = vista('w1'), h2 = vista('w2'), h3 = vista('w3'), h4 = vista('w4'), h5 = vista('w5');
+      const num = h => { const i = h.indexOf('valor atual'); return i < 0 ? '' : h.slice(i, i + 260).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' '); };
+      t('43c: o item aberto mostra "valor atual" debaixo do preço da Liga: com preço da Liga = preço × quantidade (2 × 12 = R$ 24), dizendo a fonte e o custo',
+        /valor atual: R\$\s?24,00/.test(num(h1)) && /preço atual da Liga/.test(num(h1)) && /custo R\$\s?20,00/.test(num(h1)), num(h1));
+      t('43c: sem preço atual mas com preço antigo visto, usa o ÚLTIMO preço visto (3 × 6 = R$ 18) e diz isso', /valor atual: R\$\s?18,00/.test(num(h2)) && /último preço visto na Liga/.test(num(h2)), num(h2));
+      t('43c: sem preço nenhum da Liga (produto selado), o valor atual é o custo — nunca zero — e diz isso', /valor atual: R\$\s?300,00/.test(num(h3)) && /sem preço da Liga: considero o custo/.test(num(h3)) && !/custo R\$/.test(num(h3)), num(h3));
+      t('43c: item a caminho (Pedido) também mostra o valor atual (o custo, sem preço da Liga)', /valor atual: R\$\s?200,00/.test(num(h5)), num(h5));
+      t('43c: item que já foi vendido não ganha "valor atual" (não está mais com ele)', num(h4) === '', num(h4));
+    } finally { setg('_precosLiga', o.liga); setg('consF', o.consF); setg('consVer', o.consVer); setg('expandId', o.exp); setg('consSoId', o.soId); }
+  });
+
+  await bloco43('d', () => {
+    const o = { consF: g('consF'), consVer: g('consVer'), exp: g('expandId'), soId: g('consSoId') };
+    try {
+      consulta43(); setg('consF', 'tudo'); setg('consVer', 'itens'); setg('consSoId', '');
+      M().push(compra34('a1', { cat: 'Single/Carta', obs: 'ITEM-A-UM', codigo: 'X (1/∞)' }), compra34('a2', { cat: 'Single/Carta', obs: 'ITEM-A-DOIS' }), compra34('a3', { cat: 'ETB', obs: 'ITEM-A-TRES' }));
+      A('abrirCorrigirCodigo')('a1');
+      t('43d: abrir um lançamento a partir das Pendências isola o item (consSoId) — antes ele caía no meio da lista inteira', g('consSoId') === 'a1' && g('expandId') === 'a1', S34([g('consSoId'), g('expandId')]));
+      const h = A('vConsultar')();
+      t('43d: a Consulta mostra SÓ esse item, aberto, com o aviso "mostrando só este item" e o toque para ver a lista completa', /mv-a1/.test(h) && !/mv-a2/.test(h) && !/mv-a3/.test(h) && /mostrando só este item/.test(h) && /consSoId=''/.test(h), h.slice(0, 300));
+      setg('consSoId', ''); const h0 = A('vConsultar')();
+      t('43d: sem o isolamento a lista volta inteira, sem o aviso', /mv-a1/.test(h0) && /mv-a2/.test(h0) && /mv-a3/.test(h0) && !/mostrando só este item/.test(h0), '');
+      A('verMov')('a2');
+      t('43d: abrir um item por qualquer outro caminho (verMov sem o segundo argumento) NÃO isola', g('consSoId') === '', S34(g('consSoId')));
+      setg('consSoId', 'a1'); A('go')('painel');
+      t('43d: ir para outra tela desfaz o isolamento (não fica preso na próxima visita à Consulta)', g('consSoId') === '', S34(g('consSoId')));
+      setg('consSoId', 'a1'); A('irConsultar')();
+      t('43d: entrar na Consulta pelo menu desfaz o isolamento', g('consSoId') === '', S34(g('consSoId')));
+      setg('consSoId', 'a1'); A('verFiltro')('COMPRA');
+      t('43d: escolher uma aba da Consulta desfaz o isolamento', g('consSoId') === '', S34(g('consSoId')));
+      A('go')('painel'); setg('consSoId', 'a1'); A('voltar')();
+      t('43d: o botão voltar desfaz o isolamento', g('consSoId') === '', S34(g('consSoId')));
+      setg('consSoId', 'a1'); A('buscaCons')({ value: 'x', selectionStart: 1 });
+      t('43d: digitar na busca da Consulta desfaz o isolamento (quem busca quer a lista inteira) e guarda o texto buscado', g('consSoId') === '' && g('consQ') === 'x', S34([g('consSoId'), g('consQ')]));
+    } finally { setg('consF', o.consF); setg('consVer', o.consVer); setg('expandId', o.exp); setg('consSoId', o.soId); }
+  });
+
+  await bloco43('e', () => {
+    const o = { consF: g('consF'), consVer: g('consVer'), exp: g('expandId'), soId: g('consSoId') };
+    try {
+      /* o desenho real do app: a venda aponta para o LOTE-PAI e deixa vendaRef no pedaço vendido (Triple: 4 vendas ao pai, 4 pedaços com vendaRef, +1 pedaço vendido SEM venda) */
+      M().push(compra34('R', { cat: 'Triple', qtd: 10, valor: 100, situacao: 'Em estoque' }),
+        compra34('P1', { cat: 'Triple', qtd: 2, valor: 20, situacao: 'Vendido', loteOrigem: 'R', vendaRef: 'S1', dataVenda: '2026-08-01' }),
+        compra34('P2', { cat: 'Triple', qtd: 2, valor: 20, situacao: 'Vendido', loteOrigem: 'R', vendaRef: 'S2', dataVenda: '2026-08-02' }),
+        compra34('P3', { cat: 'Triple', qtd: 3, valor: 30, situacao: 'Vendido', loteOrigem: 'R', dataVenda: '2026-10-11' }),
+        venda42('S1', { cat: 'Triple', origemId: 'R' }), venda42('S2', { cat: 'Triple', origemId: 'R' }));
+      const F = A('fragOrfao'), P = id => M().find(m => m.id === id);
+      t('43e: o pedaço vendido SEM venda (P3) é órfão mesmo quando o lote-pai tem vendas apontando para ele — as vendas já "reclamadas" por pedaços irmãos (vendaRef) não cobrem o P3 (antes o aviso escondia os 8 Triples)',
+        F(P('P3')) === true && F(P('P1')) === false && F(P('P2')) === false, S34([F(P('P1')), F(P('P2')), F(P('P3'))]));
+      /* o caso legado continua protegido: sem vendaRef em ninguém, vendas ao pai que COBREM os pedaços vendidos não geram falso-órfão */
+      M().push(compra34('R2', { cat: 'Triple', qtd: 4, valor: 40, situacao: 'Em estoque' }), compra34('Q1', { cat: 'Triple', qtd: 1, valor: 10, situacao: 'Vendido', loteOrigem: 'R2' }), compra34('Q2', { cat: 'Triple', qtd: 1, valor: 10, situacao: 'Vendido', loteOrigem: 'R2' }),
+        venda42('W1', { cat: 'Triple', origemId: 'R2' }), venda42('W2', { cat: 'Triple', origemId: 'R2' }));
+      t('43e: legado sem vendaRef: 2 vendas ao pai cobrem 2 pedaços vendidos — nenhum é falso-órfão (a proteção antiga continua)', F(P('Q1')) === false && F(P('Q2')) === false, S34([F(P('Q1')), F(P('Q2'))]));
+      const alerta = () => A('provaReal')().A.filter(a => /Material vendido sem venda apontando/.test(a.titulo));
+      const a0 = alerta(), aP3 = a0.find(a => /Triple/.test(a.titulo) && /3 un/.test(a.titulo));
+      t('43e: o aviso amarelo do P3 existe e traz duas ações: "ver o item" (isolado) e "sem venda, de propósito"', !!aP3 && /verMov\('P3',true\)/.test(aP3.acaoJs) && /marcarSemVenda\('P3'\)/.test(aP3.acao2Js) && /de propósito/.test(aP3.acao2Rot), S34(aP3));
+      setg('consF', 'tudo'); setg('consVer', 'itens'); consulta43(); setg('expandId', 'P3');
+      const h = A('vConsultar')();
+      t('43e: o item aberto da peça órfã oferece o botão "vendido sem venda, de propósito" e explica onde ligar de verdade', /marcarSemVenda\('P3'\)/.test(h) && /de onde saiu\?/.test(h), '');
+      setg('_provaCache', { x: 1 });
+      A('marcarSemVenda')('P3');
+      t('43e: marcar limpa o cache da conferência (senão o aviso velho continuaria na tela)', g('_provaCache') === null, S34(g('_provaCache')));
+      t('43e: marcar grava a marca (semVenda=proposito), tira o aviso amarelo do P3 e o custo CONTINUA no custo das vendas (a marca só cala o aviso)',
+        P('P3').semVenda === 'proposito' && F(P('P3')) === false && !alerta().some(a => /3 un/.test(a.titulo) && /Triple/.test(a.titulo)) && A('motor')().cmv >= 30, S34([P('P3').semVenda, F(P('P3')), A('motor')().cmv]));
+      setg('expandId', 'P3'); const h2 = A('vConsultar')();
+      t('43e: marcada, o item aberto diz que é de propósito e oferece "voltar a avisar"; o botão de marcar some', /desmarcarSemVenda\('P3'\)/.test(h2) && !/onclick="marcarSemVenda\('P3'\)"/.test(h2), '');
+      setg('_provaCache', { x: 1 });
+      A('desmarcarSemVenda')('P3');
+      t('43e: desfazer limpa o cache da conferência', g('_provaCache') === null, S34(g('_provaCache')));
+      t('43e: desfazer devolve a marca e o aviso', P('P3').semVenda === undefined && F(P('P3')) === true && alerta().some(a => /Triple/.test(a.titulo) && /3 un/.test(a.titulo)), S34([P('P3').semVenda, F(P('P3'))]));
+      /* M4 do revisor: 2 pedacos legados e 1 venda ao pai — marcar um "de proposito" faz a unica venda ser do irmao */
+      M().push(compra34('LR', { cat: 'Triple', qtd: 4, valor: 40, situacao: 'Em estoque' }), compra34('LA', { cat: 'Triple', qtd: 1, valor: 10, situacao: 'Vendido', loteOrigem: 'LR' }),
+        compra34('LB', { cat: 'Triple', qtd: 1, valor: 10, situacao: 'Vendido', loteOrigem: 'LR' }), venda42('LS', { cat: 'Triple', origemId: 'LR' }));
+      t('43e: legado com 2 pedaços vendidos e 1 venda ao pai: os dois avisam (a venda não cobre os dois)', F(P('LA')) === true && F(P('LB')) === true, S34([F(P('LA')), F(P('LB'))]));
+      A('marcarSemVenda')('LA');
+      t('43e: marcar um deles "de propósito" libera a venda do pai para o irmão: o LA sai do aviso e o LB também (a única venda passa a ser dele)', F(P('LA')) === false && F(P('LB')) === false, S34([F(P('LA')), F(P('LB'))]));
+      A('marcarSemVenda')('LS');
+      t('43e: marcarSemVenda ignora o que não é compra (a venda LS não ganha a marca)', P('LS').semVenda === undefined, S34(P('LS').semVenda));
+    } finally { setg('consF', o.consF); setg('consVer', o.consVer); setg('expandId', o.exp); setg('consSoId', o.soId); }
+  });
+
+  await bloco43('f', () => {
+    let html = '';
+    ctx.document.body.insertAdjacentHTML = (pp, h) => { html = h; };
+    const o = { sel: g('_svSel') };
+    try {
+      M().push(compra34('m1', { cat: 'Sleeved', colecao: 'Caos', qtd: 136, valor: 1027.43, situacao: 'Vendido', obs: 'ajuste de estoque: vendido sem vinculo' }),
+        compra34('m2', { cat: 'Quad', colecao: 'Caos', qtd: 41, valor: 1239.62, situacao: 'Vendido' }),
+        compra34('m3', { cat: 'ETB', colecao: 'Caos', qtd: 2, valor: 532, situacao: 'Vendido' }),
+        compra34('m4', { cat: 'ETB', colecao: 'Caos', qtd: 1, valor: 100, situacao: 'Em estoque' }),
+        compra34('m5', { cat: 'Box da Coleção', colecao: 'Caos', qtd: 1, valor: 105, situacao: 'Vendido' }), venda42('mv5', { cat: 'Box da Coleção', origemId: 'm5' }));
+      const orf = () => M().filter(m => A('fragOrfao')(m)).map(m => m.id).sort();
+      t('43f: antes da marca em massa, as órfãs são m1, m2 e m3 (m4 está em estoque e m5 tem venda ligada)', S34(orf()) === '["m1","m2","m3"]', S34(orf()));
+      A('abrirSemVendaMassa')();
+      t('43f: a tela em massa lista SÓ as peças vendidas sem venda (com coleção, tipo, quantidade e custo) — m4 e m5 não entram', /m1/.test(html) && /m2/.test(html) && /m3/.test(html) && !/'m4'/.test(html) && !/'m5'/.test(html) && /136 un/.test(html) && /Conferi a lista/.test(html), html.slice(0, 300));
+      A('aplicarSemVendaMassa')();
+      t('43f: sem marcar "conferi a lista" o botão não aplica nada (a trava é da função, não só do botão apagado)', S34(orf()) === '["m1","m2","m3"]' && M().every(m => m.semVenda === undefined), S34(M().map(m => m.semVenda)));
+      g('_svSel').__conferi = true; g('_svSel')['m2'] = false; g('_svSel')['m4'] = true;
+      A('aplicarSemVendaMassa')();
+      t('43f: mesmo que uma id que NÃO é órfã (m4, em estoque) entre na seleção, o em massa não a marca', M().find(m => m.id === 'm4').semVenda === undefined, S34(M().find(m => m.id === 'm4').semVenda));
+      t('43f: conferida a lista, marca só as selecionadas (m1 e m3); a desmarcada (m2) continua avisando', M().find(m => m.id === 'm1').semVenda === 'proposito' && M().find(m => m.id === 'm3').semVenda === 'proposito' && M().find(m => m.id === 'm2').semVenda === undefined && S34(orf()) === '["m2"]', S34([orf(), M().map(m => m.semVenda)]));
+      const hp = A('provaReal')();
+      t('43f: a marca em massa não mexe em número nenhum: o custo das peças continua no custo das vendas (m1 + m2 + m3 + m5)', Math.abs(A('motor')().cmv - (1027.43 + 1239.62 + 532 + 105)) < 0.01, S34(A('motor')().cmv));
+      setg('_pendFiltro', 'amarelo');
+      let htmlP = ''; ctx.document.body.insertAdjacentHTML = (pp, h) => { htmlP = h; };
+      A('abrirPendencias')('amarelo');
+      t('43f: no grupo amarelo das Pendências aparece o link "marcar todas as peças vendidas sem venda de uma vez" enquanto houver órfã (m2)', /abrirSemVendaMassa\(\)/.test(htmlP) && /marcar todas as peças vendidas sem venda de uma vez/.test(htmlP), htmlP.slice(0, 200));
+      A('marcarSemVenda')('m2');
+      htmlP = ''; A('abrirPendencias')('amarelo');
+      t('43f: sem nenhuma órfã o link some (não promete o que não há)', !/abrirSemVendaMassa/.test(htmlP), '');
+    } finally { setg('_svSel', o.sel); }
+  });
+
+  await bloco43('g', () => {
+    M().push(compra34('hx1', { cat: 'ETB', valor: 100, situacao: 'Vendido', dataVenda: '2026-08-10' }), venda42('hv1', { cat: 'ETB', origemId: 'hx1', semOrigem: 'historico', valor: 150, data: '2026-08-10' }));
+    const al = A('provaReal')().A.find(a => /histórica" e vinculada/.test(a.titulo));
+    t('43g: um aviso comum do Diagnóstico (venda histórica e vinculada ao mesmo tempo) também abre o lançamento ISOLADO (não só os dois avisos novos): "ver o item" leva ,true', !!al && /verMov\('hv1',true\)/.test(al.acaoJs), S34(al));
+  });
+
+  /* ===== 44. RENOMEAR JOGO LEVA AS COLECOES · COLECAO FORA DA LISTA NAO SOME DO CAMPO (13/10/2026, lote 3 do handoff de 03/10) =====
+     Dois defeitos vizinhos achados por execucao pela sessao da sincronizacao: (1) renomearJogo nao levava colsJ/colsG junto — o jogo novo ficava sem lista de colecoes; (2) selColOpts
+     nao tinha a opcao "fora da lista": editar um lancamento cuja colecao nao esta na lista do jogo mostrava "— selecionar —" e salvar zerava a colecao, calado. */
+  console.log('');
+  console.log('=== 44. renomear jogo leva as colecoes · colecao fora da lista aparece no campo ===');
+  const FUNCS44 = ['renomearJogo', 'moveJogoColecoes', 'selColOpts', 'colsDe', 'grupoDe', 'vLancar'];
+  const faltam44 = FUNCS44.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('44a: [pre-requisito] o app carregado tem as ' + FUNCS44.length + ' funcoes desta secao', faltam44.length === 0, 'FALTAM no app: ' + faltam44.join(', '));
+  const bloco44 = (rot, corpo) => faltam44.length ? Promise.resolve() : bloco34(rot, corpo, '44');
+
+  await bloco44('b', () => {
+    const o = { jogos: g('jogos'), colsJ: g('colsJ'), colsG: g('colsG'), exc: g('excluidos') };
+    try {
+      setg('jogos', ['Pokémon', 'One Piece']); setg('colsJ', { 'Pokémon': ['151', 'Caos'], 'One Piece': ['OP01'] }); setg('colsG', { 'Pokémon': { '151': '2023', 'Caos': '2026' } }); setg('excluidos', {});
+      M().push(compra34('r1', { jogo: 'Pokémon', colecao: '151' }));
+      ctx.prompt = () => 'Pokémon TCG';
+      A('renomearJogo')(0);
+      t('44b: renomear o jogo LEVA a lista de coleções e o grupo/ano delas (o jogo novo não fica sem coleção) e os lançamentos acompanham',
+        S34(g('colsJ')['Pokémon TCG']) === '["151","Caos"]' && !('Pokémon' in g('colsJ')) && g('colsG')['Pokémon TCG'] && g('colsG')['Pokémon TCG']['151'] === '2023' && !('Pokémon' in g('colsG')) && M().find(m => m.id === 'r1').jogo === 'Pokémon TCG' && S34(A('colsDe')('Pokémon TCG')) === '["151","Caos"]',
+        S34([g('colsJ'), g('colsG'), M().find(m => m.id === 'r1').jogo]));
+      t('44b: o nome antigo ganha túmulo (marca > 0) e o novo, marca de presença (< 0) — o antigo não volta pela fusão com um aparelho atrasado',
+        g('excluidos')['jogos:Pokémon'] > 0 && g('excluidos')['jogos:Pokémon TCG'] < 0, S34(g('excluidos')));
+      ctx.prompt = () => 'Pokémon'; A('renomearJogo')(0);
+      t('44b: renomear DE VOLTA funciona: a lista de coleções e o grupo/ano voltam ao nome original, e a marca de presença do nome original vence o túmulo da ida',
+        S34(g('colsJ')['Pokémon']) === '["151","Caos"]' && !('Pokémon TCG' in g('colsJ')) && g('colsG')['Pokémon'] && g('colsG')['Pokémon']['151'] === '2023' && g('excluidos')['jogos:Pokémon'] < 0 && g('excluidos')['jogos:Pokémon TCG'] > 0 && S34(g('jogos')) === '["Pokémon","One Piece"]',
+        S34([g('colsJ'), g('excluidos'), g('jogos')]));
+      /* une com o que já existir sob o nome novo, sem repetir */
+      setg('jogos', ['Magic', 'Yu-Gi-Oh']); setg('colsJ', { 'Magic': ['A', 'B'], 'Yu-Gi-Oh': ['B', 'Z'] }); setg('colsG', { 'Magic': { 'A': '2020' }, 'Yu-Gi-Oh': { 'Z': '2021', 'A': '1999' } }); ctx.prompt = () => 'Yu-Gi-Oh';
+      let avisou = false; ctx.alert = () => { avisou = true; }; A('renomearJogo')(0);
+      t('44b: renomear para um nome que já existe é recusado com aviso e não mexe em nada', avisou && S34(g('colsJ')['Magic']) === '["A","B"]' && S34(g('jogos')) === '["Magic","Yu-Gi-Oh"]', S34([avisou, g('colsJ'), g('jogos')]));
+      A('moveJogoColecoes')('Magic', 'Yu-Gi-Oh');
+      t('44b: moveJogoColecoes UNE a lista sem repetir (B existia dos dois lados) e o grupo/ano que já existia sob o nome novo vence o do antigo',
+        S34(g('colsJ')['Yu-Gi-Oh']) === '["B","Z","A"]' && !('Magic' in g('colsJ')) && g('colsG')['Yu-Gi-Oh']['A'] === '1999' && g('colsG')['Yu-Gi-Oh']['Z'] === '2021', S34([g('colsJ'), g('colsG')]));
+    } finally { setg('jogos', o.jogos); setg('colsJ', o.colsJ); setg('colsG', o.colsG); setg('excluidos', o.exc); }
+  });
+
+  await bloco44('c', () => {
+    const o = { colsJ: g('colsJ'), colsG: g('colsG'), editId: g('editId'), tipoSel: g('tipoSel') };
+    try {
+      setg('colsJ', { 'Pokémon': ['151', 'Caos'] }); setg('colsG', { 'Pokémon': { '151': '2023' } });
+      const S = A('selColOpts');
+      const fora = S('Pokémon', 'Zeta');
+      t('44c: a coleção atual do lançamento que NÃO está na lista do jogo entra no campo, marcada "⚠ fora da lista" (antes o campo vinha em "— selecionar —" e salvar zerava a coleção)',
+        /<option value="Zeta" selected>Zeta ⚠ fora da lista<\/option>/.test(fora), fora.slice(0, 300));
+      t('44c: coleção que ESTÁ na lista, vazia ou sem valor não ganha opção extra', !/fora da lista/.test(S('Pokémon', '151')) && !/fora da lista/.test(S('Pokémon', '')) && !/fora da lista/.test(S('Pokémon')) && !/fora da lista/.test(S('Pokémon', null)), '');
+      t('44c: aspas no nome saem escapadas no atributo (value="A&quot;B") — não quebram o campo', /<option value="A&quot;B" selected>/.test(S('Pokémon', 'A"B')), S('Pokémon', 'A"B').slice(0, 200));
+      M().push(compra34('f1', { cat: 'ETB', colecao: 'Zeta', jogo: 'Pokémon' }));
+      setg('tipoSel', 'COMPRA'); setg('editId', 'f1');
+      const h = A('vLancar')();
+      t('44c: o formulário REAL de edição da compra com coleção fora da lista traz a opção (o caminho do usuário, não só a função)', /Zeta ⚠ fora da lista/.test(h), '');
+    } finally { setg('colsJ', o.colsJ); setg('colsG', o.colsG); setg('editId', o.editId); setg('tipoSel', o.tipoSel); }
   });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====

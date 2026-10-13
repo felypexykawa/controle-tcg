@@ -816,11 +816,12 @@ function perguntarUnidadeVinculo(otherId,bpu,compra,venda){const old=document.ge
   document.body.insertAdjacentHTML('beforeend',hh);}
 /* Consultar o vínculo nos DOIS sentidos: da venda enxergo de onde veio (item, compra, nota);
    do item vendido enxergo a venda. E desfazer vínculo errado sem apagar nada. */
-function verMov(id){const t=movs.find(x=>x.id===id);if(!t){toast('Lançamento não encontrado');return;}
+let consSoId='';   /* [13/10/2026] quando preenchido, a Consulta mostra SÓ esse lançamento (aberto das Pendências); "tudo misturado" era a queixa do Felype */
+function verMov(id,soEste){const t=movs.find(x=>x.id===id);if(!t){toast('Lançamento não encontrado');return;}
   fecharModal(); /* chamado de dentro de modais (ficha/venda completa) — sem isto o modal fica aberto por cima da lista trocada */
   navHist.push(snap());if(navHist.length>40)navHist.shift();
   tela='consultar';consMenu=false;consF=t.tipo==='VENDA'?'VENDA':'COMPRA';
-  consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';consGrupoFech={};
+  consJogo='';consCol='';consCat='';consPess='';consConta='';consQ='';consGrupoFech={};consSoId=soEste?id:'';
   /* [03/10/2026] "abrir ESTE item na lista" só funciona na visão detalhada: na visão "por nota" (a padrão das abas Compras e Vendas) a linha do item não
      existe na tela e o toque caía numa lista de cartões sem nada aberto — beco sem saída (tocar num pedaço do Lote, "ver item" de uma venda). Só o
      chamador do Diagnóstico sabia disso e forçava `consVer='itens'` por conta própria; agora a regra mora na função, como já mora em `irDetalhe`. */
@@ -1089,16 +1090,51 @@ function desvincular(id){const v=movs.find(x=>x.id===id);if(!v||!v.origemId)retu
    data/quantidade — transforma "provável" em verificável com 1 toque. NÃO baixa nada
    (a baixa já aconteceu quando o material saiu); só reconecta os dois registros. */
 function fragOrfao(x){if(x.tipo!=='COMPRA'||sitDe(x)!=='Vendido')return false;
+  if(x.semVenda==='proposito')return false;   /* [13/10/2026] o dono marcou: saiu sem venda ligada, de propósito */
   if(movs.some(v=>v.tipo==='VENDA'&&v.origemId===x.id))return false;
   if(x.vendaRef&&movs.some(v=>v.id===x.vendaRef))return false; /* dono gravado na criação (determinístico) */
   /* legado sem vendaRef: se o nº de vendas apontando pro PAI cobre o nº de pedaços Vendido,
      todo pedaço tem candidato a dono (mesmo que edição tenha quebrado data/qtd) — não é órfão.
      Comparar por heurística de data/qtd aqui gerava falso-órfão e custo DUPLICADO. */
   if(x.loteOrigem){
-    const vendasPai=movs.filter(v=>v.tipo==='VENDA'&&v.origemId===x.loteOrigem).length;
-    const pedacosVend=movs.filter(y=>y.tipo==='COMPRA'&&y.loteOrigem===x.loteOrigem&&sitDe(y)==='Vendido'&&!y.vendaRef&&!movs.some(v=>v.tipo==='VENDA'&&v.origemId===y.id)).length;
+    /* [13/10/2026] venda que um pedaço irmão JÁ reclamou (vendaRef) não cobre este: contá-la escondia 8 Triples sem venda (4 vendas ao pai >= 1 pedaço) */
+    const vendasPai=movs.filter(v=>v.tipo==='VENDA'&&v.origemId===x.loteOrigem&&!movs.some(y=>y.tipo==='COMPRA'&&y.loteOrigem===x.loteOrigem&&y.vendaRef===v.id)).length;
+    const pedacosVend=movs.filter(y=>y.tipo==='COMPRA'&&y.loteOrigem===x.loteOrigem&&sitDe(y)==='Vendido'&&!y.vendaRef&&y.semVenda!=='proposito'&&!movs.some(v=>v.tipo==='VENDA'&&v.origemId===y.id)).length;
     if(vendasPai>=pedacosVend)return false;}
   return true;}
+function marcarSemVenda(id){const m=movs.find(x=>x.id===id);if(!m||m.tipo!=='COMPRA')return;
+  if(!confirm('Marcar como vendido SEM venda, de propósito?\n\nUse quando o material saiu do estoque e a venda dele não está (ou nunca vai estar) ligada a este lançamento. O aviso amarelo some; o custo continua entrando no custo das vendas. Dá pra desfazer.'))return;
+  m.semVenda='proposito';save();_provaCache=null;diarioReg('marcou vendido sem venda, de propósito',rotDe(m));toast('📜 Marcado — sem aviso de venda ✓');render();}
+function desmarcarSemVenda(id){const m=movs.find(x=>x.id===id);if(!m)return;delete m.semVenda;save();_provaCache=null;toast('↩ Voltou a avisar');render();}
+let _svSel={};
+/* [13/10/2026] o Felype quer o aviso fora ("deixar sem ligação mesmo"): 20 peças são 20 toques; aqui é uma lista para CONFERIR e um botão — mesmo cuidado das vendas históricas em massa */
+function abrirSemVendaMassa(){const pend=movs.filter(x=>fragOrfao(x));
+  if(!pend.length){toast('Nenhuma peça vendida sem venda ✓');return;}
+  _svSel={};pend.forEach(x=>_svSel[x.id]=true);renderSemVendaMassa();}
+function renderSemVendaMassa(){const pend=movs.filter(x=>fragOrfao(x));
+  const nSel=pend.filter(x=>_svSel[x.id]).length;
+  const lin=pend.map(x=>{const d=x.data?x.data.split('-').reverse().join('/'):'—';
+    return `<div class="item" style="justify-content:space-between;align-items:center;padding:8px 12px;cursor:pointer" onclick="_svSel['${x.id}']=!_svSel['${x.id}'];renderSemVendaMassa()">
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-size:18px;color:${_svSel[x.id]?'var(--amber)':'var(--mut)'}">${_svSel[x.id]?'☑':'☐'}</span>
+      <div><b>${(x.colecao?x.colecao+' · ':'')+(x.cat||'item')}</b>${(x.idioma&&x.idioma!=='—')?' · '+x.idioma:''}${(+x.qtd||1)>1?' · '+(+x.qtd)+' un':''}<div class="meta">comprado ${d} · ${x.contraparte||'—'}${x.obs?' · '+String(x.obs).slice(0,40):''}</div></div></div>
+      <b>${fmt(+x.valor||0)}</b></div>`;}).join('');
+  const conferi=!!_svSel.__conferi;
+  const hh=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;max-height:88vh;overflow:auto">
+    <div style="padding:16px 16px 8px">
+    <div class="sec" style="margin-top:0">📜 Peças vendidas sem venda — marcar de uma vez</div>
+    <div class="ctx" style="border-left:3px solid var(--amber);padding-left:10px">Isto declara que estas peças saíram do estoque e a venda delas <b>não vai ser ligada</b>, de propósito. O aviso amarelo some; o custo delas continua entrando no custo das vendas (nada muda nos números). Dá pra desfazer em cada peça. Desmarque as que você quer ligar de verdade.</div></div>
+    <div style="padding:0 16px 16px">
+    ${lin}
+    <div class="item" style="align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border:1.5px dashed var(--amber);border-radius:10px;margin-top:10px" onclick="_svSel.__conferi=!_svSel.__conferi;renderSemVendaMassa()"><span style="font-size:18px;color:${conferi?'var(--amber)':'var(--mut)'}">${conferi?'☑':'☐'}</span><span>Conferi a lista acima</span></div>
+    <button class="btn" style="margin-top:10px;${conferi&&nSel?'':'opacity:.4;pointer-events:none'}" onclick="aplicarSemVendaMassa()">📜 marcar ${nSel} peça${nSel!==1?'s':''} como vendida${nSel!==1?'s':''} sem venda, de propósito</button>
+    <button class="btn g" style="margin-top:8px" onclick="fecharModal()">cancelar</button></div></div></div>`;
+  document.getElementById('modal')?.remove();document.body.insertAdjacentHTML('beforeend',hh);}
+function aplicarSemVendaMassa(){
+  if(!_svSel.__conferi)return;
+  const alvo=movs.filter(x=>fragOrfao(x)&&_svSel[x.id]);
+  if(!alvo.length)return;
+  alvo.forEach(x=>x.semVenda='proposito');
+  _svSel={};save();_provaCache=null;diarioReg('marcou vendido sem venda, de propósito, em massa',alvo.length+' peças');fecharModal();toast('📜 '+alvo.length+' peça'+(alvo.length>1?'s':'')+' marcada'+(alvo.length>1?'s':'')+' ✓ (desfazível por peça)');render();}
 function procurarOrigem(vendaId){const v=movs.find(x=>x.id===vendaId);if(!v||v.origemId)return;
   const mesmoJogo=x=>(x.jogo||'Pokémon')===(v.jogo||'Pokémon');
   let cands=movs.filter(x=>fragOrfao(x)&&mesmoJogo(x)&&x.dataVenda===v.data&&(+x.qtd||1)===(+v.qtd||1));
@@ -1433,9 +1469,9 @@ function provaReal(){
   /* 2. Dados inválidos */
   movs.forEach(m=>{
     if(m.tipo==='COMPRA'||m.tipo==='VENDA'){
-      if(!(+m.qtd>0))add('vermelho','Quantidade inválida em '+rotDe(m),'qtd = '+m.qtd+' — todo lançamento precisa de quantidade positiva.','abrir o lançamento',`verMov('${m.id}')`);
-      if(+m.valor<0)add('vermelho','Valor negativo em '+rotDe(m),'valor = '+fmt(+m.valor)+'.','abrir o lançamento',`verMov('${m.id}')`);
-      if(!m.data||!/^\d{4}-\d{2}-\d{2}$/.test(m.data))add('amarelo','Data ausente ou inválida em '+rotDe(m),'Sem data válida o lançamento some das visões por período.','abrir o lançamento',`verMov('${m.id}')`);
+      if(!(+m.qtd>0))add('vermelho','Quantidade inválida em '+rotDe(m),'qtd = '+m.qtd+' — todo lançamento precisa de quantidade positiva.','abrir o lançamento',`verMov('${m.id}',true)`);
+      if(+m.valor<0)add('vermelho','Valor negativo em '+rotDe(m),'valor = '+fmt(+m.valor)+'.','abrir o lançamento',`verMov('${m.id}',true)`);
+      if(!m.data||!/^\d{4}-\d{2}-\d{2}$/.test(m.data))add('amarelo','Data ausente ou inválida em '+rotDe(m),'Sem data válida o lançamento some das visões por período.','abrir o lançamento',`verMov('${m.id}',true)`);
     }});
   /* 3. Conservação por família de lote (raiz com referência de origem).
      Maps pré-computados (byId/filhos) — sem eles o raizDe aninhado vira O(n²) e trava com
@@ -1454,12 +1490,12 @@ function provaReal(){
   /* 4. Vínculos de venda */
   movs.filter(v=>v.tipo==='VENDA'&&v.origemId).forEach(v=>{
     const alvo=movs.find(x=>x.id===v.origemId);
-    if(!alvo){add('amarelo','Venda vinculada a item que não existe mais: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O item de origem foi excluído — o lucro mostrado perdeu o lastro. Abrir e ✂ desvincular limpa a referência.','abrir a venda',`verMov('${v.id}')`);return;}
-    if(v.semOrigem)add('amarelo','Venda ao mesmo tempo "histórica" e vinculada: '+fmt(+v.valor||0),'Estados contraditórios — abra e desfaça um dos dois.','abrir a venda',`verMov('${v.id}')`);
+    if(!alvo){add('amarelo','Venda vinculada a item que não existe mais: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O item de origem foi excluído — o lucro mostrado perdeu o lastro. Abrir e ✂ desvincular limpa a referência.','abrir a venda',`verMov('${v.id}',true)`);return;}
+    if(v.semOrigem)add('amarelo','Venda ao mesmo tempo "histórica" e vinculada: '+fmt(+v.valor||0),'Estados contraditórios — abra e desfaça um dos dois.','abrir a venda',`verMov('${v.id}',true)`);
     const alvoTemFilhos=movs.some(x=>x.tipo==='COMPRA'&&x.loteOrigem===alvo.id);
     /* [revisão lixeira, G3] venda restaurada DEPOIS de uma devolução: o item voltou pro estoque e a venda voltou a
        contar — patrimônio e lucro dobrados, em silêncio. Vínculo são = alvo Vendido/Trocado. */
-    if(!alvoTemFilhos&&sitDe(alvo)!=='Vendido'&&sitDe(alvo)!=='Trocado')add('vermelho','Venda vinculada a item que está "'+sitDe(alvo)+'": '+fmt(+v.valor||0),'O item desta venda voltou pro estoque (devolução?) e a venda continua nos números — o valor conta DUAS vezes (no estoque E no lucro). Ou exclua/devolva a venda de novo, ou dê baixa no item.','abrir a venda',`verMov('${v.id}')`);
+    if(!alvoTemFilhos&&sitDe(alvo)!=='Vendido'&&sitDe(alvo)!=='Trocado')add('vermelho','Venda vinculada a item que está "'+sitDe(alvo)+'": '+fmt(+v.valor||0),'O item desta venda voltou pro estoque (devolução?) e a venda continua nos números — o valor conta DUAS vezes (no estoque E no lucro). Ou exclua/devolva a venda de novo, ou dê baixa no item.','abrir a venda',`verMov('${v.id}',true)`);
     /* vínculo apontando pro PAI fracionado: o custo da venda vive num pedaço-irmão — comparar
        com o valor RESTANTE do pai é falso alarme; a família é conferida pela conservação */
     /* compara por UNIDADE, não pelo total — editar a quantidade da venda vinculada (fix
@@ -1468,14 +1504,14 @@ function provaReal(){
        prova se o custo está certo (se qtd bateu = totais batiam antes, comparação idêntica). */
     const vQ=Math.max(+v.qtd||1,0.0001),alvoQ=Math.max(+alvo.qtd||1,0.0001);
     const custoUnitV=(+v.custoOrigem||0)/vQ,custoUnitAlvo=(+alvo.valor||0)/alvoQ;
-    if(sitDe(alvo)==='Vendido'&&!alvoTemFilhos&&custoUnitV>custoUnitAlvo+0.02)add('vermelho','Custo do vínculo maior que o custo do material: venda de '+fmt(+v.valor||0),'Custo por unidade '+fmt(custoUnitV)+' > custo por unidade do pedaço '+fmt(custoUnitAlvo)+' — o lucro dessa venda está subestimado.','abrir a venda',`verMov('${v.id}')`);
-    if((v.custoOrigem==null||+v.custoOrigem===0)&&(+alvo.valor||0)>0.02&&!alvoTemFilhos)add('amarelo','Venda vinculada sem custo registrado: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O vínculo existe mas o custo está vazio — o lucro aparece maior do que é. (Brinde de custo zero de verdade não gera este aviso.)','abrir a venda',`verMov('${v.id}')`);});
+    if(sitDe(alvo)==='Vendido'&&!alvoTemFilhos&&custoUnitV>custoUnitAlvo+0.02)add('vermelho','Custo do vínculo maior que o custo do material: venda de '+fmt(+v.valor||0),'Custo por unidade '+fmt(custoUnitV)+' > custo por unidade do pedaço '+fmt(custoUnitAlvo)+' — o lucro dessa venda está subestimado.','abrir a venda',`verMov('${v.id}',true)`);
+    if((v.custoOrigem==null||+v.custoOrigem===0)&&(+alvo.valor||0)>0.02&&!alvoTemFilhos)add('amarelo','Venda vinculada sem custo registrado: '+fmt(+v.valor||0)+(v.contraparte?' pra '+v.contraparte:''),'O vínculo existe mas o custo está vazio — o lucro aparece maior do que é. (Brinde de custo zero de verdade não gera este aviso.)','abrir a venda',`verMov('${v.id}',true)`);});
   /* 5. Material vendido órfão (saiu do estoque, nenhuma venda aponta) */
   movs.filter(x=>fragOrfao(x)).forEach(f=>{
-    add('amarelo','Material vendido sem venda apontando: '+rotDe(f)+((f.idioma&&f.idioma!=='—')?' · '+f.idioma:'')+((+f.qtd||1)>1?' · '+(+f.qtd)+' un':''),'Saiu como vendido ('+fmt(+f.valor||0)+(f.dataVenda?' em '+String(f.dataVenda).split('-').reverse().join('/'):', sem data de saída')+') mas nenhuma venda está ligada a ele — ou a venda correspondente está sem vínculo, ou foi excluída. Para ligar: abra a venda correspondente e toque em 🔗 de onde saiu? (ou 🔍 procurar origem sozinho).','ver o item',`verMov('${f.id}')`);});
+    add('amarelo','Material vendido sem venda apontando: '+rotDe(f)+((f.idioma&&f.idioma!=='—')?' · '+f.idioma:'')+((+f.qtd||1)>1?' · '+(+f.qtd)+' un':''),'Saiu como vendido ('+fmt(+f.valor||0)+(f.dataVenda?' em '+String(f.dataVenda).split('-').reverse().join('/'):', sem data de saída')+') mas nenhuma venda está ligada a ele — ou a venda correspondente está sem vínculo, ou foi excluída. Para ligar: abra a venda correspondente e toque em 🔗 de onde saiu? (ou 🔍 procurar origem sozinho). Se não vai ligar, marque como "sem venda, de propósito".','ver o item',`verMov('${f.id}',true)`,`marcarSemVenda('${f.id}');abrirPendencias('amarelo')`,'📜 sem venda, de propósito');});
   /* 6. Referência de venda quebrada */
   movs.filter(x=>x.vendaRef&&!movs.some(v=>v.id===x.vendaRef)).forEach(f=>{
-    add('amarelo','Referência de venda quebrada em '+rotDe(f),'O pedaço aponta pra uma venda que não existe mais (excluída).','ver o item',`verMov('${f.id}')`);});
+    add('amarelo','Referência de venda quebrada em '+rotDe(f),'O pedaço aponta pra uma venda que não existe mais (excluída).','ver o item',`verMov('${f.id}',true)`);});
   /* 7. Vendas sem vínculo (não-históricas) — resumo único */
   const nsv=movs.filter(v=>v.tipo==='VENDA'&&!v.origemId&&v.semOrigem!=='historico').length;
   if(nsv)add('amarelo',nsv+' venda(s) sem vínculo com o estoque','Sem vínculo o custo delas não entra na conta do lucro. Em cada uma: 🔍 procurar origem sozinho, "🔗 de onde saiu?" pra escolher à mão, ou 📜 marcar histórica (venda de antes do app).','abrir as vendas',`consF='VENDA';consVer='itens';go('consultar')`,`fecharModal();abrirHistoricasMassa()`,'📜 marcar as antigas em massa (abre a lista pra conferir)');
@@ -1491,17 +1527,17 @@ function provaReal(){
   const nsc=nSemConta();
   if(nsc)add('amarelo',nsc+' lançamento(s) de dinheiro sem conta','Compra paga, venda recebida ou despesa que não aponta pra conta nenhuma — esse dinheiro não aparece em saldo nenhum ("saiu do nada"). Um toque coloca todos na conta "dinheiro" e você corrige depois caso a caso.','colocar todos na conta "dinheiro"',`fecharModal();migrarSemConta()`,`fecharModal();consF='tudo';consVer='itens';go('consultar')`,'ver os lançamentos');
   movs.filter(m=>m.tipo==='TRANSF'&&!m.contaDe&&!m.contaPara).forEach(t=>{
-    add('vermelho','Transferência sem origem E sem destino ('+fmt(+t.valor||0)+')','Não diz de onde saiu nem pra onde foi — corrija ou exclua.','abrir',`verMov('${t.id}')`);});
+    add('vermelho','Transferência sem origem E sem destino ('+fmt(+t.valor||0)+')','Não diz de onde saiu nem pra onde foi — corrija ou exclua.','abrir',`verMov('${t.id}',true)`);});
   movs.filter(m=>m.tipo==='COMPRA'&&m.origem==='TROCA'&&+m.din>0&&!(m.dinConta||'').trim()).forEach(t=>{
-    add('amarelo','Dinheiro de troca sem conta: '+fmt(+t.din)+' em '+rotDe(t),'O dinheiro dado nessa troca não saiu de conta nenhuma — edite a troca ou ignore se foi antes das contas.','ver o item',`verMov('${t.id}')`);});
+    add('amarelo','Dinheiro de troca sem conta: '+fmt(+t.din)+' em '+rotDe(t),'O dinheiro dado nessa troca não saiu de conta nenhuma — edite a troca ou ignore se foi antes das contas.','ver o item',`verMov('${t.id}',true)`);});
   /* 2b. Tipo fora do vocabulário — lançamento fica invisível em compra/venda/despesa/transf */
   const TIPOS_OK=new Set(['COMPRA','VENDA','DESPESA','TRANSF']);
   movs.forEach(m=>{if(!TIPOS_OK.has(m.tipo))
-    add('vermelho','Tipo de lançamento desconhecido: "'+m.tipo+'"','Não é COMPRA, VENDA, DESPESA nem TRANSF — some de todos os relatórios e saldos.','abrir',`verMov('${m.id}')`);});
+    add('vermelho','Tipo de lançamento desconhecido: "'+m.tipo+'"','Não é COMPRA, VENDA, DESPESA nem TRANSF — some de todos os relatórios e saldos.','abrir',`verMov('${m.id}',true)`);});
   /* 2c. Condição fora do vocabulário conhecido (a UI só grava via <select>; import/backup não valida) */
   const CONDS_OK=new Set(['—','NM','LP','MP','HP','']);
   movs.forEach(m=>{if(m.condicao&&!CONDS_OK.has(m.condicao))
-    add('amarelo','Condição da carta com valor desconhecido em '+rotDe(m),'condicao = "'+m.condicao+'" não é NM/LP/MP/HP — veio de edição direta ou backup de outra origem.','abrir o lançamento',`verMov('${m.id}')`);});
+    add('amarelo','Condição da carta com valor desconhecido em '+rotDe(m),'condicao = "'+m.condicao+'" não é NM/LP/MP/HP — veio de edição direta ou backup de outra origem.','abrir o lançamento',`verMov('${m.id}',true)`);});
   /* 9c. Conta referenciada não existe mais no cadastro (dinheiro real existe, mas some do saldo mostrado).
      Só os campos que de fato usam o <select> de contasBanc (dinConta, contaDe/contaPara, pgParcelas[i].conta)
      — o campo comum `conta` de COMPRA/VENDA/DESPESA é texto livre do catálogo `pgs` (Dinheiro/Pix/Cartão),
@@ -1511,14 +1547,14 @@ function provaReal(){
   const nomesContas=new Set(contasBanc.map(c=>c.nome));
   const contaSumiu=nome=>nome&&nome!=='—'&&!nomesContas.has(nome);
   movs.forEach(m=>{
-    if(contaSumiu(m.contaDe)||contaSumiu(m.contaPara))add('amarelo','Transferência com conta excluída: '+fmt(+m.valor||0),'"'+(m.contaDe||'—')+'" → "'+(m.contaPara||'—')+'" — uma delas não existe mais no cadastro.','abrir',`verMov('${m.id}')`);
-    if(contaSumiu(m.dinConta))add('amarelo','Dinheiro de troca com conta excluída: '+fmt(+m.din||0)+' em '+rotDe(m),'A conta de onde saiu o dinheiro dessa troca não existe mais.','ver o item',`verMov('${m.id}')`);
+    if(contaSumiu(m.contaDe)||contaSumiu(m.contaPara))add('amarelo','Transferência com conta excluída: '+fmt(+m.valor||0),'"'+(m.contaDe||'—')+'" → "'+(m.contaPara||'—')+'" — uma delas não existe mais no cadastro.','abrir',`verMov('${m.id}',true)`);
+    if(contaSumiu(m.dinConta))add('amarelo','Dinheiro de troca com conta excluída: '+fmt(+m.din||0)+' em '+rotDe(m),'A conta de onde saiu o dinheiro dessa troca não existe mais.','ver o item',`verMov('${m.id}',true)`);
     if(m.pgParcelas)Object.values(m.pgParcelas).forEach(p=>{if(p&&typeof p==='object'&&contaSumiu(p.conta))
-      add('amarelo','Parcela paga com conta excluída em '+rotDe(m),'Uma parcela já quitada aponta pra uma conta que não existe mais no cadastro.','abrir o lançamento',`verMov('${m.id}')`);});});
+      add('amarelo','Parcela paga com conta excluída em '+rotDe(m),'Uma parcela já quitada aponta pra uma conta que não existe mais no cadastro.','abrir o lançamento',`verMov('${m.id}',true)`);});});
   /* 9d. Vencimento inválido em compra parcelada — quebra a projeção "a pagar" em silêncio */
   movs.filter(m=>m.tipo==='COMPRA'&&m.pgTipo==='Parcelado'&&+m.nParc>0).forEach(m=>{
     if(!dataOk(m.venc1||m.data))
-      add('amarelo','Vencimento inválido em compra parcelada: '+rotDe(m),'Sem um 1º vencimento válido o app conta as parcelas a partir da data da compra — ou, se nem ela existir, como "a vencer hoje". Corrija pra elas caírem no dia certo.','abrir o lançamento',`verMov('${m.id}')`);});
+      add('amarelo','Vencimento inválido em compra parcelada: '+rotDe(m),'Sem um 1º vencimento válido o app conta as parcelas a partir da data da compra — ou, se nem ela existir, como "a vencer hoje". Corrija pra elas caírem no dia certo.','abrir o lançamento',`verMov('${m.id}',true)`);});
   /* 11b. Coerência dentro de venda/troca multi-item — mesma lógica da nota (check já existe), aplicada a vendaId/trocaId */
   const porVendaId={};movs.forEach(m=>{if(m.tipo==='VENDA'&&m.vendaId)(porVendaId[m.vendaId]=porVendaId[m.vendaId]||[]).push(m);});
   Object.entries(porVendaId).forEach(([vid,its])=>{const h=its[0];
@@ -1637,6 +1673,7 @@ limpaEstado();   /* dado guardado antes desta regra (ou vindo de fora) sai limpo
 movs.forEach(m=>{if(m.cat&&!cats.includes(m.cat))cats.push(m.cat);if(m.colecao&&!cols.includes(m.colecao))cols.push(m.colecao);if(m.contraparte&&!pess.includes(m.contraparte))pess.push(m.contraparte);});
 if(!colsJ){colsJ={};jogos.forEach(j=>colsJ[j]=[]);movs.forEach(m=>{const j=m.jogo||'Pokémon';if(!colsJ[j])colsJ[j]=[];if(m.colecao&&!colsJ[j].includes(m.colecao))colsJ[j].push(m.colecao);});if(!colsJ['Pokémon'])colsJ['Pokémon']=[];cols.forEach(c=>{if(!colsJ['Pokémon'].includes(c))colsJ['Pokémon'].push(c);});salvarColsJ();}
 const fmt=n=>'R$ '+(Math.round(n*100)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const rotVal=t=>`<div style="font-size:10px;font-weight:400;color:var(--mut);line-height:1.1">${t}</div>`; /* etiqueta do valor da direita dos cartoes: 'custo' na compra, 'venda' na venda */
 const pct=n=>(n>=0?'+':'')+Math.round(n*100)+'%';
 const dBR=d=>d.toLocaleDateString('pt-BR');
 /* [CAUSA RAIZ 2026-08-20 — "The quota has been exceeded" no iPhone do Felype]
@@ -2526,8 +2563,8 @@ function snap(){let sy=0;try{sy=window.scrollY||window.pageYOffset||0;}catch(e){
    o balde chegava vazio no `guardaBaldeItem` e o aviso "N fotos descartadas" nao saia —
    justamente nas duas saidas mais usadas (tocar Consultar ou Painel). Remendo antigo
    convivendo com a regra nova nao e redundancia: o remendo executa primeiro e come o sinal. */
-function go(t){navHist.push(snap());if(navHist.length>40)navHist.shift();if(t!=='consultar')devolvePeriodo();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];_lancarDirty=false;_pendVolta=null;}selMode=false;selIds={};tela=t;editId=null;render();}
-function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift();devolvePeriodo();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
+function go(t){consSoId='';navHist.push(snap());if(navHist.length>40)navHist.shift();if(t!=='consultar')devolvePeriodo();if(t==='consultar')consMenu=false;if(t!=='lancar'){_preSel=null;_fotosPend=[];_lancarDirty=false;_pendVolta=null;}selMode=false;selIds={};tela=t;editId=null;render();}
+function irConsultar(){consSoId='';navHist.push(snap());if(navHist.length>40)navHist.shift();devolvePeriodo();tela='consultar';consMenu=true;consF='tudo';consQ='';editId=null;render();}
 /* Busca por digitação da Consulta (Felype 2026-08-12). Dois cuidados que fazem a diferença
    entre funcionar e ser inutilizável no celular:
    1) render() recria a tela inteira — sem devolver o foco e a posição do cursor, o teclado
@@ -2537,7 +2574,7 @@ function irConsultar(){navHist.push(snap());if(navHist.length>40)navHist.shift()
 let _buscaT=null;
 function buscaCons(el){
   const v=el.value,pos=el.selectionStart;
-  consQ=v;expandId=null;
+  consQ=v;consSoId='';expandId=null;
   clearTimeout(_buscaT);
   _buscaT=setTimeout(()=>{
     render();
@@ -2547,7 +2584,7 @@ function buscaCons(el){
 }
 /* [Felype 22/08 23h] entrar numa aba pelo menu volta à vista desenhada ("por nota" = a compra como o dono
    compra); irDetalhe() do Painel punha consVer='itens' e o valor ficava preso para sempre. */
-function verFiltro(f){consF=f;consMenu=false;consQ='';expandId=null;consVer='notas';render();}
+function verFiltro(f){consSoId='';consF=f;consMenu=false;consQ='';expandId=null;consVer='notas';render();}
 /* [Felype 22/08 23h] "salvei e agora estou numa página nada a ver; o voltar volta pro salvamento". Depois de
    salvar uma correção (ou um gesto iniciado numa linha — vender/guardar/coleção), voltar para ONDE a pessoa
    estava: o snapshot que abrir()/verMov()/venderDe() empurraram — aba, filtros, item aberto e rolagem.
@@ -2561,7 +2598,7 @@ function voltarDaEdicao(){_lancarDirty=false;_fotosPend=[];
   const s=navHist.length?navHist[navHist.length-1]:null;
   if(s&&s.tela&&s.tela!=='lancar')voltar();else go('consultar');
   if(pv){try{abrirPendencias(pv);}catch(e){}}}
-function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;
+function voltar(){const s=navHist.pop();if(!s)return;_pendVolta=null;consSoId='';
   /* [R1 2026-08-17, achado da revisão] sair do Lançar pelo "‹ voltar" não passa por go(), então
      não limpava o rascunho — e, PIOR (bug pré-existente que o R1 revelou), não limpava as
      FOTOS pendentes: fotos escolhidas num lançamento abandonado grudavam no próximo salvo. */
@@ -2674,7 +2711,9 @@ function selColOpts(jogo,val){const lista=colsDe(jogo);const semG=[],porG={};
   lista.forEach(c=>{const g=grupoDe(jogo,c);if(g)(porG[g]=porG[g]||[]).push(c);else semG.push(c);});
   const gks=Object.keys(porG).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));
   const op=c=>`<option ${c===val?'selected':''}>${c}</option>`;
-  return `<option value="">— selecionar —</option>`+gks.map(g=>`<optgroup label="📁 ${g}">${porG[g].map(op).join('')}</optgroup>`).join('')+semG.map(op).join('')+`<option value="__add__">➕ adicionar novo…</option>`;}
+  const ja=lista.some(c=>String(c)===String(val));
+  const fora=(val&&!ja)?`<option value="${String(val).replace(/"/g,'&quot;')}" selected>${val} ⚠ fora da lista</option>`:'';   /* [03/10/2026] sem isto o campo vinha em "— selecionar —" e salvar a edição zerava a coleção, calado */
+  return `<option value="">— selecionar —</option>`+fora+gks.map(g=>`<optgroup label="📁 ${g}">${porG[g].map(op).join('')}</optgroup>`).join('')+semG.map(op).join('')+`<option value="__add__">➕ adicionar novo…</option>`;}
 function novo(el,tipo){if(el.value!=='__add__'){bcalc();vcalc();return;}const n=(prompt('Adicionar novo:')||'').trim();
   if(n){if(tipo==='col'){const j=document.getElementById('f_jogo')?.value||document.getElementById('n_jogo')?.value||document.getElementById('r_jogo')?.value||document.getElementById('v_jogo')?.value||'Pokémon';if(!colsJ[j])colsJ[j]=[];if(!colsJ[j].includes(n))colsJ[j].push(n);if(!cols.includes(n))cols.push(n);desmarcaCol(j,n);saveL();}else{const L=tipo==='cat'?cats:tipo==='pg'?pgs:tipo==='jogo'?jogos:tipo==='despcat'?despCats:pess;if(!L.includes(n)){L.push(n);saveL();}}const opt=document.createElement('option');opt.text=n;opt.value=n;el.insertBefore(opt,el.querySelector('option[value="__add__"]'));el.value=n;if(tipo==='cat')bdef();}else el.value='';}
 function selJogo(el){if(el.value==='__add__'){novo(el,'jogo');}reCol(el.value);}
@@ -3078,7 +3117,7 @@ function vConsultar(){
   /* com mais de um vazio escolhido a frase nomeia todos: nomeando um so, a pessoa tirava esse e a lista continuava vazia (le-como-felype r8, 4) */
   const vazioSoCV=consF==='DESPESA'?[consCol,consCat,consPess].filter(v=>v==='(sem coleção)'||v==='(sem tipo)'||v==='(sem cliente/fornecedor)'):[];
   const nadaTxt=vazioSoCV.length?'Nada nesse filtro: '+vazioSoCV.map(v=>'"'+v+'"').join(', ').replace(/, ([^,]*)$/,' e $1')+(vazioSoCV.length>1?' só procuram compras e vendas.':' só procura compras e vendas.'):'Nada nesse filtro.';
-  let ord=doTipo.filter(m=>noPer(m.data));
+  let ord=consSoId?movs.filter(m=>m.id===consSoId):doTipo.filter(m=>noPer(m.data));
   /* BUSCA POR DIGITAÇÃO (Felype 2026-08-12: "ainda estou sem campo de busca por digitação;
      no computador uso Ctrl+F, no celular é impraticável"). O motor de busca já existia — consQ
      filtrava e havia até o aviso "filtrando: X" — mas NUNCA existiu campo pra digitar: consQ só
@@ -3173,7 +3212,7 @@ function vConsultar(){
           <div class="ttl"><b>${dataBR}</b>${m.notaId?' <span style="color:var(--blue);font-size:10px">🧾nota</span>':''}${multi?` <span style="color:var(--blue);font-size:10px;cursor:pointer" onclick="event.stopPropagation();verVenda('${m.vendaId}')">🧾venda ×${vdN[m.vendaId]}</span>`:''}${m.obs?` · <span style="color:var(--amber);font-style:italic;font-weight:400">${m.obs}</span>`:''}</div>
           <div class="meta">${tipoChip}${prod}${m.codigo?` <span style="color:var(--mut)">#${m.codigo}</span>`:''}${m.qtd>1?` <span style="color:var(--mut)">×${m.qtd}</span>`:''}${pedacoTag} · ${m.contraparte||'—'} ${st?`<span class="tag ${st[0]}">${st[1]}</span>`:''}${vincCompra}${loteTag}${venda?(m.origemId?' <span class="tag v">🔗 vinculada</span>':m.semOrigem==='historico'?' <span class="tag" style="background:var(--card2);color:var(--mut)">📜 histórica</span>':' <span class="tag c">sem vínculo</span>'):''} <span class="chev" style="color:var(--mut);font-size:13px">${expandId===m.id?'▾':'›'}</span></div>
         </div>
-        <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(total)}</div>
+        <div style="text-align:right;white-space:nowrap">${(m.tipo==='COMPRA'||venda)?`<div style="font-size:10px;font-weight:400;color:var(--mut);line-height:1.1">${venda?'venda':'custo'}</div>`:''}<div style="font-weight:700">${fmt(total)}</div>
           <div style="font-size:11px;font-weight:600;color:${venda?'var(--green)':'var(--red)'}">${pg}</div></div>
       </div>
       ${expandId===m.id?`<div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);flex-wrap:wrap">
@@ -3182,6 +3221,7 @@ function vConsultar(){
           return `<span class="meta" style="flex-basis:100%">💰 comprei por <b>${fmt(custo)}</b> · vendi líquido por <b>${fmt(receb)}</b> · lucro <b style="color:${lucro>=0?'var(--green)':'var(--red)'}">${fmt(lucro)}${pctTxt}</b></span>`;})():''}
         ${venda&&m.origemId?vinculoInfoVenda(m)+`<button class="x" onclick="desvincular('${m.id}')">✂ desvincular</button>`:''}
         ${venda&&!m.origemId&&m.semOrigem!=='historico'?`<span class="meta" style="flex-basis:100%">⚠ Venda sem vínculo — o app não sabe de onde ela saiu, então não mostra lucro. <b>🔍 procurar origem sozinho</b>: o app acha o material que saiu do estoque na mesma data/quantidade e você só confirma. <b>🔗 de onde saiu?</b>: você escolhe à mão (estoque, coleção ou pedido a caminho). Venda antiga de material que nunca entrou no app: <b>📜 marcar como histórica</b> (sai das pendências, sem inventar compra). Nada é apagado em nenhum caso.</span>`:''}
+        ${(m.tipo==='COMPRA'&&sitDe(m)==='Vendido'&&fragOrfao(m))?`<span class="meta" style="flex-basis:100%">⚠ Saiu do estoque como vendido, mas nenhuma venda aponta para este lançamento. Se a venda existe, abra a venda e use <b>🔗 de onde saiu?</b>; se não vai ligar, marque abaixo.</span><button class="x" style="color:var(--mut)" onclick="marcarSemVenda('${m.id}')">📜 vendido sem venda, de propósito</button>`:''}${(m.tipo==='COMPRA'&&m.semVenda==='proposito')?`<span class="meta" style="flex-basis:100%">📜 Vendido sem venda ligada, de propósito — o custo entra no custo das vendas; sem aviso.</span><button class="x" style="color:var(--mut)" onclick="desmarcarSemVenda('${m.id}')">↩ voltar a avisar</button>`:''}
         ${venda&&m.semOrigem==='historico'?`<span class="meta" style="flex-basis:100%">📜 Venda histórica — material vendido antes do controle no app; sem custo rastreado, por decisão sua. Não conta como pendência. Dá pra desfazer a marca a qualquer momento.</span>`:''}
         ${multi?(function(){const its=movs.filter(x=>x.tipo==='VENDA'&&x.vendaId===m.vendaId),tv=its.reduce((s,x)=>s+(+x.valor||0),0);
           return `<span class="meta" style="flex-basis:100%">🧾 Esta é 1 de <b>${its.length} itens da mesma venda</b>${m.contraparte?' pra <b>'+m.contraparte+'</b>':''} · total <b>${fmt(tv)}</b> · <span class="lnk" onclick="verVenda('${m.vendaId}')">ver a venda completa</span></span>`;})():''}
@@ -3211,12 +3251,15 @@ function vConsultar(){
         ${(function(){if(!m.codigo)return '';const pl=precoLigaDe(m.codigo);const codC=codLimpo(m.codigo);
           if(!pl)return `<span class="meta" style="flex-basis:100%">🔍 Liga: <b>#${codC}</b> ainda não coletada${m.codigoUrl?' — 🔗 link direto definido, a próxima coleta traz o valor':' — a coleta traz o valor na próxima rodada (ou cole o 🔗 link direto pra garantir a carta certa)'}</span>`;
           const vs=ligaVersoes(pl);
-          if(!vs.length&&pl.status!=='AMBIGUO'){const inf=/[∞♾]/.test(m.codigo||'');return `<span class="meta" style="flex-basis:100%;color:var(--amber)">🔍 Liga: sem preço para esta carta — ${inf?'o código tem ∞ no total (carta promocional) e a busca da Liga não a acha por ele':'a Liga não devolveu preço para este código'}. ${m.codigoUrl?'🔗 Link direto definido: a próxima coleta busca nessa página.':'Toque em <b>🔎 preço Liga</b>, ache a carta pelo nome, copie o endereço dela e cole em <b>🔗 usar link direto</b>.'}</span>`;}
+          if(!vs.length&&pl.status!=='AMBIGUO'){const inf=/[∞♾]/.test(m.codigo||'');return `<span class="meta" style="flex-basis:100%;color:var(--amber)">🔍 Liga: sem preço para esta carta — ${inf?'o código tem ∞ no total (carta promocional): a Liga acha a carta pelo nome e código completos, e a rotina de preços passou a buscar assim — o preço pode chegar na próxima coleta':'a Liga não devolveu preço para este código'}. ${m.codigoUrl?'🔗 Link direto definido: a próxima coleta busca nessa página.':'Toque em <b>🔎 preço Liga</b> para ver a carta agora; se o preço não chegar, copie o endereço dela e cole em <b>🔗 usar link direto</b>.'}</span>`;}
           if(pl.status==='AMBIGUO'){const globR=codigosResolvidos[codC],resolv=globR||m.codigoUrl;
             const diverge=globR&&m.codigoUrl&&globR!==m.codigoUrl;
             if(diverge)return `<span class="meta" style="flex-basis:100%;color:var(--red)">🔍 Liga: ⚠ este item tem um link PRÓPRIO diferente do link resolvido pro código ${codC} — confira qual carta é a certa (toque em 🔗 pra ver/trocar a deste item).</span>`;
             return `<span class="meta" style="flex-basis:100%;color:var(--amber)">🔍 Liga: código com mais de uma carta${resolv?' — 🔗 resolvido, a próxima coleta pega o preço da página certa':(pl.opcoes&&pl.opcoes.length?' — toque em 🔗 pra escolher qual das '+pl.opcoes.length+' cartas é a sua':' — ainda sem as opções pra escolher na tela; toque em 🔗 e cole o link manualmente (dica: buscar <b>Nome (código)</b> na Liga, ex. Pikachu (173/165), costuma cair direto na carta certa)')}</span>`;}
           return `<span class="meta" style="flex-basis:100%;color:var(--green)">🔍 Liga: <b>${pl.titulo.split(' (')[0]}</b>${vs.map(x=>' · '+(x.v?'<b>'+x.v+'</b> ':'')+fmt(x.mn)+(x.md!=null?' / méd '+fmt(x.md):'')+(x.mx!=null?' / máx '+fmt(x.mx):'')).join('')} <span style="color:var(--mut)">· atualizado ${precosLigaQuando()}</span></span>`;})()}
+        ${(m.tipo==='COMPRA'&&['Em estoque','Coleção','Pedido'].includes(sitDe(m)))?(function(){const vm=valorMercadoDe([m]);
+          const fonte=vm.comN?'preço atual da Liga':vm.porUltimo?'último preço visto na Liga':'sem preço da Liga: considero o custo';
+          return `<span class="meta" style="flex-basis:100%">💰 valor atual: <b>${fmt(vm.val)}</b> <span style="color:var(--mut)">· ${fonte}${(+m.qtd||1)>1?' · '+(+m.qtd)+' un':''}${(vm.comN||vm.porUltimo)?' · custo '+fmt(+m.valor||0):''}</span></span>`;})():''}
         ${(!m.codigo&&!m.codigoUrl&&!m.codigoNA)?`<span class="meta" style="flex-basis:100%">💡 Sem código — normal em cartas antigas. Busque à mão na Liga do jogo desta carta pelo nome (formato <b>Nome (código-se-tiver)</b>) e cole o link em 🔗.</span>${(m.tipo==='COMPRA'&&m.cat==='Single/Carta')?`<button class="x" style="color:var(--blue)" onclick="marcarLoteSemCodigo('${m.id}')">📚 é lote de cartas avulsas (sem código único)</button>`:''}`:''}
         ${m.codigoNA==='lote'?`<span class="meta" style="flex-basis:100%">📚 Lote de cartas avulsas — sem código único, fora das pendências de código.</span><button class="x" style="color:var(--mut)" onclick="desmarcarLoteSemCodigo('${m.id}')">↩ não é lote</button>`:''}
         ${(m.notaId||m.vendaId||m.trocaId)?`<button class="x" style="color:var(--purple)" onclick="abrirFotosGrupo('${m.notaId||m.vendaId||m.trocaId}','📷 Fotos da ${m.notaId?'nota':m.vendaId?'venda':'troca'} (comprovante)')">📷 fotos da ${m.notaId?'nota':m.vendaId?'venda':'troca'} (comprovante)</button>`:''}
@@ -3230,7 +3273,7 @@ function vConsultar(){
         <button class="x" onclick="excluir('${m.id}')">🗑 excluir</button></div>`:''}
     </div>`;}).join(''):`<div class="empty">${nadaTxt}</div>`;
   const aviso=(escondidos>0&&(perDe||perAte))?`<div class="soon" style="cursor:pointer" onclick="setPer('tudo')">+${escondidos} lançamento${escondidos>1?'s':''} fora deste período · toque pra ver tudo</div>`:'';
-  const chip=consQ?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer" onclick="consQ='';render()">filtrando: "${consQ}" · limpar ✕</div>`:'';
+  const chip=consSoId?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer" onclick="consSoId='';render()">mostrando só este item · toque para ver a lista completa ✕</div>`:(consQ?`<div class="soon" style="background:var(--infobg);color:var(--blue);cursor:pointer" onclick="consQ='';render()">filtrando: "${consQ}" · limpar ✕</div>`:'');
   const totConsulta=ord.reduce((s,v)=>s+naSoma(v),0);
   const nSemVinc=consF==='VENDA'?ord.filter(v=>v.tipo==='VENDA'&&!v.origemId&&v.semOrigem!=='historico').length:0;
   const semVincBar=nSemVinc>0?`<div class="soon" style="background:var(--infobg);color:var(--blue)">🔗 ${nSemVinc} venda${nSemVinc>1?'s':''} sem vínculo — abra cada uma e toque <b>🔍 procurar origem sozinho</b> (o app acha o material que saiu na mesma data/quantidade) ou <b>🔗 de onde saiu?</b> pra escolher à mão. Venda antiga sem material no app: <b>📜 marcar como histórica</b> — ou <span class="lnk" style="font-weight:700" onclick="abrirHistoricasMassa()">todas as antigas de uma vez (com conferência)</span>. Nada é apagado.</div>`:'';
@@ -3289,7 +3332,7 @@ function vConsultar(){
         <div style="display:flex;justify-content:space-between;gap:10px">
           <div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · <b>${h.contraparte||'—'}</b>${h.notaNum?' <span style="color:var(--mut);font-size:10px">'+h.notaNum+'</span>':''}</div>
           <div class="meta">🧾 ${origs.length} produto${origs.length>1?'s':''}${resumo?' · '+resumo:''}${taxaC>0?` · <span style="color:var(--amber)">+${fmt(frete)} frete +${fmt(taxaC)} taxa incluídos</span>`:frete>0?` · <span style="color:var(--amber)">+${fmt(frete)} frete/taxa incluído</span>`:''} · ${sitTxt}${caixasNota.length?` · <span style="color:var(--mut)">sem a caixa aberta (${fmt(totNota-tot)}), que conta pelo que saiu dela</span>`:''}${parcial}</div></div>
-          <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--red)">${pg}</div></div>
+          <div style="text-align:right;white-space:nowrap">${rotVal('custo')}<div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--red)">${pg}</div></div>
         </div></div>`;}).join('');
     /* [Felype 22/08 23h] "eu preciso visualizar a minha compra como ela foi feita: uma única entrada de
        315 (3 box)... eu clico nela e ela expande e aí mostra o que saiu e o que não saiu". O lote
@@ -3302,7 +3345,7 @@ function vConsultar(){
       return `<div class="item" style="display:block;cursor:pointer" onclick="verFicha('${m.id}')">
         <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${m.contraparte||'—'} <span style="color:var(--mut);font-size:10px">${(m.loteOrigem||temPed.has(m.id))?'🧩 parte de lote · ':''}avulso, sem nota</span></div>
         <div class="meta">${((m.colecao?m.colecao+' · ':'')+(m.cat||''))||'(sem produto)'}${m.qtd>1?' ×'+m.qtd:''} · ${(EMO[s]||'')+' '+s.toLowerCase()}</div></div>
-        <div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+m.valor||0)}</div></div></div>`;};
+        <div style="text-align:right;white-space:nowrap">${rotVal('custo')}<div style="font-weight:700">${fmt(+m.valor||0)}</div></div></div></div>`;};
     const cardLote=(rid,fam,noFiltro)=>{const raiz=movs.find(x=>x.id===rid)||fam[0];
       const tot=fam.reduce((s,x)=>caixaRedistribuida(x)?s:s+(+x.valor||0),0);
       /* [revisão C 23/08, A2] só conta unidades da MESMA unidade da raiz (caixa com caixa); pedaço aberto
@@ -3328,7 +3371,7 @@ function vConsultar(){
       return `<div class="item" style="display:block;cursor:pointer" onclick="verLote('${rid}')">
         <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${raiz.contraparte||'—'} <span style="color:var(--mut);font-size:10px">${qt?`compra de ${qt} ${catR||'un'}`:`o que saiu de ${catR||'item'} aberto`} · ${fam.length} partes</span></div>
         <div class="meta">🧩 ${metaLote}${vds.length?` · <span style="color:var(--green)">💰 ${vds.length} venda${vds.length>1?'s':''} por ${fmt(totV)}</span>`:''}${parcial}</div></div>
-        <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--red)">${pg}</div></div></div></div>`;};
+        <div style="text-align:right;white-space:nowrap">${rotVal('custo')}<div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--red)">${pg}</div></div></div></div>`;};
     /* família = partes desta compra que NÃO estão numa nota (as que estão aparecem no card da nota — sem
        isto o mesmo dinheiro saía duas vezes, revisão C M4); só na aba Compras (em Pedidos a vista é por
        situação e o lote misturaria estados, revisão C A1). */
@@ -3352,13 +3395,13 @@ function vConsultar(){
         <div style="display:flex;justify-content:space-between;gap:10px">
           <div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · <b>${h.contraparte||'—'}</b></div>
           <div class="meta">🧾 ${its.length} itens${resumo?' · '+resumo:''}${semV?` · <span class="tag c" style="font-size:9px">${semV} sem vínculo</span>`:' · <span class="tag v" style="font-size:9px">🔗 ok</span>'}</div></div>
-          <div style="text-align:right;white-space:nowrap"><div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--green)">${h.canal==='App'?'app':'Pix'}</div></div>
+          <div style="text-align:right;white-space:nowrap">${rotVal('venda')}<div style="font-weight:700">${fmt(tot)}</div><div style="font-size:11px;font-weight:600;color:var(--green)">${h.canal==='App'?'app':'Pix'}</div></div>
         </div></div>`;}).join('');
     const cardsSV=soltosV.map(m=>{const dataBR2=m.data?m.data.split('-').reverse().join('/'):'—';
       return `<div class="item" style="display:block;cursor:pointer" onclick="verFicha('${m.id}')">
         <div style="display:flex;justify-content:space-between;gap:10px"><div style="flex:1"><div class="ttl"><b>${dataBR2}</b> · ${m.contraparte||'—'}</div>
         <div class="meta">${((m.colecao?m.colecao+' · ':'')+(m.cat||''))||'(sem produto)'}${m.qtd>1?' ×'+m.qtd:''}${m.origemId?' · <span class="tag v" style="font-size:9px">🔗 vinculada</span>':m.semOrigem==='historico'?' · <span class="tag" style="font-size:9px;background:var(--card2);color:var(--mut)">📜 histórica</span>':' · <span class="tag c" style="font-size:9px">sem vínculo</span>'}</div></div>
-        <div style="text-align:right;font-weight:700;white-space:nowrap">${fmt(+m.valor||0)}</div></div></div>`;}).join('');
+        <div style="text-align:right;white-space:nowrap">${rotVal('venda')}<div style="font-weight:700">${fmt(+m.valor||0)}</div></div></div></div>`;}).join('');
     vistaNotas=`<div class="ctx">💰 <b>${vidsVis.length} venda${vidsVis.length!==1?'s':''} com vários itens</b>${soltosV.length?' + '+soltosV.length+' venda(s) de item único':''} — toque pra dissecar. "☰ detalhado" mostra item por item.</div>${cardsV}${cardsSV}`;
   }
   const modoAgrupado=modoNotas||modoVendaG;
@@ -4661,7 +4704,14 @@ function excluirCol(j,c){const n=movs.filter(m=>(m.jogo||'Pokémon')===j&&m.cole
 function addColModal(j){const n=(document.getElementById('novaCol')?.value||'').trim(),g=(document.getElementById('novaColG')?.value||'').trim();if(!n)return;
   if(!colsJ[j])colsJ[j]=[];if(!colsJ[j].includes(n))colsJ[j].push(n);if(!cols.includes(n))cols.push(n);
   if(g){if(!colsG[j])colsG[j]={};colsG[j][n]=g;}desmarcaCol(j,n);salvarColsG();saveL();abrirCols(j);}
-function renomearJogo(i){const antigo=jogos[i],nv=(prompt('Renomear jogo:',antigo)||'').trim();if(!nv||nv===antigo)return;if(jogos.includes(nv)){alert('Já existe um jogo com esse nome.');return;}jogos[i]=nv;movs.forEach(m=>{if((m.jogo||'Pokémon')===antigo)m.jogo=nv;});saveL();save();fecharModal();abrirJogos();}
+function renomearJogo(i){const antigo=jogos[i],nv=(prompt('Renomear jogo:',antigo)||'').trim();if(!nv||nv===antigo)return;if(jogos.includes(nv)){alert('Já existe um jogo com esse nome.');return;}jogos[i]=nv;movs.forEach(m=>{if((m.jogo||'Pokémon')===antigo)m.jogo=nv;});
+  moveJogoColecoes(antigo,nv);marcaExcluido('jogos:'+antigo);marcaPresente('jogos:'+nv);   /* o nome antigo não volta pela fusão com o aparelho atrasado; o novo, se já morreu um dia, volta a valer */
+  salvarColsG();saveL();save();fecharModal();abrirJogos();}
+/* [03/10/2026] as coleções de um jogo e o grupo/ano delas moram em colsJ/colsG POR NOME DE JOGO: renomear o jogo sem levar as duas listas junto deixava o jogo novo sem coleção nenhuma
+   (e editar um lançamento dele zerava a coleção). Une com o que já existir sob o nome novo (resto de um jogo antigo de mesmo nome) em vez de sobrescrever. */
+function moveJogoColecoes(antigo,nv){
+  if(colsJ&&Array.isArray(colsJ[antigo])){const alvo=Array.isArray(colsJ[nv])?colsJ[nv]:[];colsJ[nv]=alvo.concat(colsJ[antigo].filter(c=>!alvo.includes(c)));delete colsJ[antigo];}
+  if(colsG&&colsG[antigo]&&typeof colsG[antigo]==='object'){colsG[nv]=Object.assign({},colsG[antigo],(colsG[nv]&&typeof colsG[nv]==='object')?colsG[nv]:{});delete colsG[antigo];}}
 function excluirJogo(i){if(jogos.length<=1){alert('Precisa ter ao menos 1 jogo.');return;}const j=jogos[i],n=movs.filter(m=>(m.jogo||'Pokémon')===j).length,destino=jogos.find((x,k)=>k!==i);if(n>0){if(!confirm(`${n} lançamento(s) usam "${j}". Excluir e mover esses pra "${destino}"?`))return;}else if(!confirm(`Excluir o jogo "${j}"?`))return;movs.forEach(m=>{if((m.jogo||'Pokémon')===j)m.jogo=destino;});marcaExcluido('jogos:'+j);jogos.splice(i,1);saveL();save();fecharModal();abrirJogos();}
 function vCadastros(){
   const tag=t=>t==='fornecedor'?'<span class="tag c">fornecedor</span>':'<span class="tag v">cliente</span>';
@@ -5846,10 +5896,8 @@ function ligaJogoAtual(jogoSelId){
 /* o card ja sabe de que jogo ele e — nao depende de seletor nenhum na tela */
 function abrirLigaDoItem(jogo,cod){const site=ligaDoJogo(jogo);
   if(!site){alert('Ainda não sei o endereço da Liga de "'+jogo+'".\n\nTenho: '+nomeDasLigas()+'.');return;}
-  /* [12/10/2026] código com ∞ no total (promocional) a Liga não acha pelo código: a busca vai só pelo nome */
-  const n0=String(normCod(cod)),semInf=n0.replace(/\s*\([^()]*∞[^()]*\)\s*$/,'').replace(/\s+\S*∞\S*\s*$/,'').trim();
-  const busca=/∞/.test(n0)?(semInf||n0):cod;
-  window.open('https://'+site+'/?view=cards/search&card='+encodeURIComponent(busca),'_blank');}
+  /* [13/10/2026] a busca leva o TEXTO INTEIRO do cadastro ("Nome (NUM/∞)"): a Liga abre a carta direto (o Felype testou; medido ao vivo em 13 cartas). Só o emoji ♾️ do teclado do celular vira o ∞ matemático, que é o que a Liga entende (com o emoji ela devolve "nenhum item") */
+  window.open('https://'+site+'/?view=cards/search&card='+encodeURIComponent(normCod(cod)),'_blank');}
 /* usada onde a tela NAO tem seletor de jogo (abrir caixa): o jogo vem do proprio lote. */
 function abrirLigaDoCampo(jogo,inputId){const v=(document.getElementById(inputId)?.value||'').trim();
   if(!v){alert('Digite o código (ou o nome) primeiro.');return;}
@@ -6491,11 +6539,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='12/10 10h39';
+const BUILD_TAG='13/10 11h54';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1791812385087;
+const BUILD_TS=1791903259699;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
@@ -6632,7 +6680,7 @@ function pendenciasCodigo(){
       return {m,motivo:'sem_preco',cod};
     }).filter(Boolean);
 }
-function abrirCorrigirCodigo(id){_pendVolta=_pendFiltro;consVer='itens';verMov(id);}
+function abrirCorrigirCodigo(id){_pendVolta=_pendFiltro;consVer='itens';verMov(id,true);}
 /* [Felype 22/08 23h] "esses books são cartas avulsas em lote: comprei 100 reais em cartas, 200 cartas —
    não vou dar entrada de 200, dei como book". A checagem de código tratava o lote como carta sem
    código. Marca escolhida (não texto livre), reversível no próprio item — mesmo padrão da venda
@@ -6696,7 +6744,7 @@ function pendGrupos(){
   const cadItem=x=>{const m=x.m,inf=!!x.cod&&/[∞♾]/.test(x.cod),js=v=>String(v||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
     /* [12/10/2026] a linha não dizia a coleção, o idioma nem a quantidade, e a única ação era "abrir o lançamento": o Felype não achava onde resolver o preço da Liga */
     const det=[m.colecao,(m.idioma&&m.idioma!=='—')?m.idioma:'',(+m.qtd||1)>1?(+m.qtd)+' un':'',fmt(+m.valor||0),m.data?dBR(new Date(m.data+'T00:00:00')):''].filter(Boolean).join(' · ');
-    const por=x.motivo==='sem_preco'?(inf?'O código tem ∞ no total (carta promocional): a Liga não a acha por ele. O caminho é o link direto.':'A Liga não devolveu preço para este código. Procure a carta pelo nome e cole o link dela.'):'';
+    const por=x.motivo==='sem_preco'?(inf?'O código tem ∞ no total (carta promocional). A Liga acha a carta pelo nome e código completos, e a rotina de preços passou a buscar assim: o preço pode chegar na próxima coleta. Para ver já, toque em 🔎 procurar na Liga.':'A Liga não devolveu preço para este código. Procure a carta pelo nome e cole o link dela.'):'';
     const acoes=x.motivo==='sem_preco'?[['🔗 colar o link da Liga',`fecharModal();setCodigoUrl('${m.id}');abrirPendencias('sem_preco')`],['🔎 procurar na Liga',`abrirLigaDoItem('${js(m.jogo||'Pokémon')}','${js(x.cod)}')`]]:[];
     return {t:(m.obs||((m.colecao?m.colecao+' · ':'')+(m.cat||'carta')))+(x.cod?' · #'+x.cod:''),d:det+(por?'<br>'+por:''),
       a:acoes.concat([['abrir o lançamento',`fecharModal();abrirCorrigirCodigo('${m.id}')`]]).concat((x.motivo==='sem_codigo'||(x.motivo==='sem_preco'&&(+m.qtd||1)>1))?[['📚 é lote de cartas avulsas',`fecharModal();marcarLoteSemCodigo('${m.id}',true)`]]:[])};};
@@ -6740,6 +6788,7 @@ function abrirPendencias(filtro){
     corpo=`<div class="sec" style="display:flex;justify-content:space-between;align-items:baseline">
         <span>${g.ic} ${g.tit} (${g.itens.length})${g.dica?` <span style="text-transform:none;font-weight:400;color:var(--mut)">— ${g.dica}</span>`:''}</span>
         <span class="lnk" style="font-size:12px;text-transform:none" onclick="abrirPendencias('mapa')">‹ todos</span></div>`
+      +(g.id==='amarelo'&&movs.some(x=>fragOrfao(x))?`<div class="ctx" style="margin:6px 0"><span class="lnk" onclick="fecharModal();abrirSemVendaMassa()">📜 marcar todas as peças vendidas sem venda de uma vez (abre a lista pra conferir) →</span></div>`:'')
       +g.itens.map(it=>`<div class="item" style="display:block;padding:10px 12px"><b>${it.t}</b>${it.d?`<div class="meta" style="margin-top:3px">${it.d}</div>`:''}${it.a.map(a=>btn(a[0],a[1])).join('')}</div>`).join('');
   }
   const resumo=(!_precosTentado?'<span style="color:var(--amber)">⏳ ainda carregando os preços da Liga — a lista pode crescer em alguns segundos.</span> ':'')+(tot?`<b>${tot} no total</b> — ${G.map(g=>g.itens.length+' '+g.ic).join(' · ')}. Toque no grupo que você vai resolver agora; nada é corrigido sozinho.`:'Tudo conferido.');
