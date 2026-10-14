@@ -111,6 +111,7 @@ for _f in sorted(_artesTema):
 if _svgRuins: print('  SVG de tema que nao e XML valido (nao carrega como imagem):', ', '.join(_svgRuins))
 checks={
  'aparencia: toda arte citada nos temas existe em temas/ (nenhuma faltando no ar) e ha artes citadas, todas as SVG sao XML valido':bool(_artesTema) and not _artesFalta and not _svgRuins,
+ 'aparencia: a testada entra no render de TODA tela (nao so no Painel) e o vPainel nao a repete':"document.getElementById('view').innerHTML=temaTopoHTML()+(V[tela]||vPainel)();" in chk and chk.count('${temaTopoHTML()}')==0,
  'apiKey presente':'AIzaSy' in chk,
  'USAR_NUVEM auto-deriva':'const USAR_NUVEM = !!(firebaseConfig' in chk,
  'SEED vazio':'const SEED=[];' in chk,

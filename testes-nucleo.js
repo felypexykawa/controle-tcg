@@ -7038,7 +7038,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       const n = (re, s) => (s.match(re) || []).length;
       t('45f: a tela de Aparência tem "Mostrar imagens", mais as opções de topo e de fundo (3 caixas de marcar)', /Mostrar imagens/.test(cap) && n(/type="checkbox"/g, cap) === 3, String(n(/type="checkbox"/g, cap)));
       t('45f: tem os 2 controles de intensidade (topo e fundo), com a faixa certa', n(/type="range"/g, cap) === 2 && /id="apar_opTopo" type="range" min="10" max="100"/.test(cap) && /id="apar_opFundo" type="range" min="0" max="40"/.test(cap), '');
-      t('45f: tem 2 listas por jogo (topo e fundo) para os 5 jogos + fonte + "aplicar em" + tom = 13 listas', n(/<select /g, cap) === 13, String(n(/<select /g, cap)));
+      t('45f: tem 2 listas por jogo (topo e fundo) para os 5 jogos + as 3 do tema (como escolher, fixo, a cada quanto) + fonte + "aplicar em" + tom = 16 listas', n(/<select /g, cap) === 16, String(n(/<select /g, cap)));
       t('45f: a lista do topo do Pokémon traz Nenhuma, Mew (arejado), Floresta com sol, Mew (denso) e Meu desenho; a do FUNDO não traz "Meu desenho" (SVG não serve de fundo)',
         /id="aparT_pokemon"[\s\S]*?<\/select>/.test(cap) && ['Nenhuma', 'Mew \\(arejado\\)', 'Floresta com sol', 'Mew \\(denso\\)', 'Meu desenho'].every(x => new RegExp(x).test(cap.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0])) && !/Meu desenho/.test(cap.match(/id="aparF_pokemon"[\s\S]*?<\/select>/)[0]), '');
       t('45f: a lista do topo do Dragon Ball traz as 3 versões do Shenlong (sem as esferas, com as esferas, esferas viram cartas e moedas) e o meu desenho; o fundo só as 3 de traço', ['Shenlong e Goku', 'com as esferas', 'viram cartas e moedas', 'Meu desenho'].every(x => cap.match(/id="aparT_dragonball"[\s\S]*?<\/select>/)[0].includes(x)) && !cap.match(/id="aparF_dragonball"[\s\S]*?<\/select>/)[0].includes('Meu desenho') && cap.match(/id="aparF_dragonball"[\s\S]*?<\/select>/)[0].includes('viram cartas e moedas'), '');
@@ -7061,7 +7061,8 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('relJogo', 'Dragon Ball'); const hdb = A('temaTopoHTML')();
       t('45g: o Painel do Dragon Ball traz o Shenlong (máscara) e o nome do jogo', hdb.includes('data-tema="dragonball"') && hdb.includes('temas/dragonball-shenlong.webp') && hdb.includes('>Dragon Ball<'), hdb.slice(0, 200));
       setg('relJogo', 'Magic'); t('45g: jogo sem tema próprio cai na visão geral', /data-tema="geral"/.test(A('temaTopoHTML')()), A('temaTopoHTML')().slice(0, 120));
-      setg('relJogo', ''); t('45g: sem filtro de jogo o Painel mostra a visão geral', /data-tema="geral"/.test(A('temaTopoHTML')()), '');
+      setg('relJogo', ''); t('45g: sem filtro de jogo o Painel mostra o tema fixo (padrão: Pokémon), para a imagem aparecer sempre', /data-tema="pokemon"/.test(A('temaTopoHTML')()), '');
+      setg('APAR', A('aparNorm')({ temaFixo: 'geral' })); t('45g: ...e a visão geral só quando é ela o tema fixo', /data-tema="geral"/.test(A('temaTopoHTML')()), ''); setg('APAR', A('aparNorm')({}));
       setg('relJogo', 'Pokémon'); setg('APAR', A('aparNorm')({ imagens: false }));
       t('45g: com as imagens desligadas a faixa NÃO existe (o Painel volta ao visual simples, sem espaço sobrando)', A('temaTopoHTML')() === '', A('temaTopoHTML')());
       setg('APAR', A('aparNorm')({ topo: false }));
@@ -7092,6 +7093,110 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('relJogo', 'Pokémon'); setg('APAR', A('aparNorm')({ imagens: false })); A('aplicaAparencia')();
       t('45h: "Mostrar imagens" desligado: nenhuma camada, nenhuma marca', fake.camada === null && fake.cls.comFundoTema === false, S34(fake.cls));
     } finally { d.documentElement = orig.de; d.body = orig.body; d.createElement = orig.ce; d.getElementById = orig.geb; setg('relJogo', ''); volta(); }
+  });
+
+  /* --- 45i–45k (14/10/2026): a testada em TODA tela, o tema em 1 toque (automático / fixo / muda a cada tela / muda com o tempo) e o enquadramento ajustável --- */
+  const FUNCS45B = ['temaAtual', 'temaBotoesHTML', 'aparTema', 'aparModo', 'aparAj', 'aparAjReset', 'abrirEnquadrar', 'aparAjDe', 'aparAltBanner'];
+  const faltam45b = FUNCS45B.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('45i: [pré-requisito] o app carregado tem as ' + FUNCS45B.length + ' funções da testada/tema/enquadramento', faltam45b.length === 0, 'FALTAM no app: ' + faltam45b.join(', '));
+  const bloco45b = (rot, corpo) => faltam45b.length ? Promise.resolve() : bloco34(rot, corpo, '45');
+  const ROTA45 = ['pokemon', 'onepiece', 'dragonball', 'yugioh'];
+
+  await bloco45b('i', () => {
+    const { volta } = apar45(), N = A('aparNorm');
+    try {
+      setg('tela', 'painel');
+      setg('APAR', N({})); setg('relJogo', '');
+      t('45i: automático SEM filtro de jogo usa o tema fixo (padrão Pokémon) — as imagens aparecem em toda tela, não só quando se filtra por jogo', A('temaAtual')() === 'pokemon', A('temaAtual')());
+      setg('relJogo', 'One Piece');
+      t('45i: automático COM filtro de jogo segue o jogo', A('temaAtual')() === 'onepiece', A('temaAtual')());
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'yugioh' }));
+      t('45i: "sempre o mesmo tema" ignora o filtro de jogo', A('temaAtual')() === 'yugioh', A('temaAtual')());
+      setg('relJogo', ''); setg('APAR', N({ temaModo: 'auto', temaFixo: 'geral' }));
+      t('45i: o tema fixo "visão geral" também vale como tema sem filtro', A('temaAtual')() === 'geral', A('temaAtual')());
+      /* muda a cada tela: gira a cada TROCA de tela; ficar na mesma tela (ou redesenhar) não gira */
+      setg('APAR', N({ temaModo: 'tela' })); setg('tela', 'painel'); A('aplicaAparencia')();
+      const t0 = A('temaAtual')(); A('aplicaAparencia')(); A('aplicaAparencia')();
+      t('45i: "muda a cada tela" — redesenhar a MESMA tela não troca o tema', A('temaAtual')() === t0 && ROTA45.includes(t0), t0 + ' / ' + A('temaAtual')());
+      setg('tela', 'consultar'); A('aplicaAparencia')(); const t1 = A('temaAtual')();
+      t('45i: ...trocar de tela passa para o PRÓXIMO tema da rota (Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh!)', t1 === ROTA45[(ROTA45.indexOf(t0) + 1) % 4], t0 + ' -> ' + t1);
+      setg('tela', 'contas'); A('aplicaAparencia')();
+      t('45i: ...e a seguinte avança outra vez', A('temaAtual')() === ROTA45[(ROTA45.indexOf(t0) + 2) % 4], A('temaAtual')());
+      /* muda com o tempo: o mesmo em todas as telas e gira a cada N minutos */
+      setg('APAR', N({ temaModo: 'tempo', temaMin: 30 }));
+      congela(2026, 10, 14, 10, 0); const a0 = A('temaAtual')(); setg('tela', 'estoque'); const a0b = A('temaAtual')();
+      congela(2026, 10, 14, 10, 31); const a1 = A('temaAtual')();
+      descongela();
+      t('45i: "muda com o tempo" — o mesmo tema em todas as telas dentro da janela, e passa ao próximo depois de 30 min', ROTA45.includes(a0) && a0 === a0b && a1 === ROTA45[(ROTA45.indexOf(a0) + 1) % 4], [a0, a0b, a1].join(' -> '));
+      setg('APAR', N({ temaModo: 'tempo', temaMin: 15 }));
+      congela(2026, 10, 14, 10, 0); const b0 = A('temaAtual')(); congela(2026, 10, 14, 10, 16); const b1 = A('temaAtual')(); descongela();
+      t('45i: a janela é a escolhida (15 min troca mais cedo que 30)', b1 === ROTA45[(ROTA45.indexOf(b0) + 1) % 4], b0 + ' -> ' + b1);
+    } finally { descongela(); setg('relJogo', ''); volta(); }
+  });
+
+  await bloco45b('j', () => {
+    const { volta } = apar45(), N = A('aparNorm'), ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      const lido = () => JSON.parse(ctx.localStorage.getItem('tcg_aparencia') || 'null');
+      setg('APAR', N({})); setg('relJogo', '');
+      const nb = (re, s) => (s.match(re) || []).length;
+      const telas = { painel: 'Painel', consultar: 'Consultar', contas: 'Fluxo de caixa', estoque: 'Fluxo de estoque', relatorios: 'Relatório', lancar: 'Lançar', simular: 'Simular' };
+      Object.keys(telas).forEach(tl => {
+        setg('tela', tl); const h = A('temaTopoHTML')(), alt = tl === 'painel' ? 170 : 120;
+        t('45j: a testada aparece na tela "' + telas[tl] + '", com o nome da tela ("tela: Consultar": texto MAIS LONGO que o do menu de baixo, para o clique por texto cair no menu e não na testada), ' + alt + ' px de altura, o botão de enquadrar e 8 botões de tema (5 jogos + automático + 🔀 + ⏱)',
+          h.includes('class="temaTopo"') && h.includes('style="height:' + alt + 'px"') && h.includes('>tela: ' + telas[tl] + '<') && h.includes('onclick="abrirEnquadrar()"') && nb(/class="ttb/g, h) === 8, h.slice(0, 160));
+      });
+      setg('tela', 'painel');
+      const h0 = A('temaTopoHTML')();
+      t('45j: no automático só o botão "A" está ativo (marca "on")', nb(/class="ttb on"/g, h0) === 1 && /class="ttb on"[^>]*onclick="aparModo\('auto'\)"/.test(h0), h0.slice(0, 120));
+      A('aparTema')('onepiece');
+      t('45j: 1 toque num jogo da testada fixa o tema (modo fixo, One Piece) e grava no aparelho', g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === 'onepiece' && lido().temaFixo === 'onepiece' && A('temaAtual')() === 'onepiece', S34(lido()));
+      const h1 = A('temaTopoHTML')();
+      t('45j: ...e a testada passa a ser a do One Piece, com o botão do jogo ativo ("on") e só ele', h1.includes('data-tema="onepiece"') && nb(/class="ttb on"/g, h1) === 1 && /class="ttb on"[^>]*onclick="aparTema\('onepiece'\)"/.test(h1), h1.slice(0, 160));
+      A('aparTema')('onepiece');
+      t('45j: tocar de novo no jogo ATIVO volta ao automático', g('APAR').temaModo === 'auto', g('APAR').temaModo);
+      A('aparModo')('tela'); t('45j: o botão 🔀 liga "muda a cada tela"', g('APAR').temaModo === 'tela' && lido().temaModo === 'tela', S34(lido()));
+      A('aparModo')('tempo'); t('45j: o botão ⏱ liga "muda com o tempo"', g('APAR').temaModo === 'tempo', g('APAR').temaModo);
+      A('aparModo')('inexistente'); t('45j: modo que não existe volta ao automático (não quebra a tela)', g('APAR').temaModo === 'auto', g('APAR').temaModo);
+      /* a tela de Aparência também escolhe o tema */
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      A('abrirAparencia')();
+      t('45j: a tela de Aparência tem "Como escolher o tema", "Tema fixo", "Trocar a cada" e o botão de enquadrar', ['id="aparTemaModo"', 'id="aparTemaFixo"', 'id="aparTemaMin"', "abrirEnquadrar('topo')"].every(x => cap.includes(x)), '');
+      t('45j: as quatro formas de escolher o tema estão na lista', ['Automático', 'Sempre o mesmo tema', 'Muda a cada tela', 'Muda com o tempo'].every(x => cap.includes(x)), '');
+    } finally { ctx.document.body.insertAdjacentHTML = ins; setg('relJogo', ''); volta(); }
+  });
+
+  await bloco45b('k', () => {
+    const { volta } = apar45(), N = A('aparNorm'), CSS = A('aparenciaCSS'), ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      const lido = () => JSON.parse(ctx.localStorage.getItem('tcg_aparencia') || 'null');
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'pokemon' })); setg('tela', 'painel');
+      t('45k: sem ajuste o enquadramento é o original (altura 656 px, 75 px para fora à direita, 128 px acima)', CSS(g('APAR'), 'pokemon', false, 170).topo.tam === 'auto 656px' && CSS(g('APAR'), 'pokemon', false, 170).topo.pos === 'right -75px top -128px', S34(CSS(g('APAR'), 'pokemon', false, 170).topo));
+      A('aparAj')('topo', 'x', 40);
+      t('45k: mover a imagem 40 px para a direita grava o ajuste só do Pokémon/topo e desloca a posição', g('APAR').aj['pokemon:topo'].x === 40 && lido().aj['pokemon:topo'].x === 40 && CSS(g('APAR'), 'pokemon', false, 170).topo.pos === 'right -115px top -128px', S34([lido().aj, CSS(g('APAR'), 'pokemon', false, 170).topo.pos]));
+      A('aparAj')('topo', 'y', -20); A('aparAj')('topo', 'z', 150);
+      const c = CSS(g('APAR'), 'pokemon', false, 170).topo;
+      t('45k: o zoom 150% aumenta a imagem (656 → 984 px) e leva junto as distâncias; cima/baixo soma por cima', c.tam === 'auto 984px' && c.pos === 'right -152px top -172px', S34(c));
+      t('45k: na testada baixa das outras telas (120 px) o recorte escala junto, sem perder o ajuste', CSS(N({ temaModo: 'fixo', aj: {} }), 'pokemon', false, 120).topo.tam === 'auto 463px', CSS(N({}), 'pokemon', false, 120).topo.tam);
+      t('45k: o ajuste do Pokémon NÃO mexe no One Piece nem no fundo do próprio Pokémon', CSS(g('APAR'), 'onepiece', false, 170).topo.tam === 'auto 300px' && CSS(g('APAR'), 'pokemon', false, 170).fundo.pos === 'calc(50% + 0px) calc(22% + 0px)', S34([CSS(g('APAR'), 'onepiece', false, 170).topo.tam, CSS(g('APAR'), 'pokemon', false, 170).fundo.pos]));
+      A('aparAj')('fundo', 'x', 25); A('aparAj')('fundo', 'y', -10);
+      t('45k: o fundo aceita esquerda/direita e cima/baixo (sem zoom): a posição vira calc(50% + 25px) calc(22% + -10px)', CSS(g('APAR'), 'pokemon', false, 170).fundo.pos === 'calc(50% + 25px) calc(22% + -10px)', CSS(g('APAR'), 'pokemon', false, 170).fundo.pos);
+      A('aparAjReset')('topo');
+      t('45k: "Voltar ao original" desfaz só o ajuste do topo (o do fundo fica)', !('pokemon:topo' in g('APAR').aj) && ('pokemon:fundo' in g('APAR').aj) && CSS(g('APAR'), 'pokemon', false, 170).topo.pos === 'right -75px top -128px', S34(g('APAR').aj));
+      t('45k: valores absurdos são presos (x 999 vira 300, zoom 10 vira 50) e ajuste igual ao original nem é guardado',
+        N({ aj: { 'pokemon:topo': { x: 999, y: -999, z: 10 } } }).aj['pokemon:topo'].x === 300 && N({ aj: { 'pokemon:topo': { x: 999, y: -999, z: 10 } } }).aj['pokemon:topo'].y === -300 && N({ aj: { 'pokemon:topo': { x: 999, y: -999, z: 10 } } }).aj['pokemon:topo'].z === 50 && S34(N({ aj: { 'pokemon:topo': { x: 0, y: 0, z: 100 } } }).aj) === '{}', S34(N({ aj: { 'pokemon:topo': { x: 999, y: -999, z: 10 } } }).aj));
+      t('45k: ajuste de jogo ou espaço que não existe é descartado', S34(N({ aj: { 'xx:topo': { x: 5 }, 'pokemon:lateral': { x: 5 } } }).aj) === '{}', '');
+      A('aparAj')('topo', 'q', 5); A('aparAj')('lateral', 'x', 5);
+      t('45k: campo ou espaço inválido é ignorado pelo controle', !('pokemon:lateral' in g('APAR').aj) && !(g('APAR').aj['pokemon:topo'] && 'q' in g('APAR').aj['pokemon:topo']), S34(g('APAR').aj));
+      /* a folha de enquadramento */
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      A('abrirEnquadrar')('topo');
+      t('45k: a folha de enquadramento do TOPO tem os 3 controles (esquerda/direita, cima/baixo, zoom), as abas e "Voltar ao original"', ['id="aparaj_x"', 'id="aparaj_y"', 'id="aparaj_z"', 'Voltar ao original', '>Topo<', '>Fundo<'].every(x => cap.includes(x)), cap.slice(0, 80));
+      A('abrirEnquadrar')('fundo');
+      t('45k: a folha do FUNDO não tem zoom (só esquerda/direita e cima/baixo)', cap.includes('id="aparaj_x"') && cap.includes('id="aparaj_y"') && !cap.includes('id="aparaj_z"'), '');
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'yugioh' })); A('abrirEnquadrar')('topo');
+      t('45k: com o "meu desenho" (SVG) a folha avisa que o enquadramento é fixo e não mostra controles', cap.includes('enquadramento dele é fixo') && !cap.includes('id="aparaj_x"'), cap.slice(0, 120));
+    } finally { ctx.document.body.insertAdjacentHTML = ins; volta(); }
   });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
