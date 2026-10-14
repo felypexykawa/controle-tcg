@@ -7207,9 +7207,9 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       /* a folha de enquadramento */
       let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
       A('abrirEnquadrar')('topo');
-      t('45k: a folha de enquadramento do TOPO tem os 3 controles (esquerda/direita, cima/baixo, zoom) e as abas; "Voltar ao original" não aparece porque o topo está no original (desfeito acima)', ['id="aparaj_x"', 'id="aparaj_y"', 'id="aparaj_z"', '>Topo<', '>Fundo<'].every(x => cap.includes(x)) && !cap.includes('Voltar ao original'), cap.slice(0, 80));
+      t('45k: a folha de enquadramento do TOPO tem os 3 controles (esquerda/direita, cima/baixo, zoom) e as abas; o "Voltar ao original" existe mas ESCONDIDO, porque o topo está no original (desfeito acima)', ['id="aparaj_x"', 'id="aparaj_y"', 'id="aparaj_z"', '>Topo<', '>Fundo<'].every(x => cap.includes(x)) && /id="aparAjVoltar" style="display:none"/.test(cap), cap.slice(0, 80));
       A('abrirEnquadrar')('fundo');
-      t('45k: a folha do FUNDO não tem zoom (só esquerda/direita e cima/baixo) e, como o fundo TEM ajuste guardado, oferece "Voltar ao original"', cap.includes('id="aparaj_x"') && cap.includes('id="aparaj_y"') && !cap.includes('id="aparaj_z"') && cap.includes('Voltar ao original'), '');
+      t('45k: a folha do FUNDO não tem zoom (só esquerda/direita e cima/baixo) e, como o fundo TEM ajuste guardado, mostra "Voltar ao original"', cap.includes('id="aparaj_x"') && cap.includes('id="aparaj_y"') && !cap.includes('id="aparaj_z"') && /id="aparAjVoltar" style=""/.test(cap), '');
       setg('APAR', N({ temaModo: 'fixo', temaFixo: 'yugioh' })); A('abrirEnquadrar')('topo');
       t('45k: com o "meu desenho" (SVG) a folha avisa que o enquadramento é fixo e não mostra controles', cap.includes('enquadramento dele é fixo') && !cap.includes('id="aparaj_x"'), cap.slice(0, 120));
     } finally { ctx.document.body.insertAdjacentHTML = ins; volta(); }
@@ -7725,7 +7725,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   console.log('');
   console.log('=== 47. jogos novos (criar/editar/excluir), testada em 2 toques, caixas translúcidas ===');
   const FUNCS47 = ['aparNormaliza', 'aparHsl', 'aparCoresDe', 'aparTemaUsuario', 'aparTemaDe', 'aparChaves', 'aparRota', 'temaChave', 'aparPadrao', 'aparModoTexto', 'temaGradeHTML', 'abrirJogoEditor', 'aparJogoSalva',
-    'aparJogoExclui', 'aparJogoCancela', 'aparJogoEscolhe', 'aparJogoAjustar', 'aparCorSugerida', 'aparReset', 'aparBolinha', 'aparCorBolinha', 'aparModoPatch', 'aparModoPara', 'aparLetraAviso', 'aparLetraHint'];
+    'aparJogoExclui', 'aparJogoCancela', 'aparJogoEscolhe', 'aparJogoAjustar', 'aparCorSugerida', 'aparReset', 'aparBolinha', 'aparCorBolinha', 'aparModoPatch', 'aparModoPara', 'aparLetraAviso', 'aparLetraHint', 'aparAj'];
   const faltam47 = FUNCS47.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
   t('47a: [pré-requisito] o app carregado tem as ' + FUNCS47.length + ' funções desta seção', faltam47.length === 0, 'FALTAM no app: ' + faltam47.join(', '));
   const bloco47 = (rot, corpo) => faltam47.length ? Promise.resolve() : bloco34(rot, corpo, '47');
@@ -8156,10 +8156,10 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('APAR', N({ jogos: L47, temaModo: 'fixo', temaFixo: 'xlorc1' })); A('abrirEnquadrar')('fundo');
       t('47j: o mesmo num jogo criado sem imagem', !/id="apar_trPainel"/.test(cap) && /sem imagem de fundo agora/.test(cap), '');
       setg('APAR', N({})); A('abrirEnquadrar')('topo');
-      t('47j: "Voltar ao original" só aparece quando há ajuste a desfazer (no Pokémon limpo não)', !/Voltar ao original/.test(cap), '');
+      t('47j: "Voltar ao original" nasce ESCONDIDO quando não há ajuste a desfazer (Pokémon limpo) e aparece quando há', /id="aparAjVoltar" style="display:none"/.test(cap), '');
       setg('APAR', N({ aj: { 'pokemon:topo': { x: 20, y: 0, z: 100 } } })); A('abrirEnquadrar')('topo');
-      t('47j: ...com um ajuste guardado ele aparece', /Voltar ao original/.test(cap), '');
-      t('47j: a linha dos botões "Pronto" fica COLADA no rodapé da folha (no celular a folha rola e o botão não pode ficar para baixo da tela)', /position:sticky;bottom:0[^"]*"[^>]*>(<button[^>]*>↺ Voltar ao original<\/button>)?<button class="btn g" onclick="fecharModal\(\)">Pronto</.test(cap), cap.slice(-420));
+      t('47j: ...com um ajuste guardado já nasce à vista', /id="aparAjVoltar" style=""/.test(cap), '');
+      t('47j: o "Pronto" fica no CABEÇALHO da folha (sempre à vista, sem barra fixa por cima dos controles — revisor 14/10: a barra cobria botões no celular) e repete no fim', !/position:sticky/.test(cap) && cap.indexOf('>Pronto<') > 0 && cap.indexOf('>Pronto<') < cap.indexOf('id="apar_opTopo"') && cap.lastIndexOf('>Pronto<') > cap.indexOf('id="apar_opTopo"'), cap.slice(0, 260));
       /* tela de Aparência */
       setg('APAR', N({})); A('abrirAparencia')();
       t('47j: a Aparência tem UM botão de editar o tema atual (o do alto) — o repetido do meio saiu', (cap.match(/Editar o tema atual/g) || []).length === 1 && !/Enquadrar a imagem do tema atual/.test(cap), '');
@@ -8168,6 +8168,54 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       t('47j: ...e "Tema fixo" com o padrão desligado, dizendo qual tema volta ao religar o A', />Tema fixo</.test(cap) && /Religando o padrão \(A\), volta o tema de quando não há filtro \(Pokémon\)/.test(cap), '');
       t('47j: a regra das caixas translúcidas só vale onde há color-mix (senão a caixa ficaria 100% transparente)', html.includes('@supports (background:color-mix(in srgb,red 50%,transparent)){body.comFundoTema :where(.card,.item,.mini)'), '');
     } finally { ctx.document.body.insertAdjacentHTML = ins; restaura(); }
+  });
+  await bloco47('k', () => {
+    const restaura = guarda47(), N = A('aparNorm'), T = g('TEMAS'), geb = ctx.document.getElementById, ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      setg('tela', 'painel'); setg('relJogo', ''); setg('MEUS', {});
+      /* M1 (revisor da v4.1): o "Voltar ao original" precisa aparecer na hora em que a pessoa mexe, não só ao reabrir a folha */
+      const el = { style: { display: 'none' } }; const visto = { aparAjVoltar: el };
+      ctx.document.getElementById = id => visto[id] || { value: '', style: {}, remove() {}, textContent: '' };
+      setg('APAR', N({})); A('aparAj')('topo', 'z', 160);
+      t('47k: mexer no zoom na folha faz o "Voltar ao original" aparecer na hora (antes só aparecia se a folha fosse fechada e reaberta)', el.style.display === '' && g('APAR').aj['pokemon:topo'].z === 160, S34([el.style.display, g('APAR').aj]));
+      ctx.document.getElementById = geb;
+      /* L5: sem controle de ajuste (meu desenho SVG, sem imagem, desligado) não há botão de voltar */
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'yugioh', aj: { 'yugioh:topo': { x: 5, y: 0, z: 100 } } })); A('abrirEnquadrar')('topo');
+      t('47k: no "meu desenho" (SVG) não há "Voltar ao original", mesmo que haja ajuste guardado de antes (nenhum controle ajusta ali)', !/aparAjVoltar/.test(cap), '');
+      /* L1: o texto do aviso diz o motivo verdadeiro */
+      setg('APAR', N({ fundo: false })); A('abrirEnquadrar')('topo');
+      t('47k: com o fundo das telas desligado, o aviso das caixas diz que o FUNDO está desligado (não que o Pokémon está sem imagem)', /o fundo das telas está desligado, então não há o que aparecer/.test(cap) && !/sem imagem de fundo agora/.test(cap), '');
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'yugioh' })); A('abrirEnquadrar')('topo');
+      t('47k: ...e no Yu-Gi-Oh! (ligado, sem imagem de fundo) diz que o tema está sem imagem de fundo', /este tema está sem imagem de fundo agora/.test(cap), '');
+      /* M3: a migração decide POR ESPAÇO; imagem e enquadramento vêm da mesma origem */
+      const MJ = { xa: { nome: 'Pokémon Pocket', letra: 'P', cor: '#112233' } };
+      const mA = N({ jogos: MJ, arte: { 'xa:topo': 'u:img9', 'pokemon:topo': 'mew-denso' }, aj: { 'xa:topo': { x: 5, y: 5, z: 120 } } });
+      t('47k: criado que casa com o de fábrica: se o de fábrica JÁ escolheu imagem no topo, o de fábrica vence o topo inteiro — a imagem dele continua e o enquadramento acertado para OUTRA imagem não é aplicado a ela', mA.arte['pokemon:topo'] === 'mew-denso' && !('pokemon:topo' in mA.aj) && Object.keys(mA.jogos).length === 0, S34(mA));
+      const mB = N({ jogos: MJ, arte: { 'xa:topo': 'u:img9' }, aj: { 'pokemon:topo': { x: 3, y: 0, z: 100 } } });
+      t('47k: ...e se o de fábrica só tinha ENQUADRAMENTO no topo, a imagem do criado não herda esse enquadramento (o espaço é do de fábrica)', !('pokemon:topo' in mB.arte) && mB.aj['pokemon:topo'].x === 3, S34(mB));
+      const mC = N({ jogos: MJ, arte: { 'xa:topo': 'u:img9', 'xa:fundo': 'u:img8' }, aj: { 'xa:topo': { x: 5, y: 5, z: 120 } } });
+      t('47k: ...mas o espaço que o de fábrica NÃO usou migra com imagem e enquadramento juntos (topo e fundo cada um por si)', mC.arte['pokemon:topo'] === 'u:img9' && mC.arte['pokemon:fundo'] === 'u:img8' && mC.aj['pokemon:topo'].x === 5, S34(mC));
+      const mD = N({ jogos: { xa: { nome: 'Pokémon Pocket' }, xb: { nome: 'Pokemon Go' } }, arte: { 'xa:topo': 'u:1', 'xb:topo': 'u:2' } });
+      t('47k: dois criados que casam com o MESMO de fábrica: o primeiro leva o espaço, o segundo não o sobrescreve', mD.arte['pokemon:topo'] === 'u:1' && Object.keys(mD.jogos).length === 0, S34(mD));
+      const so3 = N({ jogos: { xmg: { nome: 'Mag', letra: 'M' } } });
+      t('47k: um criado de 3 letras ("Mag") só casa como PALAVRA inteira: "Mag Online" sim, "Magic: The Gathering" não (o "mag" está colado dentro de "magic")', A('temaChave')('Mag Online', so3) === 'xmg' && A('temaChave')('Magic: The Gathering', so3) === 'geral', S34([A('temaChave')('Mag Online', so3), A('temaChave')('Magic: The Gathering', so3)]));
+      /* L4: nomes iguais depois de normalizar não se repetem */
+      const dup = N({ jogos: { xa: { nome: 'Lorcana' }, xb: { nome: ' lorcana ' }, xc: { nome: 'LORCÁNA' }, xd: { nome: 'Naruto' } } });
+      t('47k: três jogos criados com o mesmo nome (maiúscula, espaço, acento) viram um só — a bolinha repetida nunca seria alcançada pelo filtro', Object.keys(dup.jogos).join() === 'xa,xd', S34(Object.keys(dup.jogos)));
+      /* L3: letra em maiúscula ANTES de cortar; símbolos dos outros botões avisam */
+      const let1 = N({ jogos: { xs: { nome: 'Straße', letra: 'ß' } } }).jogos.xs.letra, let2 = N({ jogos: { xs: { nome: 'ßeta', letra: '' } } }).jogos.xs.letra;
+      t('47k: a letra "ß" vira "S" (uma letra só na bolinha, não "SS"), também quando vem da inicial do nome', let1 === 'S' && let2 === 'S', S34([let1, let2]));
+      const es = N({});
+      t('47k: os símbolos ★ + 🔀 ⏱ avisam que já são botões da testada', ['★', '+', '🔀', '⏱'].every(x => /símbolo já é de um botão/.test(A('aparLetraAviso')(es, x, '', ''))), '');
+      /* L2: o nome criado mais longo vence */
+      const sw = N({ jogos: { xa: { nome: 'Star Wars' }, xb: { nome: 'Star Wars Unlimited' }, xc: { nome: 'Battle Spirits' }, xd: { nome: 'Battle Spirits Saga' } } });
+      t('47k: entre criados que casam, vence o nome mais específico (mais longo): "Star Wars Unlimited TCG" vai para o "Star Wars Unlimited" e "Star Wars Destiny" para o "Star Wars"', A('temaChave')('Star Wars Unlimited TCG', sw) === 'xb' && A('temaChave')('Star Wars Destiny', sw) === 'xa' && A('temaChave')('Battle Spirits Saga Evolution', sw) === 'xd', S34(['Star Wars Unlimited TCG', 'Star Wars Destiny', 'Battle Spirits Saga Evolution'].map(n => A('temaChave')(n, sw))));
+      /* L9: ß e traços Unicode */
+      const nbh = String.fromCharCode(0x2011), em = String.fromCharCode(0x2014);
+      const ws = N({ jogos: { xw: { nome: 'Weiss Schwarz' } } });
+      t('47k: "Weiß Schwarz" casa com o criado "Weiss Schwarz" (ß = ss) e "Yu' + nbh + 'Gi' + nbh + 'Oh" / "Yu' + em + 'Gi' + em + 'Oh" (traço Unicode) continuam sendo o Yu-Gi-Oh!', A('temaChave')('Weiß Schwarz', ws) === 'xw' && A('temaChave')('Yu' + nbh + 'Gi' + nbh + 'Oh', es) === 'yugioh' && A('temaChave')('Yu' + em + 'Gi' + em + 'Oh', es) === 'yugioh', S34([A('temaChave')('Weiß Schwarz', ws), A('temaChave')('Yu' + nbh + 'Gi', es)]));
+    } finally { ctx.document.getElementById = geb; ctx.document.body.insertAdjacentHTML = ins; restaura(); }
   });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====

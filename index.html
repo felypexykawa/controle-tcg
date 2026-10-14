@@ -2725,17 +2725,19 @@ const TEMAS={
 };
 function aparNorm(o){o=(o&&typeof o==='object')?o:{};const P=APAR_PADRAO,n=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d;};
   /* jogos CRIADOS pela pessoa (Lorcana, Naruto, Magic...): chave "x…" + nome, letra da bolinha e uma cor; as cinco cores do tema saem dessa cor (aparCoresDe) */
-  const jogos={};if(o.jogos&&typeof o.jogos==='object')Object.keys(o.jogos).forEach(k=>{const d=o.jogos[k];if(Object.keys(jogos).length>=APAR_MAX_JOGOS||!/^x[a-z0-9]{1,14}$/.test(k)||!d||typeof d!=='object')return;
+  const jogos={},vistos=Object.create(null);if(o.jogos&&typeof o.jogos==='object')Object.keys(o.jogos).forEach(k=>{const d=o.jogos[k];if(Object.keys(jogos).length>=APAR_MAX_JOGOS||!/^x[a-z0-9]{1,14}$/.test(k)||!d||typeof d!=='object')return;
     const nome=String(d.nome==null?'':d.nome).replace(/\s+/g,' ').trim().slice(0,24);if(!nome)return;
-    const letra=Array.from(String(d.letra==null?'':d.letra).trim()).slice(0,1).join('').toUpperCase()||Array.from(nome)[0].toUpperCase();
+    const nn=aparNormaliza(nome);if(vistos[nn])return;vistos[nn]=1;
+    const letra=Array.from(String(d.letra==null?'':d.letra).trim().toUpperCase()).slice(0,1).join('')||Array.from(nome.toUpperCase())[0];
     jogos[k]={nome:nome,letra:letra,cor:/^#[0-9a-fA-F]{6}$/.test(String(d.cor))?String(d.cor).toLowerCase():APAR_COR_PADRAO};});
-  /* jogo CRIADO cujo nome passou a casar com um tema de FÁBRICA (ele criou "Lorcana" e, um dia, o Lorcana entrou no catálogo): as imagens, os ajustes e as escolhas dele migram para o de fábrica e o criado sai — senão ficam duas bolinhas iguais, o filtro vai para a de fábrica vazia e as imagens ficam presas na criada */
+  /* jogo CRIADO cujo nome passou a casar com um tema de FÁBRICA (ele criou "Lorcana" e, um dia, o Lorcana entrou no catálogo): o criado sai e o que era dele migra para o de fábrica — POR ESPAÇO (topo, fundo): a imagem e o enquadramento de um espaço vêm juntos da MESMA origem, e se o de fábrica já tinha escolha ou ajuste naquele espaço, o de fábrica vence o espaço inteiro (senão o enquadramento acertado para uma imagem seria aplicado a outra) */
   const mig={};Object.keys(jogos).forEach(k=>{const f=temaChave(jogos[k].nome,{jogos:{}});if(f!=='geral'){mig[k]=f;delete jogos[k];}});
-  const eMig=c=>Object.prototype.hasOwnProperty.call(mig,c),trad=c=>eMig(c)?mig[c]:c;
+  const trad=c=>Object.prototype.hasOwnProperty.call(mig,c)?mig[c]:c;
   const chavesOk=aparChaves({jogos:jogos});
-  const remapa=(src,ok)=>{const r={};if(src&&typeof src==='object')[false,true].forEach(mi=>Object.keys(src).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k);if(!m||eMig(m[1])!==mi)return;const c=trad(m[1]),kk=c+':'+m[2];if(!chavesOk.includes(c)||(mi&&Object.prototype.hasOwnProperty.call(r,kk)))return;const v=ok(src[k]);if(v!==undefined)r[kk]=v;}));return r;};
-  const arte=remapa(o.arte,v=>typeof v==='string'?v:undefined);
-  const aj=remapa(o.aj,v=>{if(!v||typeof v!=='object')return undefined;const a={x:n(v.x,-300,300,0),y:n(v.y,-300,300,0),z:n(v.z,50,250,100)};return (a.x||a.y||a.z!==100)?a:undefined;});
+  const tem=(x,c)=>Object.prototype.hasOwnProperty.call(x,c),oa=Object.assign({},(o.arte&&typeof o.arte==='object')?o.arte:{}),oj=Object.assign({},(o.aj&&typeof o.aj==='object')?o.aj:{});
+  Object.keys(mig).forEach(k=>['topo','fundo'].forEach(sl=>{const ko=k+':'+sl,kf=mig[k]+':'+sl;if(!tem(oa,kf)&&!tem(oj,kf)){if(tem(oa,ko))oa[kf]=oa[ko];if(tem(oj,ko))oj[kf]=oj[ko];}}));
+  const arte={};Object.keys(oa).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k);if(m&&chavesOk.includes(m[1])&&typeof oa[k]==='string')arte[k]=oa[k];});
+  const aj={};Object.keys(oj).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k),v=oj[k];if(m&&chavesOk.includes(m[1])&&v&&typeof v==='object'){const a={x:n(v.x,-300,300,0),y:n(v.y,-300,300,0),z:n(v.z,50,250,100)};if(a.x||a.y||a.z!==100)aj[k]=a;}});
   return {imagens:o.imagens!==false,topo:o.topo!==false,fundo:o.fundo!==false,opTopo:n(o.opTopo,10,100,P.opTopo),opFundo:n(o.opFundo,0,40,P.opFundo),
     trPainel:n(o.trPainel,0,80,P.trPainel),trOutras:n(o.trOutras,0,80,P.trOutras),
     fonte:FONTES.some(f=>f.id===o.fonte)?o.fonte:P.fonte,fonteEm:o.fonteEm==='app'?'app':'valores',tom:TONS.some(t=>t.id===o.tom)?o.tom:P.tom,
@@ -2746,7 +2748,7 @@ function aparSalva(){gravaLocal(APAR_KEY,JSON.stringify(APAR));}
    Jogo novo (Lorcana, Naruto, Magic...) não mexe no código: (1) a PESSOA cria na tela de Aparência ou no "+" da testada — nome, letra da bolinha e uma cor, tudo só neste aparelho, com editar e excluir; (2) quando
    um jogo vira padrão de fábrica, acrescenta-se UMA entrada no catálogo TEMAS (rot, letra, cores, casa, artes, padrao) + as imagens em temas/. A testada, as listas, a rota "muda a cada tela/com o tempo" e o
    filtro de jogo leem o catálogo por aparChaves/aparTemaDe/temaChave — nenhuma lista de jogos escrita à mão nas telas. */
-function aparNormaliza(s){return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();}
+function aparNormaliza(s){return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ß/g,'ss').replace(/[‐-―]/g,'-').replace(/\s+/g,' ').trim();}
 function aparHsl(h,s,l){s/=100;l/=100;const k=function(n){return (n+h/30)%12;},a=s*Math.min(l,1-l),f=function(n){return l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));},x=function(v){return ('0'+Math.round(255*v).toString(16)).slice(-2);};return '#'+x(f(0))+x(f(8))+x(f(4));}
 /* PURA: de UMA cor (#rrggbb) saem as cinco cores de um tema: tinta (claro), tinta (escuro), destaque e os dois fundos suaves da faixa */
 function aparCoresDe(hex){const h=/^#[0-9a-fA-F]{6}$/.test(String(hex))?String(hex).toLowerCase():APAR_COR_PADRAO;
@@ -2900,15 +2902,15 @@ function aparNoStorage(e){if(!e||e.key!==APAR_KEY)return;let n={};try{n=JSON.par
 function aparPedePersistir(){try{if(!_aparPersist&&navigator.storage&&navigator.storage.persist){_aparPersist=true;navigator.storage.persist();}}catch(e){}}
 const APAR_ARQ_INPUT='<input type="file" id="aparFile" accept="image/*" style="display:none" onchange="aparArquivoEscolhido(this)">';
 try{if(typeof setTimeout==='function')setTimeout(aparCarregaMeus,0);aparCanal();if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('storage',aparNoStorage);}catch(e){}
-/* o tema de um nome de jogo: 1) os de fábrica, pelos pedaços de `casa`; 2) um jogo CRIADO com exatamente esse nome; 3) um criado cujo nome (3+ letras) aparece como palavra inteira no pedido; senão a visão geral. Os de fábrica vêm primeiro
+/* o tema de um nome de jogo: 1) os de fábrica, pelos pedaços de `casa`; 2) um jogo CRIADO com exatamente esse nome; 3) o criado de nome MAIS LONGO (3+ letras) que aparece como palavra inteira no pedido; senão a visão geral. Os de fábrica vêm primeiro
    porque o NOME do jogo no app costuma ser o mesmo ("Yu-Gi-Oh" sem "!"): um criado com esse nome tirava o tema de fábrica do lugar (por isso criar com nome que já casa com um de fábrica é recusado) */
 function temaChave(nome,est){const s=aparNormaliza(nome);if(!s)return 'geral';est=est||APAR;
   const bate=function(c){return s.indexOf(c)>=0;},ks=Object.keys(TEMAS),J=est.jogos||{},js=Object.keys(J);
   for(let i=0;i<ks.length;i++){if(ks[i]!=='geral'&&(TEMAS[ks[i]].casa||[]).some(bate))return ks[i];}
   for(let i=0;i<js.length;i++){if(aparNormaliza(J[js[i]].nome)===s)return js[i];}
   const cont=function(t,c){let i=t.indexOf(c);while(i>=0){if(!/[a-z0-9]/.test(i?t.charAt(i-1):' ')&&!/[a-z0-9]/.test(t.charAt(i+c.length)||' '))return true;i=t.indexOf(c,i+1);}return false;};
-  for(let i=0;i<js.length;i++){const c=aparNormaliza(J[js[i]].nome);if(c.length>=3&&cont(s,c))return js[i];}
-  return 'geral';}
+  let best='',bl=0;for(let i=0;i<js.length;i++){const c=aparNormaliza(J[js[i]].nome);if(c.length>=3&&c.length>bl&&cont(s,c)){best=js[i];bl=c.length;}}
+  return best||'geral';}
 /* o jogo em foco: o filtro de jogo da tela atual (Consulta tem o seu; as demais usam o do Painel/Relatórios). Sem filtro = nenhum */
 function jogoFoco(){if(tela==='consultar'&&consJogo&&consJogo!=='todos')return consJogo;return relJogo||'';}
 /* QUAL tema vale agora: fixo (o escolhido), automático (segue o filtro de jogo; sem filtro, o tema fixo), muda a cada tela (gira a cada troca de tela) ou muda com o tempo (gira a cada N minutos; o mesmo em todas as telas) */
@@ -2995,6 +2997,7 @@ function aparModo(modo){aparModoPara(modo);}
 /* enquadramento: esquerda/direita, cima/baixo e zoom da imagem do tema em foco, separado para o topo e para o fundo; vale por jogo e por espaço */
 let _enqSlot='topo';
 function aparAj(slot,campo,v){const ch=temaAtual();if(!aparTemaDe(APAR,ch)||(slot!=='topo'&&slot!=='fundo')||(campo!=='x'&&campo!=='y'&&campo!=='z'))return;const k=ch+':'+slot,aj=Object.assign({},APAR.aj),a=Object.assign({x:0,y:0,z:100},aj[k]);a[campo]=+v;aj[k]=a;APAR=aparNorm(Object.assign({},APAR,{aj}));aparSalva();aplicaAparencia();aparRetocaTopo();
+  try{const vb=document.getElementById('aparAjVoltar');if(vb&&vb.style)vb.style.display='';}catch(e){}
   const j=aparAjDe(APAR,ch,slot);['x','y','z'].forEach(cp=>{const el=document.getElementById('aparaj_v_'+cp);if(el)el.textContent=j[cp]+(cp==='z'?'%':' px');});}
 function aparAjReset(slot){const ch=temaAtual(),aj=Object.assign({},APAR.aj);delete aj[ch+':'+slot];APAR=aparNorm(Object.assign({},APAR,{aj}));aparSalva();aplicaAparencia();aparRetocaTopo();abrirEnquadrar(slot);}
 function abrirEnquadrar(slot){if(slot==='topo'||slot==='fundo')_enqSlot=slot;_aparJogoVolta='';fecharModal();const ch=temaAtual(),T=aparTemaDe(APAR,ch)||TEMAS.geral,s=_enqSlot,j=aparAjDe(APAR,ch,s),eid=aparEscolha(APAR,ch,s),art=eid&&aparArte(ch,eid,APAR),svg=!!(art&&!art.arq&&!art.url),sem=!art;
@@ -3002,12 +3005,12 @@ function abrirEnquadrar(slot){if(slot==='topo'||slot==='fundo')_enqSlot=slot;_ap
   const aba=(k,rot)=>`<button class="btn ${s===k?'':'g'}" style="flex:1" onclick="abrirEnquadrar('${k}')" title="Ajustar o ${rot.toLowerCase()}">${rot}</button>`;
   const campo=s==='topo'?'opTopo':'opFundo',lim=s==='topo'?[10,100]:[0,40];
   const rngOp=`<div style="display:flex;justify-content:space-between;margin-top:6px"><label for="apar_${campo}"><b>Intensidade</b></label><span id="aparv_${campo}" style="color:var(--mut)">${APAR[campo]}%</span></div><input id="apar_${campo}" type="range" min="${lim[0]}" max="${lim[1]}" value="${APAR[campo]}" oninput="aparNum('${campo}',this.value)" style="width:100%" title="Quanto a imagem aparece (${s==='topo'?'100 = traço cheio':'14 é o padrão do fundo'})">`;
-  const comFundo=!!aparenciaCSS(APAR,temaAtual(),aparEscuro(),aparAltBanner()).fundo,desl=!APAR.imagens?'as imagens':(s==='topo'?(APAR.topo?'':'a testada'):(APAR.fundo?'':'o fundo das telas')),temAj=!!(APAR.aj&&Object.prototype.hasOwnProperty.call(APAR.aj,ch+':'+s));
-  const campoCx=tela==='painel'?'trPainel':'trOutras',rngCx=comFundo?`<div style="display:flex;justify-content:space-between;margin-top:6px"><label for="apar_${campoCx}"><b>Caixas translúcidas · ${tela==='painel'?'Painel':'demais telas'}</b></label><span id="aparv_${campoCx}" style="color:var(--mut)">${APAR[campoCx]}%</span></div><input id="apar_${campoCx}" type="range" min="0" max="80" value="${APAR[campoCx]}" oninput="aparNum('${campoCx}',this.value)" style="width:100%" title="Só as caixas ficam mais transparentes (as letras não); a imagem de fundo do tema aparece através delas">`:'<div class="ctx" style="margin-top:6px">Caixas translúcidas: este tema está sem imagem de fundo agora, então não há o que aparecer atrás delas (nos temas com fundo, como o Pokémon, elas valem).</div>';
+  const comFundo=!!aparenciaCSS(APAR,temaAtual(),aparEscuro(),aparAltBanner()).fundo,desl=!APAR.imagens?'as imagens':(s==='topo'?(APAR.topo?'':'a testada'):(APAR.fundo?'':'o fundo das telas')),temAj=!!(APAR.aj&&Object.prototype.hasOwnProperty.call(APAR.aj,ch+':'+s)),podeAj=!desl&&!sem&&!svg,semFundo=(!APAR.imagens||!APAR.fundo)?'o fundo das telas está desligado':'este tema está sem imagem de fundo agora';
+  const campoCx=tela==='painel'?'trPainel':'trOutras',rngCx=comFundo?`<div style="display:flex;justify-content:space-between;margin-top:6px"><label for="apar_${campoCx}"><b>Caixas translúcidas · ${tela==='painel'?'Painel':'demais telas'}</b></label><span id="aparv_${campoCx}" style="color:var(--mut)">${APAR[campoCx]}%</span></div><input id="apar_${campoCx}" type="range" min="0" max="80" value="${APAR[campoCx]}" oninput="aparNum('${campoCx}',this.value)" style="width:100%" title="Só as caixas ficam mais transparentes (as letras não); a imagem de fundo do tema aparece através delas">`:'<div class="ctx" style="margin-top:6px">Caixas translúcidas: '+semFundo+', então não há o que aparecer atrás delas (nos temas com fundo ligado, como o Pokémon, elas valem).</div>';
   const doJogo=T.usuario?`<div class="acoes" style="flex-wrap:wrap"><button class="btn g" onclick="abrirJogoEditor('${ch}','')" title="Mudar o nome, a letra ou a cor deste jogo">✎ Editar nome e cor</button><button class="btn g" onclick="aparJogoExclui('${ch}')" title="Apagar este jogo (as imagens que você enviou continuam guardadas)">🗑 Excluir jogo</button></div>`:'';
   const posicao=sem?`<div class="ctx">Este tema está sem imagem no ${s}: use "+ Usar uma imagem minha" (ou escolha uma em Aparência) para poder ajustar a posição e a intensidade.</div>`:(svg?'<div class="ctx">Este é o "meu desenho" (SVG): o enquadramento dele é fixo. Escolha uma imagem de traço em Aparência para poder mexer.</div>':rng('x','Esquerda ← → Direita',-300,300,5)+rng('y','Cima ← → Baixo',-300,300,5)+(s==='topo'?rng('z','Zoom',50,250,5):''));
   const h=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:14px 16px;max-height:54vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)">
-    <div class="head" id="aparEnq">✥ Editar o tema · ${aparH(T.rot)}</div>
+    <div class="head" id="aparEnq" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>✥ Editar o tema · ${aparH(T.rot)}</span><button class="btn g" style="flex:none;width:auto;margin:0;padding:6px 14px;font-size:13px" onclick="fecharModal()">Pronto</button></div>
     <div class="ctx">Mexa e veja na testada, em cima. Posição e zoom: só deste jogo. Intensidade e caixas: de todos os jogos. Tudo só neste aparelho.</div>
     <div style="display:flex;gap:8px;margin:6px 0">${aba('topo','Topo')}${aba('fundo','Fundo')}</div>
     ${desl?'':(sem?'':rngOp)}
@@ -3016,7 +3019,7 @@ function abrirEnquadrar(slot){if(slot==='topo'||slot==='fundo')_enqSlot=slot;_ap
     <div class="acoes" style="flex-wrap:wrap"><label class="btn g" for="aparFile" onclick="aparAlvo('novo','','${s}')" title="Escolher uma imagem sua neste aparelho e já usá-la aqui">+ Usar uma imagem minha</label><button class="btn g" onclick="fecharModal();abrirAparencia()" title="Intensidade, minhas imagens, jogos, fonte, tom do fundo e mais">⚙ Todas as opções</button></div>
     ${doJogo}
     ${desl?`<div class="ctx">Está desligado: ${desl}. Ligue em "⚙ Todas as opções" para ajustar o ${s}.</div>`:posicao}
-    <div class="acoes" style="position:sticky;bottom:0;background:var(--card);padding:8px 0 2px;margin-top:6px">${temAj?`<button class="btn g" onclick="aparAjReset('${s}')" title="Volta o enquadramento deste espaço ao original">↺ Voltar ao original</button>`:''}<button class="btn g" onclick="fecharModal()">Pronto</button></div>${APAR_ARQ_INPUT}
+    <div class="acoes" style="margin-top:8px">${podeAj?`<button class="btn g" id="aparAjVoltar" style="${temAj?'':'display:none'}" onclick="aparAjReset('${s}')" title="Volta o enquadramento deste espaço ao original">↺ Voltar ao original</button>`:''}<button class="btn g" onclick="fecharModal()">Pronto</button></div>${APAR_ARQ_INPUT}
   </div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);}
 
@@ -3082,6 +3085,7 @@ function abrirJogoEditor(id,volta){if(typeof volta!=='string')volta='';_aparJogo
 /* PURA: a letra da bolinha já é de outro jogo (ou é o "A" do botão do padrão)? devolve a frase do aviso, ou '' */
 function aparLetraAviso(est,letra,nome,id){const L=Array.from(String(letra||'').trim().toUpperCase())[0]||Array.from(String(nome||'').trim().toUpperCase())[0]||'';if(!L)return '';
   if(L==='A')return 'A letra A é a do botão do padrão na testada — use outra para não confundir.';
+  if('★+🔀⏱'.indexOf(L)>=0)return 'Esse símbolo já é de um botão da testada — use uma letra para não confundir.';
   const outro=aparChaves(est).filter(function(k){return k!=='geral'&&k!==id;}).find(function(k){return String(aparTemaDe(est,k).letra).toUpperCase()===L;});
   return outro?'A letra '+L+' já é a bolinha de '+aparTemaDe(est,outro).rot+' — use outra para não confundir.':'';}
 function aparLetraHint(id){const g=function(x){const e=document.getElementById(x);return e?String(e.value==null?'':e.value):'';},av=document.getElementById('aparJ_aviso');if(av)av.textContent=aparLetraAviso(APAR,g('aparJ_letra'),g('aparJ_nome'),id);}
@@ -7024,11 +7028,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='14/10 16h22';
+const BUILD_TAG='14/10 17h28';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1792005780102;
+const BUILD_TS=1792009685643;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).

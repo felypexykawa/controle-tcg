@@ -317,7 +317,8 @@ const naVistaDaFolha = (p, f) => p.evaluate(g => {
   const el = g.id ? caixa.querySelector('#' + g.id) : [...caixa.querySelectorAll(g.tag || '*')].filter(e => (e.innerText || '').includes(g.texto)).sort((a, b) => (a.innerText || '').length - (b.innerText || '').length)[0];
   if (!el) return { achou: false, motivo: 'nao achei ' + (g.id || g.texto) };
   const r = el.getBoundingClientRect();
-  return { achou: true, dentro: r.height > 1 && r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1, topo: Math.round(r.top - cr.top), base: Math.round(r.bottom - cr.top), folha: Math.round(cr.height), conteudo: caixa.scrollHeight };
+  const topoEl = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2), livre = !!topoEl && (topoEl === el || el.contains(topoEl));
+  return { achou: true, livre, cobertoPor: livre ? '' : (topoEl ? (topoEl.tagName + '.' + (topoEl.className || '')) : 'nada'), dentro: r.height > 1 && r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1, topo: Math.round(r.top - cr.top), base: Math.round(r.bottom - cr.top), folha: Math.round(cr.height), conteudo: caixa.scrollHeight };
 }, f);
 /* o que esta no IndexedDB do aparelho, lido direto (sem passar pelo app) */
 const guardadasNoAparelho = p => p.evaluate(async () => {
@@ -784,7 +785,7 @@ module.exports = {
         await p.setViewportSize({ width: 390, height: 844 });
         await p.reload();
         await esperarApp(p);
-        const exige = async (f, oque) => { const r = await naVistaDaFolha(p, f); t.ok(r.achou, oque + ': ' + r.motivo); t.ok(r.dentro, oque + ' fica ESCONDIDO abaixo da dobra (topo ' + r.topo + ' / base ' + r.base + ' numa folha de ' + r.folha + ' px, conteudo de ' + r.conteudo + ' px)'); };
+        const exige = async (f, oque) => { const r = await naVistaDaFolha(p, f); t.ok(r.achou, oque + ': ' + r.motivo); t.ok(r.dentro, oque + ' fica ESCONDIDO abaixo da dobra (topo ' + r.topo + ' / base ' + r.base + ' numa folha de ' + r.folha + ' px, conteudo de ' + r.conteudo + ' px)');  t.ok(r.livre !== false, oque + ' esta COBERTO por outro elemento no centro (' + r.cobertoPor + ') — o toque cairia nele (revisor 14/10: barra fixa por cima dos botoes)'); };
 
         /* 1) a folha do enquadramento (aberta pelo botao da testada) */
         await clicar(p, '✥', 'botao de enquadrar na testada');
