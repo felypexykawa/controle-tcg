@@ -1,5 +1,6 @@
 {
  "Painel": [
+  "button:A",
   "button:Consultar",
   "button:Fluxo de caixa",
   "button:Fluxo de estoque",
@@ -8,6 +9,8 @@
   "button:Relatório",
   "button:Simular",
   "button:‹",
+  "button:⚙",
+  "button:✥",
   "div:+ na coleção (a custo) → +R$ #,#",
   "div:+ no estoque (a custo) → +R$ #,#",
   "div:A pagar (parcelas e despesas) R$ #,# nada vence este mês →",
@@ -20,12 +23,14 @@
   "div:limpar tudo",
   "div:vendi (líquido) → +R$ #,#",
   "div:⚠️ pendências — o que precisa da sua mão · # achados",
+  "div:🎨 aparência · imagens · fonte",
   "div:💾 backup · restaurar · exportar",
   "div:🔎 Filtro ▸ # dias",
   "div:🖨 imprimir este resumo",
   "div:🚪 sair da conta (felypexykawa@gmail.com)"
  ],
  "Consultar": [
+  "button:A",
   "button:Consultar",
   "button:Fluxo de caixa",
   "button:Fluxo de estoque",
@@ -34,6 +39,8 @@
   "button:Relatório",
   "button:Simular",
   "button:‹",
+  "button:⚙",
+  "button:✥",
   "div:⭐ Coleção o que foi pra coleção",
   "div:👤 Cadastros clientes, contas, coleções",
   "div:💰 Vendas o que você vendeu",
@@ -46,6 +53,7 @@
   "div:🧾 Despesas custos do negócio"
  ],
  "Fluxo de caixa": [
+  "button:A",
   "button:Consultar",
   "button:Fluxo de caixa",
   "button:Fluxo de estoque",
@@ -54,6 +62,8 @@
   "button:Relatório",
   "button:Simular",
   "button:‹",
+  "button:⚙",
+  "button:✥",
   "button:🖨 Imprimir",
   "div:▸ mês/# · # conta R$ #,#",
   "div:▾ A PAGAR — toque no grupo pra abrir",
@@ -68,6 +78,7 @@
   "span:🧾 juntar"
  ],
  "Fluxo de estoque": [
+  "button:A",
   "button:Consultar",
   "button:Fluxo de caixa",
   "button:Fluxo de estoque",
@@ -76,10 +87,13 @@
   "button:Relatório",
   "button:Simular",
   "button:‹",
+  "button:⚙",
+  "button:✥",
   "span:● ⭐ coleção",
   "span:● 💰 dinheiro"
  ],
  "Relatório": [
+  "button:A",
   "button:Ano",
   "button:Consultar",
   "button:Dia",
@@ -94,6 +108,8 @@
   "button:‹",
   "button:▦ tabela",
   "button:☰ lista",
+  "button:⚙",
+  "button:✥",
   "button:⬇ Backup",
   "button:⬇ Planilha completa (Excel)",
   "button:📊 gráfico",
@@ -113,6 +129,7 @@
   "div:🧾 Extrato ▸ por emissão, tipo banco"
  ],
  "Simular": [
+  "button:A",
   "button:Consultar",
   "button:Explicar essa conta",
   "button:Fluxo de caixa",
@@ -123,6 +140,8 @@
   "button:Relatório",
   "button:Simular",
   "button:‹",
+  "button:⚙",
+  "button:✥",
   "div:%",
   "div:R$",
   "div:com desconto",
@@ -135,6 +154,7 @@
   "input:s_val"
  ],
  "Lançar": [
+  "button:A",
   "button:Consultar",
   "button:Fluxo de caixa",
   "button:Fluxo de estoque",
@@ -144,6 +164,8 @@
   "button:Salvar e lançar outro",
   "button:Simular",
   "button:‹",
+  "button:⚙",
+  "button:✥",
   "button:📷 fotos do lançamento nota, boleto, a carta…",
   "div:# item",
   "div:Nota · vários + frete",

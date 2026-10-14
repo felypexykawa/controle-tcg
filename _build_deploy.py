@@ -118,8 +118,10 @@ checks={
  'aparencia: a testada entra no render de TODA tela (nao so no Painel) e o vPainel nao a repete':"document.getElementById('view').innerHTML=temaTopoHTML()+(V[tela]||vPainel)();" in chk and chk.count('${temaTopoHTML()}')==0,
 # [14/10, Aparencia fase B] imagens PROPRIAS: ficam so no aparelho (IndexedDB proprio), entram pelo campo de arquivo so-imagem, sao lidas ao abrir o app, a engrenagem abre a Aparencia e excluir pergunta antes
  'aparencia: minhas imagens — campo de arquivo so de imagem, guardadas no IndexedDB proprio do aparelho (tcg_aparencia_img) e lidas ao abrir o app':'id="aparFile" accept="image/*"' in chk and "indexedDB.open(APAR_DB,1)" in chk and "APAR_DB='tcg_aparencia_img'" in chk and 'setTimeout(aparCarregaMeus,0)' in chk,
- 'aparencia: a engrenagem da testada abre a Aparencia e a folha do enquadramento traz a intensidade e a escolha de imagem propria':'class="ttAj ttCfg" onclick="abrirAparencia()"' in chk and '${rngOp}' in chk and "aparAlvo('novo','','${s}')" in chk,
+ 'aparencia: a engrenagem da testada abre a Aparencia e a folha do enquadramento traz a intensidade e a escolha de imagem propria':'class="ttAj ttCfg" onclick="abrirAparencia()"' in chk and "${sem?'':rngOp}" in chk and "aparAlvo('novo','','${s}')" in chk,
  'aparencia: nada de aparencia ou de imagem propria sobe para a nuvem (o trecho do salvarNuvem ao bootNuvem tem tamanho de verdade e nao cita APAR, MEUS nem tcg_aparencia)':len(_corpoNuvem)>3000 and not _nuvemTocaAparencia,
+ 'aparencia: caixas translucidas — a regra de CSS muda SO o fundo da caixa (var(--caixa)), nunca as letras, e a barra fixa de resumo fica de fora':'body.comFundoTema :where(.card,.item,.mini):where(:not([style*="sticky"])){background:color-mix(in srgb,var(--card) var(--caixa,90%),transparent)}' in chk and "root.style.setProperty('--caixa',(100-(tela==='painel'?APAR.trPainel:APAR.trOutras))+'%')" in chk,
+ 'aparencia: jogos novos — criar/editar/excluir e o catalogo de temas e DADO (casa, aparChaves, aparTemaDe), com a testada em 2 toques (aparPadrao + grade)':'function aparJogoSalva(id)' in chk and 'function aparJogoExclui(id)' in chk and "casa:['pokem']" in chk and 'function aparChaves(est)' in chk and 'function aparTemaDe(est,chave)' in chk and 'function aparPadrao()' in chk and 'function temaGradeHTML()' in chk and 'TEMA_CHAVES' not in chk,
  'aparencia: excluir imagem propria pergunta antes':"if(!confirm('Excluir a imagem \"'+m.nome+'\"?" in chk,
  'apiKey presente':'AIzaSy' in chk,
  'USAR_NUVEM auto-deriva':'const USAR_NUVEM = !!(firebaseConfig' in chk,
@@ -301,7 +303,7 @@ checks={
  'nota no fisico usa o filtro do a-pagar':"x.pgTipo==='Parcelado'&&+x.nParc>0);" in chk,
  # --- 3 dores reportadas pelo Felype em 21/08, cadastrando troca de One Piece ---
  'troca deixa dar carta da COLECAO, nao so do estoque':'const _mt=motor();' in chk and '(_mt.disp||[]).concat(_mt.colItens||[])' in chk and "sitDe(d)==='Coleção'?'⭐ '" in chk,
- 'busca na Liga vai pro site do JOGO do lancamento':'function ligaDoJogo' in chk and "'onepiece':'www.ligaonepiece.com.br'" in chk and "'naruto'" not in chk,
+ 'busca na Liga vai pro site do JOGO do lancamento':'function ligaDoJogo' in chk and "'onepiece':'www.ligaonepiece.com.br'" in chk and "'naruto':'www.liga" not in chk,  # [14/10] o jogo "naruto" pode entrar no catalogo de temas (casa:['naruto']); o que esta guarda proibe e um site de Liga inventado para ele
  # a ligadragonball partiu em dois jogos: o www. so devolve "qual card game deseja visualizar?".
  # Se alguem "arrumar" isto de volta pro www., o botao volta a nao buscar nada.
  'Dragon Ball aponta pro host que RESPONDE a busca':"'dragonball':'fusion.ligadragonball.com.br'" in chk,

@@ -777,7 +777,7 @@ module.exports = {
       titulo: 'no celular (390x844) a intensidade e os botoes de imagem aparecem SEM rolar, na folha do enquadramento e na tela de Aparencia (e o de adicionar continua a vista com imagens na lista)',
       /* o Felype nao achou os controles ("nao vi onde ficou"): num celular a folha e baixa e o que fica abaixo da dobra nao existe para ele. O clique do
          runner rola ate o alvo e nao via isso. O negativo encolhe a folha do enquadramento para 14% da altura: nada cabe sem rolar e o caminho tem de reprovar. */
-      negativo: { de: 'max-height:46vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)', para: 'max-height:14vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)' },
+      negativo: { de: 'max-height:54vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)', para: 'max-height:14vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)' },
       limiteMs: 60000,
       async rodar(t) {
         const p = t.p;
@@ -789,12 +789,14 @@ module.exports = {
         /* 1) a folha do enquadramento (aberta pelo botao da testada) */
         await clicar(p, '✥', 'botao de enquadrar na testada');
         await exige({ id: 'apar_opTopo' }, 'a Intensidade na folha do enquadramento');
+        await exige({ id: 'apar_trPainel' }, 'as Caixas translucidas na folha do enquadramento (revisor 14/10: ficavam abaixo da dobra)');
         await exige({ tag: 'label', texto: '+ Usar uma imagem minha' }, 'o botao "+ Usar uma imagem minha" na folha do enquadramento');
         await clicar(p, 'Pronto');
 
         /* 2) a tela de Aparencia (aberta pela engrenagem), sem imagens */
         await clicar(p, '⚙', 'engrenagem da testada');
         await exige({ id: 'apar_opTopo' }, 'a Intensidade do topo na tela de Aparencia');
+        await exige({ tag: 'button', texto: '+ Novo jogo' }, 'o botao "+ Novo jogo" no alto da tela de Aparencia');
         await exige({ tag: 'label', texto: '+ Adicionar imagem' }, 'o botao "+ Adicionar imagem" na tela de Aparencia');
 
         /* 3) com uma imagem na lista o botao de adicionar continua a vista (fica ACIMA da lista) */
@@ -880,6 +882,164 @@ module.exports = {
         const [chooser2] = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), clicar(p, '+ Usar uma imagem minha', 'botao da folha do enquadramento')]);
         await chooser2.setFiles({ name: 'Normal.png', mimeType: 'image/png', buffer: pngDesenho(200, 150) });
         await esperaOu(p, () => Object.keys(MEUS).length === 1, null, 'depois de recusar a enorme, uma imagem normal nao entrou (o app travou?)', 10000);
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5g) */
+    {
+      id: 'jogos-criar-editar-excluir',
+      titulo: 'a testada em 2 toques e jogos NOVOS: fechada so "A" e "✥"; desligando o padrao aparece a grade; criei "Lorcana" pelo "+", ele vira o tema, sobrevive a fechar e abrir o app, editei o nome e exclui',
+      /* a cura de excluir: o jogo sai de APAR.jogos (e com ele as escolhas e o tema fixo). O negativo tira essa linha: depois de excluir o jogo continua na lista. */
+      negativo: { de: 'delete jogos[id];', para: '' },
+      limiteMs: 90000,
+      async rodar(t) {
+        const p = t.p;
+        await p.setViewportSize({ width: 390, height: 844 });
+        await p.reload();
+        await esperarApp(p);
+        const bolinhas = () => p.evaluate(() => [...document.querySelectorAll('.temaTopo .ttb')].map(b => b.innerText.trim()));
+        const grade = () => p.evaluate(() => [...document.querySelectorAll('.ttGrade .ttb')].map(b => b.innerText.trim()));
+        const legenda = () => p.evaluate(() => (document.querySelector('.ttModo') || {}).innerText || '');
+        const nomeNaFaixa = () => p.evaluate(() => (document.querySelector('.temaTopo .tt b') || {}).innerText || '');
+        const guardado = () => p.evaluate(() => JSON.parse(localStorage.getItem('tcg_aparencia') || '{}'));
+
+        /* 1) fechada: so "A" (padrao) e "✥" (editar); a grade NAO aparece */
+        t.igual((await bolinhas()).join('|'), 'A|✥', 'bolinhas da testada com o padrao ligado');
+        t.igual((await grade()).length, 0, 'bolinhas na grade com o padrao ligado');
+        t.contem(await legenda(), 'Padrão ligado', 'legenda da testada com o padrao ligado');
+
+        /* 2) desligar o padrao: a grade com a inicial de cada jogo aparece */
+        await clicar(p, 'A', 'bolinha do padrao na testada');
+        await esperaOu(p, () => document.querySelectorAll('.ttGrade .ttb').length >= 8, null, 'a grade de jogos nao apareceu ao desligar o padrao');
+        t.igual((await grade()).join('|'), 'P|O|D|Y|★|🔀|⏱|+', 'bolinhas da grade (jogos de fabrica, visao geral, modos e "+")');
+        t.contem(await legenda(), 'Padrão desligado', 'legenda com o padrao desligado');
+        await p.locator('.ttGrade button', { hasText: 'O' }).first().click();
+        await esperaOu(p, () => (document.querySelector('.temaTopo .tt b') || {}).innerText === 'One Piece', null, 'um toque na bolinha O nao trocou o tema para One Piece');
+
+        /* 3) criar um jogo pelo "+" da grade */
+        await p.locator('.ttGrade button[aria-label^="Novo jogo"]').click();
+        await p.waitForSelector('#aparJ_nome', { timeout: 5000 });
+        await p.locator('#aparJ_nome').fill('Lorcana');
+        await p.locator('#aparJ_cor').fill('#2e86c1');
+        await clicar(p, 'Criar jogo');
+        await esperaOu(p, () => (document.querySelector('.temaTopo .tt b') || {}).innerText === 'Lorcana', null, 'depois de criar o jogo a testada nao passou a ser a do Lorcana');
+        t.contem((await grade()).join('|'), 'L', 'a bolinha L do jogo criado na grade');
+        t.igual(await p.evaluate(() => (document.querySelector('.ttLetra') || {}).innerText), 'L', 'a inicial grande da faixa do jogo sem imagem');
+        let g = await guardado();
+        t.igual(Object.values(g.jogos || {}).map(j => j.nome).join('|'), 'Lorcana', 'jogos guardados no aparelho depois de criar');
+        t.igual(Object.values(g.jogos)[0].cor, '#2e86c1', 'a cor escolhida foi guardada');
+        t.ok(await p.evaluate(() => document.querySelector('.ttGrade').getBoundingClientRect().height < 50), 'com 1 jogo criado a grade tem de caber numa linha so no celular de 390 px (antes quebrava em 2 e a faixa crescia)');
+        t.igual(await p.evaluate(() => temaChave('Lorcana Illumineers')), Object.keys(g.jogos)[0], 'o filtro "Lorcana Illumineers" casa com o jogo criado (leitura direta da regra de casamento)');
+
+        /* 4) fechar e abrir o app: o jogo continua e o tema tambem */
+        await p.reload();
+        await esperarApp(p);
+        t.igual(await nomeNaFaixa(), 'Lorcana', 'depois de recarregar a testada continua a do Lorcana');
+
+        /* 5) a tela de Aparencia: atalho "+ Novo jogo" no alto, a fileira de jogos e o painel do jogo criado (so ver) */
+        await clicar(p, '⚙', 'engrenagem da testada');
+        await p.waitForSelector('.jogosChips', { timeout: 5000 });
+        const chips = await p.evaluate(() => [...document.querySelectorAll('.jogosChips .ttb')].map(b => b.innerText.trim()));
+        t.igual(chips.join('|'), 'P|O|D|Y|L|★|+', 'bolinhas de jogos na Aparencia (nenhuma aberta)');
+        t.igual(await p.evaluate(() => document.querySelectorAll('#modal select').length), 6, 'listas na Aparencia com nenhum jogo aberto (as imagens de cada jogo ficam minimizadas)');
+        t.contem(await p.evaluate(() => document.querySelector('#modal').innerText), '+ Novo jogo', 'atalho "+ Novo jogo" no alto da Aparencia');
+        await p.locator('.jogosChips button', { hasText: 'L' }).first().click();
+        await p.waitForSelector('#aparT_' + Object.keys(g.jogos)[0], { timeout: 5000 });
+        t.contem(await p.evaluate(() => document.querySelector('#modal').innerText), 'jogo criado por você', 'o painel do jogo criado diz que ele e seu');
+        await clicar(p, 'Fechar');
+        await clicar(p, '⚙', 'engrenagem da testada');
+        await p.waitForSelector('.jogosChips', { timeout: 5000 });
+        t.igual(await p.evaluate(() => document.querySelectorAll('#modal select').length), 6, 'reabrir a Aparencia pelo engrenagem fecha o painel do jogo que estava aberto (6 listas)');
+        await clicar(p, 'Fechar');
+
+        /* 6) editar e excluir pela folha de EDITAR O TEMA (✥ da testada): onde o jogo se cria, tambem se edita e se exclui */
+        await clicar(p, '✥', 'bolinha de editar a testada');
+        await p.waitForSelector('#aparEnq', { timeout: 5000 });
+        t.contem(await p.evaluate(() => document.querySelector('#modal').innerText), 'sem imagem', 'a folha do jogo criado sem imagem avisa que nao ha o que ajustar');
+        await clicar(p, '✎ Editar nome e cor');
+        await p.waitForSelector('#aparJ_nome', { timeout: 5000 });
+        t.igual(await p.locator('#aparJ_nome').inputValue(), 'Lorcana', 'a janela de editar traz o nome guardado');
+        await p.locator('#aparJ_nome').fill('Lorcana TCG');
+        await clicar(p, 'Salvar');
+        await esperaOu(p, () => (document.querySelector('.temaTopo .tt b') || {}).innerText === 'Lorcana TCG', null, 'o nome novo nao apareceu na testada');
+        g = await guardado();
+        t.igual(Object.values(g.jogos)[0].nome, 'Lorcana TCG', 'o nome editado foi guardado');
+        await clicar(p, '✥', 'bolinha de editar a testada');
+        await p.waitForSelector('#aparEnq', { timeout: 5000 });
+        await clicar(p, '🗑 Excluir jogo');
+        await esperaOu(p, () => (document.querySelector('.temaTopo .tt b') || {}).innerText === 'Pokémon', null, 'depois de excluir o jogo em uso o tema nao voltou ao Pokemon');
+        t.aoMenos(1, (p.__dialogos || []).filter(d => d.tipo === 'confirm'), 'pergunta de confirmacao antes de excluir o jogo');
+        g = await guardado();
+        t.igual(Object.keys(g.jogos || {}).length, 0, 'jogos guardados no aparelho depois de excluir');
+        await p.reload();
+        await esperarApp(p);
+        t.igual(await p.evaluate(() => document.querySelectorAll('.ttGrade .ttb').length > 0 ? [...document.querySelectorAll('.ttGrade .ttb')].map(b => b.innerText.trim()).join('') : ''), 'PODY★🔀⏱+', 'a grade depois de recarregar nao tem mais o L');
+
+        /* 7) ligar o padrao de novo: a grade some */
+        await clicar(p, 'A', 'bolinha do padrao na testada');
+        await esperaOu(p, () => document.querySelectorAll('.ttGrade').length === 0, null, 'a grade nao sumiu ao ligar o padrao');
+        t.contem(await legenda(), 'Padrão ligado', 'legenda com o padrao ligado de novo');
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5h) */
+    {
+      id: 'caixas-translucidas-por-tela',
+      titulo: 'as CAIXAS ficam mais ou menos translucidas (so o fundo da caixa, nao as letras), com um nivel para o Painel e OUTRO para as demais telas, e o ajuste sobrevive a fechar e abrir o app',
+      /* a cura: --caixa vem do nivel DA TELA em que a pessoa esta. O negativo fixa 90% sempre: o ajuste nao muda nada e o caminho tem de reprovar. */
+      negativo: { de: "root.style.setProperty('--caixa',(100-(tela==='painel'?APAR.trPainel:APAR.trOutras))+'%');", para: "root.style.setProperty('--caixa','90%');" },
+      limiteMs: 60000,
+      async rodar(t) {
+        const p = t.p;
+        await esperarApp(p);
+        await lancarCompra(p, 'PROVA-CAIXAS', { valor: 40 });
+        const alfaCaixa = (sel) => p.evaluate((sel) => {
+          const c = [...document.querySelectorAll(sel)].find(e => e.getBoundingClientRect().height > 20); if (!c) return { semCaixa: true, alfa: -1, opacidade: '', corLetra: '' };
+          const cs = getComputedStyle(c), m = /\/\s*([0-9.]+)\s*\)/.exec(cs.backgroundColor);
+          const filho = [...c.querySelectorAll('*')].find(e => (e.innerText || '').trim().length > 2 && e.children.length === 0);
+          return { alfa: m ? +m[1] : 1, opacidade: cs.opacity, corLetra: filho ? getComputedStyle(filho).color : '', fundoNoCorpo: document.body.classList.contains('comFundoTema') };
+        }, sel || '#view .card, #view .mini:not([style*="sticky"])');
+        const ajusta = (campo, v) => p.evaluate(([c, x]) => { const i = document.getElementById('apar_' + c); i.value = x; i.dispatchEvent(new Event('input', { bubbles: true })); }, [campo, v]);
+        const perto = (a, b) => Math.abs(a - b) < 0.03;
+
+        /* 1) Painel: padrao (10% transparente = 90% de cor) */
+        await clicar(p, 'Painel', 'aba do rodape/cabecalho'); await p.waitForTimeout(350);
+        const p0 = await alfaCaixa();
+        t.ok(p0 && p0.fundoNoCorpo, 'o fundo do tema precisa estar ligado para a caixa ser translucida (padrao)');
+        t.ok(perto(p0.alfa, 0.9), 'a caixa do Painel por padrao devia ter 90% de cor; veio ' + p0.alfa);
+
+        /* 2) pela folha de editar o tema, no Painel: 50% */
+        await clicar(p, '✥', 'bolinha de editar a testada');
+        await p.waitForSelector('#apar_trPainel', { timeout: 5000 });
+        await ajusta('trPainel', 50);
+        await p.waitForTimeout(200);
+        const p1 = await alfaCaixa();
+        t.ok(perto(p1.alfa, 0.5), 'com 50% de transparencia a caixa do Painel devia ficar com 50% de cor; veio ' + p1.alfa);
+        t.igual(p1.opacidade, '1', 'a opacidade do elemento nao pode mudar (so o fundo da caixa fica translucido, nao as letras)');
+        t.igual(p1.corLetra, p0.corLetra, 'a cor das letras da caixa nao pode mudar');
+        await clicar(p, 'Pronto');
+
+        /* 3) outra tela tem o nivel dela, separado */
+        await irConsultar(p, 'Tudo'); await p.waitForTimeout(350);
+        const c0 = await alfaCaixa('#view .item');
+        t.ok(c0 && !c0.semCaixa, 'a lista da Consulta precisa ter pelo menos um item (a lista de lancamentos e feita de .item, que tambem e caixa)');
+        t.ok(c0 && perto(c0.alfa, 0.9), 'na Consulta o item da lista devia continuar com 90% de cor (o nivel do Painel nao vale ali); veio ' + (c0 && c0.alfa));
+        await clicar(p, '✥', 'bolinha de editar a testada');
+        await p.waitForSelector('#apar_trOutras', { timeout: 5000 });
+        t.igual(await p.evaluate(() => !!document.getElementById('apar_trPainel')), false, 'na Consulta a folha nao pode mostrar o controle do Painel');
+        await ajusta('trOutras', 20);
+        await p.waitForTimeout(200);
+        const c1 = await alfaCaixa('#view .item');
+        t.ok(perto(c1.alfa, 0.8), 'com 20% de transparencia o item da lista da Consulta devia ficar com 80% de cor (a lista tambem e caixa); veio ' + c1.alfa);
+        await clicar(p, 'Pronto');
+
+        /* 4) voltar ao Painel: o nivel do Painel (50%) continua, e sobrevive a recarregar */
+        await clicar(p, 'Painel', 'aba do rodape/cabecalho'); await p.waitForTimeout(350);
+        t.ok(perto((await alfaCaixa()).alfa, 0.5), 'ao voltar ao Painel a caixa devia estar com 50% de cor');
+        await p.reload();
+        await esperarApp(p);
+        await clicar(p, 'Painel', 'aba do rodape/cabecalho'); await p.waitForTimeout(350);
+        t.ok(perto((await alfaCaixa()).alfa, 0.5), 'depois de recarregar a caixa do Painel devia continuar com 50% de cor');
       }
     },
 

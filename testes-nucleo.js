@@ -7030,24 +7030,35 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   });
 
   await bloco45('f', () => {
-    const { volta } = apar45(), ins = ctx.document.body.insertAdjacentHTML;
+    const { volta } = apar45(), ins = ctx.document.body.insertAdjacentHTML, selAnt = g('_aparJogoSel');
     try {
       let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
-      setg('APAR', A('aparNorm')({}));
+      setg('APAR', A('aparNorm')({})); setg('_aparJogoSel', '');
       A('abrirAparencia')();
       const n = (re, s) => (s.match(re) || []).length;
       t('45f: a tela de Aparência tem "Mostrar imagens", mais as opções de topo e de fundo (3 caixas de marcar)', /Mostrar imagens/.test(cap) && n(/type="checkbox"/g, cap) === 3, String(n(/type="checkbox"/g, cap)));
-      t('45f: tem os 2 controles de intensidade (topo e fundo), com a faixa certa', n(/type="range"/g, cap) === 2 && /id="apar_opTopo" type="range" min="10" max="100"/.test(cap) && /id="apar_opFundo" type="range" min="0" max="40"/.test(cap), '');
-      t('45f: tem 2 listas por jogo (topo e fundo) para os 5 jogos + as 3 do tema (como escolher, fixo, a cada quanto) + fonte + "aplicar em" + tom = 16 listas', n(/<select /g, cap) === 16, String(n(/<select /g, cap)));
+      t('45f: tem os 4 controles deslizantes, com a faixa certa: intensidade do topo (10–100) e do fundo (0–40), transparência das caixas do Painel e das demais telas (0–80)',
+        n(/type="range"/g, cap) === 4 && /id="apar_opTopo" type="range" min="10" max="100"/.test(cap) && /id="apar_opFundo" type="range" min="0" max="40"/.test(cap) && /id="apar_trPainel" type="range" min="0" max="80"/.test(cap) && /id="apar_trOutras" type="range" min="0" max="80"/.test(cap), '');
+      t('45f: com NENHUM jogo aberto só há as listas do tema (como escolher, fixo, a cada quanto) + fonte + "aplicar em" + tom = 6 listas: as imagens de cada jogo ficam MINIMIZADAS até a pessoa tocar na bolinha do jogo', n(/<select /g, cap) === 6 && !/id="aparT_/.test(cap), String(n(/<select /g, cap)));
+      t('45f: a fileira de jogos tem uma bolinha para cada jogo de fábrica (Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh!), a visão geral e o "+" para criar um jogo novo',
+        ['Jogo Pokémon', 'Jogo One Piece', 'Jogo Dragon Ball', 'Jogo Yu-Gi-Oh!', 'Jogo Visão geral', 'aria-label="Novo jogo"'].every(x => cap.includes(x)) && n(/class="ttb jc/g, cap) === 6, String(n(/class="ttb jc/g, cap)));
+      setg('_aparJogoSel', 'pokemon'); A('abrirAparencia')(true);
+      t('45f: ao abrir o Pokémon aparecem as 2 listas dele (topo e fundo): 8 listas no total', n(/<select /g, cap) === 8 && /id="aparT_pokemon"/.test(cap) && /id="aparF_pokemon"/.test(cap), String(n(/<select /g, cap)));
       t('45f: a lista do topo do Pokémon traz Nenhuma, Mew (arejado), Floresta com sol, Mew (denso) e Meu desenho; a do FUNDO não traz "Meu desenho" (SVG não serve de fundo)',
         /id="aparT_pokemon"[\s\S]*?<\/select>/.test(cap) && ['Nenhuma', 'Mew \\(arejado\\)', 'Floresta com sol', 'Mew \\(denso\\)', 'Meu desenho'].every(x => new RegExp(x).test(cap.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0])) && !/Meu desenho/.test(cap.match(/id="aparF_pokemon"[\s\S]*?<\/select>/)[0]), '');
+      setg('_aparJogoSel', 'dragonball'); A('abrirAparencia')(true);
       t('45f: a lista do topo do Dragon Ball traz as 3 versões do Shenlong (sem as esferas, com as esferas, esferas viram cartas e moedas) e o meu desenho; o fundo só as 3 de traço', ['Shenlong e Goku', 'com as esferas', 'viram cartas e moedas', 'Meu desenho'].every(x => cap.match(/id="aparT_dragonball"[\s\S]*?<\/select>/)[0].includes(x)) && !cap.match(/id="aparF_dragonball"[\s\S]*?<\/select>/)[0].includes('Meu desenho') && cap.match(/id="aparF_dragonball"[\s\S]*?<\/select>/)[0].includes('viram cartas e moedas'), '');
+      setg('_aparJogoSel', 'pokemon'); A('abrirAparencia')();
+      t('45f: abrir a Aparência de novo (pelo ⚙ ou pela folha) FECHA o painel do jogo que estava aberto: as listas voltam a ficar minimizadas (6)', g('_aparJogoSel') === '' && n(/<select /g, cap) === 6 && !/id="aparT_/.test(cap), String(n(/<select /g, cap)));
+      setg('_aparJogoSel', 'dragonball'); A('abrirAparencia')(true);
+      t('45f: jogo de fábrica NÃO oferece editar nem excluir o jogo (só os criados pela pessoa); oferece "Enquadrar e ajustar"', /Enquadrar e ajustar/.test(cap) && !/Editar nome e cor/.test(cap) && !/Excluir jogo/.test(cap), '');
       t('45f: tem "Restaurar o padrão" e Fechar, e todo controle tem dica (title ou texto de apoio)', /Restaurar o padrão/.test(cap) && /Fechar/.test(cap) && n(/title="/g, cap) >= 18, String(n(/title="/g, cap)));
+      setg('_aparJogoSel', ''); setg('APAR', A('aparNorm')({})); A('abrirAparencia')();
       t('45f: com as imagens ligadas nada está desabilitado', !/disabled/.test(cap), '');
       setg('APAR', A('aparNorm')({ imagens: false }));
       A('abrirAparencia')();
-      t('45f: com "Mostrar imagens" desligado, topo/fundo e as duas intensidades ficam desabilitados (4 controles)', n(/disabled/g, cap) === 4, String(n(/disabled/g, cap)));
-    } finally { ctx.document.body.insertAdjacentHTML = ins; volta(); }
+      t('45f: com "Mostrar imagens" desligado, topo/fundo e as 4 intensidades/transparências ficam desabilitados (6 controles)', n(/disabled/g, cap) === 6, String(n(/disabled/g, cap)));
+    } finally { ctx.document.body.insertAdjacentHTML = ins; setg('_aparJogoSel', selAnt); volta(); }
   });
 
   await bloco45('g', () => {
@@ -7143,19 +7154,24 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       const telas = { painel: 'Painel', consultar: 'Consultar', contas: 'Fluxo de caixa', estoque: 'Fluxo de estoque', relatorios: 'Relatório', lancar: 'Lançar', simular: 'Simular' };
       Object.keys(telas).forEach(tl => {
         setg('tela', tl); const h = A('temaTopoHTML')(), alt = tl === 'painel' ? 170 : 120;
-        t('45j: a testada aparece na tela "' + telas[tl] + '", com o nome da tela ("tela: Consultar": texto MAIS LONGO que o do menu de baixo, para o clique por texto cair no menu e não na testada), ' + alt + ' px de altura, o botão de enquadrar e 8 botões de tema (5 jogos + automático + 🔀 + ⏱)',
-          h.includes('class="temaTopo"') && h.includes('style="height:' + alt + 'px"') && h.includes('>tela: ' + telas[tl] + '<') && h.includes('onclick="abrirEnquadrar()"') && nb(/class="ttb/g, h) === 8, h.slice(0, 160));
+        t('45j: a testada aparece na tela "' + telas[tl] + '", com o nome da tela ("tela: Consultar": texto MAIS LONGO que o do menu de baixo, para o clique por texto cair no menu e não na testada), ' + alt + ' px de altura e, com o PADRÃO ligado, só 2 bolinhas (A = padrão, ✥ = editar) e a engrenagem ⚙',
+          h.includes('class="temaTopo"') && h.includes('style="height:' + alt + 'px"') && h.includes('>tela: ' + telas[tl] + '<') && nb(/class="ttb/g, h) === 2 && /class="ttb on"[^>]*onclick="aparPadrao\(\)"/.test(h) && /class="ttb"[^>]*onclick="abrirEnquadrar\(\)">✥</.test(h) && h.includes('onclick="abrirAparencia()"') && !h.includes('class="ttGrade"'), h.slice(0, 160));
       });
       setg('tela', 'painel');
       const h0 = A('temaTopoHTML')();
-      t('45j: no automático só o botão "A" está ativo (marca "on")', nb(/class="ttb on"/g, h0) === 1 && /class="ttb on"[^>]*onclick="aparModo\('auto'\)"/.test(h0), h0.slice(0, 120));
-      A('aparTema')('onepiece');
-      t('45j: 1 toque num jogo da testada fixa o tema (modo fixo, One Piece) e grava no aparelho', g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === 'onepiece' && lido().temaFixo === 'onepiece' && A('temaAtual')() === 'onepiece', S34(lido()));
+      t('45j: com o padrão ligado a legenda diz "Padrão ligado: o tema segue o jogo filtrado" e a grade de jogos NÃO aparece', h0.includes('<span class="ttModo">Padrão ligado: o tema segue o jogo filtrado</span>') && !h0.includes('ttGrade'), h0.slice(-200));
+      A('aparPadrao')();
       const h1 = A('temaTopoHTML')();
-      t('45j: ...e a testada passa a ser a do One Piece, com o botão do jogo ativo ("on") e só ele', h1.includes('data-tema="onepiece"') && nb(/class="ttb on"/g, h1) === 1 && /class="ttb on"[^>]*onclick="aparTema\('onepiece'\)"/.test(h1), h1.slice(0, 160));
+      t('45j: tocar em "A" DESLIGA o padrão: fixa o tema que valia (Pokémon, sem pular), grava no aparelho e a grade aparece', g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === 'pokemon' && lido().temaModo === 'fixo' && h1.includes('class="ttGrade"') && h1.includes('data-tema="pokemon"') && h1.includes('<span class="ttModo">Padrão desligado: tema fixo · Pokémon</span>') && !/class="ttb on"[^>]*onclick="aparPadrao\(\)"/.test(h1), S34(lido()));
+      t('45j: a grade tem uma bolinha por jogo (P O D Y), a visão geral (★), 🔀, ⏱ e "+" (novo jogo); a do tema ativo está marcada e só ela', nb(/class="ttb/g, h1.slice(h1.indexOf('class="ttGrade"'))) === 8 && nb(/class="ttb on"/g, h1.slice(h1.indexOf('class="ttGrade"'))) === 1 && /class="ttb on"[^>]*onclick="aparTema\('pokemon'\)"/.test(h1) && h1.includes("abrirJogoEditor('','')") && h1.includes('>🔀<') && h1.includes('>⏱<'), h1.slice(h1.indexOf('class="ttGrade"'), h1.indexOf('class="ttGrade"') + 200));
       A('aparTema')('onepiece');
-      t('45j: tocar de novo no jogo ATIVO volta ao automático', g('APAR').temaModo === 'auto', g('APAR').temaModo);
-      A('aparModo')('tela'); t('45j: o botão 🔀 liga "muda a cada tela"', g('APAR').temaModo === 'tela' && lido().temaModo === 'tela', S34(lido()));
+      const h2 = A('temaTopoHTML')();
+      t('45j: 1 toque num jogo da grade fixa o tema (modo fixo, One Piece), grava no aparelho e a testada passa a ser a do One Piece', g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === 'onepiece' && lido().temaFixo === 'onepiece' && A('temaAtual')() === 'onepiece' && h2.includes('data-tema="onepiece"') && /class="ttb on"[^>]*onclick="aparTema\('onepiece'\)"/.test(h2), S34(lido()));
+      A('aparTema')('onepiece');
+      t('45j: tocar de novo no jogo ativo NÃO volta ao automático (quem liga o padrão é o "A")', g('APAR').temaModo === 'fixo', g('APAR').temaModo);
+      A('aparPadrao')();
+      t('45j: tocar em "A" de novo LIGA o padrão (volta a seguir o filtro) e a grade some', g('APAR').temaModo === 'auto' && !A('temaTopoHTML')().includes('ttGrade'), g('APAR').temaModo);
+      A('aparModo')('tela'); t('45j: o botão 🔀 liga "muda a cada tela"', g('APAR').temaModo === 'tela' && lido().temaModo === 'tela' && A('temaTopoHTML')().includes('Padrão desligado: muda a cada tela'), S34(lido()));
       A('aparModo')('tempo'); t('45j: o botão ⏱ liga "muda com o tempo"', g('APAR').temaModo === 'tempo', g('APAR').temaModo);
       A('aparModo')('inexistente'); t('45j: modo que não existe volta ao automático (não quebra a tela)', g('APAR').temaModo === 'auto', g('APAR').temaModo);
       /* a tela de Aparência também escolhe o tema */
@@ -7475,17 +7491,20 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       const nb = (re, s) => (s.match(re) || []).length;
       setg('tela', 'painel'); setg('relJogo', ''); setg('APAR', N({})); setg('MEUS', {});
       A('abrirAparencia')();
-      t('46i: sem imagens suas a tela traz "Minhas imagens", o contador "0 de 12", o campo de arquivo (só imagem) e o botão "+ Adicionar imagem"; os controles de antes continuam (3 caixas, 2 intensidades, 16 listas)',
-        /Minhas imagens/.test(cap) && /0 de 12/.test(cap) && /id="aparFile" accept="image\/\*"/.test(cap) && /\+ Adicionar imagem/.test(cap) && nb(/data-meu=/g, cap) === 0 && nb(/type="checkbox"/g, cap) === 3 && nb(/type="range"/g, cap) === 2 && nb(/<select /g, cap) === 16, '');
+      t('46i: sem imagens suas a tela traz "Minhas imagens", o contador "0 de 12", o campo de arquivo (só imagem) e o botão "+ Adicionar imagem"; os controles de antes continuam (3 caixas, 4 controles deslizantes, 6 listas com nenhum jogo aberto)',
+        /Minhas imagens/.test(cap) && /0 de 12/.test(cap) && /id="aparFile" accept="image\/\*"/.test(cap) && /\+ Adicionar imagem/.test(cap) && nb(/data-meu=/g, cap) === 0 && nb(/type="checkbox"/g, cap) === 3 && nb(/type="range"/g, cap) === 4 && nb(/<select /g, cap) === 6, '');
       setg('MEUS', meus46()); setg('APAR', N({ arte: { 'pokemon:topo': 'u:a1' } }));
       A('abrirAparencia')();
       t('46i: com 2 imagens: 2 linhas, "2 de 12 · 52 KB", cada uma com Inverter, Trocar arquivo e Excluir', nb(/data-meu=/g, cap) === 2 && /2 de 12 · 52 KB/.test(cap) && nb(/↔ Inverter/g, cap) === 2 && nb(/↺ Trocar arquivo/g, cap) === 2 && nb(/🗑 Excluir/g, cap) === 2, String(nb(/data-meu=/g, cap)));
       t('46i: o nome com sinais de HTML aparece escapado (nada é injetado na tela) e o nome normal aparece como está', !/<b>Retrato<\/b>/.test(cap) && /&lt;b&gt;Retrato&lt;\/b&gt;/.test(cap) && /value="Mew meu"/.test(cap), '');
       t('46i: o botão do topo marca "✓" na que está em uso no tema atual (Mew meu no Pokémon) e só nela', nb(/✓ Topo · Pokémon/g, cap) === 1 && nb(/Fundo · Pokémon/g, cap) === 2 && nb(/✓ Fundo/g, cap) === 0, '');
-      t('46i: as listas de cada jogo (topo e fundo) trazem as imagens suas com ★ e o endereço "u:a1"', cap.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0].includes('★ Mew meu') && cap.match(/id="aparF_onepiece"[\s\S]*?<\/select>/)[0].includes('value="u:a1"') && /selected/.test(cap.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0].split('u:a1')[1] || '') , '');
+      setg('_aparJogoSel', 'pokemon'); A('abrirAparencia')(true); const capP = cap;
+      setg('_aparJogoSel', 'onepiece'); A('abrirAparencia')(true); const capO = cap; setg('_aparJogoSel', '');
+      t('46i: as listas do jogo que está aberto (topo e fundo) trazem as imagens suas com ★ e o endereço "u:a1", e a escolhida vem marcada', capP.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0].includes('★ Mew meu') && capO.match(/id="aparF_onepiece"[\s\S]*?<\/select>/)[0].includes('value="u:a1"') && /selected/.test(capP.match(/id="aparT_pokemon"[\s\S]*?<\/select>/)[0].split('u:a1')[1] || ''), '');
+      t('46i: o nome com HTML também sai escapado nas listas de cada jogo (aparecem com o jogo aberto): "★ &lt;b&gt;Retrato&lt;/b&gt;" e nunca o <b> cru', !/<b>Retrato<\/b>/.test(capP) && /★ &lt;b&gt;Retrato&lt;\/b&gt;/.test(capP) && !/<b>Retrato<\/b>/.test(capO), '');
       t('46i: o botão de adicionar manda o alvo "novo" e o de trocar manda o alvo "trocar" com o id da imagem', /aparAlvo\('novo','',''\)/.test(cap) && /aparAlvo\('trocar','a1',''\)/.test(cap) && /aparAlvo\('trocar','b2',''\)/.test(cap), '');
       setg('APAR', N({ imagens: false })); A('abrirAparencia')();
-      t('46i: com as imagens desligadas a lista continua mostrada e usável, e continuam os 4 controles desabilitados de antes (nenhum novo)', nb(/disabled/g, cap) === 4 && nb(/data-meu=/g, cap) === 2, String(nb(/disabled/g, cap)));
+      t('46i: com as imagens desligadas a lista continua mostrada e usável, e continuam os 6 controles desabilitados (topo, fundo e as 4 intensidades/transparências; nenhum novo)', nb(/disabled/g, cap) === 6 && nb(/data-meu=/g, cap) === 2, String(nb(/disabled/g, cap)));
     } finally { ctx.document.body.insertAdjacentHTML = ins; restaura(); }
   });
 
@@ -7495,7 +7514,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
       setg('tela', 'painel'); setg('relJogo', ''); setg('MEUS', meus46()); setg('APAR', N({}));
       const h = A('temaTopoHTML')();
-      t('46j: a testada ganha a engrenagem ⚙ (abre a Aparência) ao lado do ✥ (enquadrar): 2 botões redondos', /class="ttAj ttCfg" onclick="abrirAparencia\(\)"/.test(h) && /class="ttAj" onclick="abrirEnquadrar\(\)"/.test(h) && h.includes('>⚙<') && h.includes('>✥<'), h.slice(-400));
+      t('46j: a testada tem a engrenagem ⚙ (abre a Aparência) no canto e a bolinha ✥ (editar este tema) ao lado do A', /class="ttAj ttCfg" onclick="abrirAparencia\(\)"/.test(h) && /class="ttb"[^>]*onclick="abrirEnquadrar\(\)">✥</.test(h) && h.includes('>⚙<') && h.includes('>✥<'), h.slice(-400));
       A('abrirEnquadrar')('topo');
       t('46j: a folha do enquadramento do TOPO traz a Intensidade do topo (10–100, valor atual 70%), a imagem em uso, "+ Usar uma imagem minha" (alvo = topo), "⚙ Todas as opções" e o campo de arquivo',
         /id="aparEnq"/.test(cap) && /id="apar_opTopo" type="range" min="10" max="100" value="70"/.test(cap) && /oninput="aparNum\('opTopo',this.value\)"/.test(cap) && /Imagem do topo: <b>Mew \(arejado\)<\/b>/.test(cap)
@@ -7541,7 +7560,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       let renders = 0, rasc = false; setg('render', () => { renders++; }); setg('lancarTemRascunho', () => rasc);
       setg('tela', 'painel'); setg('relJogo', ''); setg('APAR', N({}));
       const el = { outerHTML: '<div class="temaTopo">velho</div>' };
-      ctx.document.querySelector = s => (s === '.temaTopo' ? el : null);
+      ctx.document.querySelector = s => (s === '.temaBloco' ? el : null);
       A('aparRefazFaixa')();
       t('46k: com a faixa na tela só ELA é refeita (o elemento é trocado) — o app não é redesenhado', /class="temaTopo" data-tema="pokemon"/.test(el.outerHTML) && renders === 0, el.outerHTML.slice(0, 80) + ' / ' + renders);
       ctx.document.querySelector = () => null;
@@ -7552,7 +7571,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       t('46k: com um formulário em digitação NÃO redesenha (não apaga o que a pessoa está escrevendo)', renders === 0, String(renders));
       rasc = false; renders = 0; setg('APAR', N({ imagens: false }));
       const el2 = { outerHTML: '<div class="temaTopo">velho</div>' };
-      ctx.document.querySelector = s => (s === '.temaTopo' ? el2 : null);
+      ctx.document.querySelector = s => (s === '.temaBloco' ? el2 : null);
       A('aparRefazFaixa')();
       t('46k: com as imagens desligadas a faixa precisa SUMIR: não troca o elemento, redesenha', el2.outerHTML === '<div class="temaTopo">velho</div>' && renders === 1, String(renders));
       ctx.document.querySelector = qs;
@@ -7569,7 +7588,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       /* ao ABRIR o app: a imagem chega e só a faixa é refeita (o formulário que a pessoa já começou fica) */
       setg('MEUS', {}); setg('APAR', N({ arte: { 'pokemon:topo': 'u:x1' } })); renders = 0;
       const elx = { outerHTML: '<div class="temaTopo">velho</div>' };
-      ctx.document.querySelector = s => (s === '.temaTopo' ? elx : null);
+      ctx.document.querySelector = s => (s === '.temaBloco' ? elx : null);
       setg('aparDbTodos', cb => cb([{ id: 'x1', nome: 'U', blob: { size: 1 }, w: 4, h: 3, em: 1 }]));
       A('aparCarregaMeus')();
       t('46k: ao abrir o app a imagem sua chega e SÓ a faixa é refeita, já com a imagem (o app não é redesenhado)', /blob:x/.test(elx.outerHTML) && /class="temaTopo"/.test(elx.outerHTML) && renders === 0, elx.outerHTML.slice(0, 100) + ' / ' + renders);
@@ -7675,16 +7694,16 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       setg('APAR', N({})); setg('MEUS', meus46());
       A('abrirAparencia')();
       t('46n: na tela de Aparência as duas intensidades e "Minhas imagens" vêm ANTES dos seletores de tema e das listas por jogo (no celular o botão de adicionar tem de aparecer sem rolar até o fim)',
-        pos('id="apar_opTopo"') > 0 && pos('id="apar_opTopo"') < pos('Minhas imagens') && pos('Minhas imagens') < pos('id="aparTemaModo"') && pos('id="aparTemaModo"') < pos('Imagem de cada jogo'), S34([pos('id="apar_opTopo"'), pos('Minhas imagens'), pos('id="aparTemaModo"'), pos('Imagem de cada jogo')]));
+        pos('id="apar_opTopo"') > 0 && pos('id="apar_opTopo"') < pos('Minhas imagens') && pos('Minhas imagens') < pos('id="aparTemaModo"') && pos('id="aparTemaModo"') < pos('Jogos e imagens'), S34([pos('id="apar_opTopo"'), pos('Minhas imagens'), pos('id="aparTemaModo"'), pos('Jogos e imagens')]));
       t('46n: o botão "+ Adicionar imagem" fica ACIMA da lista de imagens (com muitas imagens ele não desce para baixo da dobra)', pos('+ Adicionar imagem') > 0 && pos('+ Adicionar imagem') < pos('data-meu='), S34([pos('+ Adicionar imagem'), pos('data-meu=')]));
       t('46n: o texto de "Minhas imagens" diz o limite verdadeiro: traço escuro em fundo liso funciona; imagem colorida vira silhueta de uma cor só; ficam só no aparelho e só a versão convertida; limpar os dados do navegador apaga',
         /traço escuro em fundo liso/.test(cap) && /imagem colorida vira uma silhueta de uma cor só/.test(cap) && /só a versão convertida/.test(cap) && /limpar os dados do navegador, elas somem/.test(cap), '');
-      t('46n: "Restaurar o padrão" avisa que as imagens próprias continuam guardadas na lista', /suas imagens continuam guardadas na lista/.test(cap), '');
+      t('46n: "Restaurar o padrão" avisa que as imagens próprias continuam guardadas na lista', /seus jogos e suas imagens continuam guardados/.test(cap), '');
       /* a folha do enquadramento */
       A('abrirEnquadrar')('topo');
       t('46n: na folha do enquadramento a intensidade e os botões de imagem vêm ANTES dos controles de posição (a folha é baixa no celular)',
         pos('id="apar_opTopo"') > 0 && pos('id="apar_opTopo"') < pos('+ Usar uma imagem minha') && pos('+ Usar uma imagem minha') < pos('id="aparaj_x"'), S34([pos('id="apar_opTopo"'), pos('+ Usar uma imagem minha'), pos('id="aparaj_x"')]));
-      t('46n: a folha diz a verdade sobre o alcance: posição e zoom só deste jogo, intensidade de todos os jogos', /Posição e zoom valem só para este jogo; a intensidade vale para todos os jogos/.test(cap) && !/Vale só para este jogo, neste aparelho/.test(cap), cap.slice(0, 240));
+      t('46n: a folha diz a verdade sobre o alcance: posição e zoom só deste jogo, intensidade de todos os jogos', /Posição e zoom: só deste jogo\. Intensidade e caixas: de todos os jogos/.test(cap) && !/Vale só para este jogo, neste aparelho/.test(cap), cap.slice(0, 240));
       /* a conexão com o aparelho */
       const fakeAbort = () => ({ transaction: () => { const tx = { objectStore: () => ({ count: () => ({}), put() {}, get: () => ({}) }) }; Promise.resolve().then(() => { if (tx.onabort) tx.onabort(); }); return tx; } });
       setg('_aparDb', fakeAbort()); let rr = null;
@@ -7697,6 +7716,340 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       dbx.onclose();
       t('46n: conexão que o navegador fecha sozinho (onclose) é esquecida', g('_aparDb') === null, '');
     } finally { ctx.document.body.insertAdjacentHTML = ins; ctx.indexedDB = indexedDBorig; restaura(); }
+  });
+
+  /* ===== 47. JOGOS NOVOS, TESTADA EM 2 TOQUES E CAIXAS TRANSLÚCIDAS (14/10/2026) =====
+     Pedido do Felype: (1) podem surgir jogos novos (Lorcana, Naruto, Magic) e o app tem de nascer pronto para isso — criar, editar e excluir; (2) a testada em 2 toques: fechada só "A" (o padrão, liga/desliga) e
+     "✥" (editar); desligando o padrão aparece a grade com a inicial de cada jogo; (3) a tela de Aparência primeiro pergunta QUAL jogo (bolinhas + "+"); (4) caixas translúcidas, só o fundo da caixa, com
+     nível do Painel separado do das demais telas. O catálogo dos temas é DADO: um jogo novo de fábrica é UMA entrada em TEMAS. */
+  console.log('');
+  console.log('=== 47. jogos novos (criar/editar/excluir), testada em 2 toques, caixas translúcidas ===');
+  const FUNCS47 = ['aparNormaliza', 'aparHsl', 'aparCoresDe', 'aparTemaUsuario', 'aparTemaDe', 'aparChaves', 'aparRota', 'temaChave', 'aparPadrao', 'aparModoTexto', 'temaGradeHTML', 'abrirJogoEditor', 'aparJogoSalva',
+    'aparJogoExclui', 'aparJogoCancela', 'aparJogoEscolhe', 'aparJogoAjustar', 'aparCorSugerida', 'aparReset', 'aparBolinha', 'aparCorBolinha'];
+  const faltam47 = FUNCS47.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
+  t('47a: [pré-requisito] o app carregado tem as ' + FUNCS47.length + ' funções desta seção', faltam47.length === 0, 'FALTAM no app: ' + faltam47.join(', '));
+  const bloco47 = (rot, corpo) => faltam47.length ? Promise.resolve() : bloco34(rot, corpo, '47');
+  const guarda47 = (...fns) => {
+    const o = { apar: g('APAR'), sel: g('_aparJogoSel'), volta: g('_aparJogoVolta'), tela: g('tela'), rel: g('relJogo'), meus: g('MEUS'), fns: fns.map(n => [n, g(n)]), conf: ctx.confirm, geb: ctx.document.getElementById, ins: ctx.document.body.insertAdjacentHTML };
+    return () => { setg('APAR', o.apar); setg('_aparJogoSel', o.sel); setg('_aparJogoVolta', o.volta); setg('tela', o.tela); setg('relJogo', o.rel); setg('MEUS', o.meus); o.fns.forEach(([n, f]) => setg(n, f)); ctx.confirm = o.conf; ctx.document.getElementById = o.geb; ctx.document.body.insertAdjacentHTML = o.ins; };
+  };
+  const L47 = { xlorc1: { nome: 'Lorcana', letra: 'L', cor: '#2e86c1' }, xnaru2: { nome: 'Naruto', letra: 'N', cor: '#d68910' } };
+
+  await bloco47('b', () => {
+    const restaura = guarda47(), N = A('aparNorm');
+    try {
+      t('47b: normalizar tira acento, maiúscula e espaço sobrando', A('aparNormaliza')('  YU-Gi-Oh!  Çá ') === 'yu-gi-oh! ca' && A('aparNormaliza')(null) === '', A('aparNormaliza')('  YU-Gi-Oh!  Çá '));
+      const H = A('aparHsl');
+      t('47b: HSL vira #rrggbb nos cinco pontos conhecidos (vermelho, verde, azul, branco, preto)', H(0, 100, 50) === '#ff0000' && H(120, 100, 50) === '#00ff00' && H(240, 100, 50) === '#0000ff' && H(0, 0, 100) === '#ffffff' && H(0, 0, 0) === '#000000', S34([H(0, 100, 50), H(120, 100, 50), H(240, 100, 50)]));
+      const C = A('aparCoresDe'), c1 = C('#c0392b'), lum = x => 0.299 * parseInt(x.slice(1, 3), 16) + 0.587 * parseInt(x.slice(3, 5), 16) + 0.114 * parseInt(x.slice(5, 7), 16);
+      t('47b: de UMA cor saem as cinco cores do tema (#rrggbb); a tinta é mais escura que o fundo claro, a tinta do tema escuro é mais clara que a tinta, e o fundo 1 é mais claro que o 2',
+        ['ink', 'inkEsc', 'ac', 'bg1', 'bg2'].every(k => /^#[0-9a-f]{6}$/.test(c1[k])) && lum(c1.ink) < lum(c1.bg1) && lum(c1.inkEsc) > lum(c1.ink) && lum(c1.bg1) > lum(c1.bg2), S34(c1));
+      t('47b: a matiz da cor é mantida (um vermelho continua vermelho: mais R que G na tinta), é determinística e cor inválida cai na cor padrão',
+        parseInt(c1.ink.slice(1, 3), 16) > parseInt(c1.ink.slice(3, 5), 16) && S34(C('#c0392b')) === S34(c1) && S34(C('xyz')) === S34(C('#5a4fcf')) && S34(C(null)) === S34(C('#5a4fcf')), S34([C('xyz'), C('#5a4fcf')]));
+      const cz = C('#808080');
+      t('47b: um cinza continua cinza (sem tingir de vermelho): R = G = B na tinta e no destaque', cz.ink.slice(1, 3) === cz.ink.slice(3, 5) && cz.ink.slice(3, 5) === cz.ink.slice(5, 7) && cz.ac.slice(1, 3) === cz.ac.slice(5, 7), S34(cz));
+      /* a normalização dos jogos criados */
+      const J = N({ jogos: { xlorc1: { nome: '  Lorcana  ', letra: 'lx', cor: '#2E86C1' }, abc: { nome: 'sem x', letra: 'A', cor: '#000000' }, 'x!!': { nome: 'simbolo', letra: 'A' }, xvazio: { nome: '   ' }, xnaoobj: 5, xsemcor: { nome: 'Magic' }, xlongo: { nome: 'N'.repeat(40), letra: '', cor: 'azul' }, __proto__: { nome: 'x' } } }).jogos;
+      t('47b: jogo criado: nome sem espaço sobrando, letra = 1 só e maiúscula, cor em minúsculas; chave que não começa com "x", com símbolo, nome vazio e valor que não é objeto são descartados',
+        J.xlorc1 && J.xlorc1.nome === 'Lorcana' && J.xlorc1.letra === 'L' && J.xlorc1.cor === '#2e86c1' && !('abc' in J) && !('x!!' in J) && !('xvazio' in J) && !('xnaoobj' in J), S34(J));
+      t('47b: sem cor ou com cor inválida vale a cor padrão; sem letra vale a inicial do nome (maiúscula); nome com mais de 24 letras é cortado em 24', J.xsemcor.cor === '#5a4fcf' && J.xsemcor.letra === 'M' && J.xlongo.cor === '#5a4fcf' && J.xlongo.nome.length === 24 && J.xlongo.letra === 'N', S34([J.xsemcor, J.xlongo]));
+      const muitos = {}; for (let i = 0; i < 20; i++) muitos['x' + i] = { nome: 'Jogo ' + i };
+      t('47b: a chave "__proto__" vinda de um JSON (propriedade própria) também é descartada', S34(N(JSON.parse('{"jogos":{"__proto__":{"nome":"x"},"xok":{"nome":"Ok"}}}')).jogos) === '{"xok":{"nome":"Ok","letra":"O","cor":"#5a4fcf"}}', S34(N(JSON.parse('{"jogos":{"__proto__":{"nome":"x"},"xok":{"nome":"Ok"}}}')).jogos));
+      t('47b: no máximo 12 jogos criados (o resto é descartado)', Object.keys(N({ jogos: muitos }).jogos).length === 12, String(Object.keys(N({ jogos: muitos }).jogos).length));
+      t('47b: sem nada guardado não há jogo criado e as caixas ficam como antes (10% de transparência no Painel e nas outras telas)', S34(N({}).jogos) === '{}' && N({}).trPainel === 10 && N({}).trOutras === 10 && S34(N(undefined)) === S34(N({})), '');
+      const k = N({ jogos: { xlorc1: L47.xlorc1 }, arte: { 'xlorc1:topo': 'u:a1', 'xnada:topo': 'x', 'pokemon:topo': 'mew-denso' }, aj: { 'xlorc1:topo': { x: 9, y: 0, z: 100 }, 'xnada:topo': { x: 9 } }, temaFixo: 'xlorc1' });
+      t('47b: escolha de imagem e enquadramento valem para a chave de um jogo CRIADO; chave que não existe é descartada; o tema fixo pode ser um jogo criado', k.arte['xlorc1:topo'] === 'u:a1' && !('xnada:topo' in k.arte) && k.arte['pokemon:topo'] === 'mew-denso' && k.aj['xlorc1:topo'].x === 9 && !('xnada:topo' in k.aj) && k.temaFixo === 'xlorc1', S34(k));
+      t('47b: se o jogo criado some, o tema fixo e as escolhas dele somem junto (volta ao Pokémon)', N({ temaFixo: 'xlorc1', arte: { 'xlorc1:topo': 'u:a1' } }).temaFixo === 'pokemon' && S34(N({ temaFixo: 'xlorc1', arte: { 'xlorc1:topo': 'u:a1' } }).arte) === '{}', '');
+      t('47b: transparência das caixas é presa entre 0 e 80 (200 vira 80, -5 vira 0) e aceita texto numérico', N({ trPainel: 200 }).trPainel === 80 && N({ trOutras: -5 }).trOutras === 0 && N({ trPainel: '35' }).trPainel === 35, S34([N({ trPainel: 200 }).trPainel, N({ trOutras: -5 }).trOutras]));
+    } finally { restaura(); }
+  });
+
+  await bloco47('c', () => {
+    const restaura = guarda47(), N = A('aparNorm'), T = g('TEMAS'), noTemas = Object.assign({}, { geral: 1 });
+    try {
+      const sem = N({}), com = N({ jogos: L47 });
+      t('47c: o catálogo de fábrica, na ordem: Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh! e, por último, a visão geral', S34(A('aparChaves')(sem)) === '["pokemon","onepiece","dragonball","yugioh","geral"]', S34(A('aparChaves')(sem)));
+      t('47c: os jogos criados entram DEPOIS dos de fábrica, na ordem de criação, e antes da visão geral; a rota (muda a cada tela / com o tempo) inclui eles e nunca a visão geral',
+        S34(A('aparChaves')(com)) === '["pokemon","onepiece","dragonball","yugioh","xlorc1","xnaru2","geral"]' && S34(A('aparRota')(com)) === '["pokemon","onepiece","dragonball","yugioh","xlorc1","xnaru2"]', S34(A('aparChaves')(com)));
+      const tl = A('aparTemaDe')(com, 'xlorc1');
+      t('47c: o tema de um jogo criado tem o nome, a letra, as cores derivadas da cor dele, nenhuma arte de fábrica, padrão sem imagem e a marca "usuario"', tl && tl.rot === 'Lorcana' && tl.letra === 'L' && /^#[0-9a-f]{6}$/.test(tl.ink) && tl.ink === A('aparCoresDe')('#2e86c1').ink && S34(tl.artes) === '{}' && tl.padrao.topo === '' && tl.padrao.fundo === '' && tl.usuario === true, S34(tl));
+      t('47c: o tema de fábrica é o próprio objeto do catálogo; chave que não existe, nomes herdados ("constructor", "__proto__", "toString") e valor que não é texto dão nulo',
+        A('aparTemaDe')(sem, 'pokemon') === T.pokemon && A('aparTemaDe')(com, 'xzz') === null && A('aparTemaDe')(com, 'constructor') === null && A('aparTemaDe')(com, '__proto__') === null && A('aparTemaDe')(com, 'toString') === null && A('aparTemaDe')(com, null) === null && A('aparTemaDe')(com, 5) === null, '');
+      /* o filtro de jogo -> tema */
+      const Q = n => A('temaChave')(n, com);
+      t('47c: o nome do filtro vira o tema: criado com o MESMO nome (sem acento e sem maiúscula), criado contido no nome ("Lorcana Illumineers"), de fábrica pelos pedaços de `casa` ("Dragon Ball Super", "Pokemon TCG", "One Piece", "Yu-Gi-Oh"), senão a visão geral',
+        Q('lorcana') === 'xlorc1' && Q('LORCANA') === 'xlorc1' && Q('Lorcana Illumineers') === 'xlorc1' && Q('Naruto') === 'xnaru2' && Q('Dragon Ball Super') === 'dragonball' && Q('Pokemon TCG') === 'pokemon' && Q('One Piece') === 'onepiece' && Q('Yu-Gi-Oh') === 'yugioh' && Q('Magic') === 'geral' && Q('') === 'geral' && Q(null) === 'geral', S34(['lorcana', 'Lorcana Illumineers', 'Magic'].map(Q)));
+      const dq = N({ jogos: { xdq: { nome: 'Dragon Quest', letra: 'Q' } } });
+      t('47c: um jogo de FÁBRICA ganha de um criado com nome parecido ("Dragon Quest" casa com o Dragon Ball — por isso criar um nome assim é recusado); "Dragon Ball Super" continua sendo o de fábrica', A('temaChave')('Dragon Quest', dq) === 'dragonball' && A('temaChave')('Dragon Ball Super', dq) === 'dragonball', S34([A('temaChave')('Dragon Quest', dq), A('temaChave')('Dragon Ball Super', dq)]));
+      const mo = N({ jogos: { xa: { nome: 'Magic', letra: 'M' }, xb: { nome: 'Magic Online', letra: 'O' } } });
+      t('47c: entre dois jogos CRIADOS, o de nome EXATO ganha do que só está contido ("Magic Online" é o xb mesmo o "Magic" tendo sido criado antes); "Magic: The Gathering" cai no "Magic"', A('temaChave')('Magic Online', mo) === 'xb' && A('temaChave')('Magic: The Gathering', mo) === 'xa' && A('temaChave')('magic', mo) === 'xa', S34([A('temaChave')('Magic Online', mo), A('temaChave')('magic', mo)]));
+      const mg = N({ jogos: { xmg: { nome: 'Magic', letra: 'M' } } });
+      t('47c: "Magic: The Gathering" cai no jogo criado "Magic" (o nome criado está contido no pedido)', A('temaChave')('Magic: The Gathering', mg) === 'xmg', A('temaChave')('Magic: The Gathering', mg));
+      /* o tema atual acompanha o filtro e a rota */
+      setg('tela', 'painel'); setg('relJogo', 'Lorcana'); setg('APAR', N({ jogos: L47 }));
+      t('47c: no modo padrão, filtrar por "Lorcana" liga o tema do jogo criado', A('temaAtual')() === 'xlorc1', A('temaAtual')());
+      setg('relJogo', ''); setg('APAR', N({ jogos: L47, temaModo: 'fixo', temaFixo: 'xnaru2' }));
+      t('47c: com o tema fixo num jogo criado, ele vale (e o filtro de jogo é ignorado)', A('temaAtual')() === 'xnaru2', A('temaAtual')());
+      setg('APAR', N({ jogos: L47, temaModo: 'tempo', temaMin: 30 }));
+      congela(2026, 10, 14, 10, 0); const a0 = A('temaAtual')(); congela(2026, 10, 14, 10, 31); const a1 = A('temaAtual')(); congela(2026, 10, 14, 11, 5); const a2 = A('temaAtual')(); descongela();
+      const rota = A('aparRota')(g('APAR'));
+      t('47c: "muda com o tempo" gira por TODOS os temas, inclusive os criados (6 na rota) — de 30 em 30 minutos', rota.length === 6 && rota.includes(a0) && a1 === rota[(rota.indexOf(a0) + 1) % 6] && a2 === rota[(rota.indexOf(a0) + 2) % 6], S34([a0, a1, a2]));
+      setg('APAR', N({ jogos: L47 })); setg('relJogo', 'Lorcana'); setg('tela', 'painel');
+      A('aparPadrao')();
+      t('47c: desligar o padrão FIXA o tema que estava valendo pelo filtro (Lorcana), sem a tela pular; ligar de novo volta a seguir o filtro', g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === 'xlorc1', S34(g('APAR')));
+      setg('relJogo', 'Naruto'); t('47c: ...e agora o filtro é ignorado (continua Lorcana)', A('temaAtual')() === 'xlorc1', A('temaAtual')());
+      A('aparPadrao')(); t('47c: ligar o padrão volta a seguir o filtro (Naruto)', g('APAR').temaModo === 'auto' && A('temaAtual')() === 'xnaru2', S34([g('APAR').temaModo, A('temaAtual')()]));
+      setg('APAR', N({})); setg('relJogo', 'One Piece');
+      A('aparPadrao')(); const fixoDuranteFiltro = g('APAR').temaFixo, lembrado = g('APAR').padraoSem;
+      A('aparTema')('dragonball');
+      A('aparPadrao')(); setg('relJogo', '');
+      t('47c: desligar o padrão com um filtro ativo (One Piece) fixa o tema do filtro MAS lembra o tema de quando não há filtro (Pokémon); ligar de novo devolve esse tema — o "sem filtro" não muda calado',
+        fixoDuranteFiltro === 'onepiece' && lembrado === 'pokemon' && g('APAR').temaModo === 'auto' && g('APAR').temaFixo === 'pokemon' && g('APAR').padraoSem === '' && A('temaAtual')() === 'pokemon', S34([fixoDuranteFiltro, lembrado, g('APAR').temaFixo, g('APAR').padraoSem]));
+    } finally { descongela(); restaura(); }
+  });
+
+  await bloco47('d', () => {
+    const restaura = guarda47(), N = A('aparNorm'), CSS = A('aparenciaCSS'), T = g('TEMAS');
+    try {
+      /* UM jogo novo de fábrica = UMA entrada no catálogo: nada mais precisa mudar */
+      T.lorcana = { rot: 'Lorcana', sub: 'tinteiro', letra: 'L', casa: ['lorcana'], ink: '#222266', inkEsc: '#bbbbee', ac: '#3333aa', bg1: '#f8f8ff', bg2: '#ddddf5', artes: { meu: { rot: 'Meu desenho', svg: 'meu-geral.svg' } }, padrao: { topo: 'meu', fundo: '' } };
+      setg('tela', 'painel'); setg('relJogo', ''); setg('APAR', N({}));
+      t('47d: entrada nova no catálogo entra nas chaves (antes da visão geral), na rota e no casamento do filtro ("Lorcana TCG"), sem mexer em mais nada',
+        S34(A('aparChaves')(g('APAR'))) === '["pokemon","onepiece","dragonball","yugioh","lorcana","geral"]' && A('aparRota')(g('APAR')).includes('lorcana') && A('temaChave')('Lorcana TCG', g('APAR')) === 'lorcana', S34(A('aparChaves')(g('APAR'))));
+      t('47d: o tema fixo e as escolhas de imagem aceitam a chave nova (a normalização lê o catálogo, não uma lista escrita à mão)', N({ temaFixo: 'lorcana', arte: { 'lorcana:topo': 'meu' } }).temaFixo === 'lorcana' && N({ arte: { 'lorcana:topo': 'meu' } }).arte['lorcana:topo'] === 'meu', '');
+      const c = CSS(N({}), 'lorcana', false, 170);
+      t('47d: o desenho do tema novo sai com o nome, as cores e a imagem do catálogo', c.chave === 'lorcana' && c.rot === 'Lorcana' && c.ink === '#222266' && c.topo && c.topo.tipo === 'svg', S34(c));
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'lorcana' }));
+      const h = A('temaTopoHTML')();
+      t('47d: a testada, a grade (bolinha "L") e o "Tema fixo" da Aparência já mostram o jogo novo', h.includes('data-tema="lorcana"') && h.includes('aparTema(\'lorcana\')') && h.includes('>L<'), h.slice(-300));
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, hh) => { cap = hh; };
+      A('abrirAparencia')();
+      t('47d: ...e a fileira de jogos e a lista de tema fixo da tela de Aparência também', /Jogo Lorcana/.test(cap) && /<option value="lorcana"[^>]*>Lorcana<\/option>/.test(cap), '');
+    } finally { delete T.lorcana; restaura(); }
+    t('47d: [limpeza] o catálogo voltou ao que era (sem o jogo de teste)', !('lorcana' in g('TEMAS')) && S34(A('aparChaves')(A('aparNorm')({}))) === '["pokemon","onepiece","dragonball","yugioh","geral"]', '');
+  });
+
+  await bloco47('e', () => {
+    const restaura = guarda47('toast', 'render', 'abrirAparencia', 'abrirEnquadrar', 'aparRedesenha'), N = A('aparNorm'), lido = () => JSON.parse(ctx.localStorage.getItem('tcg_aparencia') || 'null');
+    try {
+      const toasts = []; setg('toast', m => { toasts.push(String(m)); });
+      let renders = 0, aparencias = 0, enquadros = 0; setg('render', () => { renders++; }); setg('abrirAparencia', () => { aparencias++; }); setg('abrirEnquadrar', () => { enquadros++; }); setg('aparRedesenha', () => { aparencias++; });
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      setg('APAR', N({})); setg('_aparJogoSel', ''); setg('tela', 'painel'); setg('relJogo', '');
+      /* a janela de criar */
+      A('abrirJogoEditor')('', '');
+      t('47e: a janela de novo jogo tem nome, letra e cor (com dica em todos), "Criar jogo" e Cancelar — e NÃO tem excluir (não há o que excluir ainda)',
+        /id="aparJogoEd">\+ Novo jogo</.test(cap) && /id="aparJ_nome"/.test(cap) && /id="aparJ_letra"/.test(cap) && /id="aparJ_cor" type="color"/.test(cap) && /Criar jogo/.test(cap) && /Cancelar/.test(cap) && !/Excluir jogo/.test(cap) && (cap.match(/title="/g) || []).length >= 5, cap.slice(0, 140));
+      const campos = {}; ctx.document.getElementById = id => ({ value: campos[id], remove() {} });
+      campos.aparJ_nome = '   '; campos.aparJ_letra = ''; campos.aparJ_cor = '#2e86c1';
+      A('aparJogoSalva')('');
+      t('47e: sem nome não cria e avisa', Object.keys(g('APAR').jogos).length === 0 && /Escreva o nome/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      campos.aparJ_nome = 'Pokémon';
+      A('aparJogoSalva')('');
+      t('47e: nome de um jogo de fábrica (mesmo com outro acento/maiúscula) é recusado: "Já existe um jogo com esse nome"', Object.keys(g('APAR').jogos).length === 0 && /Já existe/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      campos.aparJ_nome = 'Yu-Gi-Oh';
+      A('aparJogoSalva')('');
+      t('47e: o nome "Yu-Gi-Oh" (sem o "!", como o app costuma chamar o jogo) é recusado — já tem tema pronto; senão o jogo criado tiraria o tema de fábrica do lugar', Object.keys(g('APAR').jogos).length === 0 && /já tem tema pronto \(Yu-Gi-Oh!\)/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      campos.aparJ_nome = 'Pokemon TCG'; A('aparJogoSalva')('');
+      t('47e: "Pokemon TCG" também é recusado (casa com o Pokémon)', Object.keys(g('APAR').jogos).length === 0 && /já tem tema pronto \(Pokémon\)/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      campos.aparJ_nome = 'Dragon Quest'; A('aparJogoSalva')('');
+      t('47e: "Dragon Quest" (casa com o Dragon Ball) é recusado', Object.keys(g('APAR').jogos).length === 0 && /já tem tema pronto \(Dragon Ball\)/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      campos.aparJ_nome = ' Lorcana ';
+      setg('_aparJogoVolta', '');
+      A('aparJogoSalva')('');
+      const ks = Object.keys(g('APAR').jogos), k = ks[0];
+      t('47e: criar guarda o jogo (nome sem espaço, letra = inicial, cor), já passa a usar o tema dele (modo fixo), grava no aparelho, NÃO abre o painel dele (foi criado pela testada) e avisa',
+        ks.length === 1 && /^x[a-z0-9]+$/.test(k) && g('APAR').jogos[k].nome === 'Lorcana' && g('APAR').jogos[k].letra === 'L' && g('APAR').jogos[k].cor === '#2e86c1' && g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === k
+        && lido().jogos[k].nome === 'Lorcana' && g('_aparJogoSel') === '' && /Jogo criado/.test(toasts[toasts.length - 1]) && renders >= 1, S34([g('APAR').jogos, g('APAR').temaModo]));
+      t('47e: criado pela testada (sem "voltar" para a Aparência) não abre a tela de Aparência por cima', aparencias === 0, String(aparencias));
+      campos.aparJ_nome = 'lorcana';
+      A('aparJogoSalva')('');
+      t('47e: criar outro com o mesmo nome (sem maiúscula) é recusado', Object.keys(g('APAR').jogos).length === 1 && /Já existe/.test(toasts[toasts.length - 1]), '');
+      /* editar */
+      A('abrirJogoEditor')(k, 'apar');
+      t('47e: a janela de editar traz o que já foi guardado, "Salvar" e "Excluir jogo"', /id="aparJogoEd">✎ Editar jogo</.test(cap) && /value="Lorcana"/.test(cap) && /value="L"/.test(cap) && /value="#2e86c1"/.test(cap) && />Salvar</.test(cap) && /Excluir jogo/.test(cap), cap.slice(0, 160));
+      campos.aparJ_nome = 'Lorcana TCG'; campos.aparJ_letra = 'q'; campos.aparJ_cor = '#27ae60';
+      setg('_aparJogoVolta', 'apar'); aparencias = 0;
+      A('aparJogoSalva')(k);
+      t('47e: editar muda nome, letra e cor SEM trocar a chave (as escolhas de imagem dele continuam), não muda o tema em uso, grava e volta para a tela de Aparência quando veio dela',
+        Object.keys(g('APAR').jogos).length === 1 && g('APAR').jogos[k].nome === 'Lorcana TCG' && g('APAR').jogos[k].letra === 'Q' && g('APAR').jogos[k].cor === '#27ae60' && lido().jogos[k].nome === 'Lorcana TCG' && /atualizado/.test(toasts[toasts.length - 1]) && aparencias === 1, S34(g('APAR').jogos));
+      campos.aparJ_nome = 'Naruto'; campos.aparJ_letra = ''; A('aparJogoSalva')('');
+      campos.aparJ_nome = 'lorcana tcg'; A('aparJogoSalva')(Object.keys(g('APAR').jogos)[1]);
+      t('47e: renomear um jogo para o nome de OUTRO é recusado; salvar um jogo com o próprio nome é permitido', Object.keys(g('APAR').jogos).length === 2 && /Já existe/.test(toasts[toasts.length - 1]) && g('APAR').jogos[Object.keys(g('APAR').jogos)[1]].nome === 'Naruto', S34(g('APAR').jogos));
+      campos.aparJ_nome = 'Lorcana TCG'; A('aparJogoSalva')(k);
+      t('47e: ...salvar com o próprio nome passa', /atualizado/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      /* o limite */
+      const cheio = {}; for (let i = 0; i < 12; i++) cheio['x' + i] = { nome: 'J' + i, letra: 'J', cor: '#112233' };
+      setg('APAR', N({ jogos: cheio })); campos.aparJ_nome = 'Treze'; A('aparJogoSalva')('');
+      t('47e: com 12 jogos criados não cria o 13º e pede para excluir algum', Object.keys(g('APAR').jogos).length === 12 && /Limite de 12/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      /* cancelar */
+      setg('_aparJogoVolta', 'apar'); aparencias = 0; A('aparJogoCancela')();
+      t('47e: cancelar volta à Aparência quando veio de lá e não cria nada', aparencias === 1 && Object.keys(g('APAR').jogos).length === 12, '');
+      setg('_aparJogoVolta', ''); aparencias = 0; A('aparJogoCancela')();
+      t('47e: cancelar quando veio da testada só fecha', aparencias === 0, '');
+      setg('APAR', N({})); setg('_aparJogoSel', ''); setg('_aparJogoVolta', 'apar'); campos.aparJ_nome = 'Magic'; campos.aparJ_letra = ''; aparencias = 0;
+      A('aparJogoSalva')('');
+      const kM = Object.keys(g('APAR').jogos)[0];
+      t('47e: criado pela tela de Aparência (volta = apar) o painel do jogo novo fica aberto para escolher as imagens, e a tela é reaberta mantendo o painel', !!kM && g('_aparJogoSel') === kM && aparencias === 1, S34([kM, g('_aparJogoSel'), aparencias]));
+      /* excluir */
+      setg('APAR', N({ jogos: L47, arte: { 'xlorc1:topo': 'u:a1', 'xnaru2:fundo': 'u:b2' }, aj: { 'xlorc1:topo': { x: 9, y: 0, z: 100 } }, temaModo: 'fixo', temaFixo: 'xlorc1' })); setg('_aparJogoSel', 'xlorc1'); setg('_aparJogoVolta', 'apar');
+      ctx.confirm = () => false; A('aparJogoExclui')('xlorc1');
+      t('47e: dizer "não" na pergunta de excluir não apaga o jogo', !!g('APAR').jogos.xlorc1 && g('APAR').temaFixo === 'xlorc1', '');
+      ctx.confirm = (m) => { toasts.push('PERGUNTA: ' + m); return true; }; aparencias = 0;
+      A('aparJogoExclui')('xlorc1');
+      t('47e: excluir tira o jogo, as escolhas de imagem e o enquadramento dele (o do outro jogo fica), volta o tema fixo para o Pokémon, fecha o painel aberto dele, grava e avisa — a pergunta diz que as imagens enviadas continuam guardadas',
+        !g('APAR').jogos.xlorc1 && !!g('APAR').jogos.xnaru2 && !('xlorc1:topo' in g('APAR').arte) && g('APAR').arte['xnaru2:fundo'] === 'u:b2' && !('xlorc1:topo' in g('APAR').aj) && g('APAR').temaFixo === 'pokemon' && g('_aparJogoSel') === '' && !lido().jogos.xlorc1
+        && /Jogo excluído/.test(toasts[toasts.length - 1]) && toasts.some(x => /PERGUNTA: Excluir o jogo "Lorcana"/.test(x) && /imagens que você enviou continuam guardadas/.test(x)) && aparencias === 1, S34([g('APAR').jogos, g('APAR').temaFixo]));
+      A('aparJogoExclui')('nao-existe'); A('aparJogoExclui')('pokemon'); A('aparJogoExclui')('constructor');
+      t('47e: excluir um jogo que não existe, um de fábrica ou um nome herdado não faz nada', !!g('APAR').jogos.xnaru2 && Object.keys(g('APAR').jogos).length === 1, '');
+      setg('APAR', N({ jogos: L47 })); A('aparSet')('jogos', { xhack: { nome: 'Hack' } });
+      t('47e: o controle genérico de ajuste não deixa criar jogo por fora do fluxo de criar/editar (aparSet("jogos") é ignorado)', S34(Object.keys(g('APAR').jogos)) === '["xlorc1","xnaru2"]', S34(Object.keys(g('APAR').jogos)));
+      setg('APAR', N({ jogos: { xaspa: { nome: '"><i>x', letra: 'X', cor: '#112233' } } })); A('abrirJogoEditor')('xaspa', '');
+      t('47e: o nome do jogo no campo do editor sai escapado (aspas e < não quebram a janela)', /value="&quot;&gt;&lt;i&gt;x"/.test(cap) && !/<i>x/.test(cap), cap.slice(cap.indexOf('aparJ_nome'), cap.indexOf('aparJ_nome') + 140));
+      setg('APAR', N({ jogos: L47 }));
+      /* abrir/fechar o painel do jogo e ajustar */
+      setg('_aparJogoSel', ''); A('aparJogoEscolhe')('xnaru2');
+      t('47e: tocar na bolinha do jogo abre o painel dele; tocar de novo fecha (minimiza)', g('_aparJogoSel') === 'xnaru2', g('_aparJogoSel'));
+      A('aparJogoEscolhe')('xnaru2');
+      t('47e: ...de novo fecha', g('_aparJogoSel') === '', g('_aparJogoSel'));
+      renders = 0; enquadros = 0; A('aparJogoAjustar')('xnaru2');
+      t('47e: "Enquadrar e ajustar" do painel passa a usar o jogo como tema (fixo) e abre a folha de enquadramento', g('APAR').temaModo === 'fixo' && g('APAR').temaFixo === 'xnaru2' && enquadros === 1 && renders >= 1, S34(g('APAR').temaFixo));
+      A('aparJogoAjustar')('nao-existe');
+      t('47e: ajustar um jogo que não existe não faz nada', enquadros === 1, '');
+      /* restaurar o padrão guarda os jogos */
+      setg('APAR', N({ jogos: L47, opTopo: 33, trPainel: 50, temaModo: 'tela', arte: { 'xlorc1:topo': 'u:a1' } }));
+      A('aparReset')();
+      t('47e: "Restaurar o padrão" volta as escolhas ao padrão (intensidade, caixas, modo, imagens escolhidas) mas NÃO apaga os jogos criados', S34(Object.keys(g('APAR').jogos)) === '["xlorc1","xnaru2"]' && g('APAR').opTopo === 70 && g('APAR').trPainel === 10 && g('APAR').temaModo === 'auto' && S34(g('APAR').arte) === '{}' && lido().jogos.xlorc1.nome === 'Lorcana', S34(g('APAR')));
+    } finally { restaura(); }
+  });
+
+  await bloco47('f', () => {
+    const restaura = guarda47(), N = A('aparNorm'), CSS = A('aparenciaCSS'), ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      const nb = (re, s) => (s.match(re) || []).length;
+      setg('tela', 'painel'); setg('relJogo', ''); setg('MEUS', { a1: { id: 'a1', nome: 'Mew meu', w: 800, h: 600, em: 1, blob: { size: 5 }, url: 'blob:meu-a1' } });
+      /* o desenho de um jogo criado */
+      const est = N({ jogos: { xlorc1: L47.xlorc1 } });
+      const c = CSS(est, 'xlorc1', false, 170);
+      t('47f: o tema de um jogo criado: nome, letra e cores dele; SEM imagem de topo nem de fundo até a pessoa escolher', c.chave === 'xlorc1' && c.rot === 'Lorcana' && c.letra === 'L' && c.ink === A('aparCoresDe')('#2e86c1').ink && c.topo === null && c.fundo === null, S34(c));
+      t('47f: no tema escuro a tinta do jogo criado clareia (como nos de fábrica)', CSS(est, 'xlorc1', true, 170).ink === A('aparCoresDe')('#2e86c1').inkEsc, '');
+      const est2 = N({ jogos: { xlorc1: L47.xlorc1 }, arte: { 'xlorc1:topo': 'u:a1', 'xlorc1:fundo': 'u:a1' } });
+      const c2 = CSS(est2, 'xlorc1', false, 170);
+      t('47f: uma imagem SUA pode ser o topo e o fundo de um jogo criado (mesma máscara dos de fábrica)', c2.topo && c2.topo.tipo === 'mascara' && c2.topo.url === 'blob:meu-a1' && c2.fundo && c2.fundo.url === 'blob:meu-a1', S34(c2));
+      /* a testada sem imagem de topo continua existindo (senão não haveria onde trocar o tema) */
+      setg('APAR', N({ jogos: { xlorc1: L47.xlorc1 }, temaModo: 'fixo', temaFixo: 'xlorc1' }));
+      const h = A('temaTopoHTML')();
+      t('47f: jogo criado SEM imagem: a testada continua, com o nome, a inicial grande de marca-d\'água e as bolinhas (não some)', h.includes('data-tema="xlorc1"') && h.includes('class="ttLetra"') && h.includes('>Lorcana<') && !h.includes('class="arte"') && nb(/class="ttb/g, h) >= 2, h.slice(0, 220));
+      setg('APAR', N({ arte: { 'pokemon:topo': '' }, temaModo: 'fixo', temaFixo: 'pokemon' }));
+      t('47f: escolher "Nenhuma" no topo de um jogo de fábrica também mantém a testada (antes ela sumia e não dava mais para trocar o tema)', A('temaTopoHTML')().includes('class="ttLetra"') && A('temaTopoHTML')().includes('data-tema="pokemon"'), '');
+      setg('APAR', N({ imagens: false })); const off = A('temaTopoHTML')();
+      setg('APAR', N({ topo: false })); const off2 = A('temaTopoHTML')();
+      t('47f: com "Mostrar imagens" ou "testada" desligados não há testada nenhuma (como antes)', off === '' && off2 === '', '');
+      /* a grade com um jogo criado */
+      setg('APAR', N({ jogos: L47, temaModo: 'fixo', temaFixo: 'xnaru2' }));
+      const g1 = A('temaTopoHTML')(), grade = g1.slice(g1.indexOf('class="ttGrade"'));
+      t('47f: a grade ganha a bolinha de cada jogo criado (L, N), depois da dos de fábrica e antes da ★; a do tema em uso está marcada; o "+" abre a janela de novo jogo',
+        nb(/class="ttb/g, grade) === 10 && /onclick="aparTema\('xlorc1'\)"[^>]*>L</.test(grade) && /class="ttb on"[^>]*onclick="aparTema\('xnaru2'\)"/.test(grade) && grade.indexOf("aparTema('xlorc1')") < grade.indexOf("aparTema('geral')") && grade.indexOf("aparTema('yugioh')") < grade.indexOf("aparTema('xlorc1')") && grade.includes("abrirJogoEditor('','')"), grade.slice(0, 260));
+      t('47f: a legenda diz o tema fixo pelo nome do jogo criado', g1.includes('Padrão desligado: tema fixo · Naruto'), '');
+      const mmOrig = ctx.matchMedia;
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'pokemon' }));
+      const claro = A('temaTopoHTML')();
+      ctx.matchMedia = () => ({ matches: true, addEventListener() {}, addListener() {} });
+      const escuro = A('temaTopoHTML')(); ctx.matchMedia = mmOrig;
+      t('47f: no tema escuro as bolinhas dos jogos usam a tinta CLARA (a escura some no fundo preto): P do Pokémon fica #a9c0ee e no claro #1D3470', /aparTema\('pokemon'\)[^>]*>/.test(claro) && claro.includes('--c:#1D3470') && !claro.includes('--c:#a9c0ee') && escuro.includes('--c:#a9c0ee') && !escuro.includes('--c:#1D3470'), '');
+      /* nome com HTML é escapado em todo lugar */
+      setg('APAR', N({ jogos: { xhtml: { nome: '<b>X</b>"', letra: '<', cor: '#112233' } }, temaModo: 'fixo', temaFixo: 'xhtml' }));
+      const gh = A('temaTopoHTML')();
+      t('47f: nome e letra com sinais de HTML saem escapados na testada, na grade e na legenda (nada é injetado)', !/<b>X<\/b>/.test(gh) && /&lt;b&gt;X&lt;\/b&gt;/.test(gh) && />&lt;</.test(gh.slice(gh.indexOf('ttGrade'))), gh.slice(0, 240));
+      /* a Aparência: bolinhas e painel do jogo criado */
+      setg('APAR', N({ jogos: L47 })); setg('_aparJogoSel', '');
+      A('abrirAparencia')();
+      t('47f: a fileira da Aparência tem uma bolinha por jogo (4 de fábrica + 2 criados + ★) e o "+"; com nenhum aberto só há 6 listas', nb(/class="ttb jc/g, cap) === 8 && /Jogo Lorcana/.test(cap) && /Jogo Naruto/.test(cap) && nb(/<select /g, cap) === 6, String(nb(/class="ttb jc/g, cap)));
+      setg('_aparJogoSel', 'xlorc1'); A('abrirAparencia')(true);
+      t('47f: o painel do jogo criado mostra "(jogo criado por você)", as listas de topo e fundo (só "Nenhuma" e as imagens suas ★ — não há arte de fábrica), "Enquadrar e ajustar", "Editar nome e cor" e "Excluir jogo"',
+        /\(jogo criado por você\)/.test(cap) && /id="aparT_xlorc1"/.test(cap) && /id="aparF_xlorc1"/.test(cap) && !/Mew \(arejado\)|Floresta|Shenlong|Going Merry|Nami/.test(cap.match(/id="aparT_xlorc1"[\s\S]*?<\/select>/)[0]) && /★ Mew meu/.test(cap.match(/id="aparT_xlorc1"[\s\S]*?<\/select>/)[0]) && /Enquadrar e ajustar/.test(cap) && /Editar nome e cor/.test(cap) && /Excluir jogo/.test(cap), '');
+      t('47f: o "Tema fixo" e o texto do "muda com o tempo" da Aparência incluem os jogos criados', /<option value="xlorc1"[^>]*>Lorcana<\/option>/.test(cap) && /gira entre Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh!, Lorcana, Naruto,/.test(cap), '');
+      setg('APAR', N({ jogos: { xhtml: { nome: '<i>Z</i>', letra: 'Z', cor: '#112233' } } })); setg('_aparJogoSel', 'xhtml'); A('abrirAparencia')(true);
+      t('47f: o nome do jogo criado sai escapado na Aparência', !/<i>Z<\/i>/.test(cap) && /&lt;i&gt;Z&lt;\/i&gt;/.test(cap), '');
+      /* escolher imagem de jogo criado pela lista */
+      setg('APAR', N({ jogos: L47 })); A('aparEsc')('xlorc1', 'topo', 'u:a1');
+      t('47f: escolher a imagem de um jogo criado grava a escolha na chave dele', g('APAR').arte['xlorc1:topo'] === 'u:a1' && A('aparEscolha')(g('APAR'), 'xlorc1', 'topo') === 'u:a1', S34(g('APAR').arte));
+      A('aparEsc')('xzz', 'topo', 'u:a1');
+      t('47f: escolha para um jogo que não existe é ignorada', !('xzz:topo' in g('APAR').arte), '');
+    } finally { ctx.document.body.insertAdjacentHTML = ins; setg('_aparJogoSel', ''); restaura(); }
+  });
+
+  await bloco47('g', () => {
+    const restaura = guarda47(), N = A('aparNorm'), d = ctx.document, orig = { de: d.documentElement, body: d.body, ce: d.createElement, geb: d.getElementById }, ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      const lido = () => JSON.parse(ctx.localStorage.getItem('tcg_aparencia') || 'null');
+      const fake = { vars: {}, cls: {}, camada: null };
+      d.documentElement = { style: { setProperty: (k, v) => { fake.vars[k] = v; }, removeProperty: k => { delete fake.vars[k]; } } };
+      d.body = Object.assign({}, orig.body, { classList: { toggle: (c, on) => { fake.cls[c] = !!on; }, add: c => { fake.cls[c] = true; }, remove: c => { fake.cls[c] = false; } }, insertBefore: el => { fake.camada = el; }, firstChild: null });
+      d.createElement = () => ({ style: { cssText: '' }, remove() { fake.camada = null; } });
+      d.getElementById = id => (id === 'temaFundo' ? fake.camada : orig.geb(id));
+      setg('APAR', N({})); setg('tela', 'painel'); setg('relJogo', '');
+      A('aplicaAparencia')();
+      t('47g: por padrão as caixas ficam como antes (10% transparentes: a variável --caixa vale 90%) no Painel', fake.vars['--caixa'] === '90%', S34(fake.vars['--caixa']));
+      A('aparNum')('trPainel', 60);
+      t('47g: mexer na transparência das caixas do PAINEL grava no aparelho e vale na hora (60% transparente = --caixa 40%)', g('APAR').trPainel === 60 && lido().trPainel === 60 && fake.vars['--caixa'] === '40%', S34([lido().trPainel, fake.vars['--caixa']]));
+      setg('tela', 'consultar'); A('aplicaAparencia')();
+      t('47g: as OUTRAS telas têm o nível delas, separado (o do Painel não vale ali: --caixa 90%)', fake.vars['--caixa'] === '90%', S34(fake.vars['--caixa']));
+      A('aparNum')('trOutras', 25);
+      t('47g: mexer no nível das demais telas vale ali (--caixa 75%) e não muda o do Painel', g('APAR').trOutras === 25 && fake.vars['--caixa'] === '75%' && g('APAR').trPainel === 60 && lido().trOutras === 25, S34([g('APAR').trPainel, g('APAR').trOutras]));
+      ['painel', 'consultar', 'contas', 'estoque', 'relatorios', 'lancar', 'simular'].forEach(tl => { setg('tela', tl); A('aplicaAparencia')(); });
+      setg('tela', 'painel'); A('aplicaAparencia')();
+      t('47g: voltar ao Painel traz o nível do Painel de volta (40%)', fake.vars['--caixa'] === '40%', S34(fake.vars['--caixa']));
+      A('aparNum')('trPainel', 500);
+      t('47g: o valor é preso em 80 (500 vira 80)', g('APAR').trPainel === 80 && fake.vars['--caixa'] === '20%', S34(g('APAR').trPainel));
+      A('aparNum')('fonte', 'x');
+      t('47g: o controle de intensidade/transparência só aceita os 4 campos conhecidos', g('APAR').fonte === 'sistema', g('APAR').fonte);
+      /* os controles na tela */
+      d.documentElement = orig.de; d.body = orig.body; d.createElement = orig.ce; d.getElementById = orig.geb;
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      setg('APAR', N({})); setg('tela', 'painel');
+      A('abrirEnquadrar')('topo');
+      t('47g: a folha de edição do tema, aberta no PAINEL, tem a transparência das caixas do Painel (0–80, valor atual 10%) com a explicação de que só as caixas ficam transparentes, e a legenda diz "Painel"',
+        /id="apar_trPainel" type="range" min="0" max="80" value="10"/.test(cap) && /oninput="aparNum\('trPainel',this.value\)"/.test(cap) && /Caixas translúcidas · Painel/.test(cap) && /as letras não/.test(cap) && !/apar_trOutras/.test(cap), cap.slice(0, 120));
+      setg('tela', 'consultar'); A('abrirEnquadrar')('topo');
+      t('47g: aberta em OUTRA tela, a folha mostra o controle das demais telas (e não o do Painel)', /id="apar_trOutras" type="range" min="0" max="80" value="10"/.test(cap) && /Caixas translúcidas · demais telas/.test(cap) && !/apar_trPainel/.test(cap), '');
+      setg('tela', 'painel'); A('abrirAparencia')();
+      t('47g: a tela de Aparência tem os dois controles de transparência, com a explicação (só as caixas, não as letras; precisa do fundo ligado)', /Transparência das caixas do Painel/.test(cap) && /Transparência das caixas das demais telas/.test(cap) && /Só as CAIXAS ficam mais transparentes \(as letras não\)/.test(cap) && /Só se vê onde o tema tem imagem de fundo/.test(cap), '');
+    } finally { d.documentElement = orig.de; d.body = orig.body; d.createElement = orig.ce; d.getElementById = orig.geb; ctx.document.body.insertAdjacentHTML = ins; restaura(); }
+  });
+
+  await bloco47('h', () => {
+    const restaura = guarda47(), N = A('aparNorm'), ins = ctx.document.body.insertAdjacentHTML;
+    try {
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      const pos = x => cap.indexOf(x);
+      setg('tela', 'painel'); setg('relJogo', ''); setg('MEUS', {});
+      /* a folha de editar o tema */
+      setg('APAR', N({ jogos: L47, temaModo: 'fixo', temaFixo: 'xlorc1' }));
+      A('abrirEnquadrar')('topo');
+      t('47h: a folha de um jogo CRIADO SEM imagem tem "Editar nome e cor" e "Excluir jogo" (onde se cria, se edita e se exclui) e avisa que o tema está sem imagem — sem Intensidade, posição e zoom que não mexeriam em nada',
+        /Editar nome e cor/.test(cap) && /Excluir jogo/.test(cap) && /abrirJogoEditor\('xlorc1',''\)/.test(cap) && /aparJogoExclui\('xlorc1'\)/.test(cap) && /Este tema está sem imagem no topo/.test(cap) && !/id="aparaj_x"/.test(cap) && !/id="apar_opTopo"/.test(cap) && /\+ Usar uma imagem minha/.test(cap) && /apar_trPainel/.test(cap), cap.slice(0, 120));
+      setg('MEUS', { a1: { id: 'a1', nome: 'Mew meu', w: 800, h: 600, em: 1, blob: { size: 5 }, url: 'blob:meu-a1' } }); setg('APAR', N({ jogos: L47, temaModo: 'fixo', temaFixo: 'xlorc1', arte: { 'xlorc1:topo': 'u:a1' } }));
+      A('abrirEnquadrar')('topo');
+      t('47h: com imagem escolhida a folha do jogo criado volta a mostrar a Intensidade, a posição e o zoom', /id="apar_opTopo"/.test(cap) && /id="aparaj_x"/.test(cap) && /id="aparaj_z"/.test(cap) && !/está sem imagem/.test(cap), '');
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'pokemon' })); A('abrirEnquadrar')('topo');
+      t('47h: a folha de um jogo de FÁBRICA não oferece editar nem excluir o jogo', !/Editar nome e cor/.test(cap) && !/Excluir jogo/.test(cap) && /id="apar_opTopo"/.test(cap), '');
+      setg('APAR', N({ arte: { 'pokemon:topo': '' }, temaModo: 'fixo', temaFixo: 'pokemon' })); A('abrirEnquadrar')('topo');
+      t('47h: escolher "Nenhuma" no topo também deixa a folha sem controles que não mexem em nada (e com o aviso)', /Este tema está sem imagem no topo/.test(cap) && !/id="aparaj_x"/.test(cap), '');
+      setg('APAR', N({})); A('abrirEnquadrar')('topo');
+      t('47h: na folha, a Intensidade e as Caixas translúcidas vêm ANTES da imagem e dos botões (para tudo aparecer sem rolar no celular), e a folha é mais alta (54% da tela)',
+        pos('id="apar_opTopo"') > 0 && pos('id="apar_opTopo"') < pos('id="apar_trPainel"') && pos('id="apar_trPainel"') < pos('+ Usar uma imagem minha') && pos('+ Usar uma imagem minha') < pos('id="aparaj_x"') && /max-height:54vh/.test(cap), S34([pos('id="apar_opTopo"'), pos('id="apar_trPainel"'), pos('+ Usar uma imagem minha')]));
+      t('47h: o texto da folha diz o alcance verdadeiro: posição e zoom só deste jogo; intensidade e caixas de todos', /Posição e zoom: só deste jogo\. Intensidade e caixas: de todos os jogos/.test(cap), '');
+      /* a tela de Aparência: atalhos no alto */
+      setg('APAR', N({})); setg('_aparJogoSel', 'pokemon'); A('abrirAparencia')();
+      t('47h: no ALTO da Aparência (antes das caixas de marcar) há "+ Novo jogo" e "✥ Editar o tema atual"; e reabrir a tela pelo ⚙ fecha o painel do jogo que estava aberto',
+        pos('+ Novo jogo') > 0 && pos('+ Novo jogo') < pos('Mostrar imagens') && pos('✥ Editar o tema atual') > 0 && pos('✥ Editar o tema atual') < pos('Mostrar imagens') && /abrirJogoEditor\('','apar'\)/.test(cap) && g('_aparJogoSel') === '' && !/id="aparT_pokemon"/.test(cap), S34([pos('+ Novo jogo'), pos('Mostrar imagens'), g('_aparJogoSel')]));
+      setg('_aparJogoSel', 'onepiece'); A('abrirAparencia')(true);
+      t('47h: ...mas redesenhar a própria tela (manter) preserva o painel aberto', g('_aparJogoSel') === 'onepiece' && /id="aparT_onepiece"/.test(cap), '');
+      cap = ''; setg('_aparJogoSel', 'dragonball'); A('aparRedesenha')();
+      t('47h: o redesenho da Aparência (aparRedesenha, o que roda a cada mudança numa lista ou caixa) também mantém o painel do jogo aberto', g('_aparJogoSel') === 'dragonball' && /id="aparT_dragonball"/.test(cap), cap.slice(0, 60));
+    } finally { ctx.document.body.insertAdjacentHTML = ins; setg('_aparJogoSel', ''); restaura(); }
   });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====
