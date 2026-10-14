@@ -956,6 +956,8 @@ module.exports = {
         await clicar(p, '✥', 'bolinha de editar a testada');
         await p.waitForSelector('#aparEnq', { timeout: 5000 });
         t.contem(await p.evaluate(() => document.querySelector('#modal').innerText), 'sem imagem', 'a folha do jogo criado sem imagem avisa que nao ha o que ajustar');
+        const pronto = await p.evaluate(() => { const b = [...document.querySelectorAll('#modal button')].find(x => x.innerText.trim() === 'Pronto'); if (!b) return null; const r = b.getBoundingClientRect(); return { topo: Math.round(r.top), base: Math.round(r.bottom), alt: window.innerHeight }; });
+        t.ok(pronto && pronto.topo >= 0 && pronto.base <= pronto.alt, 'o botao "Pronto" da folha do jogo criado tem de estar a vista, sem rolar a folha, no celular de 390x844 (revisor 14/10: ficava abaixo da tela): ' + JSON.stringify(pronto));
         await clicar(p, '✎ Editar nome e cor');
         await p.waitForSelector('#aparJ_nome', { timeout: 5000 });
         t.igual(await p.locator('#aparJ_nome').inputValue(), 'Lorcana', 'a janela de editar traz o nome guardado');
@@ -978,6 +980,36 @@ module.exports = {
         /* 7) ligar o padrao de novo: a grade some */
         await clicar(p, 'A', 'bolinha do padrao na testada');
         await esperaOu(p, () => document.querySelectorAll('.ttGrade').length === 0, null, 'a grade nao sumiu ao ligar o padrao');
+        t.contem(await legenda(), 'Padrão ligado', 'legenda com o padrao ligado de novo');
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5g2) */
+    {
+      id: 'padrao-religado-devolve-o-tema-sem-filtro',
+      titulo: 'com o padrao ligado criei "Magic" pelo "+ Novo jogo" da Aparencia (ele vira o tema); apertei o "A" para religar o padrao e a testada VOLTOU ao Pokemon (o tema de quando nao ha filtro), nao ficou no Magic',
+      /* a cura: sair do automatico GUARDA o tema "sem filtro" (padraoSem) em qualquer porta, nao so no botao A. O negativo tira essa guarda: religar fica no jogo recem-criado. */
+      negativo: { de: 'if(sai){p.padraoSem=A.temaFixo;p.temaFixo=fixo||temaAtual();}', para: 'if(sai){p.temaFixo=fixo||temaAtual();}' },
+      limiteMs: 60000,
+      async rodar(t) {
+        const p = t.p;
+        await esperarApp(p);
+        const nomeNaFaixa = () => p.evaluate(() => (document.querySelector('.temaTopo .tt b') || {}).innerText || '');
+        const legenda = () => p.evaluate(() => (document.querySelector('.ttModo') || {}).innerText || '');
+        t.igual(await nomeNaFaixa(), 'Pokémon', 'no comeco, sem filtro de jogo, a testada e a do Pokemon');
+        await clicar(p, '⚙', 'engrenagem da testada');
+        await p.waitForSelector('.jogosChips', { timeout: 5000 });
+        await p.locator('#modal button', { hasText: '+ Novo jogo' }).first().click();
+        await p.waitForSelector('#aparJ_nome', { timeout: 5000 });
+        await p.locator('#aparJ_nome').fill('Magic');
+        await clicar(p, 'Criar jogo');
+        await esperaOu(p, () => (document.querySelector('.temaTopo .tt b') || {}).innerText === 'Magic', null, 'depois de criar o jogo a testada nao passou a ser a do Magic');
+        await p.waitForSelector('.jogosChips', { timeout: 5000 });
+        await clicar(p, 'Fechar');
+        t.contem(await legenda(), 'Padrão desligado', 'criar um jogo com o padrao ligado desliga o padrao (o jogo vira o tema fixo)');
+        await clicar(p, 'A', 'bolinha do padrao na testada');
+        await esperaOu(p, () => document.querySelectorAll('.ttGrade').length === 0, null, 'a grade nao sumiu ao religar o padrao');
+        await esperaOu(p, () => (document.querySelector('.temaTopo .tt b') || {}).innerText === 'Pokémon', null, 'ao religar o padrao a testada nao voltou ao Pokemon (ficou no jogo recem-criado)');
         t.contem(await legenda(), 'Padrão ligado', 'legenda com o padrao ligado de novo');
       }
     },

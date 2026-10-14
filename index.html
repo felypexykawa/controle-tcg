@@ -38,7 +38,7 @@ header h1{font-size:16px;font-weight:600}header .sub{font-size:12px;opacity:.75;
 .ttb{width:25px;height:25px;border-radius:50%;border:1.5px solid var(--c,var(--tema-ink,#2A2E48));background:rgba(255,255,255,.55);color:var(--c,var(--tema-ink,#2A2E48));font-size:11px;font-weight:700;line-height:1;padding:0;cursor:pointer}
 .ttb.on{background:var(--c,var(--tema-ink,#2A2E48));color:#fff}
 .ttAj{position:absolute;right:8px;top:8px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.75);color:var(--tema-ink,#2A2E48);font-size:15px;cursor:pointer;padding:0}
-body.comFundoTema :where(.card,.item,.mini):where(:not([style*="sticky"])){background:color-mix(in srgb,var(--card) var(--caixa,90%),transparent)}
+@supports (background:color-mix(in srgb,red 50%,transparent)){body.comFundoTema :where(.card,.item,.mini):where(:not([style*="sticky"])){background:color-mix(in srgb,var(--card) var(--caixa,90%),transparent)}}
 .aparL{display:flex;align-items:center;gap:6px;cursor:pointer}
 .ttCfg{right:8px}
 .temaBloco .temaTopo{margin-bottom:6px}
@@ -2693,7 +2693,7 @@ const TONS=[{id:'padrao',rot:'Padrão do app',bg:''},{id:'quente',rot:'Quente (c
 const TEMA_MODOS=[['auto','Automático (segue o filtro de jogo)'],['fixo','Sempre o mesmo tema'],['tela','Muda a cada tela'],['tempo','Muda com o tempo']];
 const TEMA_MINS=[15,30,60,180,720];
 const TELAS_ROT={painel:'Painel',consultar:'Consultar',contas:'Fluxo de caixa',estoque:'Fluxo de estoque',relatorios:'Relatório',lancar:'Lançar',simular:'Simular'};
-/* JOGO NOVO DE FÁBRICA (Lorcana, Naruto, Magic...): acrescente UMA entrada neste catálogo — rot, sub, letra, cores (ink, inkEsc, ac, bg1, bg2), casa (pedaços do nome que o filtro de jogo usa; '^' = começa com),
+/* JOGO NOVO DE FÁBRICA (Lorcana, Naruto, Magic...): acrescente UMA entrada neste catálogo — rot, sub, letra, cores (ink, inkEsc, ac, bg1, bg2), casa (pedaços do nome que o filtro de jogo usa; palavras inteiras e específicas — "dragon ball", nunca só "dragon" —, senão outro jogo com o mesmo começo é tomado por este),
    artes e padrao — e as imagens em temas/. Testada, listas, rota e filtro leem o catálogo (aparChaves/aparTemaDe/temaChave). Jogo criado PELA PESSOA mora em APAR.jogos (aparTemaUsuario). */
 /* topo = {h,r,t}: altura da imagem (px, numa testada de 170 px), distância da borda DIREITA e do TOPO (px; negativo = a imagem passa da borda); fundo = {py}: posição vertical em % */
 const TEMAS={
@@ -2713,14 +2713,14 @@ const TEMAS={
       'nami-rosto':{rot:'Nami (rosto)',arq:'onepiece-nami-rosto.webp',topo:{h:630,r:-70,t:-60},fundo:{py:25}},
       meu:{rot:'Meu desenho',svg:'meu-onepiece.svg'}},
     padrao:{topo:'going-merry',fundo:'nami-corpo'}},
-  dragonball:{rot:'Dragon Ball',sub:'aura',letra:'D',casa:['dragon'],ink:'#2A2F66',inkEsc:'#b9bdf0',ac:'#D1791F',bg1:'#FFF9ED',bg2:'#F6DCB0',
+  dragonball:{rot:'Dragon Ball',sub:'aura',letra:'D',casa:['dragon ball','dragonball','dragon-ball'],ink:'#2A2F66',inkEsc:'#b9bdf0',ac:'#D1791F',bg1:'#FFF9ED',bg2:'#F6DCB0',
     artes:{
       shenlong:{rot:'Shenlong e Goku',arq:'dragonball-shenlong.webp',topo:{h:745,r:-65,t:-95},fundo:{py:20}},
       'shenlong-esferas':{rot:'Shenlong e Goku (com as esferas)',arq:'dragonball-shenlong-esferas.webp',topo:{h:745,r:-65,t:-95},fundo:{py:20}},
       'shenlong-cartas':{rot:'Shenlong e Goku (esferas viram cartas e moedas)',arq:'dragonball-shenlong-cartas.webp',topo:{h:745,r:-65,t:-95},fundo:{py:20}},
       meu:{rot:'Meu desenho',svg:'meu-dragonball.svg'}},
     padrao:{topo:'shenlong',fundo:'shenlong'}},
-  yugioh:{rot:'Yu-Gi-Oh!',sub:'relicário',letra:'Y',casa:['^yu','yugi'],ink:'#1C2B4A',inkEsc:'#b4c4e6',ac:'#23498A',bg1:'#FBF8EF',bg2:'#EBDDBA',
+  yugioh:{rot:'Yu-Gi-Oh!',sub:'relicário',letra:'Y',casa:['yu-gi','yu gi','yugi'],ink:'#1C2B4A',inkEsc:'#b4c4e6',ac:'#23498A',bg1:'#FBF8EF',bg2:'#EBDDBA',
     artes:{meu:{rot:'Meu desenho',svg:'meu-yugioh.svg'}},padrao:{topo:'meu',fundo:''}}
 };
 function aparNorm(o){o=(o&&typeof o==='object')?o:{};const P=APAR_PADRAO,n=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d;};
@@ -2729,13 +2729,17 @@ function aparNorm(o){o=(o&&typeof o==='object')?o:{};const P=APAR_PADRAO,n=(v,a,
     const nome=String(d.nome==null?'':d.nome).replace(/\s+/g,' ').trim().slice(0,24);if(!nome)return;
     const letra=Array.from(String(d.letra==null?'':d.letra).trim()).slice(0,1).join('').toUpperCase()||Array.from(nome)[0].toUpperCase();
     jogos[k]={nome:nome,letra:letra,cor:/^#[0-9a-fA-F]{6}$/.test(String(d.cor))?String(d.cor).toLowerCase():APAR_COR_PADRAO};});
+  /* jogo CRIADO cujo nome passou a casar com um tema de FÁBRICA (ele criou "Lorcana" e, um dia, o Lorcana entrou no catálogo): as imagens, os ajustes e as escolhas dele migram para o de fábrica e o criado sai — senão ficam duas bolinhas iguais, o filtro vai para a de fábrica vazia e as imagens ficam presas na criada */
+  const mig={};Object.keys(jogos).forEach(k=>{const f=temaChave(jogos[k].nome,{jogos:{}});if(f!=='geral'){mig[k]=f;delete jogos[k];}});
+  const eMig=c=>Object.prototype.hasOwnProperty.call(mig,c),trad=c=>eMig(c)?mig[c]:c;
   const chavesOk=aparChaves({jogos:jogos});
-  const arte={};if(o.arte&&typeof o.arte==='object')Object.keys(o.arte).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k);if(m&&chavesOk.includes(m[1])&&typeof o.arte[k]==='string')arte[k]=o.arte[k];});
-  const aj={};if(o.aj&&typeof o.aj==='object')Object.keys(o.aj).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k),v=o.aj[k];if(m&&chavesOk.includes(m[1])&&v&&typeof v==='object'){const a={x:n(v.x,-300,300,0),y:n(v.y,-300,300,0),z:n(v.z,50,250,100)};if(a.x||a.y||a.z!==100)aj[k]=a;}});
+  const remapa=(src,ok)=>{const r={};if(src&&typeof src==='object')[false,true].forEach(mi=>Object.keys(src).forEach(k=>{const m=/^(\w+):(topo|fundo)$/.exec(k);if(!m||eMig(m[1])!==mi)return;const c=trad(m[1]),kk=c+':'+m[2];if(!chavesOk.includes(c)||(mi&&Object.prototype.hasOwnProperty.call(r,kk)))return;const v=ok(src[k]);if(v!==undefined)r[kk]=v;}));return r;};
+  const arte=remapa(o.arte,v=>typeof v==='string'?v:undefined);
+  const aj=remapa(o.aj,v=>{if(!v||typeof v!=='object')return undefined;const a={x:n(v.x,-300,300,0),y:n(v.y,-300,300,0),z:n(v.z,50,250,100)};return (a.x||a.y||a.z!==100)?a:undefined;});
   return {imagens:o.imagens!==false,topo:o.topo!==false,fundo:o.fundo!==false,opTopo:n(o.opTopo,10,100,P.opTopo),opFundo:n(o.opFundo,0,40,P.opFundo),
     trPainel:n(o.trPainel,0,80,P.trPainel),trOutras:n(o.trOutras,0,80,P.trOutras),
     fonte:FONTES.some(f=>f.id===o.fonte)?o.fonte:P.fonte,fonteEm:o.fonteEm==='app'?'app':'valores',tom:TONS.some(t=>t.id===o.tom)?o.tom:P.tom,
-    temaModo:TEMA_MODOS.some(m=>m[0]===o.temaModo)?o.temaModo:P.temaModo,temaFixo:chavesOk.includes(o.temaFixo)?o.temaFixo:P.temaFixo,padraoSem:chavesOk.includes(o.padraoSem)?o.padraoSem:'',temaMin:TEMA_MINS.includes(+o.temaMin)?+o.temaMin:P.temaMin,aj,arte,jogos};}
+    temaModo:TEMA_MODOS.some(m=>m[0]===o.temaModo)?o.temaModo:P.temaModo,temaFixo:chavesOk.includes(trad(o.temaFixo))?trad(o.temaFixo):(chavesOk.includes(trad(o.padraoSem))?trad(o.padraoSem):P.temaFixo),padraoSem:chavesOk.includes(trad(o.padraoSem))?trad(o.padraoSem):'',temaMin:TEMA_MINS.includes(+o.temaMin)?+o.temaMin:P.temaMin,aj,arte,jogos};}
 let APAR=aparNorm(get(APAR_KEY,{}));
 function aparSalva(){gravaLocal(APAR_KEY,JSON.stringify(APAR));}
 /* ===== JOGOS: o catálogo dos temas é DADO (14/10/2026) =====
@@ -2896,13 +2900,14 @@ function aparNoStorage(e){if(!e||e.key!==APAR_KEY)return;let n={};try{n=JSON.par
 function aparPedePersistir(){try{if(!_aparPersist&&navigator.storage&&navigator.storage.persist){_aparPersist=true;navigator.storage.persist();}}catch(e){}}
 const APAR_ARQ_INPUT='<input type="file" id="aparFile" accept="image/*" style="display:none" onchange="aparArquivoEscolhido(this)">';
 try{if(typeof setTimeout==='function')setTimeout(aparCarregaMeus,0);aparCanal();if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('storage',aparNoStorage);}catch(e){}
-/* o tema de um nome de jogo: 1) os de fábrica, pelos pedaços de `casa`; 2) um jogo CRIADO com exatamente esse nome; 3) um criado cujo nome está contido no pedido; senão a visão geral. Os de fábrica vêm primeiro
+/* o tema de um nome de jogo: 1) os de fábrica, pelos pedaços de `casa`; 2) um jogo CRIADO com exatamente esse nome; 3) um criado cujo nome (3+ letras) aparece como palavra inteira no pedido; senão a visão geral. Os de fábrica vêm primeiro
    porque o NOME do jogo no app costuma ser o mesmo ("Yu-Gi-Oh" sem "!"): um criado com esse nome tirava o tema de fábrica do lugar (por isso criar com nome que já casa com um de fábrica é recusado) */
 function temaChave(nome,est){const s=aparNormaliza(nome);if(!s)return 'geral';est=est||APAR;
-  const bate=function(c){return c.charAt(0)==='^'?s.indexOf(c.slice(1))===0:s.indexOf(c)>=0;},ks=Object.keys(TEMAS),J=est.jogos||{},js=Object.keys(J);
+  const bate=function(c){return s.indexOf(c)>=0;},ks=Object.keys(TEMAS),J=est.jogos||{},js=Object.keys(J);
   for(let i=0;i<ks.length;i++){if(ks[i]!=='geral'&&(TEMAS[ks[i]].casa||[]).some(bate))return ks[i];}
   for(let i=0;i<js.length;i++){if(aparNormaliza(J[js[i]].nome)===s)return js[i];}
-  for(let i=0;i<js.length;i++){const c=aparNormaliza(J[js[i]].nome);if(c&&s.indexOf(c)>=0)return js[i];}
+  const cont=function(t,c){let i=t.indexOf(c);while(i>=0){if(!/[a-z0-9]/.test(i?t.charAt(i-1):' ')&&!/[a-z0-9]/.test(t.charAt(i+c.length)||' '))return true;i=t.indexOf(c,i+1);}return false;};
+  for(let i=0;i<js.length;i++){const c=aparNormaliza(J[js[i]].nome);if(c.length>=3&&cont(s,c))return js[i];}
   return 'geral';}
 /* o jogo em foco: o filtro de jogo da tela atual (Consulta tem o seu; as demais usam o do Painel/Relatórios). Sem filtro = nenhum */
 function jogoFoco(){if(tela==='consultar'&&consJogo&&consJogo!=='todos')return consJogo;return relJogo||'';}
@@ -2971,7 +2976,12 @@ function temaTopoHTML(){const A=APAR;if(!A.imagens||!A.topo)return '';const alt=
   return `<div class="temaBloco"><div class="temaTopo" data-tema="${c.chave}" style="height:${alt}px">${arte}<div class="tt"><b>${aparH(c.rot)}</b><span>${TELAS_ROT[tela]?'tela: '+TELAS_ROT[tela]:''}</span><div class="ttSel" role="group" aria-label="Padrão e edição do tema">${temaBotoesHTML(c.chave)}</div><span class="ttModo">${aparH(aparModoTexto())}</span></div><button class="ttAj ttCfg" onclick="abrirAparencia()" title="Aparência: intensidade, imagens, jogos, fonte e tom do fundo" aria-label="Abrir a aparência">⚙</button></div>${A.temaModo!=='auto'?temaGradeHTML():''}</div>`;}
 function aparRetocaTopo(){try{const c=aparenciaCSS(APAR,temaAtual(),aparEscuro(),aparAltBanner());document.querySelectorAll('.temaTopo .arte').forEach(e=>{if(c.topo&&c.topo.tipo==='mascara')e.style.cssText=aparMascaraCSS(c.topo);});}catch(e){}}
 function aparRedesenha(){let y=0;try{const n=document.querySelector('#modal > div');y=n?n.scrollTop:0;}catch(e){}fecharModal();abrirAparencia(true);try{const n=document.querySelector('#modal > div');if(n)n.scrollTop=y;}catch(e){}}
-function aparSet(campo,v){if(!(campo in APAR_PADRAO)||campo==='arte'||campo==='aj'||campo==='jogos')return;APAR=aparNorm(Object.assign({},APAR,{[campo]:v}));aparSalva();aplicaAparencia();render();}
+/* UMA porta para trocar o modo do tema (botão A, grade, "+ Novo jogo", ✥ do jogo, lista "Como escolher o tema"): ao SAIR do automático guarda o tema de quando não há filtro (padraoSem) e fixa o que está valendo agora (a tela não pula); ao ENTRAR nele devolve esse tema. Antes só o botão A fazia isso — as outras portas perdiam o tema "sem filtro" (revisor 14/10) */
+function aparModoPatch(A,modo,fixo){if(!TEMA_MODOS.some(m=>m[0]===modo))modo=APAR_PADRAO.temaModo;const sai=A.temaModo==='auto'&&modo!=='auto',entra=A.temaModo!=='auto'&&modo==='auto',p={temaModo:modo};
+  if(sai){p.padraoSem=A.temaFixo;p.temaFixo=fixo||temaAtual();}else if(entra){p.temaFixo=A.padraoSem||A.temaFixo;p.padraoSem='';}else if(fixo)p.temaFixo=fixo;
+  return p;}
+function aparModoPara(modo,fixo){APAR=aparNorm(Object.assign({},APAR,aparModoPatch(APAR,modo,fixo)));aparSalva();aplicaAparencia();render();}
+function aparSet(campo,v){if(campo==='temaModo'){aparModoPara(v);return;}if(!(campo in APAR_PADRAO)||campo==='arte'||campo==='aj'||campo==='jogos')return;APAR=aparNorm(Object.assign({},APAR,{[campo]:v}));aparSalva();aplicaAparencia();render();}
 function aparLiga(campo){aparSet(campo,!APAR[campo]);aparRedesenha();}
 /* arrastar o controle NAO redesenha o app inteiro: só reaplica o fundo e acerta a opacidade da faixa que já está na tela */
 function aparNum(campo,v){if(['opTopo','opFundo','trPainel','trOutras'].indexOf(campo)<0)return;APAR=aparNorm(Object.assign({},APAR,{[campo]:v}));aparSalva();const c=aplicaAparencia();
@@ -2980,8 +2990,8 @@ function aparNum(campo,v){if(['opTopo','opFundo','trPainel','trOutras'].indexOf(
 function aparSel(campo,v){aparSet(campo,v);aparRedesenha();}
 function aparEsc(chave,slot,v){if(!aparTemaDe(APAR,chave)||(slot!=='topo'&&slot!=='fundo'))return;aparAtribui(chave,slot,v);aplicaAparencia();render();aparRedesenha();}
 /* 1 toque na grade da testada: este tema, sempre (quem volta ao automático é o "A") */
-function aparTema(chave){if(!aparTemaDe(APAR,chave))return;APAR=aparNorm(Object.assign({},APAR,{temaModo:'fixo',temaFixo:chave}));aparSalva();aplicaAparencia();render();}
-function aparModo(modo){APAR=aparNorm(Object.assign({},APAR,{temaModo:modo}));aparSalva();aplicaAparencia();render();}
+function aparTema(chave){if(!aparTemaDe(APAR,chave))return;aparModoPara('fixo',chave);}
+function aparModo(modo){aparModoPara(modo);}
 /* enquadramento: esquerda/direita, cima/baixo e zoom da imagem do tema em foco, separado para o topo e para o fundo; vale por jogo e por espaço */
 let _enqSlot='topo';
 function aparAj(slot,campo,v){const ch=temaAtual();if(!aparTemaDe(APAR,ch)||(slot!=='topo'&&slot!=='fundo')||(campo!=='x'&&campo!=='y'&&campo!=='z'))return;const k=ch+':'+slot,aj=Object.assign({},APAR.aj),a=Object.assign({x:0,y:0,z:100},aj[k]);a[campo]=+v;aj[k]=a;APAR=aparNorm(Object.assign({},APAR,{aj}));aparSalva();aplicaAparencia();aparRetocaTopo();
@@ -2992,20 +3002,21 @@ function abrirEnquadrar(slot){if(slot==='topo'||slot==='fundo')_enqSlot=slot;_ap
   const aba=(k,rot)=>`<button class="btn ${s===k?'':'g'}" style="flex:1" onclick="abrirEnquadrar('${k}')" title="Ajustar o ${rot.toLowerCase()}">${rot}</button>`;
   const campo=s==='topo'?'opTopo':'opFundo',lim=s==='topo'?[10,100]:[0,40];
   const rngOp=`<div style="display:flex;justify-content:space-between;margin-top:6px"><label for="apar_${campo}"><b>Intensidade</b></label><span id="aparv_${campo}" style="color:var(--mut)">${APAR[campo]}%</span></div><input id="apar_${campo}" type="range" min="${lim[0]}" max="${lim[1]}" value="${APAR[campo]}" oninput="aparNum('${campo}',this.value)" style="width:100%" title="Quanto a imagem aparece (${s==='topo'?'100 = traço cheio':'14 é o padrão do fundo'})">`;
-  const campoCx=tela==='painel'?'trPainel':'trOutras',rngCx=`<div style="display:flex;justify-content:space-between;margin-top:6px"><label for="apar_${campoCx}"><b>Caixas translúcidas · ${tela==='painel'?'Painel':'demais telas'}</b></label><span id="aparv_${campoCx}" style="color:var(--mut)">${APAR[campoCx]}%</span></div><input id="apar_${campoCx}" type="range" min="0" max="80" value="${APAR[campoCx]}" oninput="aparNum('${campoCx}',this.value)" style="width:100%" title="Só as caixas ficam mais transparentes (as letras não); a imagem de fundo do tema aparece através delas">`;
+  const comFundo=!!aparenciaCSS(APAR,temaAtual(),aparEscuro(),aparAltBanner()).fundo,desl=!APAR.imagens?'as imagens':(s==='topo'?(APAR.topo?'':'a testada'):(APAR.fundo?'':'o fundo das telas')),temAj=!!(APAR.aj&&Object.prototype.hasOwnProperty.call(APAR.aj,ch+':'+s));
+  const campoCx=tela==='painel'?'trPainel':'trOutras',rngCx=comFundo?`<div style="display:flex;justify-content:space-between;margin-top:6px"><label for="apar_${campoCx}"><b>Caixas translúcidas · ${tela==='painel'?'Painel':'demais telas'}</b></label><span id="aparv_${campoCx}" style="color:var(--mut)">${APAR[campoCx]}%</span></div><input id="apar_${campoCx}" type="range" min="0" max="80" value="${APAR[campoCx]}" oninput="aparNum('${campoCx}',this.value)" style="width:100%" title="Só as caixas ficam mais transparentes (as letras não); a imagem de fundo do tema aparece através delas">`:'<div class="ctx" style="margin-top:6px">Caixas translúcidas: este tema está sem imagem de fundo agora, então não há o que aparecer atrás delas (nos temas com fundo, como o Pokémon, elas valem).</div>';
   const doJogo=T.usuario?`<div class="acoes" style="flex-wrap:wrap"><button class="btn g" onclick="abrirJogoEditor('${ch}','')" title="Mudar o nome, a letra ou a cor deste jogo">✎ Editar nome e cor</button><button class="btn g" onclick="aparJogoExclui('${ch}')" title="Apagar este jogo (as imagens que você enviou continuam guardadas)">🗑 Excluir jogo</button></div>`:'';
   const posicao=sem?`<div class="ctx">Este tema está sem imagem no ${s}: use "+ Usar uma imagem minha" (ou escolha uma em Aparência) para poder ajustar a posição e a intensidade.</div>`:(svg?'<div class="ctx">Este é o "meu desenho" (SVG): o enquadramento dele é fixo. Escolha uma imagem de traço em Aparência para poder mexer.</div>':rng('x','Esquerda ← → Direita',-300,300,5)+rng('y','Cima ← → Baixo',-300,300,5)+(s==='topo'?rng('z','Zoom',50,250,5):''));
   const h=`<div id="modal" onclick="if(event.target.id==='modal')fecharModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:30;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:14px 16px;max-height:54vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)">
     <div class="head" id="aparEnq">✥ Editar o tema · ${aparH(T.rot)}</div>
     <div class="ctx">Mexa e veja na testada, em cima. Posição e zoom: só deste jogo. Intensidade e caixas: de todos os jogos. Tudo só neste aparelho.</div>
     <div style="display:flex;gap:8px;margin:6px 0">${aba('topo','Topo')}${aba('fundo','Fundo')}</div>
-    ${sem?'':rngOp}
+    ${desl?'':(sem?'':rngOp)}
     ${rngCx}
     <div class="ctx" style="margin-top:8px">Imagem do ${s}: <b>${art?aparH(art.rot):'nenhuma'}</b></div>
     <div class="acoes" style="flex-wrap:wrap"><label class="btn g" for="aparFile" onclick="aparAlvo('novo','','${s}')" title="Escolher uma imagem sua neste aparelho e já usá-la aqui">+ Usar uma imagem minha</label><button class="btn g" onclick="fecharModal();abrirAparencia()" title="Intensidade, minhas imagens, jogos, fonte, tom do fundo e mais">⚙ Todas as opções</button></div>
     ${doJogo}
-    ${posicao}
-    <div class="acoes" style="margin-top:10px"><button class="btn g" onclick="aparAjReset('${s}')" title="Volta o enquadramento deste espaço ao original">↺ Voltar ao original</button><button class="btn g" onclick="fecharModal()">Pronto</button></div>${APAR_ARQ_INPUT}
+    ${desl?`<div class="ctx">Está desligado: ${desl}. Ligue em "⚙ Todas as opções" para ajustar o ${s}.</div>`:posicao}
+    <div class="acoes" style="position:sticky;bottom:0;background:var(--card);padding:8px 0 2px;margin-top:6px">${temAj?`<button class="btn g" onclick="aparAjReset('${s}')" title="Volta o enquadramento deste espaço ao original">↺ Voltar ao original</button>`:''}<button class="btn g" onclick="fecharModal()">Pronto</button></div>${APAR_ARQ_INPUT}
   </div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);}
 
@@ -3036,9 +3047,8 @@ function abrirAparencia(manter){if(manter!==true)_aparJogoSel='';_aparJogoVolta=
     ${rng('trOutras','Transparência das caixas das demais telas',0,80,'O mesmo, separado, para Consultar, Fluxos, Relatório, Lançar e Simular.')}
     <div class="sec" style="margin-top:14px">Qual tema</div>
     ${sel('aparTemaModo','Como escolher o tema',TEMA_MODOS,A.temaModo,"aparSel('temaModo',this.value)",'Automático segue o filtro de jogo; os outros ignoram o filtro. Os botões da testada mudam isto com um toque.')}
-    ${sel('aparTemaFixo','Tema fixo (e tema quando não há filtro de jogo)',aparChaves(A).map(k=>[k,aparH(aparTemaDe(A,k).rot)]),A.temaFixo,"aparSel('temaFixo',this.value)",'Vale em "Sempre o mesmo tema" e no Automático quando nenhum jogo está filtrado.')}
+    ${sel('aparTemaFixo',A.temaModo==='auto'?'Tema quando não há filtro de jogo':'Tema fixo',aparChaves(A).map(k=>[k,aparH(aparTemaDe(A,k).rot)]),A.temaFixo,"aparSel('temaFixo',this.value)",A.temaModo==='auto'?'Vale no Automático quando nenhum jogo está filtrado.':'Vale em "Sempre o mesmo tema". Religando o padrão (A), volta o tema de quando não há filtro'+(A.padraoSem&&aparTemaDe(A,A.padraoSem)?' ('+aparH(aparTemaDe(A,A.padraoSem).rot)+')':'')+'.')}
     ${sel('aparTemaMin','Trocar a cada (no modo "muda com o tempo")',TEMA_MINS.map(m=>[m,m<60?m+' minutos':(m/60)+(m===60?' hora':' horas')]),A.temaMin,"aparSel('temaMin',this.value)",'Com o tempo o tema gira entre '+aparRota(A).map(k=>aparH(aparTemaDe(A,k).rot)).join(', ')+', igual em todas as telas.')}
-    <div class="acoes" style="margin-top:10px"><button class="btn g" onclick="abrirEnquadrar('topo')" title="Mexer na posição e no zoom da imagem do tema atual">✥ Enquadrar a imagem do tema atual</button></div>
     <div class="sec" style="margin-top:14px">Jogos e imagens</div>
     <div class="ctx">Toque na bolinha de um jogo para mudar as imagens dele (de fábrica ou suas), ou em + para criar um jogo novo (Lorcana, Naruto, Magic…). O que você cria sempre pode ser editado e excluído.</div>
     <div class="jogosChips">${chipsJ}</div>${painelJ}
@@ -3051,11 +3061,11 @@ function abrirAparencia(manter){if(manter!==true)_aparJogoSel='';_aparJogoVolta=
   document.body.insertAdjacentHTML('beforeend',h);}
 function aparReset(){APAR=aparNorm({jogos:APAR.jogos});aparSalva();aplicaAparencia();render();aparRedesenha();toast('Aparência: voltou ao padrão ✓');}
 /* "A" da testada: liga/desliga o PADRÃO. Desligar fixa o tema que está valendo agora (a tela não pula), LEMBRA o tema de quando não há filtro (padraoSem) e mostra a grade de jogos; ligar devolve esse tema e volta a seguir o filtro */
-function aparPadrao(){const A=APAR;APAR=aparNorm(Object.assign({},A,A.temaModo==='auto'?{temaModo:'fixo',temaFixo:temaAtual(),padraoSem:A.temaFixo}:{temaModo:'auto',temaFixo:A.padraoSem||A.temaFixo,padraoSem:''}));aparSalva();aplicaAparencia();render();}
+function aparPadrao(){aparModoPara(APAR.temaModo==='auto'?'fixo':'auto');}
 /* ---- jogos criados pela pessoa: criar, editar e excluir (sempre os três) ---- */
 function aparJogoEscolhe(k){_aparJogoSel=(_aparJogoSel===k?'':k);aparRedesenha();}
 /* ✥ do painel de um jogo: passa a usar o jogo como tema e abre a folha de enquadramento dele */
-function aparJogoAjustar(k){if(!aparTemaDe(APAR,k))return;APAR=aparNorm(Object.assign({},APAR,{temaModo:'fixo',temaFixo:k}));aparSalva();aplicaAparencia();render();abrirEnquadrar('topo');}
+function aparJogoAjustar(k){if(!aparTemaDe(APAR,k))return;aparModoPara('fixo',k);abrirEnquadrar('topo');}
 function aparCorSugerida(){const pal=['#c0392b','#2e86c1','#27ae60','#8e44ad','#d68910','#16a085','#cb4335','#5a4fcf'];return pal[Object.keys(APAR.jogos).length%pal.length];}
 function abrirJogoEditor(id,volta){if(typeof volta!=='string')volta='';_aparJogoVolta=volta;fecharModal();
   const d=id?((APAR.jogos&&Object.prototype.hasOwnProperty.call(APAR.jogos,id))?APAR.jogos[id]:null):null;if(id&&!d)return;
@@ -3063,23 +3073,30 @@ function abrirJogoEditor(id,volta){if(typeof volta!=='string')volta='';_aparJogo
   const h=`<div id="modal" onclick="if(event.target.id==='modal')aparJogoCancela()" style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:31;display:flex;align-items:flex-end"><div style="background:var(--card);width:100%;max-width:560px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px;max-height:88vh;overflow:auto">
     <div class="head" id="aparJogoEd">${id?'✎ Editar jogo':'+ Novo jogo'}</div>
     <div class="ctx">Um jogo novo ganha faixa e cores próprias. Quando você filtra por um jogo com esse nome (Lorcana, Naruto, Magic…), o tema dele entra sozinho no modo padrão. Vale só neste aparelho; as imagens dele você escolhe depois.</div>
-    <div style="margin:10px 0 2px"><label for="aparJ_nome"><b>Nome do jogo</b></label></div><input id="aparJ_nome" type="text" maxlength="24" value="${aparH(nome)}" placeholder="Lorcana, Naruto, Magic…" title="O nome tem de ser o mesmo que aparece no filtro de jogo do app" style="width:100%">
-    <div style="margin:10px 0 2px"><label for="aparJ_letra"><b>Letra da bolinha</b></label></div><input id="aparJ_letra" type="text" maxlength="2" value="${aparH(letra)}" placeholder="a inicial do nome" title="Uma letra para a bolinha da testada (se ficar vazia, vale a inicial do nome)" style="width:100%">
+    <div style="margin:10px 0 2px"><label for="aparJ_nome"><b>Nome do jogo</b></label></div><input id="aparJ_nome" type="text" maxlength="24" value="${aparH(nome)}" oninput="aparLetraHint('${id||''}')" placeholder="Lorcana, Naruto, Magic…" title="O nome tem de ser o mesmo que aparece no filtro de jogo do app" style="width:100%">
+    <div style="margin:10px 0 2px"><label for="aparJ_letra"><b>Letra da bolinha</b></label></div><input id="aparJ_letra" type="text" maxlength="2" value="${aparH(letra)}" oninput="aparLetraHint('${id||''}')" placeholder="a inicial do nome" title="Uma letra para a bolinha da testada (se ficar vazia, vale a inicial do nome)" style="width:100%"><div class="ctx" id="aparJ_aviso" style="color:#b35c00">${aparH(aparLetraAviso(APAR,letra,nome,id))}</div>
     <div style="margin:10px 0 2px"><label for="aparJ_cor"><b>Cor do jogo</b></label></div><input id="aparJ_cor" type="color" value="${cor}" title="A cor da faixa, da bolinha e do tom do fundo deste jogo" style="width:100%;height:44px;padding:2px">
     <div class="acoes" style="margin-top:14px;flex-wrap:wrap"><button class="btn" onclick="aparJogoSalva('${id||''}')" title="${id?'Guardar as mudanças':'Criar o jogo e já usar o tema dele'}">${id?'Salvar':'Criar jogo'}</button><button class="btn g" onclick="aparJogoCancela()" title="Fechar sem salvar nada">Cancelar</button>${id?`<button class="btn g" onclick="aparJogoExclui('${id}')" title="Apagar este jogo (as imagens que você enviou continuam guardadas)">🗑 Excluir jogo</button>`:''}</div>
   </div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);}
+/* PURA: a letra da bolinha já é de outro jogo (ou é o "A" do botão do padrão)? devolve a frase do aviso, ou '' */
+function aparLetraAviso(est,letra,nome,id){const L=Array.from(String(letra||'').trim().toUpperCase())[0]||Array.from(String(nome||'').trim().toUpperCase())[0]||'';if(!L)return '';
+  if(L==='A')return 'A letra A é a do botão do padrão na testada — use outra para não confundir.';
+  const outro=aparChaves(est).filter(function(k){return k!=='geral'&&k!==id;}).find(function(k){return String(aparTemaDe(est,k).letra).toUpperCase()===L;});
+  return outro?'A letra '+L+' já é a bolinha de '+aparTemaDe(est,outro).rot+' — use outra para não confundir.':'';}
+function aparLetraHint(id){const g=function(x){const e=document.getElementById(x);return e?String(e.value==null?'':e.value):'';},av=document.getElementById('aparJ_aviso');if(av)av.textContent=aparLetraAviso(APAR,g('aparJ_letra'),g('aparJ_nome'),id);}
 function aparJogoCancela(){fecharModal();if(_aparJogoVolta==='apar')abrirAparencia(true);}
 function aparJogoSalva(id){const gv=function(x){const e=document.getElementById(x);return e?String(e.value==null?'':e.value):'';};
   const nome=gv('aparJ_nome').replace(/\s+/g,' ').trim().slice(0,24),letra=Array.from(gv('aparJ_letra').trim()).slice(0,1).join(''),cor=/^#[0-9a-fA-F]{6}$/.test(gv('aparJ_cor'))?gv('aparJ_cor').toLowerCase():APAR_COR_PADRAO;
+  if(id&&!(APAR.jogos&&Object.prototype.hasOwnProperty.call(APAR.jogos,id))){fecharModal();if(_aparJogoVolta==='apar')abrirAparencia(true);toast('Esse jogo foi excluído em outra janela — nada foi salvo');return;}
   if(!nome){toast('Escreva o nome do jogo');return;}
   const n=aparNormaliza(nome);
-  if(aparChaves(APAR).some(function(k){return k!=='geral'&&k!==id&&aparNormaliza(aparTemaDe(APAR,k).rot)===n;})){toast('Já existe um jogo com esse nome');return;}
+  if(aparChaves(APAR).some(function(k){return k!==id&&aparNormaliza(aparTemaDe(APAR,k).rot)===n;})){toast('Já existe um jogo com esse nome');return;}
   const fab=temaChave(nome,{jogos:{}});if(fab!=='geral'){toast('Esse nome já tem tema pronto ('+aparTemaDe(APAR,fab).rot+')');return;}
   if(!id&&Object.keys(APAR.jogos).length>=APAR_MAX_JOGOS){toast('Limite de '+APAR_MAX_JOGOS+' jogos criados — exclua algum antes');return;}
   const novo=!id,k=id||('x'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36)),jogos=Object.assign({},APAR.jogos);
   jogos[k]={nome:nome,letra:letra||Array.from(nome)[0],cor:cor};
-  APAR=aparNorm(Object.assign({},APAR,{jogos:jogos},novo?{temaModo:'fixo',temaFixo:k}:{}));
+  APAR=aparNorm(Object.assign({},APAR,{jogos:jogos},novo?aparModoPatch(APAR,'fixo',k):{}));
   if(!APAR.jogos[k]){toast('Não consegui guardar o jogo');return;}
   if(novo&&_aparJogoVolta==='apar')_aparJogoSel=k;
   aparSalva();fecharModal();aplicaAparencia();render();if(_aparJogoVolta==='apar')abrirAparencia(true);
@@ -7007,11 +7024,11 @@ window.addEventListener('resize',fixAlturaHeader);fixAlturaHeader();
   const marca=()=>{if(tela==='lancar')_lancarDirty=true;};
   v.addEventListener('input',marca);v.addEventListener('change',marca);})();
 /* Carimbo de versão — o build injeta a data; serve pra saber se o navegador está na versão atual */
-const BUILD_TAG='14/10 15h21';
+const BUILD_TAG='14/10 16h22';
 /* carimbo em MILISSEGUNDOS, gravado pelo publicar.sh junto com o de cima. Existe porque o
    carimbo legivel ("20/08 18h55") NAO tem ano nem ordem confiavel — e comparar por
    "e diferente?" fazia o app anunciar versao VELHA como novidade (ver checarVersao). */
-const BUILD_TS=1792002094627;
+const BUILD_TS=1792005780102;
 (function(){const b=document.getElementById('buildTag');if(b)b.textContent='· v '+BUILD_TAG;fixAlturaHeader();})();
 /* Auto-aviso de versão nova. O build grava versao.json ao lado do app; se ele diz um carimbo
    diferente do embutido aqui, mostra a barra "toque pra atualizar" (recarrega com query única).
