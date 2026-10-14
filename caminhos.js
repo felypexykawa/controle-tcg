@@ -278,6 +278,13 @@ function pngDesenho(w, h) {
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pedacoPng('IHDR', ihdr), pedacoPng('IDAT', zlib.deflateSync(lin)), pedacoPng('IEND', Buffer.alloc(0))]);
 }
+/* PNG so de papel branco (barato de gerar e de comprimir): serve para provar o teto de megapixels sem mandar um arquivo gigante */
+function pngBranco(w, h) {
+  const lin = Buffer.alloc((w * 3 + 1) * h, 255);
+  for (let y = 0; y < h; y++) lin[y * (w * 3 + 1)] = 0;
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pedacoPng('IHDR', ihdr), pedacoPng('IDAT', zlib.deflateSync(lin)), pedacoPng('IEND', Buffer.alloc(0))]);
+}
 /* espera uma condicao da tela; estourar o tempo e REPROVA do caminho (nunca pane da maquina) */
 async function esperaOu(p, fn, arg, msg, ms) {
   try { await p.waitForFunction(fn, arg, { timeout: ms || 8000 }); }
@@ -295,6 +302,23 @@ const estatMascara = p => p.evaluate(async () => {
   for (let i = 0; i < n; i++) { const a = d[i * 4 + 3]; if (a > 128) { op++; cor = Math.max(cor, d[i * 4], d[i * 4 + 1], d[i * 4 + 2]); } else if (a < 10) tr++; }
   return { id: m.id, nome: m.nome, w: c.width, h: c.height, opaco: op / n, transparente: tr / n, corMax: cor };
 });
+/* a transparencia (0-255) de UM ponto da primeira imagem guardada, lida de volta por um canvas */
+const ALFA_PT = async xy => { const m = Object.values(MEUS)[0]; if (!m) return -1; const b = await createImageBitmap(await (await fetch(m.url)).blob()); const c = document.createElement('canvas'); c.width = b.width; c.height = b.height; const x = c.getContext('2d'); x.drawImage(b, 0, 0); return x.getImageData(xy[0], xy[1], 1, 1).data[3]; };
+const alfaDoPonto = (p, xy) => p.evaluate(ALFA_PT, xy);
+/* espera ate a condicao sobre o ponto ficar verdadeira; estourar o tempo REPROVA o caminho */
+async function esperaAlfa(p, xy, cond, msg, ms) {
+  const fim = Date.now() + (ms || 8000);
+  for (;;) { const a = await alfaDoPonto(p, xy); if (cond(a)) return a; if (Date.now() > fim) { const r = new Error(msg + ' (ultimo valor lido: ' + a + ')'); r.reprova = true; throw r; } await p.waitForTimeout(150); }
+}
+/* o elemento esta DENTRO da area visivel da folha aberta, sem rolar? (a folha e a caixa branca dentro do #modal) */
+const naVistaDaFolha = (p, f) => p.evaluate(g => {
+  const caixa = document.querySelector('#modal > div'); if (!caixa) return { achou: false, motivo: 'sem folha aberta' };
+  const cr = caixa.getBoundingClientRect();
+  const el = g.id ? caixa.querySelector('#' + g.id) : [...caixa.querySelectorAll(g.tag || '*')].filter(e => (e.innerText || '').includes(g.texto)).sort((a, b) => (a.innerText || '').length - (b.innerText || '').length)[0];
+  if (!el) return { achou: false, motivo: 'nao achei ' + (g.id || g.texto) };
+  const r = el.getBoundingClientRect();
+  return { achou: true, dentro: r.height > 1 && r.top >= cr.top - 1 && r.bottom <= cr.bottom + 1, topo: Math.round(r.top - cr.top), base: Math.round(r.bottom - cr.top), folha: Math.round(cr.height), conteudo: caixa.scrollHeight };
+}, f);
 /* o que esta no IndexedDB do aparelho, lido direto (sem passar pelo app) */
 const guardadasNoAparelho = p => p.evaluate(async () => {
   if (indexedDB.databases) { const bs = await indexedDB.databases(); if (!bs.some(b => b.name === 'tcg_aparencia_img')) return []; }
@@ -701,19 +725,24 @@ module.exports = {
         t.contem(lista, '1 de 12', 'o contador de imagens guardadas');
         t.igual(nomes.join('|'), 'Meu Desenho 1', 'a imagem aparece na lista com o nome do arquivo');
 
-        /* inverter: o que era traco vira fundo (e de volta) */
+        /* inverter: o que era traco vira fundo (e de volta). O ponto de PAPEL e (100,0): a diagonal do desenho passa por (0,0), que e TRACO — e
+           toda espera depois de um clique tem de estar FALSA antes dele (revisor 14/10: a espera pelo (0,0) ja era verdadeira antes do toque).
+           A espera e um laco no runner (p.evaluate aguarda a promessa); predicado async no waitForFunction devolve uma Promise, que e sempre "verdadeira". */
+        const PAPEL = [100, 0], TRACO = [0, 0];
+        t.ok((await alfaDoPonto(p, PAPEL)) < 10 && (await alfaDoPonto(p, TRACO)) > 200, 'antes de inverter o ponto de papel devia ser transparente e o de traco opaco: ' + (await alfaDoPonto(p, PAPEL)) + '/' + (await alfaDoPonto(p, TRACO)));
         await clicar(p, '↔ Inverter', 'botao de inverter da imagem');
-        await esperaOu(p, async () => { const m = Object.values(MEUS)[0]; if (!m) return false; const b = await createImageBitmap(await (await fetch(m.url)).blob()); const c = document.createElement('canvas'); c.width = b.width; c.height = b.height; const x = c.getContext('2d'); x.drawImage(b, 0, 0); return x.getImageData(0, 0, 1, 1).data[3] > 200; }, null,
-          'depois de tocar em Inverter o papel nao ficou opaco (a imagem nao foi invertida)');
+        await esperaAlfa(p, PAPEL, a => a > 200, 'depois de tocar em Inverter o papel nao ficou opaco (a imagem nao foi invertida)');
+        t.ok((await alfaDoPonto(p, TRACO)) < 10, 'invertida, o ponto de traco devia ficar transparente');
         const e2 = await estatMascara(p);
         t.ok(e2.opaco > 0.5, 'invertida, a maior parte da imagem devia ser opaca; veio ' + e2.opaco.toFixed(3));
         t.igual(e2.id, e1.id, 'inverter nao pode trocar o id da imagem (as escolhas dos jogos apontam para ele)');
         await clicar(p, '↔ Inverter', 'botao de inverter da imagem');
-        await esperaOu(p, async () => { const m = Object.values(MEUS)[0]; if (!m) return false; const b = await createImageBitmap(await (await fetch(m.url)).blob()); const c = document.createElement('canvas'); c.width = b.width; c.height = b.height; const x = c.getContext('2d'); x.drawImage(b, 0, 0); return x.getImageData(0, 0, 1, 1).data[3] < 10; }, null,
-          'inverter duas vezes nao devolveu a imagem ao que era (o papel devia voltar a ser transparente)');
+        await esperaAlfa(p, PAPEL, a => a < 10, 'inverter duas vezes nao devolveu a imagem ao que era (o papel devia voltar a ser transparente)');
+        t.ok((await alfaDoPonto(p, TRACO)) > 200, 'inverter duas vezes: o ponto de traco devia voltar a ser opaco');
 
-        /* renomear: o campo de nome da lista */
-        await p.evaluate(() => { const i = document.querySelector('[data-meu] input[type=text]'); i.focus(); i.value = 'Minha Mew'; i.dispatchEvent(new Event('change', { bubbles: true })); });
+        /* renomear: digitando no campo de nome da lista (o evento de mudanca vem quando o campo perde o foco) */
+        await p.locator('[data-meu] input[type=text]').first().fill('Minha Mew');
+        await p.keyboard.press('Tab');
         await esperaOu(p, () => Object.values(MEUS)[0] && Object.values(MEUS)[0].nome === 'Minha Mew', null, 'renomear nao atualizou o nome da imagem');
         g = await guardadasNoAparelho(p);
         t.igual((g || [])[0] && g[0].nome, 'Minha Mew', 'o novo nome tem de estar guardado no aparelho, nao so na tela');
@@ -739,6 +768,118 @@ module.exports = {
         await p.reload();
         await esperarApp(p);
         t.ok(!/blob:/.test(await mascaraDaTestada(p)), 'a imagem excluida voltou depois de fechar e abrir o app');
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5d) */
+    {
+      id: 'minhas-imagens-visiveis-no-celular',
+      titulo: 'no celular (390x844) a intensidade e os botoes de imagem aparecem SEM rolar, na folha do enquadramento e na tela de Aparencia (e o de adicionar continua a vista com imagens na lista)',
+      /* o Felype nao achou os controles ("nao vi onde ficou"): num celular a folha e baixa e o que fica abaixo da dobra nao existe para ele. O clique do
+         runner rola ate o alvo e nao via isso. O negativo encolhe a folha do enquadramento para 14% da altura: nada cabe sem rolar e o caminho tem de reprovar. */
+      negativo: { de: 'max-height:46vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)', para: 'max-height:14vh;overflow:auto;box-shadow:0 -6px 18px rgba(0,0,0,.25)' },
+      limiteMs: 60000,
+      async rodar(t) {
+        const p = t.p;
+        await p.setViewportSize({ width: 390, height: 844 });
+        await p.reload();
+        await esperarApp(p);
+        const exige = async (f, oque) => { const r = await naVistaDaFolha(p, f); t.ok(r.achou, oque + ': ' + r.motivo); t.ok(r.dentro, oque + ' fica ESCONDIDO abaixo da dobra (topo ' + r.topo + ' / base ' + r.base + ' numa folha de ' + r.folha + ' px, conteudo de ' + r.conteudo + ' px)'); };
+
+        /* 1) a folha do enquadramento (aberta pelo botao da testada) */
+        await clicar(p, '✥', 'botao de enquadrar na testada');
+        await exige({ id: 'apar_opTopo' }, 'a Intensidade na folha do enquadramento');
+        await exige({ tag: 'label', texto: '+ Usar uma imagem minha' }, 'o botao "+ Usar uma imagem minha" na folha do enquadramento');
+        await clicar(p, 'Pronto');
+
+        /* 2) a tela de Aparencia (aberta pela engrenagem), sem imagens */
+        await clicar(p, '⚙', 'engrenagem da testada');
+        await exige({ id: 'apar_opTopo' }, 'a Intensidade do topo na tela de Aparencia');
+        await exige({ tag: 'label', texto: '+ Adicionar imagem' }, 'o botao "+ Adicionar imagem" na tela de Aparencia');
+
+        /* 3) com uma imagem na lista o botao de adicionar continua a vista (fica ACIMA da lista) */
+        const [chooser] = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), clicar(p, '+ Adicionar imagem', 'botao de adicionar da tela de Aparencia')]);
+        await chooser.setFiles({ name: 'Celular.png', mimeType: 'image/png', buffer: pngDesenho(200, 150) });
+        await esperaOu(p, () => Object.keys(MEUS).length === 1, null, 'a imagem nao entrou na lista');
+        await p.waitForSelector('[data-meu]', { timeout: 5000 });
+        await exige({ tag: 'label', texto: '+ Adicionar imagem' }, 'o botao "+ Adicionar imagem" com uma imagem na lista');
+        await exige({ id: 'apar_opTopo' }, 'a Intensidade do topo com uma imagem na lista');
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5e) */
+    {
+      id: 'minhas-imagens-duas-janelas',
+      titulo: 'com DUAS janelas do app no mesmo aparelho: a outra e avisada quando eu adiciono/excluo, e editar numa janela que nao soube da exclusao NAO traz a imagem de volta',
+      /* a cura: ler-e-mudar DENTRO da mesma transacao (aparDbAtualiza): imagem que sumiu devolve "sumiu" e nada e gravado. O negativo grava um registro
+         vazio quando a imagem nao existe mais (o defeito do revisor de 14/10: renomear/inverter/trocar ressuscitava o excluido). */
+      negativo: { de: 'if(!r)return;novo=fn(r)||r;st.put(novo);', para: 'novo=fn(r||{id:id})||r;st.put(novo);' },
+      limiteMs: 90000,
+      async rodar(t) {
+        const a = t.p;
+        await esperarApp(a);
+        const ctx = a.context();
+        const b = await ctx.newPage();
+        b.on('dialog', d => d.accept().catch(() => {}));
+        await b.goto(a.url(), { waitUntil: 'load' });
+        await esperarApp(b);
+        const noAr = (p, fn, msg, ms) => esperaOu(p, fn, null, msg, ms);
+        const mascaraBlob = () => { const e = document.querySelector('.temaTopo .arte'); const cs = e ? getComputedStyle(e) : null; return !!cs && /blob:/.test(cs.webkitMaskImage || cs.maskImage || ''); };
+
+        /* 1) adiciono na janela A; a B fica sabendo sem recarregar (lista e testada) */
+        await clicar(a, '✥', 'botao de enquadrar na testada (janela A)');
+        const [chooser] = await Promise.all([a.waitForEvent('filechooser', { timeout: 8000 }), clicar(a, '+ Usar uma imagem minha', 'botao da folha do enquadramento (janela A)')]);
+        await chooser.setFiles({ name: 'Duas.png', mimeType: 'image/png', buffer: pngDesenho(200, 150) });
+        await noAr(a, () => Object.keys(MEUS).length === 1, 'janela A: a imagem nao entrou');
+        await noAr(b, () => Object.keys(MEUS).length === 1, 'janela B NAO foi avisada da imagem nova (a lista dela continua vazia)', 6000);
+        await noAr(b, mascaraBlob, 'janela B nao passou a mostrar a imagem escolhida na janela A (a testada continua a de fabrica)', 6000);
+        await clicar(a, 'Pronto');
+
+        /* 2) a B para de ouvir (simula a mensagem perdida / janela dormindo) e a A exclui */
+        await b.evaluate(() => { try { if (_aparCanal) { _aparCanal.close(); _aparCanal = null; } window.removeEventListener('storage', aparNoStorage); } catch (e) {} });
+        await clicar(a, '⚙', 'engrenagem da testada (janela A)');
+        await clicar(a, '🗑 Excluir', 'botao de excluir (janela A)');
+        await noAr(a, () => Object.keys(MEUS).length === 0, 'janela A: a imagem nao foi excluida');
+        let g = await guardadasNoAparelho(a);
+        t.igual((g || []).length, 0, 'imagens guardadas no aparelho depois de a janela A excluir');
+        t.igual(await b.evaluate(() => Object.keys(MEUS).length), 1, 'a janela B (que parou de ouvir) devia ainda achar que a imagem existe — o cenario da janela desatualizada');
+
+        /* 3) a B, desatualizada, tenta RENOMEAR a imagem que nao existe mais: nao pode ressuscitar */
+        await clicar(b, '⚙', 'engrenagem da testada (janela B)');
+        await b.waitForSelector('[data-meu] input[type=text]', { timeout: 5000 });
+        await b.locator('[data-meu] input[type=text]').first().fill('Fantasma');
+        await b.keyboard.press('Tab');
+        await noAr(b, () => /exclu/i.test((document.getElementById('toast') || {}).textContent || '') || Object.keys(MEUS).length === 0, 'a janela B nao avisou que a imagem foi excluida em outra janela', 6000);
+        await noAr(b, () => Object.keys(MEUS).length === 0, 'a janela B nao releu a lista do aparelho depois do aviso (a imagem excluida continua nela)', 6000);
+        g = await guardadasNoAparelho(a);
+        t.igual((g || []).length, 0, 'a imagem excluida na janela A VOLTOU ao aparelho quando a janela B tentou renomea-la (ressuscitou)');
+        await b.close();
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5f) */
+    {
+      id: 'minhas-imagens-recusa-foto-enorme',
+      titulo: 'uma imagem de mais de 50 megapixels e RECUSADA com aviso, antes de decodificar (nao trava a aba e nao entra na lista)',
+      /* a cura: teto de megapixels antes do desenho no canvas (o revisor mediu +1,5 GB de memoria num PNG de 400 MP com 416 KB). O negativo tira o teto: o
+         navegador decodifica os 52 MP, a imagem entra na lista e o aviso nunca aparece. */
+      negativo: { de: "if(w0*h0>APAR_MAX_PIXELS){cb(new Error('grande'));return;}", para: '' },
+      limiteMs: 90000,
+      async rodar(t) {
+        const p = t.p;
+        await esperarApp(p);
+        await clicar(p, '✥', 'botao de enquadrar na testada');
+        const [chooser] = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), clicar(p, '+ Usar uma imagem minha', 'botao da folha do enquadramento')]);
+        await chooser.setFiles({ name: 'Enorme.png', mimeType: 'image/png', buffer: pngBranco(7200, 7200) });
+        await esperaOu(p, () => /megapixels/.test((document.getElementById('toast') || {}).textContent || ''), null,
+          'a imagem de 51,8 megapixels nao foi recusada com o aviso de tamanho', 20000);
+        t.igual(await p.evaluate(() => Object.keys(MEUS).length), 0, 'imagens na lista depois de recusar a enorme');
+        const g = await guardadasNoAparelho(p);
+        t.igual((g || []).length, 0, 'imagens guardadas no aparelho depois de recusar a enorme');
+        /* e o app continua vivo: uma imagem normal entra logo depois */
+        const [chooser2] = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), clicar(p, '+ Usar uma imagem minha', 'botao da folha do enquadramento')]);
+        await chooser2.setFiles({ name: 'Normal.png', mimeType: 'image/png', buffer: pngDesenho(200, 150) });
+        await esperaOu(p, () => Object.keys(MEUS).length === 1, null, 'depois de recusar a enorme, uma imagem normal nao entrou (o app travou?)', 10000);
       }
     },
 

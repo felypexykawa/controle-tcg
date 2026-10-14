@@ -7206,7 +7206,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   console.log('');
   console.log('=== 46. aparência fase B: minhas imagens (converter, guardar, escolher, trocar, excluir) ===');
   const FUNCS46 = ['aparH', 'aparMeu', 'aparMeusIds', 'aparNomeDoArquivo', 'aparGeomMeu', 'aparArte', 'aparUrl', 'aparPixelsParaAlfa', 'aparMeuEntra', 'aparMeuGrava', 'aparCarregaMeus', 'aparAlvo', 'aparAviso',
-    'aparArquivoEscolhido', 'aparAtribui', 'aparMeuUsa', 'aparMeuNome', 'aparMeuExcluir', 'aparMeusHTML'];
+    'aparArquivoEscolhido', 'aparAtribui', 'aparMeuUsa', 'aparMeuNome', 'aparMeuExcluir', 'aparMeusHTML', 'aparDbAtualiza', 'aparDbAdiciona', 'aparDbAbre', 'aparFalhou', 'aparAvisaOutras', 'aparRefazFaixa', 'aparSincronizaMeus', 'aparNoStorage', 'aparPedePersistir', 'aparMeuInverte', 'aparAjDe', 'aparInverteAlfa', 'aparZeraAj'];
   const faltam46 = FUNCS46.filter(n => { try { return typeof A(n) !== 'function'; } catch (e) { return true; } });
   t('46a: [pré-requisito] o app carregado tem as ' + FUNCS46.length + ' funções desta seção', faltam46.length === 0, 'FALTAM no app: ' + faltam46.join(', '));
   const bloco46 = (rot, corpo) => faltam46.length ? Promise.resolve() : bloco34(rot, corpo, '46');
@@ -7234,17 +7234,23 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
     t('46b: traço claro em fundo escuro: o fundo escuro é detectado pelas bordas, o traço claro vira opaco (238) e o fundo some',
       r2.fundoEscuro === true && d2[44 * 4 + 3] === 238 && d2[3] === 0, S34([r2, d2[44 * 4 + 3], d2[3]]));
     /* "Inverter" = o contrário do que a leitura automática decidiu */
-    const d3 = px46(10, 10, i => (i >= 44 && i <= 48) ? [0, 0, 0, 255] : [255, 255, 255, 255]);
-    P(d3, 10, 10, true);
-    t('46b: com "inverter" o papel vira opaco e o traço some (o contrário da leitura automática)', d3[3] === 255 && d3[44 * 4 + 3] === 0, S34([d3[3], d3[44 * 4 + 3]]));
+    const dInv = new Uint8ClampedArray([10, 20, 30, 0, 40, 50, 60, 255, 70, 80, 90, 100, 1, 2, 3, 40]);
+    const rInv = A('aparInverteAlfa')(dInv);
+    t('46b: inverter uma imagem já convertida troca a transparência de cada ponto pelo oposto (0↔255, 100→155, 40→215) e NÃO mexe na cor; devolve o mesmo conjunto', S34(Array.from(dInv)) === S34([10, 20, 30, 255, 40, 50, 60, 0, 70, 80, 90, 155, 1, 2, 3, 215]) && rInv === dInv, S34(Array.from(dInv)));
+    A('aparInverteAlfa')(dInv);
+    t('46b: inverter duas vezes devolve exatamente a imagem de antes', S34(Array.from(dInv)) === S34([10, 20, 30, 0, 40, 50, 60, 255, 70, 80, 90, 100, 1, 2, 3, 40]), S34(Array.from(dInv)));
+    /* imagem colorida: o conversor avisa (lavado/negativo/silhueta), em vez de sugerir "Inverter" */
+    const dCor = px46(10, 10, i => (i >= 40 && i <= 69) ? [200, 40, 30, 255] : [255, 255, 255, 255]);
+    const rCor = P(dCor, 10, 10);
+    const dCinza = px46(10, 10, i => (i >= 40 && i <= 69) ? [90, 90, 90, 255] : [255, 255, 255, 255]);
+    const rCinza = P(dCinza, 10, 10);
+    t('46b: imagem colorida (30% da área em vermelho forte) é marcada "colorida" e o aviso fala de cor e de traço em fundo branco, sem sugerir Inverter; traço cinza/preto não é colorido',
+      rCor.colorida === true && /muita cor/.test(A('aparAviso')(rCor)) && !/Inverter/.test(A('aparAviso')(rCor)) && rCinza.colorida === false && A('aparAviso')(rCinza) === 'Imagem guardada ✓', S34([rCor, rCinza]));
     /* imagem que já tem transparência (PNG recortado): a transparência dela vale */
     const d4 = px46(10, 10, i => (i % 2 === 0) ? [200, 0, 0, 255] : [10, 200, 10, 0]);
     const r4 = P(d4, 10, 10, false);
     t('46b: PNG com transparência: o recorte dela é mantido (opaco onde era opaco), a cor vira preto, a leitura diz "tem transparência"',
       r4.temAlfa === true && d4[0 * 4 + 3] === 255 && d4[1 * 4 + 3] === 0 && d4[0] === 0 && d4[1 * 4 + 1] === 0 && Math.abs(r4.cobertura - 0.5) < 1e-9, S34([r4, d4.slice(0, 8)]));
-    const d5 = px46(10, 10, i => (i % 2 === 0) ? [200, 0, 0, 255] : [10, 200, 10, 0]);
-    P(d5, 10, 10, true);
-    t('46b: ...e "inverter" troca o recorte (o que era transparente passa a ser opaco)', d5[0 * 4 + 3] === 0 && d5[1 * 4 + 3] === 255, S34(d5.slice(0, 8)));
     /* o cinza do papel não vira mancha: abaixo do corte de 24 é zero; um cinza médio vira meia transparência */
     const d6 = px46(10, 10, i => i === 55 ? [128, 128, 128, 255] : (i === 56 ? [235, 235, 235, 255] : [255, 255, 255, 255]));
     P(d6, 10, 10, false);
@@ -7260,7 +7266,7 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
 
   await bloco46('c', () => {
     const G = A('aparGeomMeu'), N = A('aparNomeDoArquivo');
-    t('46c: foto 4:3 deitada fica inteira na testada: 196 px de altura, encostada à direita, 13 px para cima', S34(G(800, 600)) === '{"h":196,"r":0,"t":-13}', S34(G(800, 600)));
+    t('46c: foto 4:3 deitada: 196 px de altura, encostada à direita, 13 px para cima (no celular de 390 px a área da arte é estreita e corta uns pixels da esquerda, onde a imagem já esmaece)', S34(G(800, 600)) === '{"h":196,"r":0,"t":-13}', S34(G(800, 600)));
     t('46c: imagem quadrada: 260 px de altura e sobe 45 px', S34(G(500, 500)) === '{"h":260,"r":0,"t":-45}', S34(G(500, 500)));
     t('46c: retrato 2:3: 390 px de altura e mostra a parte de cima (sobe só 44 px, não metade)', S34(G(600, 900)) === '{"h":390,"r":0,"t":-44}', S34(G(600, 900)));
     t('46c: retrato muito estreito é limitado a 700 px, e medida inválida usa 4:3', G(100, 500).h === 700 && S34(G(0, 0)) === S34(G(800, 600)), S34([G(100, 500), G(0, 0)]));
@@ -7332,13 +7338,16 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
   });
 
   await bloco46('f', () => {
-    const restaura = guarda46('aparDbPut', 'aparImgProcessa', 'toast');
+    const restaura = guarda46('aparDbAdiciona', 'aparDbAtualiza', 'aparImgProcessa', 'toast', 'aparAvisaOutras', 'aparSincronizaMeus', '_aparPersist'), navOrig = ctx.navigator;
     try {
       const toasts = []; setg('toast', m => { toasts.push(String(m)); });
       const processos = []; let cbProc = null;
-      setg('aparImgProcessa', (f, inv, cb) => { processos.push([f.name, inv]); cbProc = cb; });
-      const puts = []; let putOk = true;
-      setg('aparDbPut', (reg, cb) => { puts.push(reg); cb(putOk); });
+      setg('aparImgProcessa', (f, cb) => { processos.push([f.name]); cbProc = cb; });
+      const puts = []; let putOk = true, motivo = 'erro', sumiu = false, avisos = 0, sincs = 0, persist = 0;
+      setg('aparDbAdiciona', (reg, max, cb) => { puts.push(reg); cb(putOk, putOk ? null : motivo); });
+      setg('aparDbAtualiza', (id, fn, cb) => { const m = g('MEUS')[id]; if (!m || sumiu) { cb(false, 'sumiu'); return; } const n = fn({ id, nome: m.nome, blob: m.blob, w: m.w, h: m.h, em: m.em }) || m; puts.push(n); cb(putOk, putOk ? n : motivo); });
+      setg('aparAvisaOutras', () => { avisos++; }); setg('aparSincronizaMeus', () => { sincs++; });
+      ctx.navigator = { storage: { persist: () => { persist++; return Promise.resolve(true); } } }; setg('_aparPersist', false);
       setg('MEUS', {}); setg('APAR', A('aparNorm')({})); setg('tela', 'painel'); setg('relJogo', '');
       const arq = (nome, tipo, tam) => ({ files: [{ name: nome, type: tipo, size: tam }], value: 'C:\\fakepath\\' + nome });
       let inp = arq('x.pdf', 'application/pdf', 10);
@@ -7351,58 +7360,81 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       t('46f: com 12 imagens guardadas, adicionar mais é recusado pedindo para excluir alguma', processos.length === 0 && /Limite de 12/.test(toasts.pop()), '');
       A('aparAlvo')('trocar', 'm3', '');
       A('aparArquivoEscolhido')(arq('b.png', 'image/png', 100));
-      t('46f: ...mas TROCAR o arquivo de uma que já existe é permitido mesmo no limite', processos.length === 1 && processos[0][0] === 'b.png' && processos[0][1] === false, S34(processos));
+      t('46f: ...mas TROCAR o arquivo de uma que já existe é permitido mesmo no limite', processos.length === 1 && processos[0][0] === 'b.png', S34(processos));
       cbProc(null, { blob: { size: 9 }, w: 400, h: 300, info: { cobertura: 0.2 } });
-      t('46f: trocar o arquivo mantém o id, o nome e a ordem da imagem (as escolhas dos jogos continuam apontando para ela)', puts.length === 1 && puts[0].id === 'm3' && puts[0].nome === 'n3' && puts[0].em === 3 && puts[0].w === 400 && puts[0].h === 300, S34(puts));
+      t('46f: trocar o arquivo mantém o id, o nome e a ordem da imagem (as escolhas dos jogos continuam apontando para ela), troca só o arquivo e as medidas, e avisa as outras janelas',
+        puts.length === 1 && puts[0].id === 'm3' && puts[0].nome === 'n3' && puts[0].em === 3 && puts[0].w === 400 && puts[0].h === 300 && puts[0].blob.size === 9 && avisos === 1, S34([puts, avisos]));
       /* adicionar de verdade (sem limite), já usando no topo do tema atual */
-      setg('MEUS', {}); puts.length = 0; processos.length = 0;
+      setg('MEUS', {}); puts.length = 0; processos.length = 0; avisos = 0;
       A('aparAlvo')('novo', '', 'topo');
       A('aparArquivoEscolhido')(arq('Meu_Mew-1.png', 'image/png', 5000));
       t('46f: ao escolher um arquivo avisa "Preparando a imagem…" e o alvo volta ao padrão (o próximo arquivo não herda o espaço)', /Preparando/.test(toasts[toasts.length - 1]) && g('_aparAlvo').modo === 'novo' && g('_aparAlvo').slot === '', S34(g('_aparAlvo')));
       cbProc(null, { blob: { size: 4000 }, w: 400, h: 300, info: { cobertura: 0.2 } });
       const ids = Object.keys(g('MEUS'));
-      t('46f: adicionar guarda a imagem com o nome do arquivo ("Meu Mew 1") e as medidas, mostra "Imagem guardada ✓" e já a usa no topo do tema atual (Pokémon)',
+      t('46f: adicionar guarda a imagem com o nome do arquivo ("Meu Mew 1") e as medidas, mostra "Imagem guardada ✓", já a usa no topo do tema atual (Pokémon) e avisa as outras janelas',
         ids.length === 1 && /^i[0-9a-z]+$/.test(ids[0]) && g('MEUS')[ids[0]].nome === 'Meu Mew 1' && g('MEUS')[ids[0]].w === 400 && puts.length === 1 && puts[0].id === ids[0]
-        && g('APAR').arte['pokemon:topo'] === 'u:' + ids[0] && toasts[toasts.length - 1] === 'Imagem guardada ✓', S34([ids, g('APAR').arte, toasts.slice(-2)]));
+        && g('APAR').arte['pokemon:topo'] === 'u:' + ids[0] && toasts[toasts.length - 1] === 'Imagem guardada ✓' && avisos === 1, S34([ids, g('APAR').arte, toasts.slice(-2), avisos]));
+      t('46f: depois da primeira imagem guardada pede ao navegador armazenamento persistente (uma vez só, mesmo com mais imagens)', persist === 1, String(persist));
+      A('aparArquivoEscolhido')(arq('Outra.png', 'image/png', 100)); cbProc(null, { blob: { size: 1 }, w: 10, h: 10, info: { cobertura: 0.2 } });
+      t('46f: ...e não pede de novo na segunda', persist === 1 && Object.keys(g('MEUS')).length === 2, String(persist));
       /* falhas */
-      setg('MEUS', {}); puts.length = 0; putOk = false;
+      setg('MEUS', {}); puts.length = 0; putOk = false; avisos = 0;
       A('aparArquivoEscolhido')(arq('c.png', 'image/png', 100)); cbProc(null, { blob: { size: 1 }, w: 10, h: 10, info: { cobertura: 0.2 } });
-      t('46f: se o aparelho não conseguiu guardar (sem espaço), avisa e NÃO deixa a imagem na lista', Object.keys(g('MEUS')).length === 0 && /Não consegui guardar/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
-      putOk = true;
+      t('46f: se o aparelho não conseguiu guardar (sem espaço), avisa e NÃO deixa a imagem na lista nem avisa as outras janelas', Object.keys(g('MEUS')).length === 0 && /Não consegui guardar/.test(toasts[toasts.length - 1]) && avisos === 0, S34(toasts.slice(-1)));
+      motivo = 'limite';
+      A('aparArquivoEscolhido')(arq('c2.png', 'image/png', 100)); cbProc(null, { blob: { size: 1 }, w: 10, h: 10, info: { cobertura: 0.2 } });
+      t('46f: se o limite de 12 estourou NA gravação (duas janelas ao mesmo tempo), o aviso é o do limite, não o de "sem espaço"', /Limite de 12/.test(toasts[toasts.length - 1]) && Object.keys(g('MEUS')).length === 0, S34(toasts.slice(-1)));
+      putOk = true; motivo = 'erro';
       A('aparArquivoEscolhido')(arq('d.png', 'image/png', 100)); cbProc(new Error('x'));
-      t('46f: se a imagem não abre (arquivo estragado), avisa e não guarda nada', Object.keys(g('MEUS')).length === 0 && /Não consegui abrir/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      t('46f: se a imagem não abre (arquivo estragado), avisa — e a mensagem já diz o que fazer com HEIC (salvar como JPG) — e não guarda nada', Object.keys(g('MEUS')).length === 0 && /Não consegui abrir/.test(toasts[toasts.length - 1]) && /HEIC/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      A('aparArquivoEscolhido')(arq('e.png', 'image/png', 100)); cbProc(new Error('grande'));
+      t('46f: imagem de mais de 50 megapixels recebe um aviso próprio (reduzir), não a mensagem genérica', /mais de 50 megapixels/.test(toasts[toasts.length - 1]) && !/HEIC/.test(toasts[toasts.length - 1]), S34(toasts.slice(-1)));
+      /* trocar o arquivo de uma imagem que foi excluída em OUTRA janela: não ressuscita */
+      setg('MEUS', meus46()); sumiu = true; sincs = 0; puts.length = 0;
+      A('aparAlvo')('trocar', 'a1', ''); A('aparArquivoEscolhido')(arq('f.png', 'image/png', 100)); cbProc(null, { blob: { size: 1 }, w: 10, h: 10, info: { cobertura: 0.2 } });
+      t('46f: trocar o arquivo de uma imagem excluída em outra janela NÃO a ressuscita: avisa, relê a lista do aparelho e não grava nada', puts.length === 0 && /excluída em outra janela/.test(toasts[toasts.length - 1]) && sincs === 1, S34([puts, toasts.slice(-1), sincs]));
+      sumiu = false;
       const antesProc = processos.length, antesToast = toasts.length;
       A('aparArquivoEscolhido')({ files: [], value: '' });
       t('46f: escolher "nada" (cancelar a janela de arquivos) não abre nada e não mostra aviso', processos.length === antesProc && toasts.length === antesToast, S34([processos.length, antesProc, toasts.length, antesToast]));
-    } finally { restaura(); }
+    } finally { ctx.navigator = navOrig; restaura(); }
   });
 
   await bloco46('g', () => {
-    const restaura = guarda46('aparDbPut'), N = A('aparNorm');
+    const restaura = guarda46('aparDbAdiciona', 'aparDbAtualiza', 'toast', 'aparAvisaOutras', 'aparSincronizaMeus'), N = A('aparNorm');
     try {
       setg('APAR', N({})); setg('MEUS', meus46());
-      const puts = []; let ok = true; setg('aparDbPut', (reg, cb) => { puts.push(reg); cb(ok); });
+      const toasts = []; setg('toast', m => { toasts.push(String(m)); });
+      const puts = []; let ok = true, sumiu = false, avisos = 0, sincs = 0;
+      setg('aparAvisaOutras', () => { avisos++; }); setg('aparSincronizaMeus', () => { sincs++; });
+      setg('aparDbAtualiza', (id, fn, cb) => { const m = g('MEUS')[id]; if (!m || sumiu) { cb(false, 'sumiu'); return; } const n = fn({ id, nome: m.nome, blob: m.blob, w: m.w, h: m.h, em: m.em }) || m; puts.push(n); cb(ok, ok ? n : 'erro'); });
+      setg('aparDbAdiciona', (reg, max, cb) => { puts.push(reg); cb(ok, ok ? null : 'erro'); });
+      const blob0 = g('MEUS').a1.blob;
       A('aparMeuNome')('a1', '  Novo   nome  ');
-      t('46g: renomear tira os espaços sobrando, guarda no aparelho e atualiza a lista', g('MEUS').a1.nome === 'Novo nome' && puts.length === 1 && puts[0].nome === 'Novo nome' && puts[0].id === 'a1' && puts[0].em === 1, S34([g('MEUS').a1.nome, puts]));
+      t('46g: renomear tira os espaços sobrando, troca SÓ o nome do registro guardado (o arquivo da imagem não é regravado), atualiza a lista e avisa as outras janelas',
+        g('MEUS').a1.nome === 'Novo nome' && puts.length === 1 && puts[0].nome === 'Novo nome' && puts[0].id === 'a1' && puts[0].em === 1 && puts[0].blob === blob0 && avisos === 1, S34([g('MEUS').a1.nome, puts.length, avisos]));
       A('aparMeuNome')('a1', 'Novo nome');
       t('46g: renomear para o mesmo nome não grava de novo', puts.length === 1, String(puts.length));
       A('aparMeuNome')('a1', '   ');
       t('46g: nome vazio vira "Minha imagem"', g('MEUS').a1.nome === 'Minha imagem', g('MEUS').a1.nome);
       ok = false; A('aparMeuNome')('a1', 'Outro');
-      t('46g: se não conseguiu gravar o nome, o nome antigo continua', g('MEUS').a1.nome === 'Minha imagem', g('MEUS').a1.nome);
-      ok = true;
+      t('46g: se não conseguiu gravar o nome, o nome antigo continua e avisa', g('MEUS').a1.nome === 'Minha imagem' && /Não consegui renomear/.test(toasts[toasts.length - 1]), g('MEUS').a1.nome);
+      ok = true; sumiu = true; sincs = 0; puts.length = 0;
+      A('aparMeuNome')('a1', 'Fantasma');
+      t('46g: renomear uma imagem que foi excluída em OUTRA janela não a ressuscita: avisa, relê a lista do aparelho e não grava', puts.length === 0 && g('MEUS').a1.nome === 'Minha imagem' && /excluída em outra janela/.test(toasts[toasts.length - 1]) && sincs === 1, S34([puts, toasts.slice(-1), sincs]));
+      sumiu = false;
       setg('tela', 'painel'); setg('relJogo', 'One Piece');
       A('aparMeuUsa')('b2', 'fundo');
       t('46g: o botão "Fundo · One Piece" da lista usa a imagem no fundo do tema ATUAL (não do Pokémon)', g('APAR').arte['onepiece:fundo'] === 'u:b2' && !('pokemon:fundo' in g('APAR').arte), S34(g('APAR').arte));
       A('aparMeuUsa')('nao-existe', 'topo');
       t('46g: usar uma imagem que não existe não grava nada', !Object.values(g('APAR').arte).includes('u:nao-existe'), '');
-      /* gravar uma nova: id novo, entra na lista com endereço; falha não entra */
-      setg('MEUS', {}); let r = null;
+      /* gravar uma nova: id novo, entra na lista com endereço; falha não entra; limite vem do banco */
+      setg('MEUS', {}); let r = null; puts.length = 0; avisos = 0;
       A('aparMeuGrava')('', 'Teste', { blob: { size: 7 }, w: 30, h: 20 }, (okk, id) => { r = [okk, id]; });
-      t('46g: gravar uma imagem nova cria um id novo, guarda o arquivo e põe na lista com o endereço do arquivo', r && r[0] === true && /^i[0-9a-z]+$/.test(r[1]) && g('MEUS')[r[1]].url === 'blob:x' && g('MEUS')[r[1]].nome === 'Teste' && puts[puts.length - 1].blob.size === 7, S34(r));
+      t('46g: gravar uma imagem nova cria um id novo, guarda o arquivo e põe na lista com o endereço do arquivo', r && r[0] === true && /^i[0-9a-z]+$/.test(r[1]) && g('MEUS')[r[1]].url === 'blob:x' && g('MEUS')[r[1]].nome === 'Teste' && puts[puts.length - 1].blob.size === 7 && avisos === 1, S34(r));
       ok = false; r = null; setg('MEUS', {});
       A('aparMeuGrava')('', 'Teste', { blob: { size: 7 }, w: 30, h: 20 }, (okk, id) => { r = [okk, id]; });
-      t('46g: se o aparelho recusa gravar, o retorno é "não" e a lista continua vazia', r && r[0] === false && Object.keys(g('MEUS')).length === 0, S34(r));
+      t('46g: se o aparelho recusa gravar, o retorno é "não" (com o motivo) e a lista continua vazia', r && r[0] === false && r[1] === 'erro' && Object.keys(g('MEUS')).length === 0, S34(r));
       /* trocar o arquivo de uma imagem existente: o endereço antigo é liberado */
       ok = true; const soltos = []; ctx.URL.revokeObjectURL = u => soltos.push(u);
       setg('MEUS', meus46());
@@ -7479,6 +7511,192 @@ const idsDe=L=>(L||[]).map(m=>m.id).join(',');
       A('aparNum')('opTopo', 40);
       t('46j: mexer na intensidade da folha grava no aparelho (40%)', g('APAR').opTopo === 40, String(g('APAR').opTopo));
     } finally { ctx.document.body.insertAdjacentHTML = ins; restaura(); }
+  });
+
+  await bloco46('k', () => {
+    const restaura = guarda46('render', 'lancarTemRascunho', 'aparRefazTela', 'aparDbTodos'), N = A('aparNorm'), CSS = A('aparenciaCSS'), qs = ctx.document.querySelector;
+    try {
+      /* o enquadramento acompanha a IMAGEM: se ela não existe mais neste aparelho, o zoom feito para ela não vai parar na imagem de fábrica */
+      setg('MEUS', {});
+      const est = N({ arte: { 'pokemon:topo': 'u:zz' }, aj: { 'pokemon:topo': { x: 50, y: 10, z: 220 } } });
+      t('46k: o enquadramento feito para uma imagem sua que NÃO existe mais neste aparelho não vale para a imagem de fábrica que a substitui (o Mew continua em 656 px, não vai a 1443)',
+        S34(A('aparAjDe')(est, 'pokemon', 'topo')) === '{"x":0,"y":0,"z":100}' && CSS(est, 'pokemon', false, 170).topo.tam === 'auto 656px', S34(CSS(est, 'pokemon', false, 170).topo));
+      setg('MEUS', meus46());
+      const est2 = N({ arte: { 'pokemon:topo': 'u:a1' }, aj: { 'pokemon:topo': { x: 50, y: 10, z: 220 } } });
+      const est3 = N({ arte: { 'pokemon:topo': 'mew-denso' }, aj: { 'pokemon:topo': { x: 50, y: 10, z: 220 } } });
+      t('46k: ...mas com a imagem presente (ou numa imagem de fábrica) o enquadramento vale', S34(A('aparAjDe')(est2, 'pokemon', 'topo')) === '{"x":50,"y":10,"z":220}' && S34(A('aparAjDe')(est3, 'pokemon', 'topo')) === '{"x":50,"y":10,"z":220}', '');
+      /* outra janela mudou a escolha (evento "storage") */
+      setg('APAR', N({})); setg('render', () => {}); setg('lancarTemRascunho', () => false); setg('aparRefazTela', () => {});
+      A('aparNoStorage')({ key: 'outra-chave', newValue: JSON.stringify({ opTopo: 33 }) });
+      t('46k: aviso de outra chave do navegador é ignorado', g('APAR').opTopo === 70, String(g('APAR').opTopo));
+      A('aparNoStorage')({ key: 'tcg_aparencia', newValue: JSON.stringify({ opTopo: 33, arte: { 'pokemon:topo': 'u:a1' } }) });
+      t('46k: a escolha feita em OUTRA janela é adotada (intensidade 33 e a imagem u:a1) — sem isso a janela velha regravava por cima o que a outra mudou', g('APAR').opTopo === 33 && g('APAR').arte['pokemon:topo'] === 'u:a1', S34(g('APAR')));
+      A('aparNoStorage')({ key: 'tcg_aparencia', newValue: '{quebrado' });
+      t('46k: valor quebrado vindo de outra janela volta ao padrão em vez de derrubar', S34(g('APAR')) === S34(N({})), S34(g('APAR')));
+      A('aparNoStorage')({ key: 'tcg_aparencia', newValue: JSON.stringify({ opTopo: 20 }) });
+      A('aparNoStorage')({ key: 'tcg_aparencia', newValue: null });
+      A('aparNoStorage')(null);
+      t('46k: outra janela que apagou a aparência (valor nulo) leva esta ao padrão, e aviso vazio não derruba', S34(g('APAR')) === S34(N({})), S34(g('APAR')));
+      /* refazer só a faixa */
+      let renders = 0, rasc = false; setg('render', () => { renders++; }); setg('lancarTemRascunho', () => rasc);
+      setg('tela', 'painel'); setg('relJogo', ''); setg('APAR', N({}));
+      const el = { outerHTML: '<div class="temaTopo">velho</div>' };
+      ctx.document.querySelector = s => (s === '.temaTopo' ? el : null);
+      A('aparRefazFaixa')();
+      t('46k: com a faixa na tela só ELA é refeita (o elemento é trocado) — o app não é redesenhado', /class="temaTopo" data-tema="pokemon"/.test(el.outerHTML) && renders === 0, el.outerHTML.slice(0, 80) + ' / ' + renders);
+      ctx.document.querySelector = () => null;
+      A('aparRefazFaixa')();
+      t('46k: sem faixa na tela (ainda) redesenha o app uma vez', renders === 1, String(renders));
+      rasc = true; renders = 0;
+      A('aparRefazFaixa')();
+      t('46k: com um formulário em digitação NÃO redesenha (não apaga o que a pessoa está escrevendo)', renders === 0, String(renders));
+      rasc = false; renders = 0; setg('APAR', N({ imagens: false }));
+      const el2 = { outerHTML: '<div class="temaTopo">velho</div>' };
+      ctx.document.querySelector = s => (s === '.temaTopo' ? el2 : null);
+      A('aparRefazFaixa')();
+      t('46k: com as imagens desligadas a faixa precisa SUMIR: não troca o elemento, redesenha', el2.outerHTML === '<div class="temaTopo">velho</div>' && renders === 1, String(renders));
+      ctx.document.querySelector = qs;
+      /* sincronizar a lista com o aparelho */
+      setg('MEUS', meus46()); setg('APAR', N({}));
+      const soltos = []; ctx.URL.revokeObjectURL = u => soltos.push(u); ctx.indexedDB = {};
+      let lista = [{ id: 'n1', nome: 'Nova', blob: { size: 3 }, w: 5, h: 6, em: 9 }];
+      setg('aparDbTodos', cb => cb(lista));
+      A('aparSincronizaMeus')();
+      t('46k: outra janela mudou as imagens: a lista daqui é TROCADA pela do aparelho (a excluída lá some, a nova entra) e os endereços antigos são liberados',
+        Object.keys(g('MEUS')).join() === 'n1' && g('MEUS').n1.nome === 'Nova' && soltos.sort().join() === 'blob:meu-a1,blob:meu-b2', S34([Object.keys(g('MEUS')), soltos]));
+      lista = null; A('aparSincronizaMeus')();
+      t('46k: se a leitura do aparelho falha, a lista que já estava aqui não é zerada', Object.keys(g('MEUS')).join() === 'n1', '');
+      /* ao ABRIR o app: a imagem chega e só a faixa é refeita (o formulário que a pessoa já começou fica) */
+      setg('MEUS', {}); setg('APAR', N({ arte: { 'pokemon:topo': 'u:x1' } })); renders = 0;
+      const elx = { outerHTML: '<div class="temaTopo">velho</div>' };
+      ctx.document.querySelector = s => (s === '.temaTopo' ? elx : null);
+      setg('aparDbTodos', cb => cb([{ id: 'x1', nome: 'U', blob: { size: 1 }, w: 4, h: 3, em: 1 }]));
+      A('aparCarregaMeus')();
+      t('46k: ao abrir o app a imagem sua chega e SÓ a faixa é refeita, já com a imagem (o app não é redesenhado)', /blob:x/.test(elx.outerHTML) && /class="temaTopo"/.test(elx.outerHTML) && renders === 0, elx.outerHTML.slice(0, 100) + ' / ' + renders);
+    } finally { ctx.document.querySelector = qs; restaura(); }
+  });
+
+  await bloco46('l', () => {
+    const restaura = guarda46('aparImgInverte', 'aparDbAtualiza', 'aparDbDel', 'toast', 'aparAvisaOutras', 'aparSincronizaMeus', 'render', 'aparRefazTela', '_aparTrab');
+    try {
+      const toasts = []; setg('toast', m => { toasts.push(String(m)); });
+      let avisos = 0, sincs = 0, sumiu = false; setg('aparAvisaOutras', () => { avisos++; }); setg('aparSincronizaMeus', () => { sincs++; });
+      setg('render', () => {}); setg('aparRefazTela', () => {});
+      setg('aparDbAtualiza', (id, fn, cb) => { const m = g('MEUS')[id]; if (!m || sumiu) { cb(false, 'sumiu'); return; } cb(true, fn({ id, nome: m.nome, blob: m.blob, w: m.w, h: m.h, em: m.em })); });
+      const inv = []; let cbInv = null; setg('aparImgInverte', (b, cb) => { inv.push(b); cbInv = cb; });
+      setg('MEUS', meus46()); setg('_aparTrab', false); setg('APAR', A('aparNorm')({}));
+      A('aparMeuInverte')('a1'); A('aparMeuInverte')('a1');
+      t('46l: dois toques seguidos em Inverter invertem UMA vez só (o segundo é ignorado enquanto o primeiro trabalha)', inv.length === 1 && toasts.filter(x => x === 'Invertendo…').length === 1, S34([inv.length, toasts]));
+      cbInv(null, { blob: { size: 5 }, w: 800, h: 600 });
+      t('46l: terminada a inversão mostra "Invertida ✓", avisa as outras janelas e libera o próximo toque', toasts[toasts.length - 1] === 'Invertida ✓' && avisos === 1 && g('_aparTrab') === false && g('MEUS').a1.w === 800, S34([toasts.slice(-1), avisos, g('_aparTrab')]));
+      A('aparMeuInverte')('a1');
+      t('46l: ...e o próximo toque funciona', inv.length === 2, String(inv.length));
+      cbInv(new Error('x'));
+      t('46l: se a inversão falha, avisa e libera (não fica travado para sempre)', /Não consegui inverter/.test(toasts[toasts.length - 1]) && g('_aparTrab') === false, S34(toasts.slice(-1)));
+      A('aparMeuInverte')('a1'); cbInv(new Error('grande'));
+      t('46l: imagem enorme tem aviso próprio ao inverter', /grande demais para inverter/.test(toasts[toasts.length - 1]) && g('_aparTrab') === false, S34(toasts.slice(-1)));
+      A('aparMeuInverte')('a1'); sumiu = true; cbInv(null, { blob: { size: 5 }, w: 10, h: 10 });
+      t('46l: inverter uma imagem excluída em OUTRA janela não a ressuscita: avisa, relê a lista e libera o toque', /excluída em outra janela/.test(toasts[toasts.length - 1]) && sincs === 1 && g('_aparTrab') === false, S34([toasts.slice(-1), sincs]));
+      sumiu = false; avisos = 0;
+      setg('aparDbDel', (id, cb) => { cb(true); }); ctx.confirm = () => true;
+      A('aparMeuExcluir')('b2');
+      t('46l: excluir avisa as outras janelas (para elas não continuarem mostrando a imagem apagada)', avisos === 1 && !g('MEUS').b2, S34([avisos, Object.keys(g('MEUS'))]));
+    } finally { ctx.confirm = () => true; restaura(); }
+  });
+
+  await bloco46('m', async () => {
+    const restaura = guarda46('_aparDb');
+    try {
+      const esp = () => new Promise(r => setTimeout(r, 0));
+      /* um armazenamento de mentira, mas com a regra de verdade das transações: fila de operações e "complete" no fim */
+      const fake = store => ({ transaction: () => {
+        const fila = [], tx = {}, st = {
+          get: id => { const rq = {}; fila.push(() => { rq.result = store[id]; if (rq.onsuccess) rq.onsuccess(); }); return rq; },
+          put: r => { fila.push(() => { store[r.id] = r; }); },
+          count: () => { const rq = {}; fila.push(() => { rq.result = Object.keys(store).length; if (rq.onsuccess) rq.onsuccess(); }); return rq; } };
+        tx.objectStore = () => st;
+        Promise.resolve().then(() => { while (fila.length) fila.shift()(); if (tx.oncomplete) tx.oncomplete(); });
+        return tx; } });
+      const store = { a1: { id: 'a1', nome: 'um', blob: 'B1', w: 1, h: 1, em: 1 } };
+      setg('_aparDb', fake(store));
+      let r1 = null; A('aparDbAtualiza')('a1', x => { x.nome = 'dois'; return x; }, (ok, v) => { r1 = [ok, v && v.nome]; });
+      await esp();
+      t('46m: ler-e-mudar na MESMA transação: imagem que existe muda só o campo pedido (o arquivo fica) e devolve o registro', r1 && r1[0] === true && r1[1] === 'dois' && store.a1.nome === 'dois' && store.a1.blob === 'B1', S34(r1));
+      let r2 = null; A('aparDbAtualiza')('zz', x => { x.nome = 'fantasma'; return x; }, (ok, v) => { r2 = [ok, v]; });
+      await esp();
+      t('46m: imagem que NÃO está mais no aparelho (excluída em outra janela) não é ressuscitada: devolve "sumiu" e o armazenamento fica igual', r2 && r2[0] === false && r2[1] === 'sumiu' && !('zz' in store) && Object.keys(store).join() === 'a1', S34([r2, Object.keys(store)]));
+      let r3 = null; A('aparDbAdiciona')({ id: 'n1', nome: 'x' }, 2, (ok, m) => { r3 = [ok, m]; });
+      await esp();
+      t('46m: adicionar com vaga grava', r3 && r3[0] === true && !!store.n1, S34(r3));
+      let r4 = null; A('aparDbAdiciona')({ id: 'n2', nome: 'y' }, 2, (ok, m) => { r4 = [ok, m]; });
+      await esp();
+      t('46m: com o limite já alcançado NO armazenamento (guardado por outra janela), não grava e diz "limite"', r4 && r4[0] === false && r4[1] === 'limite' && !('n2' in store) && Object.keys(store).length === 2, S34([r4, Object.keys(store)]));
+      const store2 = {}; setg('_aparDb', fake(store2));
+      const res = []; A('aparDbAdiciona')({ id: 'p1' }, 1, (ok, m) => res.push([ok, m])); A('aparDbAdiciona')({ id: 'p2' }, 1, (ok, m) => res.push([ok, m]));
+      await esp();
+      t('46m: dois "adicionar" seguidos com UMA vaga: só o primeiro entra (o limite é conferido dentro da gravação, não antes)', S34(res) === '[[true,null],[false,"limite"]]' && Object.keys(store2).join() === 'p1', S34([res, Object.keys(store2)]));
+      /* abertura do banco: o evento de troca de versão fecha a conexão QUE O RECEBEU */
+      setg('_aparDb', null);
+      const dbs = [], reqs = [], mk = () => { const db = { closed: false, close() { this.closed = true; } }; dbs.push(db); return db; };
+      ctx.indexedDB = { open: () => { const rq = {}; reqs.push(rq); return rq; } };
+      A('aparDbAbre')(() => {}); A('aparDbAbre')(() => {});
+      reqs[0].result = mk(); reqs[0].onsuccess(); reqs[1].result = mk(); reqs[1].onsuccess();
+      dbs[0].onversionchange();
+      t('46m: com duas aberturas ao mesmo tempo, a troca de versão fecha a conexão que recebeu o aviso e NÃO a da outra (que seguiria órfã e bloquearia a próxima versão do banco)', dbs[0].closed === true && dbs[1].closed === false && g('_aparDb') === dbs[1], S34([dbs[0].closed, dbs[1].closed]));
+      dbs[1].onversionchange();
+      t('46m: ...e quando a conexão ativa é a fechada, a próxima operação reabre', dbs[1].closed === true && g('_aparDb') === null, '');
+    } finally { restaura(); }
+  });
+
+  await bloco46('n', async () => {
+    const restaura = guarda46('aparDbAtualiza', 'aparDbAdiciona', 'aparImgProcessa', 'toast', 'aparAvisaOutras', 'aparSincronizaMeus', 'render', 'aparRefazTela', '_aparDb'), N = A('aparNorm'), ins = ctx.document.body.insertAdjacentHTML, indexedDBorig = ctx.indexedDB;
+    try {
+      const toasts = []; setg('toast', m => { toasts.push(String(m)); });
+      let cbProc = null; setg('aparImgProcessa', (f, cb) => { cbProc = cb; });
+      setg('aparDbAtualiza', (id, fn, cb) => { const m = g('MEUS')[id]; cb(true, fn({ id, nome: m.nome, blob: m.blob, w: m.w, h: m.h, em: m.em })); });
+      setg('aparAvisaOutras', () => {}); setg('render', () => {}); setg('aparRefazTela', () => {});
+      /* trocar o ARQUIVO zera o enquadramento das escolhas que apontam para a imagem */
+      setg('MEUS', meus46()); setg('tela', 'painel'); setg('relJogo', '');
+      setg('APAR', N({ temaModo: 'fixo', temaFixo: 'pokemon', arte: { 'pokemon:topo': 'u:a1', 'onepiece:topo': 'u:a1', 'dragonball:topo': 'u:b2' }, aj: { 'pokemon:topo': { x: 30, y: 0, z: 150 }, 'onepiece:topo': { x: 5, y: 0, z: 100 }, 'dragonball:topo': { x: 9, y: 0, z: 100 } } }));
+      A('aparAlvo')('trocar', 'a1', '');
+      A('aparArquivoEscolhido')({ files: [{ name: 'n.png', type: 'image/png', size: 10 }], value: '' });
+      cbProc(null, { blob: { size: 3 }, w: 10, h: 10, info: { cobertura: 0.2 } });
+      t('46n: trocar o ARQUIVO de uma imagem zera o enquadramento das escolhas que apontam para ela (Pokémon e One Piece) e deixa o das escolhas de OUTRA imagem (Dragon Ball)',
+        !('pokemon:topo' in g('APAR').aj) && !('onepiece:topo' in g('APAR').aj) && !!g('APAR').aj['dragonball:topo'] && g('APAR').arte['pokemon:topo'] === 'u:a1', S34(g('APAR').aj));
+      /* nenhum nome herdado do objeto vira imagem em nenhuma porta */
+      const puts = []; setg('aparDbAtualiza', (id, fn, cb) => { puts.push(id); cb(false, 'erro'); });
+      const antes = toasts.length;
+      ['constructor', 'toString', '__proto__'].forEach(id => { A('aparMeuNome')(id, 'x'); A('aparMeuInverte')(id); A('aparMeuUsa')(id, 'topo'); A('aparMeuExcluir')(id); });
+      t('46n: nomes herdados do objeto ("constructor", "toString", "__proto__") não são imagem em NENHUMA porta (renomear, inverter, usar e excluir não chegam ao aparelho, não mostram aviso e não gravam escolha)',
+        puts.length === 0 && toasts.length === antes && Object.values(g('APAR').arte).every(v => !/constructor|toString|__proto__/.test(v)), S34([puts, toasts.slice(antes)]));
+      /* a tela de Aparência */
+      let cap = ''; ctx.document.body.insertAdjacentHTML = (p, h) => { cap = h; };
+      const pos = x => cap.indexOf(x);
+      setg('APAR', N({})); setg('MEUS', meus46());
+      A('abrirAparencia')();
+      t('46n: na tela de Aparência as duas intensidades e "Minhas imagens" vêm ANTES dos seletores de tema e das listas por jogo (no celular o botão de adicionar tem de aparecer sem rolar até o fim)',
+        pos('id="apar_opTopo"') > 0 && pos('id="apar_opTopo"') < pos('Minhas imagens') && pos('Minhas imagens') < pos('id="aparTemaModo"') && pos('id="aparTemaModo"') < pos('Imagem de cada jogo'), S34([pos('id="apar_opTopo"'), pos('Minhas imagens'), pos('id="aparTemaModo"'), pos('Imagem de cada jogo')]));
+      t('46n: o botão "+ Adicionar imagem" fica ACIMA da lista de imagens (com muitas imagens ele não desce para baixo da dobra)', pos('+ Adicionar imagem') > 0 && pos('+ Adicionar imagem') < pos('data-meu='), S34([pos('+ Adicionar imagem'), pos('data-meu=')]));
+      t('46n: o texto de "Minhas imagens" diz o limite verdadeiro: traço escuro em fundo liso funciona; imagem colorida vira silhueta de uma cor só; ficam só no aparelho e só a versão convertida; limpar os dados do navegador apaga',
+        /traço escuro em fundo liso/.test(cap) && /imagem colorida vira uma silhueta de uma cor só/.test(cap) && /só a versão convertida/.test(cap) && /limpar os dados do navegador, elas somem/.test(cap), '');
+      t('46n: "Restaurar o padrão" avisa que as imagens próprias continuam guardadas na lista', /suas imagens continuam guardadas na lista/.test(cap), '');
+      /* a folha do enquadramento */
+      A('abrirEnquadrar')('topo');
+      t('46n: na folha do enquadramento a intensidade e os botões de imagem vêm ANTES dos controles de posição (a folha é baixa no celular)',
+        pos('id="apar_opTopo"') > 0 && pos('id="apar_opTopo"') < pos('+ Usar uma imagem minha') && pos('+ Usar uma imagem minha') < pos('id="aparaj_x"'), S34([pos('id="apar_opTopo"'), pos('+ Usar uma imagem minha'), pos('id="aparaj_x"')]));
+      t('46n: a folha diz a verdade sobre o alcance: posição e zoom só deste jogo, intensidade de todos os jogos', /Posição e zoom valem só para este jogo; a intensidade vale para todos os jogos/.test(cap) && !/Vale só para este jogo, neste aparelho/.test(cap), cap.slice(0, 240));
+      /* a conexão com o aparelho */
+      const fakeAbort = () => ({ transaction: () => { const tx = { objectStore: () => ({ count: () => ({}), put() {}, get: () => ({}) }) }; Promise.resolve().then(() => { if (tx.onabort) tx.onabort(); }); return tx; } });
+      setg('_aparDb', fakeAbort()); let rr = null;
+      A('aparDbAdiciona')({ id: 'x' }, 12, (ok, m) => { rr = [ok, m]; });
+      await new Promise(r => setTimeout(r, 0));
+      t('46n: se a gravação falha (conexão perdida — comum no iOS ao voltar do segundo plano) a conexão guardada é descartada, e a próxima operação reabre em vez de falhar para sempre', rr && rr[0] === false && rr[1] === 'erro' && g('_aparDb') === null, S34([rr, g('_aparDb')]));
+      setg('_aparDb', null); const dbx = { close() {} }, rq = {}; ctx.indexedDB = { open: () => rq };
+      A('aparDbAbre')(() => {}); rq.result = dbx; rq.onsuccess();
+      t('46n: a conexão ficou guardada ao abrir', g('_aparDb') === dbx, '');
+      dbx.onclose();
+      t('46n: conexão que o navegador fecha sozinho (onclose) é esquecida', g('_aparDb') === null, '');
+    } finally { ctx.document.body.insertAdjacentHTML = ins; ctx.indexedDB = indexedDBorig; restaura(); }
   });
 }).catch(e=>{fail++;console.log('  FALHOU  secao 34 explodiu -> '+((e&&e.stack)||e));}).then(async()=>{
   /* ===== 35. ORACULO POR RAZAO DE EVENTOS: DIVIDIR, RECARREGAR, PAGAR E DESMARCAR NAO MUDAM O DINHEIRO (19/09/2026) =====

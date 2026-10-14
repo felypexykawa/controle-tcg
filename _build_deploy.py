@@ -109,12 +109,17 @@ for _f in sorted(_artesTema):
         try: _ET.parse(os.path.join(AQUI,'temas',_f))
         except Exception: _svgRuins.append(_f)
 if _svgRuins: print('  SVG de tema que nao e XML valido (nao carrega como imagem):', ', '.join(_svgRuins))
+# [14/10, Aparencia fase B] o que vai para a nuvem NAO pode citar a aparencia nem as imagens proprias: o trecho de nuvem (do salvarNuvem ao bootNuvem) e lido de verdade, nao so o texto do modulo de imagens
+_ni=chk.find('function salvarNuvem'); _nj=chk.find('function bootNuvem')
+_corpoNuvem=chk[_ni:_nj] if 0<=_ni<_nj else ''
+_nuvemTocaAparencia=bool(re.search(r'(?<![A-Za-z0-9_])(APAR|MEUS|APAR_KEY|APAR_DB|aparSalva|aparNorm)(?![A-Za-z0-9_])|tcg_aparencia',_corpoNuvem))
 checks={
  'aparencia: toda arte citada nos temas existe em temas/ (nenhuma faltando no ar) e ha artes citadas, todas as SVG sao XML valido':bool(_artesTema) and not _artesFalta and not _svgRuins,
  'aparencia: a testada entra no render de TODA tela (nao so no Painel) e o vPainel nao a repete':"document.getElementById('view').innerHTML=temaTopoHTML()+(V[tela]||vPainel)();" in chk and chk.count('${temaTopoHTML()}')==0,
 # [14/10, Aparencia fase B] imagens PROPRIAS: ficam so no aparelho (IndexedDB proprio), entram pelo campo de arquivo so-imagem, sao lidas ao abrir o app, a engrenagem abre a Aparencia e excluir pergunta antes
  'aparencia: minhas imagens — campo de arquivo so de imagem, guardadas no IndexedDB proprio do aparelho (tcg_aparencia_img) e lidas ao abrir o app':'id="aparFile" accept="image/*"' in chk and "indexedDB.open(APAR_DB,1)" in chk and "APAR_DB='tcg_aparencia_img'" in chk and 'setTimeout(aparCarregaMeus,0)' in chk,
  'aparencia: a engrenagem da testada abre a Aparencia e a folha do enquadramento traz a intensidade e a escolha de imagem propria':'class="ttAj ttCfg" onclick="abrirAparencia()"' in chk and '${rngOp}' in chk and "aparAlvo('novo','','${s}')" in chk,
+ 'aparencia: nada de aparencia ou de imagem propria sobe para a nuvem (o trecho do salvarNuvem ao bootNuvem tem tamanho de verdade e nao cita APAR, MEUS nem tcg_aparencia)':len(_corpoNuvem)>3000 and not _nuvemTocaAparencia,
  'aparencia: excluir imagem propria pergunta antes':"if(!confirm('Excluir a imagem \"'+m.nome+'\"?" in chk,
  'apiKey presente':'AIzaSy' in chk,
  'USAR_NUVEM auto-deriva':'const USAR_NUVEM = !!(firebaseConfig' in chk,
