@@ -267,6 +267,42 @@ async function lancarCompra(p, marca, extra) {
   return marca;
 }
 
+/* ---- Aparencia, fase B (14/10/2026): imagens PROPRIAS. Tudo aqui OBSERVA o navegador de verdade (canvas, IndexedDB, arquivo); quem age e sempre o clique. ---- */
+const zlib = require('zlib');
+function crc32(buf) { let crc = 0xFFFFFFFF; for (let n = 0; n < buf.length; n++) { let c = (crc ^ buf[n]) & 0xFF; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); crc = (crc >>> 8) ^ c; } return (crc ^ 0xFFFFFFFF) >>> 0; }
+function pedacoPng(tipo, dados) { const len = Buffer.alloc(4); len.writeUInt32BE(dados.length); const td = Buffer.concat([Buffer.from(tipo, 'latin1'), dados]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); }
+/* PNG de verdade: papel branco com uma faixa diagonal preta (cerca de 5% da area) — o que um desenho de traco em fundo liso e, em miniatura */
+function pngDesenho(w, h) {
+  const lin = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y++) { lin[y * (w * 3 + 1)] = 0; for (let x = 0; x < w; x++) { const v = Math.abs(x * h / w - y) < 4 ? 0 : 255; const o = y * (w * 3 + 1) + 1 + x * 3; lin[o] = v; lin[o + 1] = v; lin[o + 2] = v; } }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pedacoPng('IHDR', ihdr), pedacoPng('IDAT', zlib.deflateSync(lin)), pedacoPng('IEND', Buffer.alloc(0))]);
+}
+/* espera uma condicao da tela; estourar o tempo e REPROVA do caminho (nunca pane da maquina) */
+async function esperaOu(p, fn, arg, msg, ms) {
+  try { await p.waitForFunction(fn, arg, { timeout: ms || 8000 }); }
+  catch (e) { if (e && e.name === 'TimeoutError') { const r = new Error(msg); r.reprova = true; throw r; } throw e; }
+}
+/* a mascara que a testada usa AGORA (o que o dono ve) */
+const mascaraDaTestada = p => p.evaluate(() => { const e = document.querySelector('.temaTopo .arte'); if (!e) return ''; const cs = getComputedStyle(e); return cs.webkitMaskImage || cs.maskImage || ''; });
+/* o arquivo guardado, lido de volta por um canvas: quanto e opaco, quanto e transparente e qual a cor mais clara entre os pontos opacos */
+const estatMascara = p => p.evaluate(async () => {
+  const m = Object.values(MEUS)[0]; if (!m) return null;
+  const bmp = await createImageBitmap(await (await fetch(m.url)).blob());
+  const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+  const x = c.getContext('2d'); x.drawImage(bmp, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height).data, n = c.width * c.height; let op = 0, tr = 0, cor = 0;
+  for (let i = 0; i < n; i++) { const a = d[i * 4 + 3]; if (a > 128) { op++; cor = Math.max(cor, d[i * 4], d[i * 4 + 1], d[i * 4 + 2]); } else if (a < 10) tr++; }
+  return { id: m.id, nome: m.nome, w: c.width, h: c.height, opaco: op / n, transparente: tr / n, corMax: cor };
+});
+/* o que esta no IndexedDB do aparelho, lido direto (sem passar pelo app) */
+const guardadasNoAparelho = p => p.evaluate(async () => {
+  if (indexedDB.databases) { const bs = await indexedDB.databases(); if (!bs.some(b => b.name === 'tcg_aparencia_img')) return []; }
+  return await new Promise(res => { const rq = indexedDB.open('tcg_aparencia_img'); rq.onerror = () => res(null);
+    rq.onsuccess = () => { const db = rq.result; try { const r = db.transaction('imgs', 'readonly').objectStore('imgs').getAll();
+      r.onsuccess = () => { db.close(); res(r.result.map(x => ({ id: x.id, nome: x.nome, w: x.w, h: x.h, tipo: x.blob && x.blob.type, tam: x.blob && x.blob.size }))); }; r.onerror = () => res(null); } catch (e) { res(null); } }; });
+});
+
 /* ------------------------------------------------------------------ caminhos */
 const BASE_CONTROLES = path.join(__dirname, 'caminhos-controles.json');
 const TELAS_VARRIDAS = ['Painel', 'Consultar', 'Fluxo de caixa', 'Fluxo de estoque', 'Relatório', 'Simular', 'Lançar'];
@@ -615,6 +651,94 @@ module.exports = {
           t.contem(txt, 'xl/worksheets/sheet2.xml', 'porta ' + porta + ': a planilha baixada nao tem a aba Compras');
           t.contem(txt, marca, 'porta ' + porta + ': o lancamento feito agora nao aparece dentro da planilha baixada');
         }
+      }
+    },
+
+    /* ----------------------------------------------------------------- (5c) */
+    {
+      id: 'minhas-imagens-do-adicionar-ao-excluir',
+      titulo: 'adicionei uma imagem MINHA pela testada: ela vira o topo, vira mascara de verdade, sobrevive a fechar e abrir o app, e inverter / renomear / trocar o arquivo / excluir funcionam',
+      /* a cura: ao abrir o app, as imagens guardadas no aparelho sao lidas (aparCarregaMeus). O negativo tira essa leitura: depois de
+         recarregar a testada volta para a imagem de fabrica e o caminho tem de reprovar. */
+      negativo: { de: 'setTimeout(aparCarregaMeus,0);', para: '0;' },
+      limiteMs: 90000,
+      async rodar(t) {
+        const p = t.p;
+        await esperarApp(p);
+        const f1 = { name: 'Meu_Desenho-1.png', mimeType: 'image/png', buffer: pngDesenho(200, 150) };
+
+        /* 1) pela testada: o botao de enquadrar abre a folha e, nela, "+ Usar uma imagem minha" abre a janela de arquivos */
+        await clicar(p, '✥', 'botao de enquadrar na testada');
+        const [chooser] = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), clicar(p, '+ Usar uma imagem minha', 'botao da folha do enquadramento')]);
+        await chooser.setFiles(f1);
+        await esperaOu(p, () => /blob:/.test((() => { const e = document.querySelector('.temaTopo .arte'); return e ? (getComputedStyle(e).webkitMaskImage || getComputedStyle(e).maskImage || '') : ''; })()), null,
+          'depois de escolher o arquivo, a testada nao passou a usar a imagem escolhida (a mascara continua sendo a de fabrica)');
+        const folha = await p.evaluate(() => (document.getElementById('modal') || {}).innerText || '');
+        t.contem(folha.replace(/\s+/g, ' '), 'Imagem do topo: Meu Desenho 1', 'a folha do enquadramento mostra o nome da imagem em uso (o nome vem do arquivo, sem a extensao)');
+        const e1 = await estatMascara(p);
+        t.ok(!!e1, 'a imagem nao entrou na lista do aparelho');
+        t.ok(e1.w === 200 && e1.h === 150, 'a imagem guardada perdeu as medidas (' + e1.w + 'x' + e1.h + ')');
+        t.ok(e1.transparente > 0.5 && e1.opaco > 0.01 && e1.opaco < 0.5, 'a conversao nao virou mascara: opaco ' + e1.opaco.toFixed(3) + ' e transparente ' + e1.transparente.toFixed(3) + ' (o papel branco devia sumir e o traco ficar)');
+        t.ok(e1.corMax <= 24, 'os pontos do traco nao ficaram pretos (cor mais clara entre os opacos: ' + e1.corMax + ')');
+        let g = await guardadasNoAparelho(p);
+        t.igual((g || []).length, 1, 'imagens guardadas no IndexedDB do aparelho depois de adicionar');
+        await clicar(p, 'Pronto');
+
+        /* 2) fechar e abrir o app: a imagem e a escolha continuam */
+        await p.reload();
+        await esperarApp(p);
+        await esperaOu(p, () => /blob:/.test((() => { const e = document.querySelector('.temaTopo .arte'); return e ? (getComputedStyle(e).webkitMaskImage || getComputedStyle(e).maskImage || '') : ''; })()), null,
+          'depois de fechar e abrir o app a testada voltou para a imagem de fabrica: a imagem minha nao foi lida do aparelho');
+        g = await guardadasNoAparelho(p);
+        t.igual((g || []).length, 1, 'imagens guardadas no aparelho depois de recarregar');
+
+        /* 3) pela Aparencia (engrenagem da testada): a lista mostra a imagem e os controles de editar */
+        await clicar(p, '⚙', 'engrenagem da testada');
+        await p.waitForSelector('#aparFile', { state: 'attached', timeout: 5000 });
+        const lista = await p.evaluate(() => ((document.getElementById('modal') || {}).innerText || '').replace(/\s+/g, ' ').toLowerCase());
+        const nomes = await p.evaluate(() => [...document.querySelectorAll('[data-meu] input[type=text]')].map(i => i.value));
+        t.contem(lista, 'minhas imagens', 'a tela de Aparencia tem a lista "Minhas imagens"');
+        t.contem(lista, '1 de 12', 'o contador de imagens guardadas');
+        t.igual(nomes.join('|'), 'Meu Desenho 1', 'a imagem aparece na lista com o nome do arquivo');
+
+        /* inverter: o que era traco vira fundo (e de volta) */
+        await clicar(p, '↔ Inverter', 'botao de inverter da imagem');
+        await esperaOu(p, async () => { const m = Object.values(MEUS)[0]; if (!m) return false; const b = await createImageBitmap(await (await fetch(m.url)).blob()); const c = document.createElement('canvas'); c.width = b.width; c.height = b.height; const x = c.getContext('2d'); x.drawImage(b, 0, 0); return x.getImageData(0, 0, 1, 1).data[3] > 200; }, null,
+          'depois de tocar em Inverter o papel nao ficou opaco (a imagem nao foi invertida)');
+        const e2 = await estatMascara(p);
+        t.ok(e2.opaco > 0.5, 'invertida, a maior parte da imagem devia ser opaca; veio ' + e2.opaco.toFixed(3));
+        t.igual(e2.id, e1.id, 'inverter nao pode trocar o id da imagem (as escolhas dos jogos apontam para ele)');
+        await clicar(p, '↔ Inverter', 'botao de inverter da imagem');
+        await esperaOu(p, async () => { const m = Object.values(MEUS)[0]; if (!m) return false; const b = await createImageBitmap(await (await fetch(m.url)).blob()); const c = document.createElement('canvas'); c.width = b.width; c.height = b.height; const x = c.getContext('2d'); x.drawImage(b, 0, 0); return x.getImageData(0, 0, 1, 1).data[3] < 10; }, null,
+          'inverter duas vezes nao devolveu a imagem ao que era (o papel devia voltar a ser transparente)');
+
+        /* renomear: o campo de nome da lista */
+        await p.evaluate(() => { const i = document.querySelector('[data-meu] input[type=text]'); i.focus(); i.value = 'Minha Mew'; i.dispatchEvent(new Event('change', { bubbles: true })); });
+        await esperaOu(p, () => Object.values(MEUS)[0] && Object.values(MEUS)[0].nome === 'Minha Mew', null, 'renomear nao atualizou o nome da imagem');
+        g = await guardadasNoAparelho(p);
+        t.igual((g || [])[0] && g[0].nome, 'Minha Mew', 'o novo nome tem de estar guardado no aparelho, nao so na tela');
+
+        /* trocar o arquivo: mesma imagem (mesmo id e nome), outro arquivo (retrato 100x200) */
+        const [chooser2] = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), clicar(p, '↺ Trocar arquivo', 'botao de trocar o arquivo')]);
+        await chooser2.setFiles({ name: 'outro.png', mimeType: 'image/png', buffer: pngDesenho(100, 200) });
+        await esperaOu(p, () => Object.values(MEUS)[0] && Object.values(MEUS)[0].w === 100, null, 'trocar o arquivo nao atualizou a imagem (as medidas continuam as do arquivo antigo)');
+        const e3 = await estatMascara(p);
+        t.igual(e3.id, e1.id, 'trocar o arquivo tem de manter o id da imagem');
+        t.igual(e3.nome, 'Minha Mew', 'trocar o arquivo tem de manter o nome que a pessoa deu');
+        t.ok(/blob:/.test(await mascaraDaTestada(p)), 'depois de trocar o arquivo a testada deixou de usar a imagem minha');
+
+        /* 4) excluir: pergunta (aceita pelo runner), some da lista, da testada e do aparelho */
+        await clicar(p, '🗑 Excluir', 'botao de excluir da imagem');
+        await esperaOu(p, () => Object.keys(MEUS).length === 0, null, 'excluir nao tirou a imagem da lista');
+        const aviso = (p.__dialogos || []).filter(d => d.tipo === 'confirm');
+        t.aoMenos(1, aviso, 'pergunta de confirmacao antes de excluir');
+        const depois = await mascaraDaTestada(p);
+        t.ok(!/blob:/.test(depois) && /pokemon-mew-arejado/.test(depois), 'depois de excluir a testada tem de voltar para a imagem de fabrica; a mascara e: ' + depois.slice(0, 120));
+        g = await guardadasNoAparelho(p);
+        t.igual((g || []).length, 0, 'imagens guardadas no aparelho depois de excluir');
+        await p.reload();
+        await esperarApp(p);
+        t.ok(!/blob:/.test(await mascaraDaTestada(p)), 'a imagem excluida voltou depois de fechar e abrir o app');
       }
     },
 

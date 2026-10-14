@@ -112,6 +112,10 @@ if _svgRuins: print('  SVG de tema que nao e XML valido (nao carrega como imagem
 checks={
  'aparencia: toda arte citada nos temas existe em temas/ (nenhuma faltando no ar) e ha artes citadas, todas as SVG sao XML valido':bool(_artesTema) and not _artesFalta and not _svgRuins,
  'aparencia: a testada entra no render de TODA tela (nao so no Painel) e o vPainel nao a repete':"document.getElementById('view').innerHTML=temaTopoHTML()+(V[tela]||vPainel)();" in chk and chk.count('${temaTopoHTML()}')==0,
+# [14/10, Aparencia fase B] imagens PROPRIAS: ficam so no aparelho (IndexedDB proprio), entram pelo campo de arquivo so-imagem, sao lidas ao abrir o app, a engrenagem abre a Aparencia e excluir pergunta antes
+ 'aparencia: minhas imagens — campo de arquivo so de imagem, guardadas no IndexedDB proprio do aparelho (tcg_aparencia_img) e lidas ao abrir o app':'id="aparFile" accept="image/*"' in chk and "indexedDB.open(APAR_DB,1)" in chk and "APAR_DB='tcg_aparencia_img'" in chk and 'setTimeout(aparCarregaMeus,0)' in chk,
+ 'aparencia: a engrenagem da testada abre a Aparencia e a folha do enquadramento traz a intensidade e a escolha de imagem propria':'class="ttAj ttCfg" onclick="abrirAparencia()"' in chk and '${rngOp}' in chk and "aparAlvo('novo','','${s}')" in chk,
+ 'aparencia: excluir imagem propria pergunta antes':"if(!confirm('Excluir a imagem \"'+m.nome+'\"?" in chk,
  'apiKey presente':'AIzaSy' in chk,
  'USAR_NUVEM auto-deriva':'const USAR_NUVEM = !!(firebaseConfig' in chk,
  'SEED vazio':'const SEED=[];' in chk,
